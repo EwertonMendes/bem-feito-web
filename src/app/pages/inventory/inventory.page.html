@@ -1,0 +1,42 @@
+<section class="bf-page">
+  <header class="bf-page-header">
+    <div><h1>Estoque</h1><p>Saldo atual, mínimos, negativos e histórico completo de cada movimentação.</p></div>
+  </header>
+
+  <div class="summary">
+    <div><strong>{{ catalog.products().length }}</strong><span>produtos</span></div>
+    <div class="danger"><strong>{{ catalog.negativeProducts().length }}</strong><span>negativos</span></div>
+    <div class="warning"><strong>{{ catalog.lowStockProducts().length }}</strong><span>produtos baixos</span></div>
+    <div><strong>{{ catalog.lowStockInputs().length }}</strong><span>insumos baixos</span></div>
+  </div>
+
+  <div class="toolbar">
+    <div class="bf-segments"><button [class.active]="tab()==='product'" (click)="tab.set('product')">Produtos</button><button [class.active]="tab()==='input'" (click)="tab.set('input')">Insumos</button></div>
+    <label class="search"><bf-icon name="search" /><input type="search" placeholder="Buscar" [value]="search()" (input)="search.set($any($event.target).value)" /></label>
+  </div>
+
+  <div class="stock-list">
+    @if(tab()==='product'){
+      @for(item of filteredProducts();track item.id){
+        <article class="stock-card"><bf-catalog-image [path]="item.imagePath" [alt]="item.displayName" [compact]="true" /><div class="identity"><strong>{{item.displayName}}</strong><span>{{item.code}}</span></div><div class="balance" [class.bad]="item.stock<0" [class.low]="item.stock>=0 && item.stock<=item.minimumStock"><strong>{{item.stock}}</strong><span>mín. {{item.minimumStock}}</span></div><div class="stock-actions"><button class="bf-button secondary" (click)="openHistory('product',item.id)">Histórico</button><button class="bf-button" (click)="openAdjustment('product',item.id)">Ajustar</button></div></article>
+      } @empty {<div class="bf-empty"><div><strong>Nenhum produto</strong><p>Cadastre produtos no Catálogo.</p></div></div>}
+    } @else {
+      @for(item of filteredInputs();track item.id){
+        <article class="stock-card"><div class="input-mark">{{item.name.slice(0,1)}}</div><div class="identity"><strong>{{item.name}}</strong><span>{{item.code}} · {{unitName(item.unitId)}}</span></div><div class="balance" [class.bad]="item.stock<0" [class.low]="item.stock>=0 && item.stock<=item.minimumStock"><strong>{{item.stock}}</strong><span>mín. {{item.minimumStock}}</span></div><div class="cost"><strong>{{currency(item.averageUnitCostCents)}}</strong><span>custo médio</span></div><div class="stock-actions"><button class="bf-button secondary" (click)="openHistory('input',item.id)">Histórico</button><button class="bf-button" (click)="openAdjustment('input',item.id)">Ajustar</button></div></article>
+      } @empty {<div class="bf-empty"><div><strong>Nenhum insumo</strong><p>Cadastre insumos no Catálogo.</p></div></div>}
+    }
+  </div>
+
+  <dialog #adjustmentDialog class="bf-dialog">
+    <div class="bf-dialog-header"><div><h2>Ajustar estoque</h2><small>{{selectedName()}}</small></div><button class="bf-icon-button" (click)="adjustmentDialog.close()"><bf-icon name="close" /></button></div>
+    <div class="bf-dialog-body"><div class="callout">Use número positivo para entrada e negativo para saída. Ajustes ficam registrados no histórico.</div><div class="bf-grid two"><label class="bf-field"><span>Quantidade (+/-)</span><input class="bf-input" type="number" step="0.001" [formField]="adjustmentForm.quantity" /></label><label class="bf-field"><span>Data</span><input class="bf-input" type="date" [formField]="adjustmentForm.businessDate" /></label><label class="bf-field full"><span>Motivo</span><textarea class="bf-textarea" [formField]="adjustmentForm.reason" placeholder="Inventário, perda, amostra, correção..."></textarea></label></div></div>
+    <div class="bf-dialog-footer"><button class="bf-button secondary" (click)="adjustmentDialog.close()">Cancelar</button><button class="bf-button" (click)="saveAdjustment()">Registrar ajuste</button></div>
+  </dialog>
+
+  <dialog #historyDialog class="bf-dialog">
+    <div class="bf-dialog-header"><div><h2>Histórico de estoque</h2><small>{{selectedName()}}</small></div><button class="bf-icon-button" (click)="historyDialog.close()"><bf-icon name="close" /></button></div>
+    <div class="bf-dialog-body history">
+      @for(move of store.movements();track move.id){<div class="movement"><div><strong>{{date(move.businessDate)}}</strong><span>{{movementSource(move.sourceType)}}</span></div><strong [class.positive]="move.quantityDelta>0" [class.negative]="move.quantityDelta<0">{{move.quantityDelta>0?'+':''}}{{move.quantityDelta}}</strong></div>} @empty {<div class="bf-empty"><div><strong>Sem movimentações</strong><p>Este item ainda não possui histórico.</p></div></div>}
+    </div>
+  </dialog>
+</section>

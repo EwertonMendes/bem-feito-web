@@ -39,10 +39,33 @@ export class DriveIntegrationService {
       const config = await this.repository.getConfig();
       this.configState.set(config);
       this.loaded = true;
-      this.statusState.set(config?.enabled ? 'disconnected' : 'unconfigured');
       this.errorState.set(null);
+
+      if (!config?.enabled) {
+        this.statusState.set('unconfigured');
+        this.configRevision.update((value) => value + 1);
+        return;
+      }
+
+      await this.auth.waitForUser();
+      if (!this.driveAuth.currentToken()) {
+        this.statusState.set('disconnected');
+        this.configRevision.update((value) => value + 1);
+        return;
+      }
+
+      await this.verifyAccount();
+      await this.verifyConfiguredFolder(config);
+      this.statusState.set('connected');
       this.configRevision.update((value) => value + 1);
     } catch (error) {
+      if (error instanceof DriveApiError && error.status === 401) {
+        this.driveAuth.invalidate();
+        this.statusState.set('disconnected');
+        this.errorState.set(null);
+        this.configRevision.update((value) => value + 1);
+        return;
+      }
       this.fail(error);
     }
   }
@@ -122,8 +145,9 @@ export class DriveIntegrationService {
   }
 
   private async verifyAccount(): Promise<void> {
+    const firebaseUser = await this.auth.waitForUser();
     const driveUser = await this.driveApi.currentUser();
-    const firebaseEmail = this.auth.user()?.email?.trim().toLowerCase();
+    const firebaseEmail = firebaseUser?.email?.trim().toLowerCase();
     const driveEmail = driveUser.emailAddress.trim().toLowerCase();
     if (!firebaseEmail || firebaseEmail !== driveEmail) {
       this.driveAuth.invalidate();

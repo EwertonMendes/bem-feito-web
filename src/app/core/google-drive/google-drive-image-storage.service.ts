@@ -20,7 +20,7 @@ export class GoogleDriveImageStorageService extends ImageStoragePort {
   readonly revision = this.integration.revision;
 
   async resolve(image?: CatalogImageRef): Promise<string | null> {
-    if (!this.enabled || !image || image.provider !== 'google-drive' || !this.auth.currentToken()) return null;
+    if (!this.enabled || !image || image.provider !== 'google-drive' || !this.integration.connected() || !this.auth.currentToken()) return null;
 
     const key = this.cacheKey(image);
     const cached = this.urlCache.get(key);

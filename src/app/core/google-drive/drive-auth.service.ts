@@ -1,5 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
+import { Auth, onAuthStateChanged } from 'firebase/auth';
 import { environment } from '../../../environments/environment';
+import { FIREBASE_AUTH } from '../firebase/firebase.providers';
 import { ExternalScriptLoaderService } from './external-script-loader.service';
 
 interface OAuthTokenResponse {
@@ -20,12 +22,26 @@ interface GoogleIdentityWindow {
         initTokenClient(config: {
           client_id: string;
           scope: string;
+          login_hint?: string;
           callback: (response: OAuthTokenResponse) => void;
           error_callback?: () => void;
         }): OAuthTokenClient;
       };
     };
   };
+}
+
+interface DriveTokenSession {
+  value: string;
+  expiresAt: number;
+  firebaseUid: string;
+}
+
+interface StoredDriveSession {
+  accessToken: string;
+  expiresAt: number;
+  firebaseUid: string;
+  accountEmail?: string;
 }
 
 class DriveOAuthError extends Error {
@@ -43,9 +59,11 @@ export class DriveAuthorizationRequiredError extends Error {
 @Injectable({ providedIn: 'root' })
 export class DriveAuthService {
   private readonly scripts = inject(ExternalScriptLoaderService);
-  private readonly tokenState = signal<{ value: string; expiresAt: number } | null>(null);
+  private readonly firebaseAuth = inject<Auth>(FIREBASE_AUTH);
+  private readonly tokenState = signal<DriveTokenSession | null>(null);
   private readonly accountState = signal<string | null>(null);
   private readonly revisionState = signal(0);
+  private readonly storageKey = `bem-feito:google-drive:${environment.name}`;
   private pending?: Promise<string>;
 
   readonly enabled = environment.googleDrive.enabled;
@@ -56,10 +74,29 @@ export class DriveAuthService {
   readonly accountEmail = this.accountState.asReadonly();
   readonly revision = this.revisionState.asReadonly();
 
+  constructor() {
+    this.restoreSession();
+    onAuthStateChanged(this.firebaseAuth, (user) => {
+      const token = this.tokenState();
+      if (!user) {
+        if (token) this.invalidate();
+        return;
+      }
+      if (token && token.firebaseUid !== user.uid) this.invalidate();
+    });
+  }
+
   currentToken(): string | null {
     const token = this.tokenState();
     if (!token || token.expiresAt <= Date.now() + 60_000) {
       if (token) this.invalidate();
+      return null;
+    }
+
+    const user = this.firebaseAuth.currentUser;
+    if (!user) return null;
+    if (token.firebaseUid !== user.uid) {
+      this.invalidate();
       return null;
     }
     return token.value;
@@ -90,11 +127,13 @@ export class DriveAuthService {
 
   setAccountEmail(email: string): void {
     this.accountState.set(email);
+    this.persistSession();
   }
 
   invalidate(): void {
     this.tokenState.set(null);
     this.accountState.set(null);
+    this.removeStoredSession();
     this.revisionState.update((value) => value + 1);
   }
 
@@ -104,10 +143,14 @@ export class DriveAuthService {
     const oauth = google?.accounts?.oauth2;
     if (!oauth) throw new Error('Google Identity Services indisponível.');
 
+    const firebaseUser = this.firebaseAuth.currentUser;
+    if (!firebaseUser) throw new Error('Entre no Bem Feito antes de conectar o Google Drive.');
+
     return new Promise<string>((resolve, reject) => {
       const client = oauth.initTokenClient({
         client_id: environment.googleDrive.clientId,
         scope: 'https://www.googleapis.com/auth/drive.file',
+        login_hint: firebaseUser.email ?? undefined,
         callback: (response) => {
           if (!response.access_token) {
             reject(new DriveOAuthError(
@@ -117,7 +160,12 @@ export class DriveAuthService {
             return;
           }
           const expiresIn = Math.max(60, Number(response.expires_in ?? 3600));
-          this.tokenState.set({ value: response.access_token, expiresAt: Date.now() + expiresIn * 1000 });
+          this.tokenState.set({
+            value: response.access_token,
+            expiresAt: Date.now() + expiresIn * 1000,
+            firebaseUid: firebaseUser.uid,
+          });
+          this.persistSession();
           this.revisionState.update((value) => value + 1);
           resolve(response.access_token);
         },
@@ -125,5 +173,55 @@ export class DriveAuthService {
       });
       client.requestAccessToken({ prompt });
     });
+  }
+
+  private restoreSession(): void {
+    try {
+      const raw = sessionStorage.getItem(this.storageKey);
+      if (!raw) return;
+      const stored = JSON.parse(raw) as Partial<StoredDriveSession>;
+      if (
+        typeof stored.accessToken !== 'string' ||
+        typeof stored.expiresAt !== 'number' ||
+        typeof stored.firebaseUid !== 'string' ||
+        stored.expiresAt <= Date.now() + 60_000
+      ) {
+        this.removeStoredSession();
+        return;
+      }
+
+      this.tokenState.set({
+        value: stored.accessToken,
+        expiresAt: stored.expiresAt,
+        firebaseUid: stored.firebaseUid,
+      });
+      if (typeof stored.accountEmail === 'string') this.accountState.set(stored.accountEmail);
+    } catch {
+      this.removeStoredSession();
+    }
+  }
+
+  private persistSession(): void {
+    const token = this.tokenState();
+    if (!token) return;
+    try {
+      const stored: StoredDriveSession = {
+        accessToken: token.value,
+        expiresAt: token.expiresAt,
+        firebaseUid: token.firebaseUid,
+        accountEmail: this.accountState() ?? undefined,
+      };
+      sessionStorage.setItem(this.storageKey, JSON.stringify(stored));
+    } catch {
+      return;
+    }
+  }
+
+  private removeStoredSession(): void {
+    try {
+      sessionStorage.removeItem(this.storageKey);
+    } catch {
+      return;
+    }
   }
 }

@@ -13,7 +13,7 @@ O app usa autorização OAuth incremental com o escopo `https://www.googleapis.c
 - Google Drive decide se a conta Google pode acessar fisicamente a pasta e os arquivos.
 - O app confere se o e-mail autorizado no Drive é o mesmo e-mail autenticado no Firebase.
 
-Access tokens ficam somente em memória. Nunca grave access token, refresh token, client secret, cookies ou credenciais de service account em Firestore, localStorage, sessionStorage, IndexedDB, Git ou logs.
+O access token fica em memória e também é espelhado temporariamente em `sessionStorage` somente para sobreviver a recarregamentos da mesma aba. Ele é curto, limitado a `drive.file`, removido quando expira, quando o Firebase faz logout, quando a conta Firebase muda ou quando o Drive devolve `401`. Nunca grave refresh token, client secret, cookies ou credenciais de service account em Firestore, localStorage, IndexedDB, Git ou logs.
 
 OAuth Client ID, Picker API Key restrita e Cloud Project Number são identificadores públicos de uma SPA. A API Key deve ser limitada aos origins e APIs necessários.
 
@@ -117,9 +117,11 @@ A leitura usa blob privado, cache em memória e carregamento próximo ao viewpor
 
 ## Sessão OAuth
 
-O consentimento `drive.file` não deve aparecer a cada uso enquanto a concessão continuar válida. O access token, porém, é curto e propositalmente não é persistido.
+O consentimento `drive.file` não deve aparecer a cada uso enquanto a concessão continuar válida.
 
-Depois de um reload completo, nova sessão do navegador ou expiração do token, pode ser necessário clicar em **Conectar Drive** novamente. Quando o consentimento já existe, a tendência é obter uma nova autorização sem repetir a tela de consentimento.
+Para evitar que um simples F5 derrube as imagens, o access token atual é mantido em `sessionStorage` até a expiração. No reload da mesma aba, o app restaura o token, valida novamente a conta Google e a pasta configurada e só então libera a leitura das imagens.
+
+O token não é mantido após logout, troca de conta, expiração, resposta `401` do Drive ou encerramento da sessão da aba. Como o fluxo client-side do Google não entrega um refresh token durável para a SPA, depois da expiração ainda pode ser necessário clicar em **Conectar Drive**. Esse botão reutiliza o consentimento existente sempre que possível e usa o e-mail Firebase como `login_hint` para evitar seleção de conta desnecessária.
 
 ## Testes recomendados
 
@@ -133,6 +135,6 @@ Teste com duas contas reais no DEV:
 - remover apaga a referência e manda o arquivo para a lixeira;
 - remover o compartilhamento de uma conta no Drive deve impedir o acesso aos arquivos;
 - tentar autorizar outra conta Google que não corresponda ao Firebase deve ser rejeitado;
-- nenhum token deve aparecer em Firestore, DevTools storage persistente ou Git.
+- nenhum token deve aparecer em Firestore, `localStorage`, IndexedDB ou Git; durante a sessão atual, apenas o access token curto pode existir em `sessionStorage`.
 
 PROD deve usar OAuth configuration e pasta separados do DEV.

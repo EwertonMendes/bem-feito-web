@@ -1,0 +1,53 @@
+<section class="bf-page">
+  <header class="bf-page-header">
+    <div><h1>Financeiro</h1><p>Compras, despesas, recebimentos e contas em aberto sem misturar fluxos diferentes.</p></div>
+    <button class="bf-button" type="button" (click)="openExpense()"><bf-icon name="plus" /> Nova saída</button>
+  </header>
+
+  <div class="bf-grid three summary">
+    <article><span>Saldo a receber</span><strong>{{currency(totalReceivable())}}</strong></article>
+    <article><span>Saídas registradas</span><strong>{{currency(totalOut())}}</strong></article>
+    <article><span>Recebimentos</span><strong>{{store.payments().length}}</strong></article>
+  </div>
+
+  <div class="bf-segments tabs"><button [class.active]="tab()==='expenses'" (click)="tab.set('expenses')">Saídas</button><button [class.active]="tab()==='receivables'" (click)="tab.set('receivables')">A receber</button><button [class.active]="tab()==='payments'" (click)="tab.set('payments')">Recebimentos</button></div>
+
+  @if(tab()==='expenses'){
+    <div class="bf-table-wrap"><table class="bf-table"><thead><tr><th>ID</th><th>Data</th><th>Tipo</th><th>Categoria / Insumo</th><th>Valor</th><th>Forma</th></tr></thead><tbody>
+      @for(item of store.expenses();track item.id){<tr><td><strong>{{item.code}}</strong></td><td>{{date(item.businessDate)}}</td><td>{{item.kind}}</td><td>{{item.kind==='input-purchase'?inputName(item.inputId):categoryName(item.categoryId)}}</td><td>{{currency(item.amountCents)}}</td><td>{{paymentName(item.paymentMethodId || '')}}</td></tr>} @empty {<tr><td colspan="6"><div class="bf-empty"><div><strong>Nenhuma saída registrada</strong><p>Compras de insumos e despesas aparecem aqui.</p></div></div></td></tr>}
+    </tbody></table></div>
+  } @else if(tab()==='receivables'){
+    <div class="receivable-list">@for(item of sales.openSales();track item.id){<article><div><strong>{{item.customerName || 'Cliente não informado'}}</strong><span>{{item.code}} · {{date(item.businessDate)}}</span></div><div class="amount"><strong>{{currency(item.balanceCents)}}</strong><span>{{item.dueDate ? 'vence ' + date(item.dueDate) : 'sem vencimento'}}</span></div></article>} @empty {<div class="bf-empty"><div><strong>Nada a receber</strong><p>Todas as vendas estão quitadas.</p></div></div>}</div>
+  } @else {
+    <div class="bf-table-wrap"><table class="bf-table"><thead><tr><th>ID</th><th>Data</th><th>Venda</th><th>Forma</th><th>Aplicado</th><th>Gorjeta</th><th>Status</th></tr></thead><tbody>
+      @for(item of store.payments();track item.id){<tr><td><strong>{{item.code}}</strong></td><td>{{date(item.businessDate)}}</td><td>{{item.saleId.slice(0,8)}}</td><td>{{paymentName(item.methodId)}}</td><td>{{currency(item.appliedCents)}}</td><td>{{currency(item.tipCents)}}</td><td><span class="bf-badge" [class.muted]="item.status!=='active'">{{item.status==='active'?'Ativo':'Estornado'}}</span></td></tr>} @empty {<tr><td colspan="7"><div class="bf-empty"><div><strong>Nenhum recebimento</strong><p>Pagamentos de vendas aparecem aqui.</p></div></div></td></tr>}
+    </tbody></table></div>
+  }
+
+  <dialog #expenseDialog class="bf-dialog">
+    <div class="bf-dialog-header"><h2>Registrar saída</h2><button class="bf-icon-button" (click)="expenseDialog.close()"><bf-icon name="close" /></button></div>
+    <div class="bf-dialog-body">
+      <div class="kind-grid">
+        <button type="button" [class.active]="model().kind==='input-purchase'" (click)="model.update(v=>({...v,kind:'input-purchase'}))">Compra de insumo</button>
+        <button type="button" [class.active]="model().kind==='operating-expense'" (click)="model.update(v=>({...v,kind:'operating-expense'}))">Despesa</button>
+        <button type="button" [class.active]="model().kind==='equipment'" (click)="model.update(v=>({...v,kind:'equipment'}))">Equipamento</button>
+        <button type="button" [class.active]="model().kind==='other'" (click)="model.update(v=>({...v,kind:'other'}))">Outro</button>
+      </div>
+      <div class="bf-grid two">
+        <label class="bf-field"><span>Data</span><input class="bf-input" type="date" [formField]="expenseForm.businessDate" /></label>
+        <label class="bf-field"><span>Valor total</span><input class="bf-input" type="number" min="0" step="0.01" [formField]="expenseForm.amount" /></label>
+        @if(model().kind==='input-purchase'){
+          <label class="bf-field full"><span>Insumo</span><select class="bf-select" [formField]="expenseForm.inputId"><option value="">Selecione</option>@for(input of catalog.activeInputs();track input.id){<option [value]="input.id">{{input.name}}</option>}</select></label>
+          <label class="bf-field"><span>Quantidade comprada</span><input class="bf-input" type="number" min="0.001" step="0.001" [formField]="expenseForm.quantity" /></label>
+          <label class="bf-field"><span>Unidade</span><select class="bf-select" [formField]="expenseForm.unitId"><option value="">Selecione</option>@for(unit of catalog.units();track unit.id){<option [value]="unit.id">{{unit.name}}</option>}</select></label>
+        } @else {
+          <label class="bf-field full"><span>Categoria</span><select class="bf-select" [formField]="expenseForm.categoryId"><option value="">Sem categoria</option>@for(category of settings.expenseCategories();track category.id){@if(category.active){<option [value]="category.id">{{category.name}}</option>}}</select></label>
+        }
+        <label class="bf-field"><span>Forma de pagamento</span><select class="bf-select" [formField]="expenseForm.paymentMethodId"><option value="">Não informado</option>@for(method of settings.paymentMethods();track method.id){@if(method.active){<option [value]="method.id">{{method.name}}</option>}}</select></label>
+        <label class="bf-field"><span>Link / comprovante</span><input class="bf-input" type="url" [formField]="expenseForm.link" /></label>
+        <label class="bf-field full"><span>Observações</span><textarea class="bf-textarea" [formField]="expenseForm.notes"></textarea></label>
+      </div>
+    </div>
+    <div class="bf-dialog-footer"><button class="bf-button secondary" (click)="expenseDialog.close()">Cancelar</button><button class="bf-button" (click)="save()">Registrar</button></div>
+  </dialog>
+</section>

@@ -1,4 +1,5 @@
 import { AuditFields } from './common.model';
+import { CatalogImageRef } from './image.model';
 
 export type SaleStatus = 'active' | 'cancelled';
 export type PaymentStatus = 'paid' | 'pending' | 'partial' | 'cancelled';
@@ -16,7 +17,7 @@ export interface SaleLineSnapshot {
   kind: SaleLineKind;
   sourceId: string;
   name: string;
-  imagePath?: string;
+  image?: CatalogImageRef;
   quantity: number;
   unitPriceCents: number;
   unitCostCents: number;

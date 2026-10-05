@@ -43,7 +43,10 @@ export class DriveAuthService {
   private pending?: Promise<string>;
 
   readonly enabled = environment.googleDrive.enabled;
-  readonly connected = computed(() => Boolean(this.currentToken()));
+  readonly connected = computed(() => {
+    const token = this.tokenState();
+    return Boolean(token && token.expiresAt > Date.now() + 60_000);
+  });
   readonly accountEmail = this.accountState.asReadonly();
   readonly revision = this.revisionState.asReadonly();
 

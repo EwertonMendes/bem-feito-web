@@ -1,23 +1,39 @@
 import '@angular/compiler';
-import { Injector, runInInjectionContext } from '@angular/core';
+import { Injector, runInInjectionContext, signal } from '@angular/core';
 import { describe, expect, it } from 'vitest';
-import { FIREBASE_STORAGE } from '../firebase/firebase.providers';
+import { CatalogImageRef } from '../../domain/models/image.model';
+import { ImageStoragePort } from '../images/image-storage.port';
 import { ImageService } from './image.service';
 
-describe('Catalog without an image provider', () => {
-  it('does not initialize Storage even when a record has a saved image path', async () => {
-    let storageRequests = 0;
-    const injector = Injector.create({ providers: [{
-      provide: FIREBASE_STORAGE,
-      useFactory: () => { storageRequests++; throw new Error('Storage unavailable'); },
-    }] });
+class FakeStorage extends ImageStoragePort {
+  readonly enabled = false;
+  readonly revision = signal(0);
+  readonly availability = signal<'loading' | 'available' | 'unavailable'>('unavailable');
+  calls = 0;
+
+  async resolve(): Promise<string | null> {
+    this.calls++;
+    return null;
+  }
+
+  async save(): Promise<CatalogImageRef> {
+    this.calls++;
+    throw new Error('indisponível');
+  }
+
+  async remove(): Promise<void> {
+    this.calls++;
+  }
+}
+
+describe('ImageService', () => {
+  it('delegates to the configured storage provider', async () => {
+    const storage = new FakeStorage();
+    const injector = Injector.create({ providers: [{ provide: ImageStoragePort, useValue: storage }] });
     const service = runInInjectionContext(injector, () => new ImageService());
     expect(service.enabled).toBe(false);
     expect(await service.resolve()).toBeNull();
-    expect(await service.resolve('catalog/products/existing/cover.webp')).toBeNull();
-    await service.remove('catalog/products/existing/cover.webp');
-    await expect(service.uploadCatalogImage('products', 'new', {} as File)).rejects.toThrow('indisponível');
-    expect(storageRequests).toBe(0);
+    expect(storage.calls).toBe(1);
     injector.destroy();
   });
 });

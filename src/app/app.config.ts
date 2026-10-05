@@ -2,6 +2,8 @@ import { ApplicationConfig, provideBrowserGlobalErrorListeners, provideZonelessC
 import { provideRouter, withComponentInputBinding, withInMemoryScrolling, withViewTransitions } from '@angular/router';
 import { routes } from './app.routes';
 import { provideFirebase } from './core/firebase/firebase.providers';
+import { GoogleDriveImageStorageService } from './core/google-drive/google-drive-image-storage.service';
+import { ImageStoragePort } from './core/images/image-storage.port';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -14,5 +16,6 @@ export const appConfig: ApplicationConfig = {
       withViewTransitions()
     ),
     provideFirebase(),
+    { provide: ImageStoragePort, useExisting: GoogleDriveImageStorageService },
   ],
 };

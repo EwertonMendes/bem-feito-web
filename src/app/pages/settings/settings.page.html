@@ -1,5 +1,8 @@
 <section class="bf-page">
   <header class="bf-page-header"><div><h1>Configurações</h1><p>Listas administrativas que alimentam os formulários sem espalhar valores fixos pelo código.</p></div><button class="bf-button" type="button" (click)="openNew()"><bf-icon name="plus" /> Novo</button></header>
+
+  <bf-google-drive-settings-card />
+
   <div class="bf-segments tabs">
     <button [class.active]="tab()==='collections'" (click)="tab.set('collections')">Coleções</button>
     <button [class.active]="tab()==='fragrances'" (click)="tab.set('fragrances')">Fragrâncias</button>

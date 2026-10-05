@@ -7,14 +7,17 @@ const devPath = 'src/environments/environment.ts';
 const dev = readFileSync(devPath, 'utf8');
 const otherGoogleKey = 'AI' + 'za' + 'X'.repeat(35);
 
-test('audited DEV config is public; the exception does not cover other paths', () => {
+test('audited DEV browser config is public only at the exact allowed path', () => {
   assert.deepEqual(scanContent(devPath, dev), []);
-  assert.ok(scanContent('src/environments/environment.production.ts', dev).length);
+  const copied = scanContent('src/environments/environment.production.ts', dev);
+  assert.equal(copied.filter((finding) => finding.name === 'Google API key').length, 2);
 });
+
 test('an additional Google key in the same file is still detected', () => {
   assert.equal(scanContent(devPath, `${dev}\nconst extra = '${otherGoogleKey}';`).length, 1);
 });
-test('sensitive credentials are detected even beside the public Firebase config', () => {
+
+test('sensitive credentials are detected even beside the public browser config', () => {
   const examples = [
     '-----BEGIN ' + 'PRIVATE KEY-----',
     JSON.stringify({ type: ['service', 'account'].join('_') }),
@@ -35,6 +38,7 @@ test('sensitive credentials are detected even beside the public Firebase config'
     assert.ok(findings.every((finding) => !('value' in finding)));
   }
 });
+
 test('reports multiple occurrences and their lines without values', () => {
   const findings = scanContent('other.ts', `${otherGoogleKey}\n${otherGoogleKey}`);
   assert.deepEqual(findings.map(({ line }) => line), [1, 2]);

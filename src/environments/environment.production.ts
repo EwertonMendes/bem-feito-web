@@ -3,7 +3,12 @@
 export const environment = {
   production: true,
   name: 'production',
-  catalogImagesEnabled: false,
+  googleDrive: {
+    enabled: false,
+    clientId: 'REPLACE_GOOGLE_DRIVE_CLIENT_ID',
+    pickerApiKey: 'REPLACE_GOOGLE_PICKER_API_KEY',
+    cloudProjectNumber: 'REPLACE_GOOGLE_CLOUD_PROJECT_NUMBER'
+  },
   firebase: {
     apiKey: 'REPLACE_PROD_API_KEY',
     authDomain: 'REPLACE_PROD_PROJECT_ID.firebaseapp.com',

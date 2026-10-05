@@ -27,7 +27,7 @@
 
       @if (selectedProduct()) {
         <section class="preview">
-          <div class="product"><bf-catalog-image [path]="selectedProduct()?.imagePath" [alt]="selectedProduct()?.displayName || ''" [compact]="true" /><div><strong>{{ selectedProduct()?.displayName }}</strong><small>Estoque atual: {{ selectedProduct()?.stock }}</small></div></div>
+          <div class="product"><bf-catalog-image [image]="selectedProduct()?.image" [alt]="selectedProduct()?.displayName || ''" [compact]="true" /><div><strong>{{ selectedProduct()?.displayName }}</strong><small>Estoque atual: {{ selectedProduct()?.stock }}</small></div></div>
           <div class="consumption-head"><strong>Consumo previsto</strong><span>{{ estimatedConsumptions().length ? estimatedConsumptions().length + ' insumos' : 'Sem receita cadastrada' }}</span></div>
           @for (item of estimatedConsumptions(); track item.name) {
             <div class="consumption" [class.not-enough]="!item.enough"><span>{{ item.name }}</span><strong>{{ item.quantity }} {{ item.unit }}</strong></div>

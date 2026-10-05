@@ -5,10 +5,12 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Exact value + exact path only. Re-audit Cloud restrictions before adding PROD.
+// These are public browser configuration keys, not administrative credentials.
 // This does not suppress GitHub Secret Scanning. See docs/firebase-key-security.md.
-const publicFirebaseKeys = new Map([
+const publicBrowserGoogleApiKeys = new Map([
   ['src/environments/environment.ts', new Set([
     '5f727ceafe724bc42e33acdc94d89cf1324c877debd2ed9282f7fecd12f0511a',
+    'c889e85223b68330b79e4b98f4b64a6e448e5c33c92f9864ecb3bc4eda76cf32',
   ])],
 ]);
 
@@ -32,7 +34,7 @@ export function scanContent(file, content) {
   const findings = [];
   for (const [name, pattern] of patterns) {
     for (const match of content.matchAll(pattern)) {
-      if (name === 'Google API key' && publicFirebaseKeys.get(file)?.has(
+      if (name === 'Google API key' && publicBrowserGoogleApiKeys.get(file)?.has(
         createHash('sha256').update(match[0]).digest('hex'),
       )) continue;
       findings.push({ file, line: content.slice(0, match.index).split(/\r?\n/).length, name });
@@ -49,8 +51,8 @@ if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
     let content;
     try { content = readFileSync(file, 'utf8'); }
     catch (error) {
-      if (error.code === 'ENOENT') continue; // Tracked deletion.
-      throw error; // Never silently skip unreadable files.
+      if (error.code === 'ENOENT') continue;
+      throw error;
     }
     if (!content.includes('\u0000')) findings.push(...scanContent(file, content));
   }

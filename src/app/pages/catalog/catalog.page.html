@@ -14,11 +14,25 @@
     <label class="search"><bf-icon name="search" /><input type="search" placeholder="Buscar" [value]="search()" (input)="search.set($any($event.target).value)" /></label>
   </div>
 
-  @if (tab() === 'products') {
+  @if (!store.initialized()) {
+    <div class="catalog-grid skeleton-grid" aria-busy="true" aria-label="Carregando catálogo">
+      @for (item of skeletonItems; track item) {
+        <article class="catalog-card skeleton-card">
+          <div class="skeleton-block skeleton-image"></div>
+          <div class="body">
+            <div class="skeleton-block skeleton-line short"></div>
+            <div class="skeleton-block skeleton-line"></div>
+            <div class="skeleton-block skeleton-line medium"></div>
+            <div class="skeleton-block skeleton-button"></div>
+          </div>
+        </article>
+      }
+    </div>
+  } @else if (tab() === 'products') {
     <div class="catalog-grid">
       @for (item of filteredProducts(); track item.id) {
         <article class="catalog-card" [class.inactive]="!item.active">
-          <bf-catalog-image [path]="item.imagePath" [alt]="item.displayName" />
+          <bf-catalog-image [image]="item.image" [alt]="item.displayName" />
           <div class="body"><div class="meta"><span>{{ item.code }}</span><span class="bf-badge" [class.muted]="!item.active">{{ item.active ? 'Ativo' : 'Inativo' }}</span></div><h2>{{ item.displayName }}</h2><div class="stats"><strong>{{ currency(item.salePriceCents) }}</strong><span [class.stock-danger]="item.stock < 0">{{ item.stock }} em estoque</span></div><button class="bf-button secondary" type="button" (click)="editProduct(item)">Editar</button></div>
         </article>
       } @empty { <div class="bf-empty"><div><strong>Nenhum produto ainda</strong><p>Cadastre o primeiro sabonete para começar.</p></div></div> }
@@ -26,19 +40,19 @@
   } @else if (tab() === 'inputs') {
     <div class="list-grid">
       @for (item of filteredInputs(); track item.id) {
-        <article class="list-card"><div><span class="code">{{ item.code }}</span><h2>{{ item.name }}</h2><p>Estoque {{ item.stock }} · mínimo {{ item.minimumStockConfigured === false ? 'não definido' : item.minimumStock }}</p></div><div class="row-actions"><span class="bf-badge" [class.muted]="!item.active">{{ item.active ? 'Ativo' : 'Inativo' }}</span><button class="bf-button secondary" (click)="editInput(item)">Editar</button></div></article>
+        <article class="list-card"><div class="input-main"><bf-catalog-image [image]="item.image" [alt]="item.name" [compact]="true" /><div><span class="code">{{ item.code }}</span><h2>{{ item.name }}</h2><p>Estoque {{ item.stock }} · mínimo {{ item.minimumStockConfigured === false ? 'não definido' : item.minimumStock }}</p></div></div><div class="row-actions"><span class="bf-badge" [class.muted]="!item.active">{{ item.active ? 'Ativo' : 'Inativo' }}</span><button class="bf-button secondary" (click)="editInput(item)">Editar</button></div></article>
       } @empty { <div class="bf-empty"><div><strong>Nenhum insumo</strong><p>Cadastre matérias-primas e embalagens.</p></div></div> }
     </div>
   } @else if (tab() === 'kits') {
     <div class="catalog-grid">
       @for (item of filteredKits(); track item.id) {
-        <article class="catalog-card"><bf-catalog-image [path]="item.imagePath" [alt]="item.name" /><div class="body"><div class="meta"><span>{{ item.components.length }} regras</span><span class="bf-badge" [class.muted]="!item.active">{{ item.active ? 'Ativo' : 'Inativo' }}</span></div><h2>{{ item.name }}</h2><div class="stats"><strong>{{ currency(item.priceCents) }}</strong><span>{{ item.notes || 'Kit comercial' }}</span></div><button class="bf-button secondary" (click)="editKit(item)">Editar</button></div></article>
+        <article class="catalog-card"><bf-catalog-image [image]="item.image" [alt]="item.name" /><div class="body"><div class="meta"><span>{{ item.components.length }} regras</span><span class="bf-badge" [class.muted]="!item.active">{{ item.active ? 'Ativo' : 'Inativo' }}</span></div><h2>{{ item.name }}</h2><div class="stats"><strong>{{ currency(item.priceCents) }}</strong><span>{{ item.notes || 'Kit comercial' }}</span></div><button class="bf-button secondary" (click)="editKit(item)">Editar</button></div></article>
       } @empty { <div class="bf-empty"><div><strong>Nenhum kit</strong><p>Crie combinações para vender mais rápido.</p></div></div> }
     </div>
   } @else {
     <div class="catalog-grid">
       @for (item of filteredAdditions(); track item.id) {
-        <article class="catalog-card"><bf-catalog-image [path]="item.imagePath" [alt]="item.name" /><div class="body"><div class="meta"><span>{{ item.category }}</span><span class="bf-badge" [class.muted]="!item.active">{{ item.active ? 'Ativo' : 'Inativo' }}</span></div><h2>{{ item.name }}</h2><div class="stats"><strong>{{ currency(item.priceCents) }}</strong><span>{{ item.components.length }} consumos</span></div><button class="bf-button secondary" (click)="editAddition(item)">Editar</button></div></article>
+        <article class="catalog-card"><bf-catalog-image [image]="item.image" [alt]="item.name" /><div class="body"><div class="meta"><span>{{ item.category }}</span><span class="bf-badge" [class.muted]="!item.active">{{ item.active ? 'Ativo' : 'Inativo' }}</span></div><h2>{{ item.name }}</h2><div class="stats"><strong>{{ currency(item.priceCents) }}</strong><span>{{ item.components.length }} consumos</span></div><button class="bf-button secondary" (click)="editAddition(item)">Editar</button></div></article>
       } @empty { <div class="bf-empty"><div><strong>Nenhum adicional</strong><p>Cadastre embalagens, incensos e outros extras.</p></div></div> }
     </div>
   }
@@ -80,7 +94,13 @@
         </section>
       }
 
-      @if (imagesEnabled && tab() !== 'inputs') { <label class="bf-field image-field"><span>Imagem</span><input class="bf-input" type="file" accept="image/webp,image/png,image/jpeg,image/gif,image/avif" (change)="onImage($event)" /><small>O navegador reduz e converte para WebP antes do upload.</small></label> }
+      @if (imagesEnabled) {
+        <div class="image-field">
+          <label class="bf-field"><span>Imagem</span><input class="bf-input" type="file" accept="image/webp,image/png,image/jpeg,image/gif,image/avif" (change)="onImage($event)" /><small>O navegador reduz para até 1200 px e converte para WebP antes do envio ao Drive.</small></label>
+          @if (currentImage() && !removeImage()) { <button class="bf-button secondary" type="button" (click)="markImageForRemoval()">Remover imagem atual</button> }
+          @if (removeImage()) { <small class="image-remove">A imagem atual será removida ao salvar.</small> }
+        </div>
+      }
     </div>
     <div class="bf-dialog-footer"><button class="bf-button secondary" type="button" (click)="editor.close()">Cancelar</button><button class="bf-button" type="button" (click)="save()">Salvar</button></div>
   </dialog>

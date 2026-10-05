@@ -1,7 +1,7 @@
 import { inject } from '@angular/core';
 import {
   CollectionReference, DocumentData, DocumentReference, QueryConstraint,
-  collection, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc,
+  collection, deleteDoc, deleteField, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc,
 } from 'firebase/firestore';
 import { FIREBASE_AUTH, FIRESTORE } from './firebase.providers';
 
@@ -45,6 +45,14 @@ export abstract class FirestoreRepository<T extends { id: string }> {
   async patch(id: string, data: Partial<Omit<T, 'id'>>): Promise<void> {
     const { createdAt: _createdAt, createdBy: _createdBy, ...editable } = data as typeof data & { createdAt?: unknown; createdBy?: string };
     await updateDoc(this.documentRef(id), { ...editable, updatedAt: serverTimestamp(), updatedBy: this.actor() });
+  }
+
+  async clearField(id: string, field: keyof Omit<T, 'id'>): Promise<void> {
+    await updateDoc(this.documentRef(id), {
+      [field]: deleteField(),
+      updatedAt: serverTimestamp(),
+      updatedBy: this.actor(),
+    });
   }
 
   async remove(id: string): Promise<void> {

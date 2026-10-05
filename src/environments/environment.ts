@@ -3,7 +3,7 @@ export const environment = {
   name: 'development',
   catalogImagesEnabled: false,
   firebase: {
-    apiKey: 'AIzaSyDphJI0zALbNQm8bYJTSI99kYgvgVyaga8',
+    apiKey: 'CONFIGURE_WITH_FIREBASE_DEV_API_KEY',
     authDomain: 'bem-feito-dev.firebaseapp.com',
     projectId: 'bem-feito-dev',
     storageBucket: 'bem-feito-dev.firebasestorage.app',

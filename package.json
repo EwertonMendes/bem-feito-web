@@ -9,7 +9,7 @@
     "build": "ng build",
     "build:dev": "ng build --configuration development",
     "build:prod": "ng build --configuration production",
-    "test": "vitest run",
+    "test": "vitest run src",
     "test:watch": "vitest",
     "firebase:emulators": "firebase emulators:start",
     "firebase:deploy:dev": "firebase use dev && npm run build:dev && firebase deploy",
@@ -18,7 +18,8 @@
     "migration:validate": "node tools/migration/validate-export.mjs",
     "migration:reconcile": "node tools/migration/reconcile.mjs",
     "migration:import": "node tools/migration/import-firestore.mjs",
-    "admin:user": "node tools/admin/upsert-user.mjs"
+    "admin:user": "node tools/admin/upsert-user.mjs",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-bem-feito \"node tools/tests/firestore.rules.test.mjs\""
   },
   "dependencies": {
     "@angular/common": "^22.2.1",

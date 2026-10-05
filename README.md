@@ -75,6 +75,8 @@ src/environments/environment.production.ts
 
 Consulte [docs/firebase-setup.md](docs/firebase-setup.md).
 
+O DEV usa configuração Web pública versionada, sem `.env.local` obrigatório ou geração de arquivos. Consulte [a auditoria da chave e a política de secrets](docs/firebase-key-security.md). Execute `npm run security:scan` antes de enviar alterações.
+
 ## Comandos principais
 
 ```bash

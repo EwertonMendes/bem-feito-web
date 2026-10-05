@@ -4,6 +4,8 @@
   "private": true,
   "packageManager": "npm@10.9.2",
   "scripts": {
+    "security:scan": "node tools/security/check-secrets.mjs",
+    "test:security": "node --test tools/tests/secret-scan.test.mjs",
     "ng": "ng",
     "start": "ng serve --configuration development",
     "build": "ng build",

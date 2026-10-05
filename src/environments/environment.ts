@@ -1,3 +1,5 @@
+// Public Firebase Web config. See docs/firebase-key-security.md for the audit.
+// Never add administrative credentials or App Check debug tokens here.
 export const environment = {
   production: false,
   name: 'development',

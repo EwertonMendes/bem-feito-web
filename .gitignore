@@ -15,6 +15,11 @@
 *.local
 *.log
 service-account*.json
+*service-account*.json
+*firebase-adminsdk*.json
+application_default_credentials.json
+credentials.json
+client_secret*.json
 *.pem
 *.key
 .env

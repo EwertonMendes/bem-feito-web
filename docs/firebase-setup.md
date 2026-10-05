@@ -15,6 +15,8 @@
 
 O config oficial público do Web App está em `src/environments/environment.ts`. Nenhuma credencial administrativa deve entrar no frontend.
 
+As restrições reais da Browser key foram conferidas no Console em 05/10/2026. Consulte [firebase-key-security.md](firebase-key-security.md) para evidências, limitações e tratamento do alerta GitHub #1. Não há geração de environment nem secret de CI para essa configuração pública.
+
 ```powershell
 npx firebase-tools login
 npm test

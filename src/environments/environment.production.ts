@@ -1,3 +1,5 @@
+// Public Web config for a SEPARATE Firebase PROD project, once provisioned.
+// Placeholders compile but cannot authenticate; never replace them with DEV config.
 export const environment = {
   production: true,
   name: 'production',

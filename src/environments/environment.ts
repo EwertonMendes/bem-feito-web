@@ -3,7 +3,12 @@
 export const environment = {
   production: false,
   name: 'development',
-  catalogImagesEnabled: false,
+  googleDrive: {
+    enabled: false,
+    clientId: 'REPLACE_GOOGLE_DRIVE_CLIENT_ID',
+    pickerApiKey: 'REPLACE_GOOGLE_PICKER_API_KEY',
+    cloudProjectNumber: 'REPLACE_GOOGLE_CLOUD_PROJECT_NUMBER'
+  },
   firebase: {
     apiKey: 'AIzaSyDphJI0zALbNQm8bYJTSI99kYgvgVyaga8',
     authDomain: 'bem-feito-dev.firebaseapp.com',

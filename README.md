@@ -24,13 +24,15 @@ src/
     layout/        # Shell desktop/mobile
     pages/         # Telas Angular
     shared/        # Componentes visuais reutilizáveis
-  environments/   # DEV e PROD
+  environments/   # templates DEV/PROD; DEV real é gerado localmente
   main.ts
   styles.scss
 public/
 tools/
   admin/
+  config/
   migration/
+  security/
   tests/
 ```
 
@@ -46,6 +48,12 @@ Depois:
 
 ```bash
 npm ci
+```
+
+Antes do primeiro `npm start`, copie `.env.example` para `.env.local` e preencha `FIREBASE_DEV_API_KEY` com a chave do Web App DEV obtida no Firebase Console. O arquivo `.env.local` é ignorado pelo Git.
+
+```powershell
+Copy-Item .env.example .env.local
 npm start
 ```
 
@@ -65,13 +73,16 @@ DEV está publicado em https://bem-feito-dev.web.app. A migração real foi conc
 
 Por decisão do usuário, imagens e App Check ficam adiados. Os cadastros funcionam sem imagem e permitem edição posterior. Storage não foi criado e nenhum faturamento foi vinculado. PROD ainda não foi criado; a compilação com placeholders não significa um ambiente PROD funcional.
 
-Configurações:
+Configurações versionadas:
 
 ```text
 src/environments/environment.ts
 src/environments/environment.production.ts
+.env.example
 .firebaserc
 ```
+
+A configuração DEV usada pelo Angular é gerada em `src/environments/environment.generated.ts` a partir de `.env.local` ou de `FIREBASE_DEV_API_KEY` no ambiente do processo. Esse arquivo gerado nunca deve ser versionado.
 
 Consulte [docs/firebase-setup.md](docs/firebase-setup.md).
 
@@ -80,6 +91,7 @@ Consulte [docs/firebase-setup.md](docs/firebase-setup.md).
 ```bash
 npm start
 npm test
+npm run security:scan
 npm run test:rules
 npm run test:transactions
 npm run test:migration
@@ -102,7 +114,7 @@ npm run migration:import
 
 Arquivos com dados reais da planilha e checkpoints ficam ignorados pelo Git. A importação é exclusiva de DEV, começa em dry-run, recusa colisões e grava o lote atomicamente. Consulte [as instruções Firebase](docs/firebase-setup.md) antes de executar; a migração já concluída não precisa ser repetida.
 
-Não versione service accounts, chaves privadas, OAuth secrets, tokens de sessão ou App Check debug tokens. O Firebase Web config é público por natureza; Authentication e Rules controlam o acesso atual. App Check está adiado.
+Não versione service accounts, chaves privadas, OAuth secrets, tokens de sessão, App Check debug tokens nem valores com formato de credencial. Embora a Firebase Web API Key seja pública por design e não autorize acesso ao Firestore, o projeto não a mantém no histórico Git para evitar alertas genéricos, reutilização acidental e confusão operacional. A CI executa `npm run security:scan` antes dos testes.
 
 ## Regra importante de operação
 

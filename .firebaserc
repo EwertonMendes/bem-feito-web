@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "dev": "REPLACE_WITH_BEM_FEITO_DEV_PROJECT_ID",
+    "prod": "REPLACE_WITH_BEM_FEITO_PROD_PROJECT_ID"
+  }
+}

@@ -1,0 +1,55 @@
+<section class="bf-page">
+  <header class="bf-page-header">
+    <div>
+      <h1>Dashboard</h1>
+      <p>Uma visão rápida do que entrou, do que saiu e do que precisa de atenção.</p>
+    </div>
+    <div class="period">
+      <label class="bf-field"><span>De</span><input class="bf-input" type="date" [value]="store.startDate()" (change)="store.startDate.set($any($event.target).value)" /></label>
+      <label class="bf-field"><span>Até</span><input class="bf-input" type="date" [value]="store.endDate()" (change)="store.endDate.set($any($event.target).value)" /></label>
+    </div>
+  </header>
+
+  <div class="bf-grid four kpis">
+    <article class="bf-kpi"><span>Faturamento</span><strong>{{ currency(store.revenueCents()) }}</strong></article>
+    <article class="bf-kpi"><span>Recebido</span><strong>{{ currency(store.receivedCents()) }}</strong></article>
+    <article class="bf-kpi"><span>Saldo a receber</span><strong>{{ currency(store.receivableCents()) }}</strong></article>
+    <article class="bf-kpi result"><span>Resultado estimado</span><strong>{{ store.missingCostItems() ? 'Custos pendentes' : currency(store.resultCents()) }}</strong><small>{{ store.missingCostItems() ? store.missingCostItems() + ' itens sem custo conhecido' : 'Receita + gorjetas - CMV - despesas operacionais' }}</small></article>
+  </div>
+
+  <div class="bf-grid four compact-kpis">
+    <article class="mini"><span>Vendas</span><strong>{{ store.saleCount() }}</strong></article>
+    <article class="mini"><span>Ticket médio</span><strong>{{ currency(store.averageTicketCents()) }}</strong></article>
+    <article class="mini"><span>Itens vendidos</span><strong>{{ store.itemsSold() }}</strong></article>
+    <article class="mini"><span>Gorjetas</span><strong>{{ currency(store.tipsCents()) }}</strong></article>
+  </div>
+
+  <div class="main-grid">
+    <section class="bf-panel chart-panel">
+      <div class="section-head"><div><h2>Faturamento por mês</h2><p>Ano de {{ store.endDate().slice(0, 4) }}</p></div><strong>{{ currency(store.revenueCents()) }}</strong></div>
+      <div class="bars">
+        @for (month of store.monthlyRevenue(); track month.month) {
+          <div class="bar-column" [title]="month.month + ': ' + currency(month.valueCents)">
+            <div class="bar-track"><div class="bar" [style.height.%]="(month.valueCents / maxMonth()) * 100"></div></div>
+            <span>{{ month.month }}</span>
+          </div>
+        }
+      </div>
+    </section>
+
+    <section class="bf-panel alerts">
+      <div class="section-head"><div><h2>Atenção</h2><p>Itens que merecem ação.</p></div></div>
+      <a routerLink="/estoque" class="alert-row"><span><strong>{{ store.negativeProducts().length }}</strong> produtos negativos</span><span>Corrigir →</span></a>
+      <a routerLink="/estoque" class="alert-row"><span><strong>{{ store.lowStockProducts().length }}</strong> produtos em estoque baixo</span><span>Ver →</span></a>
+      <a routerLink="/estoque" class="alert-row"><span><strong>{{ store.lowStockInputs().length }}</strong> insumos em estoque baixo</span><span>Ver →</span></a>
+      <a routerLink="/financeiro" class="alert-row"><span><strong>{{ store.overdueCount() }}</strong> contas vencidas</span><span>Cobrar →</span></a>
+      <a routerLink="/catalogo" class="alert-row"><span><strong>{{ store.missingCostItems() }}</strong> itens vendidos sem custo</span><span>Completar →</span></a>
+    </section>
+  </div>
+
+  <div class="bf-grid three financial-strip">
+    <article><span>CMV conhecido</span><strong>{{ currency(store.cogsCents()) }}</strong></article>
+    <article><span>Saídas de caixa</span><strong>{{ currency(store.cashOutCents()) }}</strong></article>
+    <article><span>Fluxo de caixa</span><strong [class.negative]="store.cashFlowCents() < 0">{{ currency(store.cashFlowCents()) }}</strong></article>
+  </div>
+</section>

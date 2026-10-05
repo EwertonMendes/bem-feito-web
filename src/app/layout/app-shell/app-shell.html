@@ -1,0 +1,36 @@
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" routerLink="/dashboard"><img src="/brand-mark.svg" alt="" /><span><strong>Bem Feito</strong><small>Vendas, estoque e operação</small></span></a>
+    <nav aria-label="Principal">
+      @for (item of nav; track item.path) {
+        <a [routerLink]="item.path" routerLinkActive="active"><bf-icon [name]="item.icon" /><span>{{ item.label }}</span></a>
+      }
+    </nav>
+    <div class="sidebar-footer">
+      <button type="button" class="utility" (click)="toggleTheme()"><bf-icon [name]="darkMode() ? 'sun' : 'moon'" /><span>{{ darkMode() ? 'Tema claro' : 'Tema escuro' }}</span></button>
+      <button type="button" class="utility" (click)="auth.logout()"><bf-icon name="logout" /><span>Sair</span></button>
+      <div class="profile"><span class="avatar">{{ auth.profile()?.displayName?.slice(0,1) || 'B' }}</span><span><strong>{{ auth.profile()?.displayName || 'Bem Feito' }}</strong><small>{{ auth.profile()?.role || '' }}</small></span></div>
+    </div>
+  </aside>
+
+  <main class="content"><router-outlet /></main>
+
+  <nav class="mobile-nav" aria-label="Navegação móvel">
+    <a routerLink="/dashboard" routerLinkActive="active"><bf-icon name="dashboard" /><span>Início</span></a>
+    <a routerLink="/vendas" routerLinkActive="active"><bf-icon name="sales" /><span>Vendas</span></a>
+    <button type="button" class="quick" (click)="mobileMenuOpen.set(!mobileMenuOpen())" aria-label="Ações rápidas"><bf-icon [name]="mobileMenuOpen() ? 'close' : 'plus'" /></button>
+    <a routerLink="/estoque" routerLinkActive="active"><bf-icon name="inventory" /><span>Estoque</span></a>
+    <a routerLink="/financeiro" routerLinkActive="active"><bf-icon name="finance" /><span>Financeiro</span></a>
+  </nav>
+
+  @if (mobileMenuOpen()) {
+    <button class="quick-backdrop" type="button" aria-label="Fechar ações rápidas" (click)="mobileMenuOpen.set(false)"></button>
+    <section class="quick-sheet">
+      <strong>Registrar</strong>
+      <button type="button" (click)="quickNavigate('/vendas?novo=1')"><bf-icon name="sales" /> Nova venda</button>
+      <button type="button" (click)="quickNavigate('/producao?novo=1')"><bf-icon name="production" /> Produção</button>
+      <button type="button" (click)="quickNavigate('/financeiro?novo=1')"><bf-icon name="finance" /> Compra ou despesa</button>
+      <button type="button" (click)="quickNavigate('/estoque?ajuste=1')"><bf-icon name="inventory" /> Ajuste de estoque</button>
+    </section>
+  }
+</div>

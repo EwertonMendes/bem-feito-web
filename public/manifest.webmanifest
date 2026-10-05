@@ -1,0 +1,9 @@
+{
+  "name": "Bem Feito",
+  "short_name": "Bem Feito",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f4ed",
+  "theme_color": "#16362f",
+  "icons": []
+}

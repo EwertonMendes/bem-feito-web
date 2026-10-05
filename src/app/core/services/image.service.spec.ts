@@ -8,6 +8,7 @@ import { ImageService } from './image.service';
 class FakeStorage extends ImageStoragePort {
   readonly enabled = false;
   readonly revision = signal(0);
+  readonly availability = signal<'loading' | 'available' | 'unavailable'>('unavailable');
   calls = 0;
 
   async resolve(): Promise<string | null> {

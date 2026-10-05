@@ -1,7 +1,7 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, computed, inject } from '@angular/core';
 import { environment } from '../../../environments/environment';
 import { CatalogImageEntityKind, CatalogImageRef } from '../../domain/models/image.model';
-import { ImageStoragePort } from '../images/image-storage.port';
+import { ImageStorageAvailability, ImageStoragePort } from '../images/image-storage.port';
 import { ImageProcessorService } from '../images/image-processor.service';
 import { DriveApiService, DriveFileMetadata } from './drive-api.service';
 import { DriveAuthService, DriveAuthorizationRequiredError } from './drive-auth.service';
@@ -18,6 +18,12 @@ export class GoogleDriveImageStorageService extends ImageStoragePort {
 
   readonly enabled = environment.googleDrive.enabled;
   readonly revision = this.integration.revision;
+  readonly availability = computed<ImageStorageAvailability>(() => {
+    if (!this.enabled) return 'unavailable';
+    const status = this.integration.status();
+    if (status === 'loading') return 'loading';
+    return status === 'connected' ? 'available' : 'unavailable';
+  });
 
   async resolve(image?: CatalogImageRef): Promise<string | null> {
     if (!this.enabled || !image || image.provider !== 'google-drive' || !this.integration.connected() || !this.auth.currentToken()) return null;

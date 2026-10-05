@@ -8,6 +8,7 @@ export class ImageService {
 
   readonly enabled = this.storage.enabled;
   readonly revision = this.storage.revision;
+  readonly availability = this.storage.availability;
 
   resolve(image?: CatalogImageRef): Promise<string | null> {
     return this.storage.resolve(image);

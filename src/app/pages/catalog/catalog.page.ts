@@ -31,6 +31,7 @@ export class CatalogPage {
   private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('editor');
 
   readonly currency = formatCurrency;
+  readonly skeletonItems = [1, 2, 3, 4, 5, 6, 7, 8];
   readonly tab = signal<CatalogImageEntityKind>('products');
   readonly search = signal('');
   readonly editingId = signal('');

@@ -35,6 +35,7 @@ export class CatalogStore {
   private readonly formatPricesState = signal<FormatPrice[]>([]);
   private readonly unitsState = signal<UnitDefinition[]>([]);
   private readonly loadingState = signal(false);
+  private readonly initializedState = signal(false);
   private loaded = false;
 
   readonly products = this.productsState.asReadonly();
@@ -47,6 +48,7 @@ export class CatalogStore {
   readonly formatPrices = this.formatPricesState.asReadonly();
   readonly units = this.unitsState.asReadonly();
   readonly loading = this.loadingState.asReadonly();
+  readonly initialized = this.initializedState.asReadonly();
 
   readonly activeProducts = computed(() => this.productsState().filter((item) => item.active));
   readonly activeInputs = computed(() => this.inputsState().filter((item) => item.active));
@@ -84,6 +86,7 @@ export class CatalogStore {
     } catch (error) {
       this.toast.error(this.errors.message(error));
     } finally {
+      this.initializedState.set(true);
       this.loadingState.set(false);
     }
   }

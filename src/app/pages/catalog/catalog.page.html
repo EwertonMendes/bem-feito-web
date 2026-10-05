@@ -14,7 +14,21 @@
     <label class="search"><bf-icon name="search" /><input type="search" placeholder="Buscar" [value]="search()" (input)="search.set($any($event.target).value)" /></label>
   </div>
 
-  @if (tab() === 'products') {
+  @if (!store.initialized()) {
+    <div class="catalog-grid skeleton-grid" aria-busy="true" aria-label="Carregando catálogo">
+      @for (item of skeletonItems; track item) {
+        <article class="catalog-card skeleton-card">
+          <div class="skeleton-block skeleton-image"></div>
+          <div class="body">
+            <div class="skeleton-block skeleton-line short"></div>
+            <div class="skeleton-block skeleton-line"></div>
+            <div class="skeleton-block skeleton-line medium"></div>
+            <div class="skeleton-block skeleton-button"></div>
+          </div>
+        </article>
+      }
+    </div>
+  } @else if (tab() === 'products') {
     <div class="catalog-grid">
       @for (item of filteredProducts(); track item.id) {
         <article class="catalog-card" [class.inactive]="!item.active">

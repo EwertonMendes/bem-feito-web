@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { DriveIntegrationService } from '../../core/google-drive/drive-integration.service';
 import { ErrorService } from '../../core/services/error.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -7,10 +7,13 @@ import { ToastService } from '../../core/services/toast.service';
   selector: 'bf-drive-connection-banner',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    @if (integration.enabled && integration.config()?.enabled && !integration.connected()) {
+    @if (integration.enabled && integration.config()?.enabled && (integration.status() === 'disconnected' || integration.status() === 'error')) {
       <div class="banner" role="status">
-        <div><strong>Google Drive desconectado</strong><span>Conecte sua conta para carregar e alterar as imagens privadas.</span></div>
-        <button class="bf-button secondary" type="button" (click)="connect()">Conectar Drive</button>
+        <div>
+          <strong>{{ integration.status() === 'error' ? 'Google Drive indisponível' : 'Google Drive desconectado' }}</strong>
+          <span>{{ integration.status() === 'error' ? 'Não foi possível validar o acesso às imagens privadas.' : 'Conecte sua conta para carregar e alterar as imagens privadas.' }}</span>
+        </div>
+        <button class="bf-button secondary" type="button" [disabled]="connecting()" (click)="connect()">{{ connecting() ? 'Conectando...' : 'Conectar Drive' }}</button>
       </div>
     }
   `,
@@ -21,6 +24,7 @@ import { ToastService } from '../../core/services/toast.service';
 })
 export class DriveConnectionBanner {
   readonly integration = inject(DriveIntegrationService);
+  readonly connecting = signal(false);
   private readonly toast = inject(ToastService);
   private readonly errors = inject(ErrorService);
 
@@ -29,11 +33,15 @@ export class DriveConnectionBanner {
   }
 
   async connect(): Promise<void> {
+    if (this.connecting()) return;
+    this.connecting.set(true);
     try {
       await this.integration.connect();
       this.toast.success('Google Drive conectado.');
     } catch (error) {
       this.toast.error(this.errors.message(error));
+    } finally {
+      this.connecting.set(false);
     }
   }
 }

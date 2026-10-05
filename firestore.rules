@@ -108,23 +108,52 @@ service cloud.firestore {
           && fields(data, ['collectionId', 'formatId', 'priceCents', 'active'], [])
           && text(data.collectionId) && text(data.formatId) && money(data.priceCents) && data.active is bool)
         || (name == 'products'
-          && fields(data, ['code', 'active', 'collectionId', 'fragranceId', 'formatId', 'displayName', 'salePriceCents', 'additionalCostCents', 'averageUnitCostCents', 'stock', 'minimumStock', 'recipe'], ['imagePath'])
+          && fields(data, ['code', 'active', 'collectionId', 'fragranceId', 'formatId', 'displayName', 'salePriceCents', 'additionalCostCents', 'averageUnitCostCents', 'stock', 'minimumStock', 'recipe'], ['image'])
           && text(data.code) && text(data.displayName) && data.active is bool
           && text(data.collectionId) && text(data.fragranceId) && text(data.formatId)
           && money(data.salePriceCents) && money(data.additionalCostCents) && money(data.averageUnitCostCents)
-          && stock(data.stock) && quantity(data.minimumStock) && data.recipe is list)
+          && stock(data.stock) && quantity(data.minimumStock) && data.recipe is list
+          && (!('image' in data) || validImage(data.image)))
         || (name == 'inputs'
-          && fields(data, ['code', 'active', 'name', 'unitId', 'stock', 'minimumStock', 'averageUnitCostCents'], ['imagePath', 'minimumStockConfigured'])
+          && fields(data, ['code', 'active', 'name', 'unitId', 'stock', 'minimumStock', 'averageUnitCostCents'], ['image', 'minimumStockConfigured'])
           && text(data.code) && text(data.name) && text(data.unitId) && data.active is bool
           && stock(data.stock) && quantity(data.minimumStock) && money(data.averageUnitCostCents)
-          && (!('minimumStockConfigured' in data) || data.minimumStockConfigured is bool))
+          && (!('minimumStockConfigured' in data) || data.minimumStockConfigured is bool)
+          && (!('image' in data) || validImage(data.image)))
         || (name == 'kits'
-          && fields(data, ['active', 'name', 'priceCents', 'components'], ['notes', 'imagePath'])
-          && data.active is bool && text(data.name) && money(data.priceCents) && data.components is list)
+          && fields(data, ['active', 'name', 'priceCents', 'components'], ['notes', 'image'])
+          && data.active is bool && text(data.name) && money(data.priceCents) && data.components is list
+          && (!('image' in data) || validImage(data.image)))
         || (name == 'additions'
-          && fields(data, ['active', 'name', 'category', 'priceCents', 'components'], ['notes', 'imagePath'])
+          && fields(data, ['active', 'name', 'category', 'priceCents', 'components'], ['notes', 'image'])
           && data.active is bool && text(data.name) && data.category is string
-          && money(data.priceCents) && data.components is list);
+          && money(data.priceCents) && data.components is list
+          && (!('image' in data) || validImage(data.image)));
+    }
+
+    function validImage(image) {
+      return image is map
+        && image.keys().hasOnly(['provider', 'fileId', 'mimeType', 'sizeBytes', 'width', 'height', 'modifiedTime'])
+        && image.provider == 'google-drive'
+        && text(image.fileId)
+        && image.mimeType == 'image/webp'
+        && image.sizeBytes is int && image.sizeBytes > 0 && image.sizeBytes <= 3 * 1024 * 1024
+        && image.width is int && image.width > 0 && image.width <= 1200
+        && image.height is int && image.height > 0 && image.height <= 1200
+        && text(image.modifiedTime);
+    }
+
+    function validDriveIntegration(data) {
+      return fields(data, ['enabled', 'rootFolderId', 'rootFolderName', 'folders'], [])
+        && data.enabled is bool
+        && text(data.rootFolderId)
+        && text(data.rootFolderName)
+        && data.folders is map
+        && data.folders.keys().hasOnly(['products', 'inputs', 'kits', 'additions'])
+        && text(data.folders.products)
+        && text(data.folders.inputs)
+        && text(data.folders.kits)
+        && text(data.folders.additions);
     }
 
     function businessDate(data) {
@@ -183,6 +212,17 @@ service cloud.firestore {
       allow read: if signedIn() && (request.auth.uid == userId || canAdminister());
       allow create, update: if canAdminister() && validProfile(request.resource.data);
       allow delete: if canAdminister();
+    }
+
+    match /integrations/{integrationId} {
+      allow read: if activeUser();
+      allow create: if integrationId == 'google-drive' && canAdminister()
+        && auditCreate(request.resource.data)
+        && validDriveIntegration(request.resource.data);
+      allow update: if integrationId == 'google-drive' && canAdminister()
+        && auditUpdate(request.resource.data)
+        && validDriveIntegration(request.resource.data);
+      allow delete: if false;
     }
 
     match /counters/{documentId} {

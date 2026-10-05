@@ -1,6 +1,6 @@
 # Arquitetura
 
-A UI consome stores de feature. Stores chamam repositories. Repositories encapsulam Firebase.
+A UI consome stores de feature. Stores chamam repositories. Repositories encapsulam Firestore.
 
 ```text
 pages/ui
@@ -9,12 +9,26 @@ pages/ui
       -> Firebase SDK
 ```
 
-Valores monetários são persistidos em centavos inteiros.
+Valores monetários são persistidos em centavos inteiros. Datas comerciais usam `YYYY-MM-DD`; timestamps de auditoria usam `serverTimestamp()`.
 
-Datas comerciais usam `YYYY-MM-DD`. Timestamps de auditoria usam `serverTimestamp()`.
+Estoque possui saldo materializado em `products.stock` e `inputs.stock` e histórico em `stockMovements`. Operações que mexem em mais de uma entidade usam Firestore Transactions.
 
-Estoque possui saldo materializado em `products.stock` e `inputs.stock` e histórico em `stockMovements`.
+## Imagens
 
-Operações que mexem em mais de uma entidade usam Firestore Transactions: vendas, cancelamentos, produção, compras de insumos, recebimentos e ajustes de estoque.
+A UI não conhece Google Drive diretamente:
+
+```text
+Catalog/Sales UI
+  -> ImageService
+    -> ImageStoragePort
+      -> GoogleDriveImageStorageService
+        -> DriveApiService
+```
+
+`ImageProcessorService` cuida de validação, resize e WebP. `DriveAuthService` cuida somente do token OAuth em memória. `DriveIntegrationService` cuida da pasta configurada, conta Google e estado da integração.
+
+Firestore armazena somente `CatalogImageRef`; o blob fica no Drive. Essa separação permite trocar o provider de armazenamento sem reescrever as telas ou o domínio de vendas.
+
+Não existe transação distribuída entre Firestore e Drive. A integração usa operações idempotentes e compensação segura: criação pode deixar o cadastro sem imagem se o upload falhar; remoção limpa a referência antes de mandar o arquivo para a lixeira; substituição preserva o mesmo `fileId`.
 
 Vendas guardam snapshots de nome, preço e custo para não alterar o histórico quando o catálogo mudar.

@@ -9,8 +9,8 @@ Aplicação Angular da Bem Feito para vendas, produção, estoque, financeiro, c
 - Change detection zoneless
 - Firebase Authentication
 - Cloud Firestore
-- Cloud Storage
 - Firebase Hosting
+- Google Drive privado para imagens do catálogo
 - Vitest
 
 ## Estrutura
@@ -18,7 +18,7 @@ Aplicação Angular da Bem Feito para vendas, produção, estoque, financeiro, c
 ```text
 src/
   app/
-    core/          # Firebase, auth, repositories, services e utilitários
+    core/          # Firebase, auth, Google Drive, repositories, services e utilitários
     domain/        # Models do domínio
     features/      # Stores por feature
     layout/        # Shell desktop/mobile
@@ -49,38 +49,22 @@ npm ci
 npm start
 ```
 
-O frontend abre em:
+O frontend abre em `http://localhost:4200`. O `package-lock.json` está versionado; use `npm ci`.
 
-```text
-http://localhost:4200
-```
+## DEV
 
-O `package-lock.json` está versionado. Use `npm ci` para instalar as versões reproduzíveis.
+O Firebase DEV usa `bem-feito-dev`, com Authentication, Firestore e Hosting. O ambiente publicado continua em https://bem-feito-dev.web.app.
 
-## Firebase DEV e PROD
+Firebase Storage não é necessário para a nova arquitetura de imagens. A integração Google Drive fica desativada enquanto `environment.googleDrive.enabled` for `false`; antes de testar imagens, configure os identificadores públicos do OAuth/Picker e siga [docs/google-drive-images.md](docs/google-drive-images.md).
 
-DEV usa o projeto `bem-feito-dev`, com Google Authentication e Firestore Native/Standard em `southamerica-east1` (São Paulo). O primeiro owner e uma gravação real pelo navegador foram validados em 05/10/2026.
+PROD ainda não foi criado. Não reutilize configuração, pasta ou OAuth do DEV em PROD.
 
-DEV está publicado em https://bem-feito-dev.web.app. A migração real foi concluída e conferida em 05/10/2026: 282 registros de domínio e cópia de origem das 21 abas. Consulte [o relatório da migração](docs/migration-dev.md).
-
-Por decisão do usuário, imagens e App Check ficam adiados. Os cadastros funcionam sem imagem e permitem edição posterior. Storage não foi criado e nenhum faturamento foi vinculado. PROD ainda não foi criado; a compilação com placeholders não significa um ambiente PROD funcional.
-
-Configurações:
-
-```text
-src/environments/environment.ts
-src/environments/environment.production.ts
-.firebaserc
-```
-
-Consulte [docs/firebase-setup.md](docs/firebase-setup.md).
-
-O DEV usa configuração Web pública versionada, sem `.env.local` obrigatório ou geração de arquivos. Consulte [a auditoria da chave e a política de secrets](docs/firebase-key-security.md). Execute `npm run security:scan` antes de enviar alterações.
+Consulte também [docs/firebase-setup.md](docs/firebase-setup.md).
 
 ## Comandos principais
 
 ```bash
-npm start
+npm run security:scan
 npm test
 npm run test:rules
 npm run test:transactions
@@ -88,23 +72,21 @@ npm run test:migration
 npm run build:dev
 npm run build:dev:hosting
 npm run build:prod
+npm start
 npm run firebase:emulators
 npm run firebase:deploy:dev
 npm run firebase:deploy:prod
 ```
 
+## Segurança
+
+Não versione service accounts, chaves privadas, OAuth client secrets, access tokens, refresh tokens, cookies de sessão ou App Check debug tokens.
+
+Firebase Web config, OAuth Client ID e a Picker API Key de uma SPA são públicos por natureza. Mesmo assim, as chaves públicas devem ser restritas aos origins/APIs esperados. Execute `npm run security:scan` antes de enviar alterações.
+
 ## Migração
 
-```bash
-npm run migration:normalize
-npm run migration:validate
-npm run migration:reconcile
-npm run migration:import
-```
-
-Arquivos com dados reais da planilha e checkpoints ficam ignorados pelo Git. A importação é exclusiva de DEV, começa em dry-run, recusa colisões e grava o lote atomicamente. Consulte [as instruções Firebase](docs/firebase-setup.md) antes de executar; a migração já concluída não precisa ser repetida.
-
-Não versione service accounts, chaves privadas, OAuth secrets, tokens de sessão ou App Check debug tokens. O Firebase Web config é público por natureza; Authentication e Rules controlam o acesso atual. App Check está adiado.
+A migração real de DEV já foi concluída. Arquivos com dados reais e checkpoints continuam ignorados pelo Git.
 
 ## Regra importante de operação
 

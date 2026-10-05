@@ -23,7 +23,7 @@ DEV permanece em `src/environments/environment.ts`. PROD permanece em `environme
 
 Removidos do PR #1: `.env.example` para a chave DEV, geração de `environment.generated.ts`, hooks prestart/prebuild, replacements DEV extras e instruções que tornavam `.env.local` obrigatório. A chave DEV voltou ao environment versionado. Nenhum secret de CI é necessário para builds.
 
-Mantida e aprimorada a proteção útil do scanner local/CI: apenas SHA-256 do valor DEV auditado no caminho exato é permitido. Outra chave no mesmo arquivo, a mesma chave em outro arquivo ou segredos reais continuam sendo sinalizados. PROD não tem exceção automática. O scanner percorre todas as ocorrências, não imprime valores, detecta padrões de private keys/service account, OAuth/refresh tokens, GitHub/AWS/Slack, Stripe/OpenAI, URLs de banco com senha e atribuições comuns de secrets/debug tokens. Testes verificam essas fronteiras. É uma defesa parcial por padrões, não uma garantia matemática contra todos os formatos de segredo.
+Mantida e aprimorada a proteção útil do scanner local/CI: apenas os SHA-256 das chaves públicas de navegador DEV auditadas no caminho exato são permitidos. A allowlist cobre a Firebase Web API Key e a Google Picker API Key usada pela SPA. Outra chave no mesmo arquivo, qualquer uma das chaves em outro arquivo ou segredos reais continuam sendo sinalizados. PROD não tem exceção automática. O scanner percorre todas as ocorrências, não imprime valores, detecta padrões de private keys/service account, OAuth/refresh tokens, GitHub/AWS/Slack, Stripe/OpenAI, URLs de banco com senha e atribuições comuns de secrets/debug tokens. Testes verificam essas fronteiras. É uma defesa parcial por padrões, não uma garantia matemática contra todos os formatos de segredo.
 
 `.gitignore` continua excluindo `.env`, PEM/KEY, dados privados de migração e logs, e amplia nomes comuns de credenciais Google. Ignore não protege arquivos já rastreados. Revise todo diff e mantenha GitHub Secret Scanning e push protection habilitados; nenhuma exclusão para `src/environments/**` foi adicionada.
 
@@ -31,7 +31,7 @@ Mantida e aprimorada a proteção útil do scanner local/CI: apenas SHA-256 do v
 
 | Material | Tratamento |
 | --- | --- |
-| Firebase Web config auditado | Público, restrito aos serviços Firebase; projects DEV/PROD separados |
+| Firebase Web config auditado | Público, restrito aos serviços Firebase; projects DEV/PROD separados |\n| Google Picker API Key auditada | Pública no bundle da SPA; restringir por HTTP referrer e somente às APIs Drive/Picker necessárias |
 | Conta de serviço | Identidade IAM; o e-mail não é segredo, mas seu JSON com private key é secreto |
 | Private key / Firebase Admin credentials | Autorização administrativa; backend/ADC, nunca frontend |
 | OAuth client secret, refresh/access token, token administrativo | Segredo que permite autenticação/autorização; nunca versionar |
@@ -49,7 +49,7 @@ As listas internas e vínculos financeiros entre documentos ainda precisam de va
 
 ## Alerta GitHub e ações posteriores
 
-O alerta #1 foi resolvido via API GitHub em 05/10/2026 como **false positive** quanto a segredo sensível, após comparar também o valor do alerta com a chave auditada. A API retornou `state: resolved` e `resolution: false_positive`. Não usar `used in tests` (DEV é real) nem `revoked` (a chave continua em uso). Fechar apenas este alerta não desativa scanning. A exceção do scanner local não altera os detectores do GitHub; novos alertas devem ser avaliados individualmente.
+O alerta #1 foi resolvido via API GitHub em 05/10/2026 como **false positive** quanto a segredo sensível, após comparar também o valor do alerta com a chave auditada. Novos alertas de Google API Key devem ser avaliados pelo mesmo critério: confirmar que o valor é uma chave pública de navegador esperada, verificar as restrições no Google Cloud e nunca resolver automaticamente apenas por corresponder ao formato. A API retornou `state: resolved` e `resolution: false_positive`. Não usar `used in tests` (DEV é real) nem `revoked` (a chave continua em uso). Fechar apenas este alerta não desativa scanning. A exceção do scanner local não altera os detectores do GitHub; novos alertas devem ser avaliados individualmente.
 
 Antes de PROD, configure App Check e observe métricas antes de enforcement, revise quotas e alertas de orçamento se habilitar billing, e considere HTTP referrers limitados a domínios usados após testes de login/refresh. Não reutilize a chave em outros serviços. Reavalie esta conclusão caso as restrições Cloud mudem; o código não consegue verificar automaticamente a configuração do Console.
 

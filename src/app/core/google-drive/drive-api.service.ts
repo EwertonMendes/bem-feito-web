@@ -12,6 +12,12 @@ export interface DriveFileMetadata {
   appProperties?: Record<string, string>;
 }
 
+export class DriveApiError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+  }
+}
+
 @Injectable({ providedIn: 'root' })
 export class DriveApiService {
   private readonly auth = inject(DriveAuthService);
@@ -105,7 +111,7 @@ export class DriveApiService {
     if (response.status === 401) this.auth.invalidate();
     if (!response.ok) {
       const body = await response.text().catch(() => '');
-      throw new Error(`Google Drive respondeu ${response.status}.${body ? ` ${body.slice(0, 300)}` : ''}`);
+      throw new DriveApiError(response.status, `Google Drive respondeu ${response.status}.${body ? ` ${body.slice(0, 300)}` : ''}`);
     }
     return response;
   }

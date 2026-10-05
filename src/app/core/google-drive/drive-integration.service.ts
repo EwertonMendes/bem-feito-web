@@ -4,7 +4,7 @@ import { AuthService } from '../auth/auth.service';
 import { DriveIntegrationRepository } from '../repositories/drive-integration.repository';
 import { GoogleDriveIntegration } from '../../domain/models/integration.model';
 import { CatalogImageEntityKind } from '../../domain/models/image.model';
-import { DriveApiService } from './drive-api.service';
+import { DriveApiError, DriveApiService } from './drive-api.service';
 import { DriveAuthService } from './drive-auth.service';
 import { DrivePickerService } from './drive-picker.service';
 
@@ -30,7 +30,7 @@ export class DriveIntegrationService {
   readonly error = this.errorState.asReadonly();
   readonly driveEmail = this.driveEmailState.asReadonly();
   readonly revision = computed(() => this.driveAuth.revision() + this.configRevision());
-  readonly connected = computed(() => this.statusState() === 'connected');
+  readonly connected = computed(() => this.statusState() === 'connected' && this.driveAuth.connected());
 
   async load(force = false): Promise<void> {
     if (!this.enabled || (this.loaded && !force)) return;
@@ -95,7 +95,8 @@ export class DriveIntegrationService {
       await this.verifyAccount();
       try {
         await this.verifyConfiguredFolder(config);
-      } catch {
+      } catch (error) {
+        if (!(error instanceof DriveApiError) || ![403, 404].includes(error.status)) throw error;
         const selected = await this.picker.selectFolder();
         if (selected.id !== config.rootFolderId) throw new Error('Selecione exatamente a pasta de imagens configurada para este ambiente.');
         await this.verifyConfiguredFolder(config);

@@ -28,6 +28,12 @@ interface GoogleIdentityWindow {
   };
 }
 
+class DriveOAuthError extends Error {
+  constructor(readonly code: string, message: string) {
+    super(message);
+  }
+}
+
 export class DriveAuthorizationRequiredError extends Error {
   constructor() {
     super('Conecte o Google Drive para visualizar ou alterar imagens.');
@@ -71,7 +77,12 @@ export class DriveAuthService {
     if (current) return current;
     if (this.pending) return this.pending;
 
-    this.pending = this.requestToken('').catch(() => this.requestToken('consent')).finally(() => {
+    this.pending = this.requestToken('').catch((error) => {
+      if (error instanceof DriveOAuthError && ['consent_required', 'interaction_required'].includes(error.code)) {
+        return this.requestToken('consent');
+      }
+      throw error;
+    }).finally(() => {
       this.pending = undefined;
     });
     return this.pending;
@@ -99,7 +110,10 @@ export class DriveAuthService {
         scope: 'https://www.googleapis.com/auth/drive.file',
         callback: (response) => {
           if (!response.access_token) {
-            reject(new Error(response.error_description || response.error || 'Autorização do Google Drive não concluída.'));
+            reject(new DriveOAuthError(
+              response.error ?? 'oauth_failed',
+              response.error_description || 'Autorização do Google Drive não concluída.',
+            ));
             return;
           }
           const expiresIn = Math.max(60, Number(response.expires_in ?? 3600));
@@ -107,7 +121,7 @@ export class DriveAuthService {
           this.revisionState.update((value) => value + 1);
           resolve(response.access_token);
         },
-        error_callback: () => reject(new Error('A autorização do Google Drive foi cancelada ou bloqueada.')),
+        error_callback: () => reject(new DriveOAuthError('popup_failed', 'A autorização do Google Drive foi cancelada ou bloqueada.')),
       });
       client.requestAccessToken({ prompt });
     });

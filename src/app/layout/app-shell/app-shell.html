@@ -13,7 +13,10 @@
     </div>
   </aside>
 
-  <main class="content"><router-outlet /></main>
+  <main class="content">
+    <bf-drive-connection-banner />
+    <router-outlet />
+  </main>
 
   <nav class="mobile-nav" aria-label="Navegação móvel">
     <a routerLink="/dashboard" routerLinkActive="active"><bf-icon name="dashboard" /><span>Início</span></a>

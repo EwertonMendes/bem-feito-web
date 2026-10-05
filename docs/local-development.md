@@ -4,6 +4,9 @@ Use Node 22.22.3 ou superior compatível com `package.json`.
 
 ```powershell
 npm ci
+Copy-Item .env.example .env.local
+# Preencha FIREBASE_DEV_API_KEY em .env.local com a chave do Web App DEV.
+npm run security:scan
 npm test
 npm run test:migration
 npm run build:dev
@@ -11,6 +14,8 @@ npm start
 ```
 
 Abra `http://localhost:4200`. DEV real usa `bem-feito-dev`. Google Authentication está habilitado e localhost autorizado. O acesso exige `users/{UID}` com `active: true`; a conta Google sozinha não libera o aplicativo.
+
+`npm start`, `npm run build:dev` e `npm run build:dev:hosting` geram `src/environments/environment.generated.ts` usando `FIREBASE_DEV_API_KEY` de `.env.local` ou da variável de ambiente do processo. O arquivo gerado e os arquivos `.env*` locais são ignorados pelo Git. Não copie a chave de volta para `environment.ts`.
 
 Se `npm ci` retornar EBUSY no Sass, pare o `npm start` deste projeto, instale as dependências e reinicie. Não encerre processos de outros projetos.
 
@@ -31,7 +36,7 @@ Para testes manuais, execute em um terminal:
 npm run firebase:emulators -- --project demo-bem-feito
 ```
 
-Configure temporariamente `useEmulators: true` e `firebase.projectId: 'demo-bem-feito'` no environment de desenvolvimento. Use configuração Web de demonstração no lugar dos IDs do projeto real, mantenha `emulatorHost: '127.0.0.1'` e reinicie Angular. Emulator UI: `http://localhost:4000`; Auth: 9099; Firestore: 8080; Storage: 9199.
+Configure temporariamente `useEmulators: true` e `firebase.projectId: 'demo-bem-feito'` no environment gerado de desenvolvimento. Use configuração Web de demonstração no lugar dos IDs do projeto real, mantenha `emulatorHost: '127.0.0.1'` e reinicie Angular. Emulator UI: `http://localhost:4000`; Auth: 9099; Firestore: 8080; Storage: 9199.
 
 Restaure o environment real ao terminar. Não publique um build com `useEmulators: true`.
 
@@ -54,4 +59,4 @@ O build PROD pode compilar mesmo com placeholders. Isso apenas verifica compila�
 
 Para publicar DEV, use `npm run firebase:deploy:dev`. A configuração `dev-hosting` mantém o Firebase DEV, otimiza o bundle e gera nomes com hash, sem sourcemaps. O deploy não inclui Storage. Localmente, imagens também ficam desabilitadas e todos os cadastros podem ser salvos sem elas.
 
-Não versione tokens, chaves privadas, credenciais administrativas, `.env` com secrets ou dados empresariais. Firebase Web config e reCAPTCHA site key são públicos; App Check debug tokens são secretos e não devem ser colocados no environment versionado.
+Não versione tokens, chaves privadas, credenciais administrativas, `.env` com valores, App Check debug tokens ou dados empresariais. A Firebase Web API Key é pública por design, mas a política deste repositório é injetá-la localmente para evitar alertas de credencial e reutilização acidental. Authentication, Security Rules e API restrictions são as barreiras reais de segurança.

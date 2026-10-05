@@ -11,7 +11,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { todayBusinessDate, formatBusinessDate } from '../../core/utils/date';
 import { formatCurrency, toCents } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
-import { CatalogImage } from '../../shared/ui/image/catalog-image';
+import { CatalogImage } from '../../shared/media/catalog-image/catalog-image';
 
 interface SaleFormModel { businessDate: string; customerName: string; dueDate: string; discount: number; notes: string; }
 interface ProductCartLine { key: string; kind: 'product'; sourceId: string; quantity: number; }

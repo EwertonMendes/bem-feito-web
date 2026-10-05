@@ -8,7 +8,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { ErrorService } from '../../core/services/error.service';
 import { toCents, fromCents, formatCurrency } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
-import { CatalogImage } from '../../shared/ui/image/catalog-image';
+import { CatalogImage } from '../../shared/media/catalog-image/catalog-image';
 
 interface ProductFormModel { code: string; collectionId: string; fragranceId: string; formatId: string; salePrice: number; additionalCost: number; minimumStock: number; active: boolean; }
 interface InputFormModel { code: string; name: string; unitId: string; minimumStock: number | null; active: boolean; }

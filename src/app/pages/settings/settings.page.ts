@@ -16,9 +16,10 @@ import { ToastService } from '../../core/services/toast.service';
 import { ErrorService } from '../../core/services/error.service';
 import { fromCents, toCents } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
-import { GoogleDriveSettingsCard } from '../../shared/integrations/google-drive-settings-card';
+import { GoogleDriveSettingsCard } from '../../features/google-drive/components/google-drive-settings-card';
 
 type SettingTab = 'collections' | 'fragrances' | 'formats' | 'prices' | 'units' | 'payments' | 'expenseCategories' | 'expenseTypes';
+type SimpleSetting = CollectionDefinition | UnitDefinition | PaymentMethod | ExpenseCategory;
 
 interface SimpleModel { name: string; active: boolean; }
 interface FragranceModel extends SimpleModel { collectionId: string; }
@@ -67,20 +68,33 @@ export class SettingsPage {
     this.dialog().nativeElement.showModal();
   }
 
-  edit(item: unknown): void {
-    const value = item as Record<string, unknown>;
-    this.editingId.set(String(value['id'] ?? ''));
-    if (this.tab() === 'fragrances') {
-      this.fragranceModel.set({ name: String(value['name'] ?? ''), collectionId: String(value['collectionId'] ?? ''), active: Boolean(value['active']) });
-    } else if (this.tab() === 'formats') {
-      this.formatModel.set({ name: String(value['name'] ?? ''), approximateWeightGrams: Number(value['approximateWeightGrams'] ?? 0), active: Boolean(value['active']) });
-    } else if (this.tab() === 'prices') {
-      this.priceModel.set({ collectionId: String(value['collectionId'] ?? ''), formatId: String(value['formatId'] ?? ''), price: fromCents(Number(value['priceCents'] ?? 0)), active: Boolean(value['active']) });
-    } else if (this.tab() === 'expenseTypes') {
-      this.expenseTypeModel.set({ name: String(value['name'] ?? ''), kind: value['kind'] as ExpenseType['kind'], active: Boolean(value['active']) });
-    } else {
-      this.simpleModel.set({ name: String(value['name'] ?? ''), active: Boolean(value['active']) });
-    }
+  editSimple(item: SimpleSetting): void {
+    this.editingId.set(item.id);
+    this.simpleModel.set({ name: item.name, active: item.active });
+    this.dialog().nativeElement.showModal();
+  }
+
+  editFragrance(item: FragranceDefinition): void {
+    this.editingId.set(item.id);
+    this.fragranceModel.set({ name: item.name, collectionId: item.collectionId, active: item.active });
+    this.dialog().nativeElement.showModal();
+  }
+
+  editFormat(item: FormatDefinition): void {
+    this.editingId.set(item.id);
+    this.formatModel.set({ name: item.name, approximateWeightGrams: item.approximateWeightGrams ?? 0, active: item.active });
+    this.dialog().nativeElement.showModal();
+  }
+
+  editPrice(item: FormatPrice): void {
+    this.editingId.set(item.id);
+    this.priceModel.set({ collectionId: item.collectionId, formatId: item.formatId, price: fromCents(item.priceCents), active: item.active });
+    this.dialog().nativeElement.showModal();
+  }
+
+  editExpenseType(item: ExpenseType): void {
+    this.editingId.set(item.id);
+    this.expenseTypeModel.set({ name: item.name, kind: item.kind, active: item.active });
     this.dialog().nativeElement.showModal();
   }
 

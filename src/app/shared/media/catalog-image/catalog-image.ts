@@ -1,29 +1,13 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, afterNextRender, effect, inject, input, signal } from '@angular/core';
 import { ImageService } from '../../../core/services/image.service';
 import { CatalogImageRef } from '../../../domain/models/image.model';
-import { BfIcon } from '../icon/icon';
+import { BfImageFrame } from '../../ui/image-frame/image-frame';
 
 @Component({
   selector: 'bf-catalog-image',
-  imports: [BfIcon],
+  imports: [BfImageFrame],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <div class="frame" [class.compact]="compact()" [attr.aria-busy]="loading()">
-      @if (url()) {
-        <img [src]="url()!" [alt]="alt()" loading="lazy" />
-      } @else if (loading()) {
-        <span class="skeleton" aria-hidden="true"></span>
-      } @else {
-        <bf-icon name="image" />
-      }
-    </div>
-  `,
-  styles: [`
-    :host{display:block}.frame{position:relative;aspect-ratio:4/3;border-radius:14px;display:grid;place-items:center;overflow:hidden;background:linear-gradient(145deg,var(--surface-2),var(--brand-soft));color:var(--muted)}
-    .frame.compact{width:48px;height:48px;aspect-ratio:1;border-radius:12px}.frame img{width:100%;height:100%;object-fit:cover}.frame bf-icon{width:28px;height:28px}
-    .skeleton{position:absolute;inset:0;background:linear-gradient(100deg,var(--surface-2) 20%,color-mix(in srgb,var(--surface-2) 70%,white) 38%,var(--surface-2) 56%);background-size:220% 100%;animation:image-loading 1.15s ease-in-out infinite}
-    @keyframes image-loading{from{background-position:120% 0}to{background-position:-100% 0}}@media(prefers-reduced-motion:reduce){.skeleton{animation:none}}
-  `],
+  template: `<bf-image-frame [src]="url()" [alt]="alt()" [loading]="loading()" [compact]="compact()" />`,
 })
 export class CatalogImage {
   private readonly images = inject(ImageService);
@@ -59,7 +43,6 @@ export class CatalogImage {
       const availability = this.images.availability();
       this.images.revision();
       const request = ++this.request;
-
       this.url.set(null);
 
       if (!image) {

@@ -6,7 +6,7 @@ import { InventoryStore } from '../../features/inventory/inventory.store';
 import { todayBusinessDate, formatBusinessDate } from '../../core/utils/date';
 import { formatCurrency } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
-import { CatalogImage } from '../../shared/ui/image/catalog-image';
+import { CatalogImage } from '../../shared/media/catalog-image/catalog-image';
 
 interface AdjustmentModel {
   quantity: number;

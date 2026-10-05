@@ -25,7 +25,8 @@
     "test:migration": "node --test tools/tests/migration.test.mjs",
     "test:transactions": "firebase emulators:exec --only firestore --project demo-bem-feito \"vitest run tools/tests/transactions.spec.ts\"",
     "admin:user": "node tools/admin/upsert-user.mjs",
-    "test:rules": "firebase emulators:exec --only firestore --project demo-bem-feito \"node tools/tests/firestore.rules.test.mjs && node tools/tests/drive-integration.rules.test.mjs\""
+    "test:rules": "firebase emulators:exec --only firestore --project demo-bem-feito \"node tools/tests/firestore.rules.test.mjs && node tools/tests/drive-integration.rules.test.mjs\"",
+    "test:architecture": "node --test tools/tests/architecture.test.mjs"
   },
   "dependencies": {
     "@angular/common": "^22.2.1",

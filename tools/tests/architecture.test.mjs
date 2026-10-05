@@ -1,0 +1,77 @@
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname, normalize, relative, resolve, sep } from 'node:path';
+import { strict as assert } from 'node:assert';
+import { test } from 'node:test';
+
+const appRoot = resolve('src/app');
+
+function walk(directory) {
+  return readdirSync(directory).flatMap((entry) => {
+    const path = resolve(directory, entry);
+    return statSync(path).isDirectory() ? walk(path) : path.endsWith('.ts') ? [path] : [];
+  });
+}
+
+function appTarget(file, specifier) {
+  if (!specifier.startsWith('.')) return null;
+  const absolute = normalize(resolve(dirname(file), specifier));
+  if (!absolute.startsWith(appRoot + sep)) return null;
+  return relative(appRoot, absolute).split(sep).join('/');
+}
+
+function importsOf(file) {
+  const source = readFileSync(file, 'utf8');
+  const matches = [
+    ...source.matchAll(/from\s+['"]([^'"]+)['"]/g),
+    ...source.matchAll(/import\(\s*['"]([^'"]+)['"]\s*\)/g),
+  ];
+  return matches.map((match) => match[1]);
+}
+
+test('application layer dependencies stay directional', () => {
+  const violations = [];
+
+  for (const file of walk(appRoot)) {
+    const relativeFile = relative(appRoot, file).split(sep).join('/');
+    for (const specifier of importsOf(file)) {
+      const target = appTarget(file, specifier);
+      if (!target) {
+        if (relativeFile.startsWith('domain/') && (specifier.startsWith('@angular/') || specifier.startsWith('firebase'))) {
+          violations.push(`${relativeFile} -> ${specifier}`);
+        }
+        continue;
+      }
+
+      if (relativeFile.startsWith('domain/') && /^(core|features|pages|layout|shared)\//.test(target)) {
+        violations.push(`${relativeFile} -> ${target}`);
+      }
+
+      if (relativeFile.startsWith('core/') && /^(features|pages|layout|shared)\//.test(target)) {
+        violations.push(`${relativeFile} -> ${target}`);
+      }
+
+      if (relativeFile.startsWith('features/') && /^(pages|layout)\//.test(target)) {
+        violations.push(`${relativeFile} -> ${target}`);
+      }
+
+      if (relativeFile.startsWith('shared/ui/') && /^(core|domain|features|pages|layout|shared\/media|shared\/feedback)\//.test(target)) {
+        violations.push(`${relativeFile} -> ${target}`);
+      }
+    }
+  }
+
+  assert.deepEqual(violations, [], `Architecture violations:\n${violations.join('\n')}`);
+});
+
+test('app-specific integrations do not live under shared ui', () => {
+  const forbidden = [
+    resolve(appRoot, 'shared/integrations'),
+    resolve(appRoot, 'shared/ui/image/catalog-image.ts'),
+    resolve(appRoot, 'shared/ui/toast/toast-container.ts'),
+  ];
+  const existing = forbidden.filter((path) => {
+    try { return statSync(path).isDirectory() || statSync(path).isFile(); }
+    catch { return false; }
+  });
+  assert.deepEqual(existing, []);
+});

@@ -20,6 +20,7 @@ service-account*.json
 .env
 .env.*
 !.env.example
+src/environments/environment.generated.ts
 tools/migration/legacy-export.json
 tools/migration/reconciliation.json
 tools/migration/legacy-raw.json

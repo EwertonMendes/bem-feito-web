@@ -7,8 +7,15 @@ import { SalesStore } from '../../features/sales/sales.store';
 import { SettingsStore } from '../../features/settings/settings.store';
 import { ExpenseDraft, ExpenseKind } from '../../domain/models/finance.model';
 import { formatBusinessDate, todayBusinessDate } from '../../core/utils/date';
-import { formatCurrency, toCents } from '../../core/utils/money';
+import { formatCurrency, fromCents, toCents } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
+
+interface ReceiptFormModel {
+  saleId: string;
+  businessDate: string;
+  methodId: string;
+  amount: number;
+}
 
 interface ExpenseFormModel {
   businessDate: string;
@@ -37,6 +44,7 @@ export class FinancePage {
   readonly settings = inject(SettingsStore);
   private readonly route = inject(ActivatedRoute);
   private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('expenseDialog');
+  private readonly receiptDialog = viewChild.required<ElementRef<HTMLDialogElement>>('receiptDialog');
 
   readonly tab = signal<'expenses' | 'receivables' | 'payments'>('expenses');
   readonly currency = formatCurrency;
@@ -60,6 +68,14 @@ export class FinancePage {
   });
   readonly totalReceivable = computed(() => this.sales.openSales().reduce((sum, sale) => sum + sale.balanceCents, 0));
   readonly totalOut = computed(() => this.store.expenses().reduce((sum, item) => sum + item.amountCents, 0));
+  readonly receiptModel = signal<ReceiptFormModel>({ saleId: '', businessDate: todayBusinessDate(), methodId: '', amount: 0 });
+  readonly receiptForm = form(this.receiptModel, (p) => {
+    required(p.saleId);
+    required(p.businessDate);
+    required(p.methodId);
+    min(p.amount, 0.01);
+  });
+  readonly selectedReceivable = computed(() => this.sales.openSales().find((sale) => sale.id === this.receiptModel().saleId));
 
   constructor() {
     void Promise.all([this.catalog.load(), this.store.load(), this.sales.load(), this.settings.load()]).then(() => {
@@ -81,6 +97,34 @@ export class FinancePage {
       link: '',
     });
     this.dialog().nativeElement.showModal();
+  }
+
+  openReceipt(saleId: string): void {
+    const sale = this.sales.openSales().find((item) => item.id === saleId);
+    if (!sale) return;
+    this.receiptModel.set({
+      saleId: sale.id,
+      businessDate: todayBusinessDate(),
+      methodId: this.settings.paymentMethods().find((item) => item.active)?.id ?? '',
+      amount: fromCents(sale.balanceCents),
+    });
+    this.receiptDialog().nativeElement.showModal();
+  }
+
+  async saveReceipt(): Promise<void> {
+    if (this.receiptForm().invalid()) return;
+    const value = this.receiptModel();
+    const ok = await this.sales.addPayment(value.saleId, value.businessDate, value.methodId, toCents(value.amount));
+    if (ok) {
+      await this.store.load();
+      this.receiptDialog().nativeElement.close();
+    }
+  }
+
+  async reversePayment(paymentId: string): Promise<void> {
+    if (!window.confirm('Estornar este recebimento? O saldo da venda será reaberto.')) return;
+    const ok = await this.sales.reversePayment(paymentId);
+    if (ok) await this.store.load();
   }
 
   async save(): Promise<void> {

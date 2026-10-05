@@ -1,4 +1,5 @@
 import { AuditFields } from './common.model';
+import { CatalogImageRef } from './image.model';
 
 export interface RecipeComponent {
   inputId: string;
@@ -19,7 +20,7 @@ export interface Product extends AuditFields {
   averageUnitCostCents: number;
   stock: number;
   minimumStock: number;
-  imagePath?: string;
+  image?: CatalogImageRef;
   recipe: RecipeComponent[];
 }
 
@@ -33,7 +34,7 @@ export interface InputItem extends AuditFields {
   minimumStock: number;
   minimumStockConfigured?: boolean;
   averageUnitCostCents: number;
-  imagePath?: string;
+  image?: CatalogImageRef;
 }
 
 export interface KitComponent {
@@ -51,7 +52,7 @@ export interface Kit extends AuditFields {
   name: string;
   priceCents: number;
   notes?: string;
-  imagePath?: string;
+  image?: CatalogImageRef;
   components: KitComponent[];
 }
 
@@ -70,7 +71,7 @@ export interface Addition extends AuditFields {
   category: string;
   priceCents: number;
   notes?: string;
-  imagePath?: string;
+  image?: CatalogImageRef;
   components: AdditionComponent[];
 }
 

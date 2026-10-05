@@ -17,11 +17,11 @@
         <div class="picker-top"><div class="bf-segments"><button [class.active]="catalogTab()==='products'" (click)="catalogTab.set('products')">Produtos</button><button [class.active]="catalogTab()==='kits'" (click)="catalogTab.set('kits')">Kits</button><button [class.active]="catalogTab()==='additions'" (click)="catalogTab.set('additions')">Adicionais</button></div></div>
         <div class="picker-grid">
           @if(catalogTab()==='products'){
-            @for(product of catalog.activeProducts();track product.id){<button class="pick-card" type="button" [disabled]="product.stock<=0" (click)="addProduct(product)"><bf-catalog-image [path]="product.imagePath" [alt]="product.displayName" /><span><strong>{{product.displayName}}</strong><small>{{currency(product.salePriceCents)}} · estoque {{product.stock}}</small></span><span class="add">+</span></button>}
+            @for(product of catalog.activeProducts();track product.id){<button class="pick-card" type="button" [disabled]="product.stock<=0" (click)="addProduct(product)"><bf-catalog-image [image]="product.image" [alt]="product.displayName" /><span><strong>{{product.displayName}}</strong><small>{{currency(product.salePriceCents)}} · estoque {{product.stock}}</small></span><span class="add">+</span></button>}
           } @else if(catalogTab()==='kits'){
-            @for(kit of catalog.activeKits();track kit.id){<button class="pick-card" type="button" (click)="addKit(kit)"><bf-catalog-image [path]="kit.imagePath" [alt]="kit.name" /><span><strong>{{kit.name}}</strong><small>{{currency(kit.priceCents)}}</small></span><span class="add">+</span></button>}
+            @for(kit of catalog.activeKits();track kit.id){<button class="pick-card" type="button" (click)="addKit(kit)"><bf-catalog-image [image]="kit.image" [alt]="kit.name" /><span><strong>{{kit.name}}</strong><small>{{currency(kit.priceCents)}}</small></span><span class="add">+</span></button>}
           } @else {
-            @for(addition of catalog.activeAdditions();track addition.id){<button class="pick-card" type="button" (click)="addAddition(addition)"><bf-catalog-image [path]="addition.imagePath" [alt]="addition.name" /><span><strong>{{addition.name}}</strong><small>{{currency(addition.priceCents)}}</small></span><span class="add">+</span></button>}
+            @for(addition of catalog.activeAdditions();track addition.id){<button class="pick-card" type="button" (click)="addAddition(addition)"><bf-catalog-image [image]="addition.image" [alt]="addition.name" /><span><strong>{{addition.name}}</strong><small>{{currency(addition.priceCents)}}</small></span><span class="add">+</span></button>}
           }
         </div>
       </section>
@@ -30,7 +30,7 @@
         <div class="cart-scroll">
           <h3>Pedido</h3>
           @for(line of cart();track line.key){
-            <article class="cart-line"><bf-catalog-image [path]="lineImage(line)" [alt]="lineName(line)" [compact]="true" /><div class="line-main"><strong>{{lineName(line)}}</strong><small>{{currency(lineUnitPrice(line))}}</small>
+            <article class="cart-line"><bf-catalog-image [image]="lineImage(line)" [alt]="lineName(line)" [compact]="true" /><div class="line-main"><strong>{{lineName(line)}}</strong><small>{{currency(lineUnitPrice(line))}}</small>
               @if(line.kind==='kit'){
                 <div class="kit-config">@for(slot of kitSlots(line);track slot.index){<label><span>{{slot.label}}</span><select [value]="line.componentProductIds[slot.index]" (change)="changeKitSelection(line,slot.index,$any($event.target).value)">@for(product of slot.candidates;track product.id){<option [value]="product.id">{{product.displayName}}</option>}</select></label>}</div>
               }

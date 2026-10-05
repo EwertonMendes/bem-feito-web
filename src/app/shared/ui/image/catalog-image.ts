@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, afterNextRender, effect, inject, input, signal } from '@angular/core';
 import { ImageService } from '../../../core/services/image.service';
+import { CatalogImageRef } from '../../../domain/models/image.model';
 import { BfIcon } from '../icon/icon';
 
 @Component({
@@ -19,19 +20,39 @@ import { BfIcon } from '../icon/icon';
 })
 export class CatalogImage {
   private readonly images = inject(ImageService);
+  private readonly host = inject(ElementRef<HTMLElement>);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly visible = signal(false);
   private request = 0;
-  readonly path = input<string | undefined>();
+
+  readonly image = input<CatalogImageRef | undefined>();
   readonly alt = input('Imagem do item');
   readonly compact = input(false);
   readonly url = signal<string | null>(null);
 
   constructor() {
+    afterNextRender(() => {
+      if (!('IntersectionObserver' in window)) {
+        this.visible.set(true);
+        return;
+      }
+      const observer = new IntersectionObserver((entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        this.visible.set(true);
+        observer.disconnect();
+      }, { rootMargin: '240px' });
+      observer.observe(this.host.nativeElement);
+      this.destroyRef.onDestroy(() => observer.disconnect());
+    });
+
     effect(() => {
-      const path = this.path();
+      const image = this.image();
+      const visible = this.visible();
+      this.images.revision();
       const request = ++this.request;
       this.url.set(null);
-      if (!path) return;
-      void this.images.resolve(path).then((url) => {
+      if (!visible || !image) return;
+      void this.images.resolve(image).then((url) => {
         if (request === this.request) this.url.set(url);
       }).catch(() => {
         if (request === this.request) this.url.set(null);

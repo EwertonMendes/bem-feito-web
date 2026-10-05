@@ -3,6 +3,7 @@ import {
   Addition, CollectionDefinition, FormatDefinition, FormatPrice, FragranceDefinition,
   InputItem, Kit, Product, UnitDefinition,
 } from '../../domain/models/catalog.model';
+import { CatalogImageRef } from '../../domain/models/image.model';
 import {
   AdditionRepository, CollectionRepository, FormatPriceRepository, FormatRepository,
   FragranceRepository, InputRepository, KitRepository, ProductRepository, UnitRepository,
@@ -87,32 +88,56 @@ export class CatalogStore {
     }
   }
 
-  async saveProduct(product: Product): Promise<string> {
+  async saveProduct(product: Product, reload = true): Promise<string> {
     const id = product.id || await this.productRepository.create(this.withoutId(product));
     if (product.id) await this.productRepository.replace(product);
-    await this.load(true);
+    if (reload) await this.load(true);
     return id;
   }
 
-  async saveInput(input: InputItem): Promise<string> {
+  async saveInput(input: InputItem, reload = true): Promise<string> {
     const id = input.id || await this.inputRepository.create(this.withoutId(input));
     if (input.id) await this.inputRepository.replace(input);
-    await this.load(true);
+    if (reload) await this.load(true);
     return id;
   }
 
-  async saveKit(kit: Kit): Promise<string> {
+  async saveKit(kit: Kit, reload = true): Promise<string> {
     const id = kit.id || await this.kitRepository.create(this.withoutId(kit));
     if (kit.id) await this.kitRepository.replace(kit);
-    await this.load(true);
+    if (reload) await this.load(true);
     return id;
   }
 
-  async saveAddition(addition: Addition): Promise<string> {
+  async saveAddition(addition: Addition, reload = true): Promise<string> {
     const id = addition.id || await this.additionRepository.create(this.withoutId(addition));
     if (addition.id) await this.additionRepository.replace(addition);
-    await this.load(true);
+    if (reload) await this.load(true);
     return id;
+  }
+
+  async setProductImage(id: string, image: CatalogImageRef | null): Promise<void> {
+    if (image) await this.productRepository.patch(id, { image });
+    else await this.productRepository.clearField(id, 'image');
+    await this.load(true);
+  }
+
+  async setInputImage(id: string, image: CatalogImageRef | null): Promise<void> {
+    if (image) await this.inputRepository.patch(id, { image });
+    else await this.inputRepository.clearField(id, 'image');
+    await this.load(true);
+  }
+
+  async setKitImage(id: string, image: CatalogImageRef | null): Promise<void> {
+    if (image) await this.kitRepository.patch(id, { image });
+    else await this.kitRepository.clearField(id, 'image');
+    await this.load(true);
+  }
+
+  async setAdditionImage(id: string, image: CatalogImageRef | null): Promise<void> {
+    if (image) await this.additionRepository.patch(id, { image });
+    else await this.additionRepository.clearField(id, 'image');
+    await this.load(true);
   }
 
   async saveCollection(item: CollectionDefinition): Promise<void> {

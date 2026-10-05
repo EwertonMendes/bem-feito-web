@@ -6,6 +6,7 @@ import { Production, ProductionConsumption } from '../../domain/models/productio
 import { AuthService } from '../auth/auth.service';
 import { FIRESTORE } from '../firebase/firebase.providers';
 import { entityCode } from '../utils/ids';
+import { aggregateRecipe } from '../utils/recipe';
 
 @Injectable({ providedIn: 'root' })
 export class ProductionRepository {
@@ -33,19 +34,21 @@ export class ProductionRepository {
       const product = { id: productSnapshot.id, ...productSnapshot.data() } as Product;
       if (!product.active) throw new Error('O produto está inativo.');
 
+      const recipe = aggregateRecipe(product.recipe);
       const inputSnapshots = [];
-      for (const component of product.recipe) {
+      for (const component of recipe) {
         inputSnapshots.push(await transaction.get(doc(this.firestore, 'inputs', component.inputId)));
       }
 
       const consumptions: ProductionConsumption[] = [];
       let totalCostCents = product.additionalCostCents * quantity;
 
-      for (let index = 0; index < product.recipe.length; index++) {
-        const component = product.recipe[index];
+      for (let index = 0; index < recipe.length; index++) {
+        const component = recipe[index];
         const snapshot = inputSnapshots[index];
         if (!component || !snapshot?.exists()) throw new Error('A receita contém um insumo inválido.');
         const input = { id: snapshot.id, ...snapshot.data() } as InputItem;
+        if (component.unitId !== input.unitId) throw new Error(`Unidade incompatível para ${input.name}.`);
         const consumedQuantity = component.quantity * quantity;
         if (input.stock < consumedQuantity) throw new Error(`Estoque insuficiente de ${input.name}.`);
         const componentCost = Math.round(consumedQuantity * input.averageUnitCostCents);
@@ -59,6 +62,7 @@ export class ProductionRepository {
         });
       }
 
+      totalCostCents = Math.round(totalCostCents);
       const sequence = Number(counterSnapshot.data()?.['value'] ?? 0) + 1;
       const productionRef = doc(collection(this.firestore, 'productions'));
       const unitCostCents = Math.round(totalCostCents / quantity);

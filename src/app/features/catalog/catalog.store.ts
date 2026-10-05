@@ -52,7 +52,7 @@ export class CatalogStore {
   readonly activeKits = computed(() => this.kitsState().filter((item) => item.active));
   readonly activeAdditions = computed(() => this.additionsState().filter((item) => item.active));
   readonly lowStockProducts = computed(() => this.productsState().filter((item) => item.active && item.stock <= item.minimumStock));
-  readonly lowStockInputs = computed(() => this.inputsState().filter((item) => item.active && item.stock <= item.minimumStock));
+  readonly lowStockInputs = computed(() => this.inputsState().filter((item) => item.active && item.minimumStockConfigured !== false && item.stock <= item.minimumStock));
   readonly negativeProducts = computed(() => this.productsState().filter((item) => item.stock < 0));
 
   async load(force = false): Promise<void> {

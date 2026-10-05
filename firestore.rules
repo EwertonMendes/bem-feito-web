@@ -11,7 +11,10 @@ service cloud.firestore {
     }
 
     function activeUser() {
-      return signedIn() && currentProfile().active == true;
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && currentProfile().active == true
+        && currentProfile().role in ['owner', 'operator', 'viewer'];
     }
 
     function roleIs(role) {
@@ -49,13 +52,152 @@ service cloud.firestore {
       ];
     }
 
+    function money(value) {
+      return value is int && value >= 0 && value <= 1000000000;
+    }
+
+    function quantity(value) {
+      return value is number && value >= 0 && value <= 1000000;
+    }
+
+    // Imported deficits can be preserved or corrected, never created or made worse by clients.
+    function stock(value) {
+      return quantity(value) || (value is number && value >= -1000000 && value < 0
+        && resource != null && resource.data.stock < 0 && value >= resource.data.stock);
+    }
+
+    function text(value) {
+      return value is string && value.size() > 0 && value.size() <= 500;
+    }
+
+    function fields(data, required, optional) {
+      return data.keys().hasAll(required)
+        && data.keys().hasOnly(required.concat(optional).concat(['createdAt', 'updatedAt', 'createdBy', 'updatedBy']));
+    }
+
+    function auditCreate(data) {
+      return data.createdAt == request.time && data.updatedAt == request.time
+        && data.createdBy == request.auth.uid && data.updatedBy == request.auth.uid;
+    }
+
+    function auditUpdate(data) {
+      return !data.diff(resource.data).affectedKeys().hasAny(['createdAt', 'createdBy'])
+        && data.updatedAt == request.time && data.updatedBy == request.auth.uid;
+    }
+
+    function validProfile(data) {
+      return fields(data, ['email', 'displayName', 'role', 'active'], ['photoURL'])
+        && text(data.email) && text(data.displayName)
+        && data.role in ['owner', 'operator', 'viewer'] && data.active is bool;
+    }
+
+    function validCatalog(name, data) {
+      return (name in ['collections', 'units', 'paymentMethods', 'expenseCategories']
+          && fields(data, ['name', 'active'], []) && text(data.name) && data.active is bool)
+        || (name == 'fragrances'
+          && fields(data, ['name', 'active', 'collectionId'], [])
+          && text(data.name) && text(data.collectionId) && data.active is bool)
+        || (name == 'formats'
+          && fields(data, ['name', 'active'], ['approximateWeightGrams'])
+          && text(data.name) && data.active is bool
+          && (!('approximateWeightGrams' in data) || quantity(data.approximateWeightGrams)))
+        || (name == 'expenseTypes'
+          && fields(data, ['name', 'active', 'kind'], []) && text(data.name) && data.active is bool
+          && data.kind in ['input-purchase', 'operating-expense', 'equipment', 'other'])
+        || (name == 'formatPrices'
+          && fields(data, ['collectionId', 'formatId', 'priceCents', 'active'], [])
+          && text(data.collectionId) && text(data.formatId) && money(data.priceCents) && data.active is bool)
+        || (name == 'products'
+          && fields(data, ['code', 'active', 'collectionId', 'fragranceId', 'formatId', 'displayName', 'salePriceCents', 'additionalCostCents', 'averageUnitCostCents', 'stock', 'minimumStock', 'recipe'], ['imagePath'])
+          && text(data.code) && text(data.displayName) && data.active is bool
+          && text(data.collectionId) && text(data.fragranceId) && text(data.formatId)
+          && money(data.salePriceCents) && money(data.additionalCostCents) && money(data.averageUnitCostCents)
+          && stock(data.stock) && quantity(data.minimumStock) && data.recipe is list)
+        || (name == 'inputs'
+          && fields(data, ['code', 'active', 'name', 'unitId', 'stock', 'minimumStock', 'averageUnitCostCents'], ['imagePath', 'minimumStockConfigured'])
+          && text(data.code) && text(data.name) && text(data.unitId) && data.active is bool
+          && stock(data.stock) && quantity(data.minimumStock) && money(data.averageUnitCostCents)
+          && (!('minimumStockConfigured' in data) || data.minimumStockConfigured is bool))
+        || (name == 'kits'
+          && fields(data, ['active', 'name', 'priceCents', 'components'], ['notes', 'imagePath'])
+          && data.active is bool && text(data.name) && money(data.priceCents) && data.components is list)
+        || (name == 'additions'
+          && fields(data, ['active', 'name', 'category', 'priceCents', 'components'], ['notes', 'imagePath'])
+          && data.active is bool && text(data.name) && data.category is string
+          && money(data.priceCents) && data.components is list);
+    }
+
+    function businessDate(data) {
+      return data.businessDate is string && data.businessDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    function validOperation(name, data) {
+      return (name == 'sales'
+          && fields(data, ['code', 'businessDate', 'discountCents', 'subtotalCents', 'totalCents', 'receivedCents', 'tipCents', 'balanceCents', 'paymentStatus', 'status', 'items', 'paymentIds', 'stockEffects'], ['customerName', 'dueDate', 'notes', 'cancelledAt', 'cancelledBy'])
+          && text(data.code) && businessDate(data)
+          && money(data.discountCents) && money(data.subtotalCents) && money(data.totalCents)
+          && money(data.receivedCents) && money(data.tipCents) && money(data.balanceCents)
+          && data.discountCents <= data.subtotalCents && data.totalCents == data.subtotalCents - data.discountCents
+          && data.receivedCents <= data.totalCents
+          && data.status in ['active', 'cancelled']
+          && data.paymentStatus in ['paid', 'pending', 'partial', 'cancelled']
+          && ((data.status == 'cancelled' && data.paymentStatus == 'cancelled' && data.balanceCents == 0)
+            || (data.status == 'active' && data.balanceCents == data.totalCents - data.receivedCents
+              && ((data.balanceCents == 0 && data.paymentStatus == 'paid')
+                || (data.balanceCents > 0 && data.receivedCents == 0 && data.paymentStatus == 'pending')
+                || (data.balanceCents > 0 && data.receivedCents > 0 && data.paymentStatus == 'partial'))))
+          && data.items is list && data.items.size() > 0 && data.paymentIds is list && data.stockEffects is list)
+        || (name == 'payments'
+          && fields(data, ['code', 'saleId', 'businessDate', 'methodId', 'amountReceivedCents', 'appliedCents', 'tipCents', 'status'], ['notes', 'reversalOf'])
+          && text(data.code) && text(data.saleId) && text(data.methodId) && businessDate(data)
+          && money(data.amountReceivedCents) && data.amountReceivedCents > 0
+          && money(data.appliedCents) && money(data.tipCents)
+          && data.amountReceivedCents == data.appliedCents + data.tipCents && data.status in ['active', 'reversed'])
+        || (name == 'expenses'
+          && fields(data, ['code', 'businessDate', 'kind', 'amountCents'], ['categoryId', 'inputId', 'quantity', 'unitId', 'paymentMethodId', 'notes', 'link'])
+          && text(data.code) && businessDate(data) && money(data.amountCents) && data.amountCents > 0
+          && data.kind in ['input-purchase', 'operating-expense', 'equipment', 'other']
+          && (data.kind != 'input-purchase' || (text(data.inputId) && quantity(data.quantity) && data.quantity > 0)))
+        || (name == 'productions'
+          && fields(data, ['code', 'businessDate', 'productId', 'productName', 'quantity', 'unitCostCents', 'totalCostCents', 'costPending', 'consumptions'], ['notes'])
+          && text(data.code) && businessDate(data) && text(data.productId) && text(data.productName)
+          && quantity(data.quantity) && data.quantity > 0 && money(data.unitCostCents) && money(data.totalCostCents)
+          && data.costPending is bool && data.consumptions is list)
+        || (name == 'stockAdjustments'
+          && fields(data, ['code', 'businessDate', 'itemType', 'itemId', 'quantityDelta', 'reason'], [])
+          && text(data.code) && businessDate(data) && text(data.itemId) && text(data.reason)
+          && data.itemType in ['product', 'input'] && quantityDelta(data.quantityDelta))
+        || (name == 'stockMovements'
+          && fields(data, ['businessDate', 'itemType', 'itemId', 'quantityDelta', 'unitCostCents', 'totalCostCents', 'sourceType', 'sourceId'], ['reversalOf'])
+          && businessDate(data) && text(data.itemId) && text(data.sourceId)
+          && data.itemType in ['product', 'input'] && quantityDelta(data.quantityDelta)
+          && money(data.unitCostCents) && money(data.totalCostCents)
+          && data.sourceType in ['sale', 'sale-cancellation', 'production', 'purchase', 'adjustment']);
+    }
+
+    function quantityDelta(value) {
+      return value is number && value != 0 && value >= -1000000 && value <= 1000000;
+    }
+
     match /users/{userId} {
       allow read: if signedIn() && (request.auth.uid == userId || canAdminister());
-      allow create, update, delete: if canAdminister();
+      allow create, update: if canAdminister() && validProfile(request.resource.data);
+      allow delete: if canAdminister();
     }
 
     match /counters/{documentId} {
-      allow read, write: if canOperate();
+      allow read: if canOperate();
+      allow create, update: if canOperate()
+        && documentId in ['sale', 'payment', 'production', 'expense', 'stockAdjustment']
+        && request.resource.data.keys().hasOnly(['value', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy'])
+        && request.resource.data.value is int && request.resource.data.value >= 0
+        && request.resource.data.value <= 1000000000
+        && request.resource.data.updatedAt == request.time
+        && ((!exists(/databases/$(database)/documents/counters/$(documentId))
+            && request.resource.data.keys().hasOnly(['value', 'updatedAt']) && request.resource.data.value <= 500)
+          || (request.resource.data.value >= resource.data.value && request.resource.data.value <= resource.data.value + 500
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['value', 'updatedAt'])));
+      allow delete: if false;
     }
 
     match /migrationRuns/{documentId} {
@@ -63,9 +205,20 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /migrationSources/{runId}/{document=**} {
+      allow read: if canAdminister();
+      allow write: if false;
+    }
+
     match /{collectionName}/{documentId} {
       allow read: if operationalCollection(collectionName) && activeUser();
-      allow create, update, delete: if operationalCollection(collectionName) && canOperate();
+      allow create: if operationalCollection(collectionName) && canOperate()
+        && auditCreate(request.resource.data)
+        && (validCatalog(collectionName, request.resource.data) || validOperation(collectionName, request.resource.data));
+      allow update: if operationalCollection(collectionName) && canOperate()
+        && auditUpdate(request.resource.data)
+        && (validCatalog(collectionName, request.resource.data) || validOperation(collectionName, request.resource.data));
+      allow delete: if collectionName in ['collections', 'fragrances', 'formats', 'formatPrices', 'units', 'paymentMethods', 'expenseCategories', 'expenseTypes', 'inputs', 'products', 'kits', 'additions'] && canAdminister();
     }
 
     match /{document=**} {

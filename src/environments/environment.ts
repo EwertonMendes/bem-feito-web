@@ -1,13 +1,14 @@
 export const environment = {
   production: false,
   name: 'development',
+  catalogImagesEnabled: false,
   firebase: {
-    apiKey: 'REPLACE_DEV_API_KEY',
-    authDomain: 'REPLACE_DEV_PROJECT_ID.firebaseapp.com',
-    projectId: 'REPLACE_DEV_PROJECT_ID',
-    storageBucket: 'REPLACE_DEV_PROJECT_ID.firebasestorage.app',
-    messagingSenderId: 'REPLACE_DEV_MESSAGING_SENDER_ID',
-    appId: 'REPLACE_DEV_APP_ID'
+    apiKey: 'AIzaSyDphJI0zALbNQm8bYJTSI99kYgvgVyaga8',
+    authDomain: 'bem-feito-dev.firebaseapp.com',
+    projectId: 'bem-feito-dev',
+    storageBucket: 'bem-feito-dev.firebasestorage.app',
+    messagingSenderId: '312978463343',
+    appId: '1:312978463343:web:e49e223d872b9c68374b9a'
   },
   useEmulators: false,
   emulatorHost: '127.0.0.1'

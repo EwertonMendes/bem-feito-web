@@ -8,5 +8,5 @@ export const publicOnlyGuard: CanActivateFn = async () => {
   const user = await auth.waitForUser();
   if (!user) return true;
   const profile = await auth.resolveProfile(user);
-  return profile?.active ? router.parseUrl('/dashboard') : true;
+  return profile?.active === true ? router.parseUrl('/dashboard') : true;
 };

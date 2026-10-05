@@ -11,7 +11,10 @@ service firebase.storage {
     }
 
     function activeUser() {
-      return signedIn() && profile().active == true;
+      return signedIn()
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        && profile().active == true
+        && profile().role in ['owner', 'operator', 'viewer'];
     }
 
     function canOperate() {
@@ -22,8 +25,8 @@ service firebase.storage {
       allow read: if activeUser();
       allow write: if canOperate()
         && (request.resource == null
-          || (request.resource.size < 3 * 1024 * 1024
-            && request.resource.contentType.matches('image/.*')));
+          || (request.resource.size <= 3 * 1024 * 1024
+            && request.resource.contentType in ['image/webp', 'image/png', 'image/jpeg', 'image/gif', 'image/avif']));
     }
 
     match /{allPaths=**} {

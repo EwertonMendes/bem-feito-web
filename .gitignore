@@ -6,6 +6,7 @@
 !/.vscode/settings.json
 /dist
 /node_modules
+/.npm-cache
 /out-tsc
 /firebase-debug.log
 /firestore-debug.log
@@ -14,7 +15,13 @@
 *.local
 *.log
 service-account*.json
+*.pem
+*.key
+.env
+.env.*
+!.env.example
 tools/migration/legacy-export.json
 tools/migration/reconciliation.json
 tools/migration/legacy-raw.json
 tools/migration/migration-data.json
+tools/migration/.private/

@@ -26,7 +26,7 @@
   } @else if (tab() === 'inputs') {
     <div class="list-grid">
       @for (item of filteredInputs(); track item.id) {
-        <article class="list-card"><div><span class="code">{{ item.code }}</span><h2>{{ item.name }}</h2><p>Estoque {{ item.stock }} · mínimo {{ item.minimumStock }}</p></div><div class="row-actions"><span class="bf-badge" [class.muted]="!item.active">{{ item.active ? 'Ativo' : 'Inativo' }}</span><button class="bf-button secondary" (click)="editInput(item)">Editar</button></div></article>
+        <article class="list-card"><div><span class="code">{{ item.code }}</span><h2>{{ item.name }}</h2><p>Estoque {{ item.stock }} · mínimo {{ item.minimumStockConfigured === false ? 'não definido' : item.minimumStock }}</p></div><div class="row-actions"><span class="bf-badge" [class.muted]="!item.active">{{ item.active ? 'Ativo' : 'Inativo' }}</span><button class="bf-button secondary" (click)="editInput(item)">Editar</button></div></article>
       } @empty { <div class="bf-empty"><div><strong>Nenhum insumo</strong><p>Cadastre matérias-primas e embalagens.</p></div></div> }
     </div>
   } @else if (tab() === 'kits') {
@@ -80,7 +80,7 @@
         </section>
       }
 
-      @if (tab() !== 'inputs') { <label class="bf-field image-field"><span>Imagem</span><input class="bf-input" type="file" accept="image/*" (change)="onImage($event)" /><small>O navegador reduz e converte para WebP antes do upload.</small></label> }
+      @if (imagesEnabled && tab() !== 'inputs') { <label class="bf-field image-field"><span>Imagem</span><input class="bf-input" type="file" accept="image/webp,image/png,image/jpeg,image/gif,image/avif" (change)="onImage($event)" /><small>O navegador reduz e converte para WebP antes do upload.</small></label> }
     </div>
     <div class="bf-dialog-footer"><button class="bf-button secondary" type="button" (click)="editor.close()">Cancelar</button><button class="bf-button" type="button" (click)="save()">Salvar</button></div>
   </dialog>

@@ -114,7 +114,7 @@ export class SalesRepository {
             quantity: line.quantity,
             unitPriceCents,
             unitCostCents: product.averageUnitCostCents,
-            totalCents: unitPriceCents * line.quantity,
+            totalCents: Math.round(unitPriceCents * line.quantity),
             totalCostCents: Math.round(product.averageUnitCostCents * line.quantity),
           });
           addEffect({ itemType: 'product', itemId: product.id, quantityDelta: -line.quantity, unitCostCents: product.averageUnitCostCents });
@@ -186,7 +186,7 @@ export class SalesRepository {
           quantity: line.quantity,
           unitPriceCents: addition.priceCents,
           unitCostCents,
-          totalCents: addition.priceCents * line.quantity,
+          totalCents: Math.round(addition.priceCents * line.quantity),
           totalCostCents: unitCostCents * line.quantity,
         });
       }
@@ -439,7 +439,7 @@ export class SalesRepository {
       }
 
       for (const paymentSnapshot of paymentSnapshots) {
-        if (!paymentSnapshot.exists()) continue;
+        if (!paymentSnapshot.exists() || paymentSnapshot.data()['status'] !== 'active') continue;
         transaction.update(paymentSnapshot.ref, {
           status: 'reversed',
           updatedAt: serverTimestamp(),

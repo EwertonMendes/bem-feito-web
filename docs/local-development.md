@@ -1,65 +1,57 @@
 # Desenvolvimento local
 
-## 1. Clonar
+Use Node 22.22.3 ou superior compatível com `package.json`.
 
-```bash
-git clone https://github.com/EwertonMendes/bem-feito-web.git
-cd bem-feito-web
-```
-
-## 2. Node
-
-O projeto usa Node 22.22.3.
-
-```bash
-nvm use
-```
-
-Sem nvm, instale uma versão compatível com o campo `engines` de `package.json`.
-
-## 3. Instalar dependências
-
-```bash
-npm install
-```
-
-## 4. Configurar Firebase DEV
-
-Copie a configuração do Web App do projeto Firebase de desenvolvimento para:
-
-```text
-src/environments/environment.ts
-```
-
-Troque todos os placeholders `REPLACE_DEV_...`.
-
-## 5. Rodar Angular
-
-```bash
+```powershell
+npm ci
+npm test
+npm run test:migration
+npm run build:dev
 npm start
 ```
 
-Acesse `http://localhost:4200`.
+Abra `http://localhost:4200`. DEV real usa `bem-feito-dev`. Google Authentication está habilitado e localhost autorizado. O acesso exige `users/{UID}` com `active: true`; a conta Google sozinha não libera o aplicativo.
 
-## 6. Emuladores opcionais
+Se `npm ci` retornar EBUSY no Sass, pare o `npm start` deste projeto, instale as dependências e reinicie. Não encerre processos de outros projetos.
 
-Para trabalhar sem tocar no Firebase DEV, coloque temporariamente:
+## Emuladores
 
-```ts
-useEmulators: true
+Java precisa estar disponível para os emuladores Firestore e Storage.
+
+```powershell
+npm run test:rules
+npm run test:transactions
 ```
 
-em `src/environments/environment.ts` e execute em outro terminal:
+Esse comando inicia Firestore e Storage exclusivamente em `demo-bem-feito`, executa testes de autorização/schema e encerra os emuladores. Nunca aponte testes de rules para PROD.
 
-```bash
-npm run firebase:emulators
+Para testes manuais, execute em um terminal:
+
+```powershell
+npm run firebase:emulators -- --project demo-bem-feito
 ```
 
-A Emulator UI usa `http://localhost:4000`.
+Configure temporariamente `useEmulators: true` e `firebase.projectId: 'demo-bem-feito'` no environment de desenvolvimento. Use configuração Web de demonstração no lugar dos IDs do projeto real, mantenha `emulatorHost: '127.0.0.1'` e reinicie Angular. Emulator UI: `http://localhost:4000`; Auth: 9099; Firestore: 8080; Storage: 9199.
 
-## 7. Build
+Restaure o environment real ao terminar. Não publique um build com `useEmulators: true`.
 
-```bash
+Neste Windows com Java 25, o runtime Storage emite avisos de compatibilidade no encerramento, e Firestore pode deixar processo residual na porta 8080. Se necessário, identifique o processo `demo-bem-feito` e encerre apenas esse Emulator antes de repetir testes.
+
+## Validação real
+
+Em 05/10/2026 foram verificados login Google, acesso negado sem perfil, primeiro owner, Dashboard, refresh mantendo sessão e cadastro/atualização sem imagem. Os nove cadastros descartáveis da configuração foram arquivados com cópia recuperável após a migração real.
+
+Hosting DEV está publicado e a migração foi conferida por readback e reconciliação financeira. Vendas, recebimentos, estornos, cancelamento, produção, compras e ajustes foram testados com os repositories e Rules reais nos emuladores. Imagens e App Check estão adiados por decisão do usuário. Consulte [firebase-setup.md](firebase-setup.md) e [migration-dev.md](migration-dev.md) antes de preparar PROD.
+
+## Builds
+
+```powershell
 npm run build:dev
 npm run build:prod
 ```
+
+O build PROD pode compilar mesmo com placeholders. Isso apenas verifica compilação e não o torna publicável; PROD continua pendente.
+
+Para publicar DEV, use `npm run firebase:deploy:dev`. A configuração `dev-hosting` mantém o Firebase DEV, otimiza o bundle e gera nomes com hash, sem sourcemaps. O deploy não inclui Storage. Localmente, imagens também ficam desabilitadas e todos os cadastros podem ser salvos sem elas.
+
+Não versione tokens, chaves privadas, credenciais administrativas, `.env` com secrets ou dados empresariais. Firebase Web config e reCAPTCHA site key são públicos; App Check debug tokens são secretos e não devem ser colocados no environment versionado.

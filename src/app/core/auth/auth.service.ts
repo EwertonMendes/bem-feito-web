@@ -43,7 +43,7 @@ export class AuthService {
     provider.setCustomParameters({ prompt: 'select_account' });
     try {
       const result = await signInWithPopup(this.auth, provider);
-      await this.resolveProfile(result.user);
+      await this.finishLogin(result.user);
     } catch (error) {
       if (this.firebaseCode(error) === 'auth/popup-blocked') {
         await signInWithRedirect(this.auth, provider);
@@ -93,10 +93,15 @@ export class AuthService {
   private async completeRedirect(): Promise<void> {
     try {
       const result = await getRedirectResult(this.auth);
-      if (result?.user) await this.resolveProfile(result.user);
+      if (result?.user) await this.finishLogin(result.user);
     } catch (error) {
       this.errorState.set(this.authError(error));
     }
+  }
+
+  private async finishLogin(user: User): Promise<void> {
+    const profile = await this.resolveProfile(user);
+    await this.router.navigateByUrl(profile?.active === true ? '/dashboard' : '/acesso-negado');
   }
 
   private firebaseCode(error: unknown): string {

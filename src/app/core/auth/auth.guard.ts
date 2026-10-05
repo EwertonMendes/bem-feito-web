@@ -8,5 +8,5 @@ export const authGuard: CanActivateFn = async () => {
   const user = await auth.waitForUser();
   if (!user) return router.parseUrl('/login');
   const profile = await auth.resolveProfile(user);
-  return profile?.active ? true : router.parseUrl('/acesso-negado');
+  return profile?.active === true ? true : router.parseUrl('/acesso-negado');
 };

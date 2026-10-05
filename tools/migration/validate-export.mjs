@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 
 const filePath = resolve(process.argv[2] ?? 'tools/migration/migration-data.json');
 const data = JSON.parse(await readFile(filePath, 'utf8'));
+if (data.schemaVersion !== 1) throw new Error('Versão da migração inválida.');
 const errors = [];
 const warnings = [];
 const list = (name) => Array.isArray(data[name]) ? data[name] : [];
@@ -21,7 +22,10 @@ const ensureUnique = (name) => {
   'collections', 'fragrances', 'formats', 'formatPrices', 'units', 'paymentMethods', 'expenseCategories',
   'expenseTypes', 'inputs', 'products', 'kits', 'additions', 'expenses', 'productions', 'sales', 'payments',
   'stockAdjustments', 'stockMovements', 'counters',
-].forEach(ensureUnique);
+].forEach((name) => {
+  if (!Array.isArray(data[name])) errors.push(`${name}: coleção ausente ou inválida.`);
+  ensureUnique(name);
+});
 
 const collections = index('collections');
 const fragrances = index('fragrances');
@@ -81,6 +85,66 @@ for (const sale of list('sales')) {
 for (const movement of list('stockMovements')) {
   if (movement.itemType === 'product' && !products.has(movement.itemId)) errors.push(`stockMovements/${movement.id}: produto inexistente ${movement.itemId}.`);
   if (movement.itemType === 'input' && !inputs.has(movement.itemId)) errors.push(`stockMovements/${movement.id}: insumo inexistente ${movement.itemId}.`);
+}
+
+const dateValid = (value) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+  && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
+const finite = (value) => typeof value === 'number' && Number.isFinite(value);
+const positive = (value) => finite(value) && value > 0 && value <= 1000000;
+const idValid = (value) => typeof value === 'string' && value.length > 0 && value.length <= 500 && !value.includes('/');
+const paymentMethods = index('paymentMethods');
+for (const [name, records] of Object.entries(data)) {
+  if (!Array.isArray(records)) continue;
+  for (const item of records) {
+    if (!idValid(item.id)) errors.push(`${name}: id inválido.`);
+    if ('active' in item && typeof item.active !== 'boolean') errors.push(`${name}/${item.id}: active inválido.`);
+    for (const [field, value] of Object.entries(item)) {
+      if (field.endsWith('Cents') && (!Number.isSafeInteger(value) || value < 0 || value > 1000000000)) errors.push(`${name}/${item.id}: ${field} inválido.`);
+    }
+    if ('businessDate' in item && !dateValid(item.businessDate)) errors.push(`${name}/${item.id}: data inválida.`);
+    if ('stock' in item && (!finite(item.stock) || Math.abs(item.stock) > 1000000)) errors.push(`${name}/${item.id}: estoque inválido.`);
+    if ('minimumStock' in item && (!finite(item.minimumStock) || item.minimumStock < 0)) errors.push(`${name}/${item.id}: mínimo inválido.`);
+  }
+}
+for (const product of list('products')) {
+  if (fragrances.get(product.fragranceId)?.collectionId !== product.collectionId) errors.push(`products/${product.id}: fragrância de outra coleção.`);
+  for (const component of product.recipe ?? []) {
+    if (!positive(component.quantity) || inputs.get(component.inputId)?.unitId !== component.unitId) errors.push(`products/${product.id}: consumo/unidade inválido.`);
+  }
+}
+for (const kit of list('kits')) for (const component of kit.components ?? []) {
+  if (!Number.isSafeInteger(component.quantity) || component.quantity <= 0 || component.quantity > 1000000) errors.push(`kits/${kit.id}: quantidade inválida.`);
+}
+for (const addition of list('additions')) for (const component of addition.components ?? []) {
+  if (!positive(component.quantity) || inputs.get(component.inputId)?.unitId !== component.unitId) errors.push(`additions/${addition.id}: consumo/unidade inválido.`);
+}
+for (const production of list('productions')) if (!positive(production.quantity)) errors.push(`productions/${production.id}: quantidade inválida.`);
+for (const expense of list('expenses')) {
+  if (expense.amountCents <= 0) errors.push(`expenses/${expense.id}: valor inválido.`);
+  if (expense.kind === 'input-purchase' && (!inputs.has(expense.inputId) || !positive(expense.quantity) || inputs.get(expense.inputId)?.unitId !== expense.unitId)) errors.push(`expenses/${expense.id}: compra inválida.`);
+  if (expense.paymentMethodId && !paymentMethods.has(expense.paymentMethodId)) errors.push(`expenses/${expense.id}: forma de pagamento inválida.`);
+}
+for (const payment of list('payments')) {
+  if (!paymentMethods.has(payment.methodId) || !['active', 'reversed'].includes(payment.status) || payment.amountReceivedCents <= 0) errors.push(`payments/${payment.id}: recebimento inválido.`);
+  if (payment.status === 'active' && payment.amountReceivedCents !== payment.appliedCents + payment.tipCents) errors.push(`payments/${payment.id}: alocação divergente.`);
+  if (!(sales.get(payment.saleId)?.paymentIds ?? []).includes(payment.id)) errors.push(`payments/${payment.id}: vínculo inverso ausente.`);
+}
+for (const sale of list('sales')) {
+  const linked = list('payments').filter((item) => item.saleId === sale.id && item.status === 'active');
+  if (!sale.items?.length || !['active', 'cancelled'].includes(sale.status)) errors.push(`sales/${sale.id}: venda inválida.`);
+  if (sale.subtotalCents !== sale.items.reduce((sum, item) => sum + item.totalCents, 0) || sale.totalCents !== sale.subtotalCents - sale.discountCents) errors.push(`sales/${sale.id}: total divergente.`);
+  if (sale.status === 'active' && (sale.receivedCents !== linked.reduce((sum, item) => sum + item.appliedCents, 0) || sale.tipCents !== linked.reduce((sum, item) => sum + item.tipCents, 0) || sale.balanceCents !== sale.totalCents - sale.receivedCents)) errors.push(`sales/${sale.id}: recebimentos/saldo divergentes.`);
+  for (const paymentId of sale.paymentIds ?? []) if (!index('payments').has(paymentId)) errors.push(`sales/${sale.id}: pagamento inexistente.`);
+  for (const item of sale.items ?? []) if (!positive(item.quantity)) errors.push(`sales/${sale.id}: quantidade de item inválida.`);
+}
+const deltas = new Map();
+for (const movement of list('stockMovements')) {
+  if (!finite(movement.quantityDelta) || movement.quantityDelta === 0 || Math.abs(movement.quantityDelta) > 1000000) errors.push(`stockMovements/${movement.id}: delta inválido.`);
+  const key = `${movement.itemType}:${movement.itemId}`;
+  deltas.set(key, (deltas.get(key) ?? 0) + movement.quantityDelta);
+}
+for (const [name, type] of [['products', 'product'], ['inputs', 'input']]) for (const item of list(name)) {
+  if (Math.abs((deltas.get(`${type}:${item.id}`) ?? 0) - item.stock) > 0.000001) errors.push(`${name}/${item.id}: histórico não reconcilia com estoque.`);
 }
 
 console.log(`Validação: ${errors.length} erro(s), ${warnings.length} aviso(s).`);

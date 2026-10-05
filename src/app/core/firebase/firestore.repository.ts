@@ -3,10 +3,11 @@ import {
   CollectionReference, DocumentData, DocumentReference, QueryConstraint,
   collection, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc,
 } from 'firebase/firestore';
-import { FIRESTORE } from './firebase.providers';
+import { FIREBASE_AUTH, FIRESTORE } from './firebase.providers';
 
 export abstract class FirestoreRepository<T extends { id: string }> {
   protected readonly firestore = inject(FIRESTORE);
+  private readonly auth = inject(FIREBASE_AUTH);
 
   protected constructor(private readonly collectionName: string) {}
 
@@ -30,20 +31,29 @@ export abstract class FirestoreRepository<T extends { id: string }> {
 
   async create(value: Omit<T, 'id'>, id?: string): Promise<string> {
     const target = id ? this.documentRef(id) : doc(this.collectionRef());
-    await setDoc(target, { ...value, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    const userId = this.actor();
+    await setDoc(target, { ...value, createdAt: serverTimestamp(), updatedAt: serverTimestamp(), createdBy: userId, updatedBy: userId });
     return target.id;
   }
 
   async replace(value: T): Promise<void> {
     const { id, ...data } = value;
-    await setDoc(this.documentRef(id), { ...data, updatedAt: serverTimestamp() }, { merge: true });
+    const { createdAt: _createdAt, createdBy: _createdBy, ...editable } = data as typeof data & { createdAt?: unknown; createdBy?: string };
+    await setDoc(this.documentRef(id), { ...editable, updatedAt: serverTimestamp(), updatedBy: this.actor() }, { merge: true });
   }
 
   async patch(id: string, data: Partial<Omit<T, 'id'>>): Promise<void> {
-    await updateDoc(this.documentRef(id), { ...data, updatedAt: serverTimestamp() });
+    const { createdAt: _createdAt, createdBy: _createdBy, ...editable } = data as typeof data & { createdAt?: unknown; createdBy?: string };
+    await updateDoc(this.documentRef(id), { ...editable, updatedAt: serverTimestamp(), updatedBy: this.actor() });
   }
 
   async remove(id: string): Promise<void> {
     await deleteDoc(this.documentRef(id));
+  }
+
+  private actor(): string {
+    const uid = this.auth.currentUser?.uid;
+    if (!uid) throw new Error('Sessão inválida.');
+    return uid;
   }
 }

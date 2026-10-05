@@ -31,6 +31,7 @@ export interface InputItem extends AuditFields {
   unitId: string;
   stock: number;
   minimumStock: number;
+  minimumStockConfigured?: boolean;
   averageUnitCostCents: number;
   imagePath?: string;
 }

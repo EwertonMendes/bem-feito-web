@@ -6,9 +6,28 @@ const outputPath = resolve(process.argv[3] ?? 'tools/migration/migration-data.js
 const raw = JSON.parse(await readFile(inputPath, 'utf8'));
 const sheets = raw.sheets ?? {};
 
-const rows = (name) => Array.isArray(sheets[name]) ? sheets[name] : [];
+const identityFields = {
+  Vendas: ['Data', 'Cliente'], 'Itens da Venda': ['Venda_ID', 'Produto'], Recebimentos: ['Venda_ID', 'Data'],
+  Produção: ['Produto_ID', 'Data'], 'Compras e Despesas': ['Tipo', 'Data'], Produtos: ['Nome de Exibição', 'Coleção'],
+  Insumos: ['Insumo'], Receitas: ['Produto_ID', 'Insumo_ID'], 'Ajustes de Estoque': ['Tipo', 'Data'],
+  Kits: ['Nome'], 'Itens do Kit': ['Kit_ID'], Cadastros: ['Tipo', 'Nome'], 'Preços de Formato': ['Coleção', 'Formato'],
+  Adicionais: ['Nome'], 'Itens do Adicional': ['Adicional_ID'], 'Consumos da Venda': ['Venda_ID'],
+};
+const rows = (name) => (Array.isArray(sheets[name]) ? sheets[name] : []).filter((row) =>
+  (identityFields[name] ?? []).some((field) => row[field] !== '' && row[field] !== null && row[field] !== undefined));
 const text = (value) => value === null || value === undefined ? '' : String(value).trim();
-const number = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
+const number = (value) => {
+  if (value === '' || value === null || value === undefined) return 0;
+  if (!Number.isFinite(Number(value))) throw new Error('A exportação contém um número inválido.');
+  return Number(value);
+};
+const date = (value) => {
+  if (typeof value === 'number') return new Date(Date.UTC(1899, 11, 30) + Math.floor(value) * 86400000).toISOString().slice(0, 10);
+  const result = text(value);
+  if (!result) return '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(result) || new Date(result + 'T00:00:00Z').toISOString().slice(0, 10) !== result) throw new Error('Data inválida na exportação.');
+  return result;
+};
 const cents = (value) => Math.round(number(value) * 100);
 const active = (value) => text(value).toLowerCase() === 'sim';
 const lower = (value) => text(value).toLocaleLowerCase('pt-BR');
@@ -32,7 +51,14 @@ const fragrances = typeRows('Fragrância').map((row) => ({
   collectionId: collectionIds.get(lower(row.Pai)) ?? '',
   active: active(row.Ativo),
 }));
-const fragranceIds = byName(fragrances);
+const fragranceIds = new Map(fragrances.map((item) => [`${item.collectionId}:${lower(item.name)}`, item.id]));
+const fragranceId = (name, collectionName) => {
+  const collectionId = collectionIds.get(lower(collectionName));
+  if (collectionId) return fragranceIds.get(`${collectionId}:${lower(name)}`) ?? '';
+  const matches = fragrances.filter((item) => lower(item.name) === lower(name));
+  if (matches.length > 1) throw new Error('Fragrância ambígua: informe a coleção.');
+  return matches[0]?.id ?? '';
+};
 const formats = typeRows('Formato').map((row) => omitEmpty({
   id: text(row.Cadastro_ID),
   name: text(row.Nome),
@@ -74,6 +100,7 @@ const inputs = rows('Insumos').map((row) => ({
   unitId: unitIds.get(lower(row['Unidade Base'])) ?? '',
   stock: number(row['Estoque Atual']),
   minimumStock: number(row['Estoque Mínimo']),
+  minimumStockConfigured: row['Estoque Mínimo'] !== '' && row['Estoque Mínimo'] !== null && row['Estoque Mínimo'] !== undefined,
   averageUnitCostCents: cents(row['Custo Médio Unit.']),
 }));
 const inputById = new Map(inputs.map((item) => [item.id, item]));
@@ -98,7 +125,7 @@ const products = rows('Produtos').map((row) => ({
   code: text(row.Produto_ID),
   active: active(row.Ativo),
   collectionId: collectionIds.get(lower(row.Coleção)) ?? '',
-  fragranceId: fragranceIds.get(lower(row.Fragrância)) ?? '',
+  fragranceId: fragranceId(row.Fragrância, row.Coleção),
   formatId: formatIds.get(lower(row.Formato)) ?? '',
   displayName: text(row['Nome de Exibição']),
   salePriceCents: cents(row['Preço de Venda']),
@@ -120,7 +147,7 @@ for (const row of rows('Itens do Kit')) {
     formatId: formatIds.get(lower(row.Formato)) ?? '',
     quantity: number(row.Quantidade),
     collectionId: collectionIds.get(lower(row.Coleção)) || undefined,
-    fragranceId: fragranceIds.get(lower(row['Fragrância fixa'])) || undefined,
+    fragranceId: fragranceId(row['Fragrância fixa'], row.Coleção) || undefined,
     order: number(row.Ordem),
   }));
   kitComponents.set(kitId, list);
@@ -183,7 +210,7 @@ const productions = rows('Produção').map((row) => {
   return omitEmpty({
     id: text(row.Produção_ID),
     code: text(row.Produção_ID),
-    businessDate: text(row.Data),
+    businessDate: date(row.Data),
     productId: text(row.Produto_ID),
     productName: text(row.Produto),
     quantity,
@@ -207,7 +234,7 @@ const expenses = rows('Compras e Despesas').map((row) => {
   return omitEmpty({
     id: text(row.Mov_ID),
     code: text(row.Mov_ID),
-    businessDate: text(row.Data),
+    businessDate: date(row.Data),
     kind,
     categoryId: expenseCategoryIds.get(lower(row.Categoria)) || undefined,
     inputId: text(row.Insumo_ID) || undefined,
@@ -223,7 +250,7 @@ const expenses = rows('Compras e Despesas').map((row) => {
 const stockAdjustments = rows('Ajustes de Estoque').map((row) => omitEmpty({
   id: text(row.Ajuste_ID),
   code: text(row.Ajuste_ID),
-  businessDate: text(row.Data),
+  businessDate: date(row.Data),
   itemType: text(row.Tipo) === 'Insumo' ? 'input' : 'product',
   itemId: text(row.Tipo) === 'Insumo' ? text(row.Insumo_ID) : text(row.Produto_ID),
   quantityDelta: number(row['Quantidade (+/-)']),
@@ -234,7 +261,7 @@ const payments = rows('Recebimentos').map((row) => omitEmpty({
   id: text(row.Pagamento_ID),
   code: text(row.Pagamento_ID),
   saleId: text(row.Venda_ID),
-  businessDate: text(row.Data),
+  businessDate: date(row.Data),
   methodId: paymentMethodIds.get(lower(row.Forma)) ?? '',
   amountReceivedCents: cents(row['Valor Recebido']),
   appliedCents: cents(row['Aplicado à Venda']),
@@ -372,9 +399,9 @@ for (const row of rows('Vendas')) {
   sales.push(omitEmpty({
     id: saleId,
     code: saleId,
-    businessDate: text(row.Data),
+    businessDate: date(row.Data),
     customerName: text(row.Cliente) || undefined,
-    dueDate: text(row.Vencimento) || undefined,
+    dueDate: date(row.Vencimento) || undefined,
     discountCents: cents(row.Desconto),
     subtotalCents: cents(row['Total dos Itens']),
     totalCents,
@@ -405,7 +432,7 @@ for (const product of products) {
     totalCostCents: Math.round(Math.abs(opening) * product.averageUnitCostCents),
     sourceType: 'migration',
     sourceId: 'legacy-opening-balance',
-    businessDate: '2026-01-01',
+    businessDate: raw.openingBalanceDate ?? productions.map((item) => item.businessDate).concat(sales.map((item) => item.businessDate), expenses.map((item) => item.businessDate)).sort()[0] ?? date(raw.exportedAt?.slice(0, 10)),
   });
 }
 
@@ -422,7 +449,7 @@ for (const input of inputs) {
     totalCostCents: Math.round(Math.abs(opening) * input.averageUnitCostCents),
     sourceType: 'migration',
     sourceId: 'legacy-opening-balance',
-    businessDate: '2026-01-01',
+    businessDate: raw.openingBalanceDate ?? productions.map((item) => item.businessDate).concat(sales.map((item) => item.businessDate), expenses.map((item) => item.businessDate)).sort()[0] ?? date(raw.exportedAt?.slice(0, 10)),
   });
 }
 
@@ -509,6 +536,8 @@ const counters = [
 const result = {
   schemaVersion: 1,
   source: {
+    spreadsheetId: text(raw.spreadsheetId),
+    timeZone: text(raw.timeZone),
     spreadsheetName: text(raw.spreadsheetName),
     exportedAt: text(raw.exportedAt),
   },

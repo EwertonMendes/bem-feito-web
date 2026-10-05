@@ -24,7 +24,7 @@ interface InputFormModel {
   code: string;
   name: string;
   unitId: string;
-  minimumStock: number;
+  minimumStock: number | null;
   active: boolean;
 }
 
@@ -53,6 +53,7 @@ interface AdditionFormModel {
 export class CatalogPage {
   readonly store = inject(CatalogStore);
   private readonly images = inject(ImageService);
+  readonly imagesEnabled = this.images.enabled;
   private readonly toast = inject(ToastService);
   private readonly errors = inject(ErrorService);
   private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('editor');
@@ -147,7 +148,7 @@ export class CatalogPage {
     this.tab.set('inputs');
     this.editingId.set(item.id);
     this.imageFile.set(null);
-    this.inputModel.set({ code: item.code, name: item.name, unitId: item.unitId, minimumStock: item.minimumStock, active: item.active });
+    this.inputModel.set({ code: item.code, name: item.name, unitId: item.unitId, minimumStock: item.minimumStockConfigured === false ? null : item.minimumStock, active: item.active });
     this.dialog().nativeElement.showModal();
   }
 
@@ -214,6 +215,7 @@ export class CatalogPage {
   }
 
   onImage(event: Event): void {
+    if (!this.imagesEnabled) return;
     const files = (event.target as HTMLInputElement).files;
     this.imageFile.set(files?.[0] ?? null);
   }
@@ -256,7 +258,7 @@ export class CatalogPage {
       recipe: this.recipe().filter((item) => item.inputId && item.quantity > 0 && item.unitId),
     };
     const id = await this.store.saveProduct(product);
-    if (this.imageFile()) {
+    if (this.imagesEnabled && this.imageFile()) {
       const path = await this.images.uploadCatalogImage('products', id, this.imageFile()!);
       await this.store.saveProduct({ ...product, id, imagePath: path });
     }
@@ -273,7 +275,8 @@ export class CatalogPage {
       name: model.name.trim(),
       unitId: model.unitId,
       stock: existing?.stock ?? 0,
-      minimumStock: model.minimumStock,
+      minimumStock: model.minimumStock ?? 0,
+      minimumStockConfigured: model.minimumStock !== null,
       averageUnitCostCents: existing?.averageUnitCostCents ?? 0,
       imagePath: existing?.imagePath,
     };
@@ -295,7 +298,7 @@ export class CatalogPage {
       components: this.kitComponents().filter((item) => item.formatId && item.quantity > 0),
     };
     const id = await this.store.saveKit(kit);
-    if (this.imageFile()) {
+    if (this.imagesEnabled && this.imageFile()) {
       const path = await this.images.uploadCatalogImage('kits', id, this.imageFile()!);
       await this.store.saveKit({ ...kit, id, imagePath: path });
     }
@@ -316,7 +319,7 @@ export class CatalogPage {
       components: this.additionComponents().filter((item) => item.inputId && item.quantity > 0 && item.unitId),
     };
     const id = await this.store.saveAddition(addition);
-    if (this.imageFile()) {
+    if (this.imagesEnabled && this.imageFile()) {
       const path = await this.images.uploadCatalogImage('additions', id, this.imageFile()!);
       await this.store.saveAddition({ ...addition, id, imagePath: path });
     }

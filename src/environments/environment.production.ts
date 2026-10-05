@@ -1,6 +1,7 @@
 export const environment = {
   production: true,
   name: 'production',
+  catalogImagesEnabled: false,
   firebase: {
     apiKey: 'REPLACE_PROD_API_KEY',
     authDomain: 'REPLACE_PROD_PROJECT_ID.firebaseapp.com',

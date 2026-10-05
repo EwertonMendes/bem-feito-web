@@ -59,7 +59,7 @@ const report = {
       ? Math.round(periodSales.reduce((sum, sale) => sum + Number(sale.totalCents ?? 0), 0) / periodSales.length)
       : 0,
     missingCostItems: periodSales.reduce(
-      (sum, sale) => sum + (sale.items ?? []).filter((item) => item.kind !== 'addition' && Number(item.totalCostCents ?? 0) <= 0).length,
+      (sum, sale) => sum + (sale.items ?? []).reduce((count, item) => count + (item.kind === 'product' ? (Number(item.totalCostCents ?? 0) <= 0 ? 1 : 0) : item.kind === 'kit' ? (item.components ?? []).filter((component) => Number(component.unitCostCents ?? 0) <= 0).length : 0), 0),
       0
     ),
     tipsCents: periodSales.reduce((sum, sale) => sum + Number(sale.tipCents ?? 0), 0),
@@ -67,10 +67,10 @@ const report = {
   stock: {
     negativeProducts: list('products').filter((item) => Number(item.stock ?? 0) < 0).length,
     lowProducts: list('products').filter(
-      (item) => item.active && Number(item.stock ?? 0) <= Number(item.minimumStock ?? 0)
+      (item) => item.active && item.minimumStockConfigured !== false && Number(item.stock ?? 0) <= Number(item.minimumStock ?? 0)
     ).length,
     lowInputs: list('inputs').filter(
-      (item) => item.active && Number(item.stock ?? 0) <= Number(item.minimumStock ?? 0)
+      (item) => item.active && item.minimumStockConfigured !== false && Number(item.stock ?? 0) <= Number(item.minimumStock ?? 0)
     ).length,
     productsWithoutCost: list('products').filter((item) => item.active && !Number(item.averageUnitCostCents ?? 0)).length,
     inputsWithoutCost: list('inputs').filter((item) => item.active && !Number(item.averageUnitCostCents ?? 0)).length,

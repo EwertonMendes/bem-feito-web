@@ -38,7 +38,7 @@ export class DashboardStore {
   readonly operationalExpenseCents = computed(() => this.periodExpenses().filter((expense) => expense.kind === 'operating-expense').reduce((sum, expense) => sum + expense.amountCents, 0));
   readonly cashOutCents = computed(() => this.periodExpenses().reduce((sum, expense) => sum + expense.amountCents, 0));
   readonly cashFlowCents = computed(() => this.cashReceivedCents() - this.cashOutCents());
-  readonly tipsCents = computed(() => this.periodSales().reduce((sum, sale) => sum + sale.tipCents, 0));
+  readonly tipsCents = computed(() => this.periodPayments().reduce((sum, payment) => sum + payment.tipCents, 0));
   readonly cogsCents = computed(() => this.periodSales().reduce((sum, sale) => sum + sale.items.reduce((itemSum, item) => itemSum + item.totalCostCents, 0), 0));
   readonly missingCostItems = computed(() =>
     this.periodSales().reduce((sum, sale) => sum + sale.items.reduce((itemSum, item) => {

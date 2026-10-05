@@ -20,7 +20,7 @@
     <div class="bf-dialog-body">
       <div class="bf-grid two">
         <label class="bf-field full"><span>Produto</span><select class="bf-select" [formField]="productionForm.productId"><option value="">Selecione</option>@for (product of catalog.activeProducts(); track product.id) { <option [value]="product.id">{{ product.displayName }} · estoque {{ product.stock }}</option> }</select></label>
-        <label class="bf-field"><span>Quantidade</span><input class="bf-input" type="number" min="1" step="1" [formField]="productionForm.quantity" /></label>
+        <label class="bf-field"><span>Quantidade</span><input class="bf-input" type="number" step="1" [formField]="productionForm.quantity" /></label>
         <label class="bf-field"><span>Data</span><input class="bf-input" type="date" [formField]="productionForm.businessDate" /></label>
         <label class="bf-field full"><span>Observações</span><textarea class="bf-textarea" [formField]="productionForm.notes"></textarea></label>
       </div>

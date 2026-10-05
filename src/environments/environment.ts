@@ -1,9 +1,11 @@
+// Public Firebase Web config. See docs/firebase-key-security.md for the audit.
+// Never add administrative credentials or App Check debug tokens here.
 export const environment = {
   production: false,
   name: 'development',
   catalogImagesEnabled: false,
   firebase: {
-    apiKey: 'CONFIGURE_WITH_FIREBASE_DEV_API_KEY',
+    apiKey: 'AIzaSyDphJI0zALbNQm8bYJTSI99kYgvgVyaga8',
     authDomain: 'bem-feito-dev.firebaseapp.com',
     projectId: 'bem-feito-dev',
     storageBucket: 'bem-feito-dev.firebasestorage.app',

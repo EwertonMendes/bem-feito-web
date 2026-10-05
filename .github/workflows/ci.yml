@@ -18,6 +18,8 @@ jobs:
         with:
           node-version: 22.22.3
       - run: npm run security:scan
-      - run: npm install --no-audit --no-fund
+      - run: npm run test:security
+      - run: npm ci --no-audit --no-fund
       - run: npm test
+      - run: npm run build:dev:hosting
       - run: npm run build:prod

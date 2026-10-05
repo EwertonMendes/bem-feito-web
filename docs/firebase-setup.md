@@ -11,27 +11,14 @@
 - Storage não criado e billing não vinculado. Imagens e App Check adiados por decisão do usuário; App Check sem provider registrado ou enforcement.
 - PROD não existe nem tem alias. `environment.production.ts` contém placeholders e não deve ser publicado.
 
-## Configuração local da chave DEV
-
-A Firebase Web API Key é pública por design e funciona como identificador do projeto, não como autorização de acesso aos dados. Mesmo assim, este repositório não mantém o valor versionado: isso evita alertas genéricos de secret scanning, reduz reutilização acidental e deixa evidente a diferença entre configuração pública de frontend e credenciais administrativas.
-
-Copie o template local e preencha a chave do Web App DEV obtida no Firebase Console:
-
-```powershell
-Copy-Item .env.example .env.local
-# edite .env.local:
-# FIREBASE_DEV_API_KEY=<valor do Web App DEV>
-```
-
-`.env.local` e `src/environments/environment.generated.ts` são ignorados pelo Git. `npm start`, `npm run build:dev` e `npm run build:dev:hosting` geram automaticamente o environment DEV a partir dessa configuração. Também é possível fornecer `FIREBASE_DEV_API_KEY` diretamente como variável de ambiente do processo.
-
-Nunca trate essa estratégia como armazenamento de segredo no browser: qualquer valor necessário ao frontend termina visível no bundle executado pelo usuário. A proteção real do Firebase continua sendo Authentication, Security Rules, API restrictions e, quando habilitado, App Check.
-
 ## Deploy DEV
+
+O config oficial público do Web App está em `src/environments/environment.ts`. Nenhuma credencial administrativa deve entrar no frontend.
+
+As restrições reais da Browser key foram conferidas no Console em 05/10/2026. Consulte [firebase-key-security.md](firebase-key-security.md) para evidências, limitações e tratamento do alerta GitHub #1. Não há geração de environment nem secret de CI para essa configuração pública.
 
 ```powershell
 npx firebase-tools login
-npm run security:scan
 npm test
 npm run test:migration
 npm run test:rules
@@ -39,7 +26,7 @@ npm run test:transactions
 npm run firebase:deploy:dev
 ```
 
-O deploy DEV compila com `dev-hosting`, usando o environment DEV gerado localmente, otimização e nomes de arquivos com hash, sem sourcemaps. Publica somente Firestore e Hosting. O diretório é `dist/bem-feito-web/browser`, com rewrite SPA e `Cache-Control: no-cache`. `build:dev` continua disponível para desenvolvimento local.
+O deploy DEV compila com `dev-hosting`, usando o environment DEV, otimização e nomes de arquivos com hash, sem sourcemaps. Publica somente Firestore e Hosting. O diretório é `dist/bem-feito-web/browser`, com rewrite SPA e `Cache-Control: no-cache`. `build:dev` continua disponível para desenvolvimento local.
 
 `catalogImagesEnabled: false` oculta upload e evita dependência de Storage. Os modelos preservam campos de imagem para edição futura. Escolha e implemente o armazenamento antes de mudar a flag. Se optar por Firebase Storage, autorize billing e crie o bucket antes de publicar suas regras.
 
@@ -105,8 +92,4 @@ PROD exige projeto separado, config real, alias próprio, owner controlado e nov
 
 ## Secrets
 
-Não versione service-account JSON, private keys, OAuth client secrets, tokens, cookies, App Check debug tokens, dados reais da migração nem qualquer outro valor que conceda autorização. `.gitignore` cobre exports conhecidos, checkpoints, cache, PEM/KEY, `.env`, environment DEV gerado e logs.
-
-A CI executa `npm run security:scan` antes de instalar dependências e falha se detectar padrões comuns de credenciais em arquivos rastreados. O scanner nunca imprime o valor detectado.
-
-Para a Firebase Web API Key, valide no Google Cloud Console que a chave usada pelo Web App está restrita somente às APIs Firebase necessárias. Não reutilize essa chave para APIs não-Firebase ou serviços faturáveis.
+Não versione service-account JSON, private keys, OAuth client secrets, tokens, cookies, App Check debug tokens ou dados reais da migração. `.gitignore` cobre exports conhecidos, checkpoints, cache, PEM/KEY, `.env` e logs. Revise conteúdo e histórico antes de qualquer push. Firebase Browser API Key é configuração pública.

@@ -1,8 +1,12 @@
 <div class="shell">
   <aside class="sidebar">
     <a class="brand" routerLink="/dashboard" aria-label="Bem Feito - Dashboard">
-      <img src="/brand-mark.svg" alt="" />
-      <span class="brand-copy"><strong>Bem Feito</strong><small>Vendas, estoque e operação</small></span>
+      <img
+        [src]="theme.darkMode() ? '/assets/brand/bem-feito-logo-dark.webp' : '/assets/brand/bem-feito-logo-light.webp'"
+        width="208"
+        height="208"
+        alt=""
+      />
     </a>
 
     <nav aria-label="Principal">

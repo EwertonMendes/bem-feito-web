@@ -15,35 +15,32 @@
 }
 
 .brand {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  min-height: 94px;
-  padding: 7px 10px 20px;
+  display: grid;
+  place-items: center;
+  min-height: 142px;
+  padding: 4px 8px 22px;
   color: var(--text);
   text-decoration: none;
 }
 
 .brand img {
-  width: 58px;
-  height: 58px;
-  flex: 0 0 auto;
+  display: block;
+  width: 118px;
+  height: 118px;
   object-fit: contain;
+  transition: transform 160ms ease;
 }
 
-.brand-copy,
+.brand:hover img {
+  transform: translateY(-1px) scale(1.01);
+}
+
 .profile-copy {
   display: grid;
   gap: 3px;
   min-width: 0;
 }
 
-.brand-copy strong {
-  font-size: 0.96rem;
-  font-weight: 720;
-}
-
-.brand-copy small,
 .profile small {
   color: var(--muted);
   font-size: 0.68rem;

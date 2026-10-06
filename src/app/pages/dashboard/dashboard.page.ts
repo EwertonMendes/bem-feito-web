@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DashboardStore } from '../../features/dashboard/dashboard.store';
 import { formatCurrency } from '../../core/utils/money';
@@ -13,6 +13,7 @@ import { BfIcon } from '../../shared/ui/icon/icon';
 })
 export class DashboardPage {
   readonly store = inject(DashboardStore);
+  private readonly destroyRef = inject(DestroyRef);
   readonly currency = formatCurrency;
 
   readonly chartCeiling = computed(() => {
@@ -27,6 +28,7 @@ export class DashboardPage {
   });
 
   constructor() {
+    this.destroyRef.onDestroy(() => this.store.deactivate());
     void this.store.load();
   }
 

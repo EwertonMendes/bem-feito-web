@@ -8,11 +8,11 @@
     <div class="period" aria-label="Período do dashboard">
       <label class="bf-field">
         <span>De</span>
-        <input class="bf-input" type="date" [value]="store.startDate()" (change)="store.startDate.set($any($event.target).value)" />
+        <input class="bf-input" type="date" [value]="store.startDate()" (change)="store.setStartDate($any($event.target).value)" />
       </label>
       <label class="bf-field">
         <span>Até</span>
-        <input class="bf-input" type="date" [value]="store.endDate()" (change)="store.endDate.set($any($event.target).value)" />
+        <input class="bf-input" type="date" [value]="store.endDate()" (change)="store.setEndDate($any($event.target).value)" />
       </label>
     </div>
   </header>
@@ -133,19 +133,19 @@
 
       <a routerLink="/estoque" class="alert-row danger-row">
         <span class="alert-icon"><bf-icon name="arrow-down-right" /></span>
-        <span class="alert-count">{{ store.negativeProducts().length }}</span>
+        <span class="alert-count">{{ store.negativeProducts() }}</span>
         <span class="alert-label">produtos negativos</span>
         <span class="alert-action">Corrigir <bf-icon name="arrow-right" /></span>
       </a>
       <a routerLink="/estoque" class="alert-row">
         <span class="alert-icon"><bf-icon name="box" /></span>
-        <span class="alert-count">{{ store.lowStockProducts().length }}</span>
+        <span class="alert-count">{{ store.lowStockProducts() }}</span>
         <span class="alert-label">produtos em estoque baixo</span>
         <span class="alert-action">Ver <bf-icon name="arrow-right" /></span>
       </a>
       <a routerLink="/estoque" class="alert-row">
         <span class="alert-icon sage"><bf-icon name="leaf" /></span>
-        <span class="alert-count">{{ store.lowStockInputs().length }}</span>
+        <span class="alert-count">{{ store.lowStockInputs() }}</span>
         <span class="alert-label">insumos em estoque baixo</span>
         <span class="alert-action">Ver <bf-icon name="arrow-right" /></span>
       </a>

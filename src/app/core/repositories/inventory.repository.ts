@@ -116,7 +116,8 @@ export class InventoryRepository {
         createdBy: userId,
         updatedBy: userId,
       } satisfies Omit<StockAdjustment, 'id'>);
-      transaction.set(movementRef, {
+      const movement: StockMovement = {
+        id: movementRef.id,
         itemType,
         itemId,
         quantityDelta,
@@ -125,6 +126,16 @@ export class InventoryRepository {
         sourceType: 'adjustment',
         sourceId: adjustmentRef.id,
         businessDate,
+      };
+      transaction.set(movementRef, {
+        itemType: movement.itemType,
+        itemId: movement.itemId,
+        quantityDelta: movement.quantityDelta,
+        unitCostCents: movement.unitCostCents,
+        totalCostCents: movement.totalCostCents,
+        sourceType: movement.sourceType,
+        sourceId: movement.sourceId,
+        businessDate: movement.businessDate,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         createdBy: userId,
@@ -135,6 +146,7 @@ export class InventoryRepository {
 
       return {
         adjustment,
+        movement,
         stockChange: { itemType, itemId, stock },
       };
     });

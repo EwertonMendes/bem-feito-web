@@ -79,9 +79,9 @@ export class InventoryPage {
   async saveAdjustment(): Promise<void> {
     if (this.adjustmentForm().invalid() || !this.model().quantity) return;
     const value = this.model();
-    const ok = await this.store.adjust(this.selectedType(), this.selectedId(), value.quantity, value.reason, value.businessDate);
-    if (ok) {
-      await this.catalog.load(true);
+    const result = await this.store.adjust(this.selectedType(), this.selectedId(), value.quantity, value.reason, value.businessDate);
+    if (result) {
+      this.catalog.applyStockChanges([result.stockChange]);
       this.adjustmentDialog().close();
     }
   }

@@ -13,6 +13,7 @@ import {
   serverTimestamp,
   startAfter,
   count,
+  sum,
   where,
 } from 'firebase/firestore';
 import { summarizeSaleItems } from '../../domain/logic/sale-analytics';
@@ -34,7 +35,7 @@ import {
   SalePaymentReversalResult,
   StockChange,
 } from './mutation-results';
-import { BusinessDateCursor, PageResult } from './pagination';
+import { BalanceCursor, BusinessDateCursor, PageResult } from './pagination';
 
 @Injectable({ providedIn: 'root' })
 export class SalesRepository {
@@ -61,15 +62,28 @@ export class SalesRepository {
     };
   }
 
-  async openReceivables(max = 100): Promise<Sale[]> {
-    const snapshot = await getDocs(query(
-      collection(this.firestore, 'sales'),
+  async receivablePage(
+    pageSize = 40,
+    cursor?: BalanceCursor | null,
+  ): Promise<PageResult<Sale, BalanceCursor>> {
+    const constraints = [
       where('status', '==', 'active'),
       where('balanceCents', '>', 0),
       orderBy('balanceCents', 'desc'),
-      limit(max),
-    ));
-    return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as Sale);
+      orderBy(documentId(), 'desc'),
+      ...(cursor ? [startAfter(cursor.balanceCents, cursor.id)] : []),
+      limit(pageSize + 1),
+    ];
+    const snapshot = await getDocs(query(collection(this.firestore, 'sales'), ...constraints));
+    const hasMore = snapshot.docs.length > pageSize;
+    const docs = snapshot.docs.slice(0, pageSize);
+    const items = docs.map((item) => ({ id: item.id, ...item.data() }) as Sale);
+    const last = items.at(-1);
+    return {
+      items,
+      hasMore,
+      nextCursor: hasMore && last ? { balanceCents: last.balanceCents, id: last.id } : null,
+    };
   }
 
   async paymentPage(pageSize = 40, cursor?: BusinessDateCursor | null): Promise<PageResult<Payment>> {
@@ -98,6 +112,14 @@ export class SalesRepository {
     return Number(snapshot.data().total ?? 0);
   }
 
+  async receivableTotalCents(): Promise<number> {
+    const snapshot = await getAggregateFromServer(
+      query(collection(this.firestore, 'sales'), where('status', '==', 'active')),
+      { total: sum('balanceCents') },
+    );
+    return Number(snapshot.data().total ?? 0);
+  }
+
   async create(draft: SaleDraft): Promise<SaleCreateResult> {
     const userId = this.auth.user()?.uid;
     if (!userId) throw new Error('Sessão inválida.');
@@ -106,9 +128,7 @@ export class SalesRepository {
 
     return runTransaction(this.firestore, async (transaction) => {
       const saleCounterRef = doc(this.firestore, 'counters', 'sale');
-      const paymentCounterRef = doc(this.firestore, 'counters', 'payment');
       const saleCounterSnapshot = await transaction.get(saleCounterRef);
-      const paymentCounterSnapshot = await transaction.get(paymentCounterRef);
 
       const productLineIds = draft.lines.filter((line) => line.kind === 'product').map((line) => line.sourceId);
       const kitIds = draft.lines.filter((line) => line.kind === 'kit').map((line) => line.sourceId);
@@ -171,6 +191,10 @@ export class SalesRepository {
       const analytics = summarizeSaleItems(lines);
 
       const allocations = allocatePayments(totalCents, draft.payments);
+      const paymentCounterRef = doc(this.firestore, 'counters', 'payment');
+      const paymentCounterSnapshot = allocations.length
+        ? await transaction.get(paymentCounterRef)
+        : null;
       const receivedCents = allocations.reduce((sum, item) => sum + item.appliedCents, 0);
       const tipCents = allocations.reduce((sum, item) => sum + item.tipCents, 0);
       const balanceCents = Math.max(0, totalCents - receivedCents);
@@ -180,7 +204,7 @@ export class SalesRepository {
       }
 
       const saleSequence = Number(saleCounterSnapshot.data()?.['value'] ?? 0) + 1;
-      let paymentSequence = Number(paymentCounterSnapshot.data()?.['value'] ?? 0);
+      let paymentSequence = Number(paymentCounterSnapshot?.data()?.['value'] ?? 0);
       const saleRef = doc(collection(this.firestore, 'sales'));
       const paymentIds: string[] = [];
       const payments: Payment[] = [];

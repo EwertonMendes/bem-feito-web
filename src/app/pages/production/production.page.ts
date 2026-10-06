@@ -66,9 +66,9 @@ export class ProductionPage {
   async save(): Promise<void> {
     if (this.productionForm().invalid()) return;
     const value = this.model();
-    const ok = await this.store.create(value.productId, value.quantity, value.businessDate, value.notes);
-    if (ok) {
-      await this.catalog.load(true);
+    const result = await this.store.create(value.productId, value.quantity, value.businessDate, value.notes);
+    if (result) {
+      this.catalog.applyStockChanges(result.stockChanges);
       this.dialog().close();
     }
   }

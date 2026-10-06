@@ -1,9 +1,13 @@
-import { computed, inject, Injectable, signal } from '@angular/core';
+import { computed, effect, inject, Injectable, signal } from '@angular/core';
+import { stockStatusForInput, stockStatusForProduct } from '../../domain/logic/stock-status';
 import { Addition, InputItem, Kit, Product } from '../../domain/models/catalog.model';
 import { CatalogImageRef } from '../../domain/models/image.model';
 import { AdditionRepository, InputRepository, KitRepository, ProductRepository } from '../../core/repositories/catalog.repository';
+import { StockChange } from '../../core/repositories/mutation-results';
 import { ErrorService } from '../../core/services/error.service';
 import { ToastService } from '../../core/services/toast.service';
+import { DataRevisionService } from '../../core/firebase/data-revision.service';
+import { AsyncLoadGate } from '../../core/state/async-load-gate';
 
 @Injectable({ providedIn: 'root' })
 export class CatalogStore {
@@ -11,8 +15,12 @@ export class CatalogStore {
   private readonly inputRepository = inject(InputRepository);
   private readonly kitRepository = inject(KitRepository);
   private readonly additionRepository = inject(AdditionRepository);
+  private readonly revisions = inject(DataRevisionService);
   private readonly errors = inject(ErrorService);
   private readonly toast = inject(ToastService);
+  private readonly gate = new AsyncLoadGate();
+  private readonly remoteRevision = this.revisions.revision('catalog');
+  private lastRemoteRevision = 0;
 
   private readonly productsState = signal<Product[]>([]);
   private readonly inputsState = signal<InputItem[]>([]);
@@ -20,7 +28,6 @@ export class CatalogStore {
   private readonly additionsState = signal<Addition[]>([]);
   private readonly loadingState = signal(false);
   private readonly initializedState = signal(false);
-  private loaded = false;
 
   readonly products = this.productsState.asReadonly();
   readonly inputs = this.inputsState.asReadonly();
@@ -33,83 +40,157 @@ export class CatalogStore {
   readonly activeInputs = computed(() => this.inputsState().filter((item) => item.active));
   readonly activeKits = computed(() => this.kitsState().filter((item) => item.active));
   readonly activeAdditions = computed(() => this.additionsState().filter((item) => item.active));
-  readonly lowStockProducts = computed(() => this.productsState().filter((item) => item.active && item.stock <= item.minimumStock));
-  readonly lowStockInputs = computed(() => this.inputsState().filter((item) => item.active && item.minimumStockConfigured !== false && item.stock <= item.minimumStock));
+  readonly lowStockProducts = computed(() => this.productsState().filter((item) => item.active && stockStatusForProduct(item) === 'low'));
+  readonly lowStockInputs = computed(() => this.inputsState().filter((item) => item.active && stockStatusForInput(item) === 'low'));
   readonly negativeProducts = computed(() => this.productsState().filter((item) => item.stock < 0));
 
-  async load(force = false): Promise<void> {
-    if (this.loaded && !force) return;
-    this.loadingState.set(true);
-    try {
-      const [products, inputs, kits, additions] = await Promise.all([
-        this.productRepository.all(),
-        this.inputRepository.all(),
-        this.kitRepository.all(),
-        this.additionRepository.all(),
-      ]);
-      this.productsState.set(products);
-      this.inputsState.set(inputs);
-      this.kitsState.set(kits);
-      this.additionsState.set(additions);
-      this.loaded = true;
-    } catch (error) {
-      this.toast.error(this.errors.message(error));
-    } finally {
-      this.initializedState.set(true);
-      this.loadingState.set(false);
-    }
+  constructor() {
+    effect(() => {
+      const revision = this.remoteRevision();
+      if (revision === this.lastRemoteRevision) return;
+      this.lastRemoteRevision = revision;
+      if (this.gate.isLoaded) void this.load(true);
+    });
   }
 
-  async saveProduct(product: Product, reload = true): Promise<string> {
-    const id = product.id || await this.productRepository.create(this.withoutId(product));
-    if (product.id) await this.productRepository.replace(product);
-    if (reload) await this.load(true);
+  load(force = false): Promise<void> {
+    return this.gate.run(async () => {
+      this.loadingState.set(true);
+      try {
+        const [products, inputs, kits, additions] = await Promise.all([
+          this.productRepository.all(),
+          this.inputRepository.all(),
+          this.kitRepository.all(),
+          this.additionRepository.all(),
+        ]);
+        this.productsState.set(products);
+        this.inputsState.set(inputs);
+        this.kitsState.set(kits);
+        this.additionsState.set(additions);
+      } catch (error) {
+        this.toast.error(this.errors.message(error));
+        throw error;
+      } finally {
+        this.initializedState.set(true);
+        this.loadingState.set(false);
+      }
+    }, force).catch(() => undefined);
+  }
+
+  async saveProduct(product: Product): Promise<string> {
+    const normalized = { ...product, stockStatus: stockStatusForProduct(product) };
+    const id = normalized.id || await this.productRepository.create(this.withoutId(normalized));
+    if (normalized.id) await this.productRepository.replace(normalized);
+    this.upsertProduct({ ...normalized, id });
     return id;
   }
 
-  async saveInput(input: InputItem, reload = true): Promise<string> {
-    const id = input.id || await this.inputRepository.create(this.withoutId(input));
-    if (input.id) await this.inputRepository.replace(input);
-    if (reload) await this.load(true);
+  async saveInput(input: InputItem): Promise<string> {
+    const normalized = { ...input, stockStatus: stockStatusForInput(input) };
+    const id = normalized.id || await this.inputRepository.create(this.withoutId(normalized));
+    if (normalized.id) await this.inputRepository.replace(normalized);
+    this.upsertInput({ ...normalized, id });
     return id;
   }
 
-  async saveKit(kit: Kit, reload = true): Promise<string> {
+  async saveKit(kit: Kit): Promise<string> {
     const id = kit.id || await this.kitRepository.create(this.withoutId(kit));
     if (kit.id) await this.kitRepository.replace(kit);
-    if (reload) await this.load(true);
+    this.kitsState.update((items) => this.upsert(items, { ...kit, id }, (item) => item.name));
     return id;
   }
 
-  async saveAddition(addition: Addition, reload = true): Promise<string> {
+  async saveAddition(addition: Addition): Promise<string> {
     const id = addition.id || await this.additionRepository.create(this.withoutId(addition));
     if (addition.id) await this.additionRepository.replace(addition);
-    if (reload) await this.load(true);
+    this.additionsState.update((items) => this.upsert(items, { ...addition, id }, (item) => item.name));
     return id;
   }
 
   async setProductImage(id: string, image: CatalogImageRef | null): Promise<void> {
     if (image) await this.productRepository.patch(id, { image });
     else await this.productRepository.clearField(id, 'image');
-    await this.load(true);
+    this.productsState.update((items) => items.map((item) =>
+      item.id === id ? this.withImage(item, image) : item
+    ));
   }
 
   async setInputImage(id: string, image: CatalogImageRef | null): Promise<void> {
     if (image) await this.inputRepository.patch(id, { image });
     else await this.inputRepository.clearField(id, 'image');
-    await this.load(true);
+    this.inputsState.update((items) => items.map((item) =>
+      item.id === id ? this.withImage(item, image) : item
+    ));
   }
 
   async setKitImage(id: string, image: CatalogImageRef | null): Promise<void> {
     if (image) await this.kitRepository.patch(id, { image });
     else await this.kitRepository.clearField(id, 'image');
-    await this.load(true);
+    this.kitsState.update((items) => items.map((item) =>
+      item.id === id ? this.withImage(item, image) : item
+    ));
   }
 
   async setAdditionImage(id: string, image: CatalogImageRef | null): Promise<void> {
     if (image) await this.additionRepository.patch(id, { image });
     else await this.additionRepository.clearField(id, 'image');
-    await this.load(true);
+    this.additionsState.update((items) => items.map((item) =>
+      item.id === id ? this.withImage(item, image) : item
+    ));
+  }
+
+  applyStockChanges(changes: readonly StockChange[]): void {
+    if (!changes.length) return;
+
+    const productChanges = new Map(changes.filter((item) => item.itemType === 'product').map((item) => [item.itemId, item]));
+    const inputChanges = new Map(changes.filter((item) => item.itemType === 'input').map((item) => [item.itemId, item]));
+
+    if (productChanges.size) {
+      this.productsState.update((items) => items.map((item) => {
+        const change = productChanges.get(item.id);
+        if (!change) return item;
+        const updated: Product = {
+          ...item,
+          stock: change.stock,
+          averageUnitCostCents: change.averageUnitCostCents ?? item.averageUnitCostCents,
+        };
+        return { ...updated, stockStatus: stockStatusForProduct(updated) };
+      }));
+    }
+
+    if (inputChanges.size) {
+      this.inputsState.update((items) => items.map((item) => {
+        const change = inputChanges.get(item.id);
+        if (!change) return item;
+        const updated: InputItem = {
+          ...item,
+          stock: change.stock,
+          averageUnitCostCents: change.averageUnitCostCents ?? item.averageUnitCostCents,
+        };
+        return { ...updated, stockStatus: stockStatusForInput(updated) };
+      }));
+    }
+  }
+
+  private upsertProduct(product: Product): void {
+    this.productsState.update((items) => this.upsert(items, product, (item) => item.displayName));
+  }
+
+  private upsertInput(input: InputItem): void {
+    this.inputsState.update((items) => this.upsert(items, input, (item) => item.name));
+  }
+
+  private upsert<T extends { id: string }>(items: T[], value: T, sortKey: (item: T) => string): T[] {
+    const next = items.some((item) => item.id === value.id)
+      ? items.map((item) => item.id === value.id ? value : item)
+      : [...items, value];
+    return [...next].sort((a, b) => sortKey(a).localeCompare(sortKey(b), 'pt-BR'));
+  }
+
+  private withImage<T extends { image?: CatalogImageRef }>(item: T, image: CatalogImageRef | null): T {
+    if (image) return { ...item, image };
+    const { image: _image, ...rest } = item;
+    return rest as T;
   }
 
   private withoutId<T extends { id: string }>(value: T): Omit<T, 'id'> {

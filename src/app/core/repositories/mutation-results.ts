@@ -1,5 +1,5 @@
 import { Expense } from '../../domain/models/finance.model';
-import { StockAdjustment } from '../../domain/models/inventory.model';
+import { StockAdjustment, StockMovement } from '../../domain/models/inventory.model';
 import { Production } from '../../domain/models/production.model';
 import { Payment, Sale } from '../../domain/models/sales.model';
 
@@ -44,5 +44,6 @@ export interface ProductionCreateResult {
 
 export interface StockAdjustmentResult {
   adjustment: StockAdjustment;
+  movement: StockMovement;
   stockChange: StockChange;
 }

@@ -30,8 +30,10 @@ export class ReadOptimizationBackfillService {
   private readonly auth = inject(AuthService);
   private readonly revisions = inject(DataRevisionService);
   private inFlight: Promise<void> | null = null;
+  private completed = false;
 
   ensure(): Promise<void> {
+    if (this.completed) return Promise.resolve();
     if (this.inFlight) return this.inFlight;
     this.inFlight = this.run().finally(() => {
       this.inFlight = null;
@@ -45,7 +47,10 @@ export class ReadOptimizationBackfillService {
 
     const markerRef = doc(this.firestore, 'system', 'read-optimization');
     const marker = await getDoc(markerRef);
-    if (Number(marker.data()?.['version'] ?? 0) >= READ_OPTIMIZATION_VERSION) return;
+    if (Number(marker.data()?.['version'] ?? 0) >= READ_OPTIMIZATION_VERSION) {
+      this.completed = true;
+      return;
+    }
 
     const [productsSnapshot, inputsSnapshot, salesSnapshot] = await Promise.all([
       getDocs(collection(this.firestore, 'products')),
@@ -105,5 +110,6 @@ export class ReadOptimizationBackfillService {
     });
     this.revisions.touchBatch(markerBatch, 'catalog', 'sales');
     await markerBatch.commit();
+    this.completed = true;
   }
 }

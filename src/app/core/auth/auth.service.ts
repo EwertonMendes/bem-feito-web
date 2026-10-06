@@ -18,6 +18,9 @@ export class AuthService {
   private readonly profileState = signal<UserProfile | null>(null);
   private readonly busyState = signal(false);
   private readonly errorState = signal<string | null>(null);
+  private profileResolvedForUid: string | null = null;
+  private profilePendingForUid: string | null = null;
+  private profilePromise: Promise<UserProfile | null> | null = null;
 
   readonly user = computed(() => this.userState() ?? null);
   readonly profile = this.profileState.asReadonly();
@@ -30,8 +33,9 @@ export class AuthService {
 
   constructor() {
     onAuthStateChanged(this.auth, (user) => {
+      const previousUid = this.userState()?.uid;
       this.userState.set(user);
-      if (!user) this.profileState.set(null);
+      if (!user || (previousUid && previousUid !== user.uid)) this.resetProfileCache();
     });
     void this.completeRedirect();
   }
@@ -57,7 +61,7 @@ export class AuthService {
 
   async logout(): Promise<void> {
     await signOut(this.auth);
-    this.profileState.set(null);
+    this.resetProfileCache();
     await this.router.navigateByUrl('/login');
   }
 
@@ -75,19 +79,30 @@ export class AuthService {
     });
   }
 
-  async resolveProfile(user: User | null): Promise<UserProfile | null> {
+  async resolveProfile(user: User | null, force = false): Promise<UserProfile | null> {
     if (!user) {
-      this.profileState.set(null);
+      this.resetProfileCache();
       return null;
     }
-    const snapshot = await getDoc(doc(this.firestore, 'users', user.uid));
-    if (!snapshot.exists()) {
-      this.profileState.set(null);
-      return null;
-    }
-    const profile = { id: snapshot.id, ...snapshot.data() } as UserProfile;
-    this.profileState.set(profile);
-    return profile;
+    if (!force && this.profileResolvedForUid === user.uid) return this.profileState();
+    if (!force && this.profilePendingForUid === user.uid && this.profilePromise) return this.profilePromise;
+
+    this.profilePendingForUid = user.uid;
+    this.profilePromise = getDoc(doc(this.firestore, 'users', user.uid))
+      .then((snapshot) => {
+        const profile = snapshot.exists()
+          ? ({ id: snapshot.id, ...snapshot.data() } as UserProfile)
+          : null;
+        this.profileState.set(profile);
+        this.profileResolvedForUid = user.uid;
+        return profile;
+      })
+      .finally(() => {
+        if (this.profilePendingForUid === user.uid) this.profilePendingForUid = null;
+        this.profilePromise = null;
+      });
+
+    return this.profilePromise;
   }
 
   private async completeRedirect(): Promise<void> {
@@ -102,6 +117,13 @@ export class AuthService {
   private async finishLogin(user: User): Promise<void> {
     const profile = await this.resolveProfile(user);
     await this.router.navigateByUrl(profile?.active === true ? '/dashboard' : '/acesso-negado');
+  }
+
+  private resetProfileCache(): void {
+    this.profileState.set(null);
+    this.profileResolvedForUid = null;
+    this.profilePendingForUid = null;
+    this.profilePromise = null;
   }
 
   private firebaseCode(error: unknown): string {

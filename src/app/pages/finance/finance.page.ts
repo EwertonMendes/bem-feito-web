@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { FormField, form, min, required } from '@angular/forms/signals';
+import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
 import { CatalogStore } from '../../features/catalog/catalog.store';
 import { FinanceStore } from '../../features/finance/finance.store';
 import { SalesStore } from '../../features/sales/sales.store';
@@ -40,6 +41,7 @@ interface ExpenseFormModel {
 })
 export class FinancePage {
   readonly catalog = inject(CatalogStore);
+  readonly references = inject(CatalogReferenceStore);
   readonly store = inject(FinanceStore);
   readonly sales = inject(SalesStore);
   readonly settings = inject(SettingsStore);
@@ -79,7 +81,7 @@ export class FinancePage {
   readonly selectedReceivable = computed(() => this.sales.openSales().find((sale) => sale.id === this.receiptModel().saleId));
 
   constructor() {
-    void Promise.all([this.catalog.load(), this.store.load(), this.sales.load(), this.settings.load()]).then(() => {
+    void Promise.all([this.catalog.load(), this.references.load(), this.store.load(), this.sales.load(), this.settings.load()]).then(() => {
       if (this.route.snapshot.queryParamMap.get('novo') === '1') this.openExpense();
     });
   }
@@ -91,7 +93,7 @@ export class FinancePage {
       categoryId: this.settings.expenseCategories().find((item) => item.active)?.id ?? '',
       inputId: this.catalog.activeInputs()[0]?.id ?? '',
       quantity: 1,
-      unitId: this.catalog.units().find((item) => item.active)?.id ?? '',
+      unitId: this.references.units().find((item) => item.active)?.id ?? '',
       amount: 0,
       paymentMethodId: this.settings.paymentMethods().find((item) => item.active)?.id ?? '',
       notes: '',

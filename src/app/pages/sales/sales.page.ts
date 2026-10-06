@@ -4,6 +4,7 @@ import { FormField, form, min, required } from '@angular/forms/signals';
 import { Addition, Kit, Product } from '../../domain/models/catalog.model';
 import { CatalogImageRef } from '../../domain/models/image.model';
 import { PaymentDraft, Sale, SaleDraft, SaleDraftLine } from '../../domain/models/sales.model';
+import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
 import { CatalogStore } from '../../features/catalog/catalog.store';
 import { SalesStore } from '../../features/sales/sales.store';
 import { SettingsStore } from '../../features/settings/settings.store';
@@ -32,6 +33,7 @@ interface KitSlot { index: number; label: string; candidates: Product[]; }
 export class SalesPage {
   readonly store = inject(SalesStore);
   readonly catalog = inject(CatalogStore);
+  readonly references = inject(CatalogReferenceStore);
   readonly settings = inject(SettingsStore);
   private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(ToastService);
@@ -69,7 +71,7 @@ export class SalesPage {
   readonly cartPhysicalItems = computed(() => this.cart().reduce((sum, line) => line.kind === 'product' ? sum + line.quantity : line.kind === 'kit' ? sum + line.componentProductIds.length : sum, 0));
 
   constructor() {
-    void Promise.all([this.store.load(), this.catalog.load(), this.settings.load()]).then(() => {
+    void Promise.all([this.store.load(), this.catalog.load(), this.references.load(), this.settings.load()]).then(() => {
       if (this.route.snapshot.queryParamMap.get('novo') === '1') this.openNewSale();
     });
   }
@@ -193,7 +195,7 @@ export class SalesPage {
           (!component.collectionId || product.collectionId === component.collectionId) &&
           (!component.fragranceId || product.fragranceId === component.fragranceId)
         );
-        const format = this.catalog.formats().find((item) => item.id === component.formatId)?.name ?? 'Item';
+        const format = this.references.formats().find((item) => item.id === component.formatId)?.name ?? 'Item';
         slots.push({ index, label: `${format} ${slot + 1}`, candidates }); index++;
       }
     }

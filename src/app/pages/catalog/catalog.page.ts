@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild
 import { FormField, form, min, required } from '@angular/forms/signals';
 import { Addition, AdditionComponent, InputItem, Kit, KitComponent, Product, RecipeComponent } from '../../domain/models/catalog.model';
 import { CatalogImageEntityKind, CatalogImageRef } from '../../domain/models/image.model';
+import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
 import { CatalogStore } from '../../features/catalog/catalog.store';
 import { ImageService } from '../../core/services/image.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -25,6 +26,7 @@ interface AdditionFormModel { name: string; category: string; price: number; not
 })
 export class CatalogPage {
   readonly store = inject(CatalogStore);
+  readonly references = inject(CatalogReferenceStore);
   private readonly images = inject(ImageService);
   readonly imagesEnabled = this.images.enabled;
   private readonly toast = inject(ToastService);
@@ -78,9 +80,9 @@ export class CatalogPage {
   readonly filteredInputs = computed(() => this.filter(this.store.inputs(), (item) => item.name + ' ' + item.code));
   readonly filteredKits = computed(() => this.filter(this.store.kits(), (item) => item.name));
   readonly filteredAdditions = computed(() => this.filter(this.store.additions(), (item) => item.name + ' ' + item.category));
-  readonly availableFragrances = computed(() => this.store.fragrances().filter((item) => item.active && (!this.productModel().collectionId || item.collectionId === this.productModel().collectionId)));
+  readonly availableFragrances = computed(() => this.references.fragrances().filter((item) => item.active && (!this.productModel().collectionId || item.collectionId === this.productModel().collectionId)));
 
-  constructor() { void this.store.load(); }
+  constructor() { void Promise.all([this.store.load(), this.references.load()]); }
 
   openNew(): void {
     this.editingId.set('');
@@ -129,14 +131,14 @@ export class CatalogPage {
 
   addRecipeComponent(): void {
     const input = this.store.activeInputs()[0];
-    const unit = this.store.units()[0];
+    const unit = this.references.units()[0];
     if (input && unit) this.recipe.update((items) => [...items, { inputId: input.id, quantity: 0, unitId: unit.id }]);
   }
   patchRecipe(index: number, patch: Partial<RecipeComponent>): void { this.recipe.update((items) => items.map((item, i) => i === index ? { ...item, ...patch } : item)); }
   removeRecipe(index: number): void { this.recipe.update((items) => items.filter((_, i) => i !== index)); }
 
   addKitComponent(): void {
-    const format = this.store.formats().find((item) => item.active);
+    const format = this.references.formats().find((item) => item.active);
     if (format) this.kitComponents.update((items) => [...items, { id: crypto.randomUUID(), formatId: format.id, quantity: 1, order: items.length + 1 }]);
   }
   patchKitComponent(index: number, patch: Partial<KitComponent>): void { this.kitComponents.update((items) => items.map((item, i) => i === index ? { ...item, ...patch } : item)); }
@@ -144,7 +146,7 @@ export class CatalogPage {
 
   addAdditionComponent(): void {
     const input = this.store.activeInputs()[0];
-    const unit = this.store.units()[0];
+    const unit = this.references.units()[0];
     if (input && unit) this.additionComponents.update((items) => [...items, { id: crypto.randomUUID(), inputId: input.id, quantity: 1, unitId: unit.id, order: items.length + 1 }]);
   }
   patchAdditionComponent(index: number, patch: Partial<AdditionComponent>): void { this.additionComponents.update((items) => items.map((item, i) => i === index ? { ...item, ...patch } : item)); }
@@ -175,9 +177,9 @@ export class CatalogPage {
   private async saveProduct(): Promise<void> {
     if (this.productForm().invalid()) throw new Error('Revise os campos obrigatórios.');
     const model = this.productModel();
-    const collection = this.store.collections().find((item) => item.id === model.collectionId);
-    const fragrance = this.store.fragrances().find((item) => item.id === model.fragranceId);
-    const format = this.store.formats().find((item) => item.id === model.formatId);
+    const collection = this.references.collections().find((item) => item.id === model.collectionId);
+    const fragrance = this.references.fragrances().find((item) => item.id === model.fragranceId);
+    const format = this.references.formats().find((item) => item.id === model.formatId);
     if (!collection || !fragrance || !format) throw new Error('Coleção, fragrância ou formato inválido.');
     const existing = this.store.products().find((item) => item.id === this.editingId());
     const product: Product = {

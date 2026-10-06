@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { FormField, form, min, required } from '@angular/forms/signals';
+import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
 import { CatalogStore } from '../../features/catalog/catalog.store';
 import { ProductionStore } from '../../features/production/production.store';
 import { todayBusinessDate, formatBusinessDate } from '../../core/utils/date';
@@ -25,6 +26,7 @@ interface ProductionFormModel {
 })
 export class ProductionPage {
   readonly catalog = inject(CatalogStore);
+  readonly references = inject(CatalogReferenceStore);
   readonly store = inject(ProductionStore);
   private readonly route = inject(ActivatedRoute);
   private readonly dialog = viewChild.required<BfDialog>('productionDialog');
@@ -43,14 +45,14 @@ export class ProductionPage {
     if (!product) return [];
     return product.recipe.map((component) => {
       const input = this.catalog.inputs().find((item) => item.id === component.inputId);
-      const unit = this.catalog.units().find((item) => item.id === component.unitId);
+      const unit = this.references.units().find((item) => item.id === component.unitId);
       const quantity = component.quantity * this.model().quantity;
       return { name: input?.name ?? 'Insumo', quantity, unit: unit?.name ?? '', enough: (input?.stock ?? 0) >= quantity };
     });
   });
 
   constructor() {
-    void Promise.all([this.catalog.load(), this.store.load()]).then(() => {
+    void Promise.all([this.catalog.load(), this.references.load(), this.store.load()]).then(() => {
       if (this.route.snapshot.queryParamMap.get('novo') === '1') this.open();
     });
   }

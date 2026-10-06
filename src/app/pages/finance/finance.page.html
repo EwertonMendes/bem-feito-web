@@ -39,7 +39,7 @@
         @if(model().kind==='input-purchase'){
           <label class="bf-field full"><span>Insumo</span><select class="bf-select" [formField]="expenseForm.inputId"><option value="">Selecione</option>@for(input of catalog.activeInputs();track input.id){<option [value]="input.id">{{input.name}}</option>}</select></label>
           <label class="bf-field"><span>Quantidade comprada</span><input class="bf-input" type="number" step="0.001" [formField]="expenseForm.quantity" /></label>
-          <label class="bf-field"><span>Unidade</span><select class="bf-select" [formField]="expenseForm.unitId"><option value="">Selecione</option>@for(unit of catalog.units();track unit.id){<option [value]="unit.id">{{unit.name}}</option>}</select></label>
+          <label class="bf-field"><span>Unidade</span><select class="bf-select" [formField]="expenseForm.unitId"><option value="">Selecione</option>@for(unit of references.units();track unit.id){<option [value]="unit.id">{{unit.name}}</option>}</select></label>
         } @else {
           <label class="bf-field full"><span>Categoria</span><select class="bf-select" [formField]="expenseForm.categoryId"><option value="">Sem categoria</option>@for(category of settings.expenseCategories();track category.id){@if(category.active){<option [value]="category.id">{{category.name}}</option>}}</select></label>
         }

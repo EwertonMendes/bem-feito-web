@@ -10,7 +10,7 @@ import {
   PaymentMethod,
   UnitDefinition,
 } from '../../domain/models/catalog.model';
-import { CatalogStore } from '../../features/catalog/catalog.store';
+import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
 import { SettingsStore } from '../../features/settings/settings.store';
 import { ToastService } from '../../core/services/toast.service';
 import { ErrorService } from '../../core/services/error.service';
@@ -36,7 +36,7 @@ interface ExpenseTypeModel extends SimpleModel { kind: ExpenseType['kind']; }
   styleUrl: './settings.page.scss',
 })
 export class SettingsPage {
-  readonly catalog = inject(CatalogStore);
+  readonly references = inject(CatalogReferenceStore);
   readonly settings = inject(SettingsStore);
   private readonly toast = inject(ToastService);
   private readonly errors = inject(ErrorService);
@@ -56,7 +56,7 @@ export class SettingsPage {
   readonly expenseTypeForm = form(this.expenseTypeModel, (p) => { required(p.name); required(p.kind); });
 
   constructor() {
-    void Promise.all([this.catalog.load(), this.settings.load()]);
+    void Promise.all([this.references.load(), this.settings.load()]);
   }
 
   openNew(): void {
@@ -102,13 +102,13 @@ export class SettingsPage {
   async save(): Promise<void> {
     try {
       const id = this.editingId();
-      if (this.tab() === 'collections') await this.catalog.saveCollection({ id, ...this.simpleModel() } as CollectionDefinition);
-      else if (this.tab() === 'fragrances') await this.catalog.saveFragrance({ id, ...this.fragranceModel() } as FragranceDefinition);
-      else if (this.tab() === 'formats') await this.catalog.saveFormat({ id, ...this.formatModel() } as FormatDefinition);
+      if (this.tab() === 'collections') await this.references.saveCollection({ id, ...this.simpleModel() } as CollectionDefinition);
+      else if (this.tab() === 'fragrances') await this.references.saveFragrance({ id, ...this.fragranceModel() } as FragranceDefinition);
+      else if (this.tab() === 'formats') await this.references.saveFormat({ id, ...this.formatModel() } as FormatDefinition);
       else if (this.tab() === 'prices') {
         const model = this.priceModel();
-        await this.catalog.saveFormatPrice({ id, collectionId: model.collectionId, formatId: model.formatId, priceCents: toCents(model.price), active: model.active } as FormatPrice);
-      } else if (this.tab() === 'units') await this.catalog.saveUnit({ id, ...this.simpleModel() } as UnitDefinition);
+        await this.references.saveFormatPrice({ id, collectionId: model.collectionId, formatId: model.formatId, priceCents: toCents(model.price), active: model.active } as FormatPrice);
+      } else if (this.tab() === 'units') await this.references.saveUnit({ id, ...this.simpleModel() } as UnitDefinition);
       else if (this.tab() === 'payments') await this.settings.savePaymentMethod({ id, ...this.simpleModel() } as PaymentMethod);
       else if (this.tab() === 'expenseCategories') await this.settings.saveExpenseCategory({ id, ...this.simpleModel() } as ExpenseCategory);
       else await this.settings.saveExpenseType({ id, ...this.expenseTypeModel() } as ExpenseType);
@@ -120,10 +120,10 @@ export class SettingsPage {
   }
 
   collectionName(id: string): string {
-    return this.catalog.collections().find((item) => item.id === id)?.name ?? '—';
+    return this.references.collections().find((item) => item.id === id)?.name ?? '—';
   }
 
   formatName(id: string): string {
-    return this.catalog.formats().find((item) => item.id === id)?.name ?? '—';
+    return this.references.formats().find((item) => item.id === id)?.name ?? '—';
   }
 }

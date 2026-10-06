@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { FormField, form, required } from '@angular/forms/signals';
+import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
 import { CatalogStore } from '../../features/catalog/catalog.store';
 import { InventoryStore } from '../../features/inventory/inventory.store';
 import { todayBusinessDate, formatBusinessDate } from '../../core/utils/date';
@@ -24,6 +25,7 @@ interface AdjustmentModel {
 })
 export class InventoryPage {
   readonly catalog = inject(CatalogStore);
+  readonly references = inject(CatalogReferenceStore);
   readonly store = inject(InventoryStore);
   private readonly route = inject(ActivatedRoute);
   private readonly adjustmentDialog = viewChild.required<BfDialog>('adjustmentDialog');
@@ -54,7 +56,7 @@ export class InventoryPage {
   });
 
   constructor() {
-    void this.catalog.load().then(() => {
+    void Promise.all([this.catalog.load(), this.references.load()]).then(() => {
       if (this.route.snapshot.queryParamMap.get('ajuste') === '1') this.openAdjustmentFromFirst();
     });
   }
@@ -84,7 +86,7 @@ export class InventoryPage {
   }
 
   unitName(id: string): string {
-    return this.catalog.units().find((item) => item.id === id)?.name ?? '';
+    return this.references.units().find((item) => item.id === id)?.name ?? '';
   }
 
   movementSource(source: string): string {

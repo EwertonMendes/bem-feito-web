@@ -1,10 +1,16 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import {
-  Auth, GoogleAuthProvider, User, getRedirectResult, onAuthStateChanged,
-  signInWithPopup, signInWithRedirect, signOut,
+  Auth,
+  GoogleAuthProvider,
+  User,
+  getRedirectResult,
+  onAuthStateChanged,
+  signInWithPopup,
+  signInWithRedirect,
+  signOut,
 } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { Unsubscribe, doc, onSnapshot } from 'firebase/firestore';
 import { UserProfile } from '../../domain/models/common.model';
 import { FIREBASE_AUTH, FIRESTORE } from '../firebase/firebase.providers';
 
@@ -18,9 +24,9 @@ export class AuthService {
   private readonly profileState = signal<UserProfile | null>(null);
   private readonly busyState = signal(false);
   private readonly errorState = signal<string | null>(null);
-  private profileResolvedForUid: string | null = null;
-  private profilePendingForUid: string | null = null;
-  private profilePromise: Promise<UserProfile | null> | null = null;
+  private profileUid: string | null = null;
+  private profileUnsubscribe: Unsubscribe | null = null;
+  private profileReady: Promise<UserProfile | null> | null = null;
 
   readonly user = computed(() => this.userState() ?? null);
   readonly profile = this.profileState.asReadonly();
@@ -33,9 +39,14 @@ export class AuthService {
 
   constructor() {
     onAuthStateChanged(this.auth, (user) => {
-      const previousUid = this.userState()?.uid;
       this.userState.set(user);
-      if (!user || (previousUid && previousUid !== user.uid)) this.resetProfileCache();
+      if (user) {
+        void this.ensureProfileListener(user).catch((error) => {
+          this.errorState.set(this.authError(error));
+        });
+      } else {
+        this.clearProfileListener();
+      }
     });
     void this.completeRedirect();
   }
@@ -61,7 +72,7 @@ export class AuthService {
 
   async logout(): Promise<void> {
     await signOut(this.auth);
-    this.resetProfileCache();
+    this.clearProfileListener();
     await this.router.navigateByUrl('/login');
   }
 
@@ -79,30 +90,52 @@ export class AuthService {
     });
   }
 
-  async resolveProfile(user: User | null, force = false): Promise<UserProfile | null> {
+  async resolveProfile(user: User | null): Promise<UserProfile | null> {
     if (!user) {
-      this.resetProfileCache();
+      this.clearProfileListener();
       return null;
     }
-    if (!force && this.profileResolvedForUid === user.uid) return this.profileState();
-    if (!force && this.profilePendingForUid === user.uid && this.profilePromise) return this.profilePromise;
+    return this.ensureProfileListener(user);
+  }
 
-    this.profilePendingForUid = user.uid;
-    this.profilePromise = getDoc(doc(this.firestore, 'users', user.uid))
-      .then((snapshot) => {
-        const profile = snapshot.exists()
-          ? ({ id: snapshot.id, ...snapshot.data() } as UserProfile)
-          : null;
-        this.profileState.set(profile);
-        this.profileResolvedForUid = user.uid;
-        return profile;
-      })
-      .finally(() => {
-        if (this.profilePendingForUid === user.uid) this.profilePendingForUid = null;
-        this.profilePromise = null;
-      });
+  private ensureProfileListener(user: User): Promise<UserProfile | null> {
+    if (this.profileUid === user.uid && this.profileReady) return this.profileReady;
 
-    return this.profilePromise;
+    this.clearProfileListener();
+    this.profileUid = user.uid;
+    this.profileReady = new Promise<UserProfile | null>((resolve, reject) => {
+      let initial = true;
+      this.profileUnsubscribe = onSnapshot(
+        doc(this.firestore, 'users', user.uid),
+        (snapshot) => {
+          const profile = snapshot.exists()
+            ? ({ id: snapshot.id, ...snapshot.data() } as UserProfile)
+            : null;
+          this.profileState.set(profile);
+          if (initial) {
+            initial = false;
+            resolve(profile);
+          }
+        },
+        (error) => {
+          this.profileState.set(null);
+          if (initial) {
+            initial = false;
+            reject(error);
+          }
+        },
+      );
+    });
+
+    return this.profileReady;
+  }
+
+  private clearProfileListener(): void {
+    this.profileUnsubscribe?.();
+    this.profileUnsubscribe = null;
+    this.profileUid = null;
+    this.profileReady = null;
+    this.profileState.set(null);
   }
 
   private async completeRedirect(): Promise<void> {
@@ -117,13 +150,6 @@ export class AuthService {
   private async finishLogin(user: User): Promise<void> {
     const profile = await this.resolveProfile(user);
     await this.router.navigateByUrl(profile?.active === true ? '/dashboard' : '/acesso-negado');
-  }
-
-  private resetProfileCache(): void {
-    this.profileState.set(null);
-    this.profileResolvedForUid = null;
-    this.profilePendingForUid = null;
-    this.profilePromise = null;
   }
 
   private firebaseCode(error: unknown): string {

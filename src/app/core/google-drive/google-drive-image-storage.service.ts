@@ -1,4 +1,4 @@
-import { Injectable, computed, inject } from '@angular/core';
+import { Injectable, computed, effect, inject } from '@angular/core';
 import { environment } from '../../../environments/environment';
 import { CatalogImageEntityKind, CatalogImageRef } from '../../domain/models/image.model';
 import { ImageStorageAvailability, ImageStoragePort } from '../images/image-storage.port';
@@ -6,6 +6,8 @@ import { ImageProcessorService } from '../images/image-processor.service';
 import { DriveApiService, DriveFileMetadata } from './drive-api.service';
 import { DriveAuthService, DriveAuthorizationRequiredError } from './drive-auth.service';
 import { DriveIntegrationService } from './drive-integration.service';
+
+const MAX_CACHED_IMAGE_URLS = 128;
 
 @Injectable({ providedIn: 'root' })
 export class GoogleDriveImageStorageService extends ImageStoragePort {
@@ -15,6 +17,7 @@ export class GoogleDriveImageStorageService extends ImageStoragePort {
   private readonly integration = inject(DriveIntegrationService);
   private readonly urlCache = new Map<string, string>();
   private readonly pendingDownloads = new Map<string, Promise<string | null>>();
+  private cacheGeneration = 0;
 
   readonly enabled = environment.googleDrive.enabled;
   readonly revision = this.integration.revision;
@@ -25,18 +28,35 @@ export class GoogleDriveImageStorageService extends ImageStoragePort {
     return status === 'connected' ? 'available' : 'unavailable';
   });
 
+  constructor() {
+    super();
+    effect(() => {
+      this.integration.revision();
+      this.clearCache();
+    });
+  }
+
   async resolve(image?: CatalogImageRef): Promise<string | null> {
     if (!this.enabled || !image || image.provider !== 'google-drive' || !this.integration.connected() || !this.auth.currentToken()) return null;
 
     const key = this.cacheKey(image);
     const cached = this.urlCache.get(key);
-    if (cached) return cached;
+    if (cached) {
+      this.urlCache.delete(key);
+      this.urlCache.set(key, cached);
+      return cached;
+    }
     const pending = this.pendingDownloads.get(key);
     if (pending) return pending;
 
+    const generation = this.cacheGeneration;
     const request = this.api.download(image.fileId).then((blob) => {
       const url = URL.createObjectURL(blob);
-      this.urlCache.set(key, url);
+      if (generation !== this.cacheGeneration) {
+        URL.revokeObjectURL(url);
+        return null;
+      }
+      this.cacheUrl(key, url);
       return url;
     }).catch((error) => {
       if (error instanceof DriveAuthorizationRequiredError) return null;
@@ -108,5 +128,26 @@ export class GoogleDriveImageStorageService extends ImageStoragePort {
       URL.revokeObjectURL(url);
       this.urlCache.delete(key);
     }
+  }
+
+  private cacheUrl(key: string, url: string): void {
+    const existing = this.urlCache.get(key);
+    if (existing && existing !== url) URL.revokeObjectURL(existing);
+    this.urlCache.delete(key);
+    this.urlCache.set(key, url);
+
+    while (this.urlCache.size > MAX_CACHED_IMAGE_URLS) {
+      const oldest = this.urlCache.entries().next().value as [string, string] | undefined;
+      if (!oldest) break;
+      URL.revokeObjectURL(oldest[1]);
+      this.urlCache.delete(oldest[0]);
+    }
+  }
+
+  private clearCache(): void {
+    this.cacheGeneration += 1;
+    for (const url of this.urlCache.values()) URL.revokeObjectURL(url);
+    this.urlCache.clear();
+    this.pendingDownloads.clear();
   }
 }

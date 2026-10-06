@@ -78,6 +78,10 @@ try {
   await deny(setDoc(doc(viewer, 'counters', 'sale'), { value: 1, updatedAt: serverTimestamp() }));
   await deny(setDoc(doc(operator, 'counters', 'unknown'), { value: 1, updatedAt: serverTimestamp() }));
   await pass(setDoc(doc(operator, 'counters', 'sale'), { value: 1, updatedAt: serverTimestamp() }));
+  await deny(setDoc(doc(operator, 'counters', 'payment'), { value: 1, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }));
+  for (const counter of ['payment', 'production', 'expense', 'stockAdjustment']) {
+    await pass(setDoc(doc(operator, 'counters', counter), { value: 1, updatedAt: serverTimestamp() }));
+  }
   await deny(updateDoc(doc(operator, 'counters', 'sale'), { value: 0, updatedAt: serverTimestamp() }));
   await deny(updateDoc(doc(operator, 'counters', 'sale'), { value: 502, updatedAt: serverTimestamp() }));
   await deny(updateDoc(doc(operator, 'counters', 'sale'), { value: 2, createdBy: 'owner', updatedAt: serverTimestamp() }));

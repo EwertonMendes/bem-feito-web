@@ -93,5 +93,12 @@ jobs:
           service_account: github-deploy@bem-feito-dev.iam.gserviceaccount.com
           create_credentials_file: true
           export_environment_variables: true
-      - run: npm run firebase:deploy:dev:ci
+      - name: Deploy Firestore rules and indexes
+        run: npm run firebase:deploy:dev:firestore
+      - name: Wait for Firestore indexes
+        run: npm run firebase:wait-indexes:dev
+      - name: Verify Firestore query paths
+        run: npm run firebase:verify-queries:dev
+      - name: Deploy Hosting
+        run: npm run firebase:deploy:dev:hosting
       - run: npm run deploy:verify:dev

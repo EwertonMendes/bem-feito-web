@@ -141,7 +141,8 @@ export class DashboardStore {
     this.active = true;
     this.loading.set(true);
     try {
-      await this.backfill.ensure();
+      // Compatibility backfill is opportunistic; dashboard reads have a safe legacy fallback.
+      void this.backfill.ensure().catch(() => undefined);
       const tasks: Promise<void>[] = [];
       if (!this.initialized || this.periodStale) tasks.push(this.refreshPeriod());
       if (!this.initialized || this.yearStale) tasks.push(this.refreshYear());

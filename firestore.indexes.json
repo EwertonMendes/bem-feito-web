@@ -165,6 +165,112 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "sales",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "businessDate",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "totalCents",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "sales",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "analyticsVersion",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "businessDate",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "cogsCents",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "itemsSold",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "missingCostItems",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "payments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "businessDate",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "amountReceivedCents",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "appliedCents",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "tipCents",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "expenses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "businessDate",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "amountCents",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "expenses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "kind",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "businessDate",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "amountCents",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

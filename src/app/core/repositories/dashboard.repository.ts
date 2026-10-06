@@ -73,10 +73,9 @@ export class DashboardRepository {
       where('businessDate', '>=', startDate),
       where('businessDate', '<=', endDate),
     );
-    const activeSales = query(
-      collection(this.firestore, 'sales'),
-      where('status', '==', 'active'),
-    );
+    // Cancelled sales are persisted with balanceCents = 0, so summing all sales is
+    // equivalent and avoids an unnecessary status + balance composite index.
+    const allSales = collection(this.firestore, 'sales');
     const overdueSales = query(
       collection(this.firestore, 'sales'),
       where('status', '==', 'active'),
@@ -115,7 +114,7 @@ export class DashboardRepository {
       getAggregateFromServer(operatingExpensesInPeriod, {
         operationalExpenseCents: sum('amountCents'),
       }),
-      getAggregateFromServer(activeSales, {
+      getAggregateFromServer(allSales, {
         receivableCents: sum('balanceCents'),
       }),
       getAggregateFromServer(overdueSales, {
@@ -132,11 +131,21 @@ export class DashboardRepository {
     let missingCostItems = Number(optimizedData.missingCostItems ?? 0);
 
     if (Number(optimizedData.optimizedCount ?? 0) < saleCount) {
+      // Recompute the whole period when legacy rows exist. The backfill can finish between
+      // the aggregate and this read; resetting first makes that race deterministic.
       const snapshot = await getDocs(salesInPeriod);
+      cogsCents = 0;
+      itemsSold = 0;
+      missingCostItems = 0;
       for (const saleSnapshot of snapshot.docs) {
         const sale = { id: saleSnapshot.id, ...saleSnapshot.data() } as Sale;
-        if (sale.analyticsVersion === 1) continue;
-        const analytics = summarizeSaleItems(sale.items);
+        const analytics = sale.analyticsVersion === 1
+          ? {
+              cogsCents: Number(sale.cogsCents ?? 0),
+              itemsSold: Number(sale.itemsSold ?? 0),
+              missingCostItems: Number(sale.missingCostItems ?? 0),
+            }
+          : summarizeSaleItems(sale.items);
         cogsCents += analytics.cogsCents;
         itemsSold += analytics.itemsSold;
         missingCostItems += analytics.missingCostItems;

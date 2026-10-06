@@ -21,8 +21,15 @@ export class ToastService {
   }
 
   private push(message: string, kind: ToastMessage['kind']): void {
+    const normalized = message.trim();
+    if (!normalized) return;
+    if (this.messagesState().some((toast) => toast.kind === kind && toast.message === normalized)) return;
+
     const id = this.nextId++;
-    this.messagesState.update((messages) => [...messages, { id, message, kind }]);
-    window.setTimeout(() => this.dismiss(id), 3800);
+    this.messagesState.update((messages) => [
+      ...messages.slice(-2),
+      { id, message: normalized, kind },
+    ]);
+    window.setTimeout(() => this.dismiss(id), kind === 'error' ? 5600 : 3800);
   }
 }

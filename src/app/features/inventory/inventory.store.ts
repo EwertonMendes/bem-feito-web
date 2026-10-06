@@ -16,7 +16,9 @@ export class InventoryStore {
   private readonly toast = inject(ToastService);
   private readonly errors = inject(ErrorService);
   private readonly remoteRevision = this.revisions.revision('inventory');
+  private readonly localRevision = this.revisions.localRevision('inventory');
   private lastRemoteRevision = 0;
+  private lastLocalRevision = 0;
   private historyConsumers = 0;
   private historyStale = true;
   private movementRequest = 0;
@@ -30,6 +32,13 @@ export class InventoryStore {
   readonly hasMore = this.hasMoreState.asReadonly();
 
   constructor() {
+    effect(() => {
+      const revision = this.localRevision();
+      if (revision === this.lastLocalRevision) return;
+      this.lastLocalRevision = revision;
+      this.historyStale = true;
+    });
+
     effect(() => {
       const revision = this.remoteRevision();
       if (revision === this.lastRemoteRevision) return;
@@ -53,6 +62,11 @@ export class InventoryStore {
     if (!force && itemId === this.currentItemId && !this.historyStale) return true;
 
     const request = ++this.movementRequest;
+    if (itemId !== this.currentItemId) {
+      this.movementsState.set([]);
+      this.cursor = null;
+      this.hasMoreState.set(false);
+    }
     this.currentItemId = itemId;
     this.historyStale = true;
     try {

@@ -61,7 +61,7 @@ export class InventoryRepository {
   ): Promise<StockAdjustmentResult> {
     const userId = this.auth.user()?.uid;
     if (!userId) throw new Error('Sessão inválida.');
-    if (!quantityDelta) throw new Error('Informe uma quantidade diferente de zero.');
+    if (!Number.isFinite(quantityDelta) || quantityDelta === 0) throw new Error('Informe uma quantidade diferente de zero.');
     if (!reason.trim()) throw new Error('Informe o motivo do ajuste.');
 
     return runTransaction(this.firestore, async (transaction) => {
@@ -78,6 +78,10 @@ export class InventoryRepository {
       const stock = currentStock + quantityDelta;
       const unitCostCents = Number(itemSnapshot.data()['averageUnitCostCents'] ?? 0);
       const item = { id: itemSnapshot.id, ...itemSnapshot.data() } as Product | InputItem;
+      if (stock < 0) {
+        const itemName = itemType === 'product' ? (item as Product).displayName : (item as InputItem).name;
+        throw new Error(`Estoque insuficiente de ${itemName}. Ajuste o saldo disponível antes de registrar a saída.`);
+      }
       const stockStatus = itemType === 'product'
         ? productStockStatus(stock, (item as Product).minimumStock)
         : inputStockStatus(

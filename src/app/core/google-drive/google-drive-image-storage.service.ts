@@ -31,7 +31,7 @@ export class GoogleDriveImageStorageService extends ImageStoragePort {
   constructor() {
     super();
     effect(() => {
-      this.auth.revision();
+      this.integration.revision();
       this.clearCache();
     });
   }

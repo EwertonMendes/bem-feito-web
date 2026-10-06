@@ -121,7 +121,9 @@ O consentimento `drive.file` não deve aparecer a cada uso enquanto a concessão
 
 Para evitar que um simples F5 derrube as imagens, o access token atual é mantido em `sessionStorage` até a expiração. No reload da mesma aba, o app restaura o token, valida novamente a conta Google e a pasta configurada e só então libera a leitura das imagens.
 
-O token não é mantido após logout, troca de conta, expiração, resposta `401` do Drive ou encerramento da sessão da aba. Como o fluxo client-side do Google não entrega um refresh token durável para a SPA, depois da expiração ainda pode ser necessário clicar em **Conectar Drive**. Esse botão reutiliza o consentimento existente sempre que possível e usa o e-mail Firebase como `login_hint` para evitar seleção de conta desnecessária.
+O token não é mantido após logout, troca de conta, expiração, resposta `401` do Drive ou encerramento da sessão da aba. O modelo de token do Google Identity Services usado por esta SPA emite access tokens curtos e exige um novo gesto do usuário para obter outro token depois da expiração. A duração do access token é definida pelo Google e não pode ser aumentada pelo Angular para dias ou meses.
+
+Uma conexão realmente durável por dias ou meses exige migrar a autorização do Drive para o **authorization code model** com um backend seguro, que recebe e armazena um refresh token fora do navegador. Não armazene refresh token no frontend para contornar essa limitação. Enquanto o app continuar client-only, o botão **Conectar Drive** reutiliza a concessão existente sempre que possível e usa o e-mail Firebase como `login_hint`, evitando novo consentimento quando o Google não exigir.
 
 ## Testes recomendados
 

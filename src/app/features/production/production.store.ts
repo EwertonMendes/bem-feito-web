@@ -2,7 +2,7 @@ import { effect, inject, Injectable, signal } from '@angular/core';
 import { Production } from '../../domain/models/production.model';
 import { DataRevisionService } from '../../core/firebase/data-revision.service';
 import { ProductionCreateResult } from '../../core/repositories/mutation-results';
-import { BusinessDateCursor } from '../../core/repositories/pagination';
+import { BusinessDateCursor, compareBusinessDateDesc } from '../../core/repositories/pagination';
 import { ProductionRepository } from '../../core/repositories/production.repository';
 import { ErrorService } from '../../core/services/error.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -85,7 +85,7 @@ export class ProductionStore {
     try {
       const result = await this.repository.create(productId, quantity, businessDate, notes);
       if (this.gate.isLoaded) {
-        this.itemsState.update((items) => [result.production, ...items.filter((item) => item.id !== result.production.id)]);
+        this.itemsState.update((items) => [result.production, ...items.filter((item) => item.id !== result.production.id)].sort(compareBusinessDateDesc));
       }
       this.toast.success('Produção registrada com sucesso.');
       return result;

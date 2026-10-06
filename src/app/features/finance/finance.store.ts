@@ -4,7 +4,7 @@ import { Payment } from '../../domain/models/sales.model';
 import { DataRevisionService } from '../../core/firebase/data-revision.service';
 import { FinanceRepository } from '../../core/repositories/finance.repository';
 import { ExpenseCreateResult } from '../../core/repositories/mutation-results';
-import { BusinessDateCursor } from '../../core/repositories/pagination';
+import { BusinessDateCursor, compareBusinessDateDesc } from '../../core/repositories/pagination';
 import { SalesRepository } from '../../core/repositories/sales.repository';
 import { ErrorService } from '../../core/services/error.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -148,7 +148,7 @@ export class FinanceStore {
     try {
       const result = await this.financeRepository.createExpense(draft);
       if (this.expensesGate.isLoaded) {
-        this.expensesState.update((items) => [result.expense, ...items.filter((item) => item.id !== result.expense.id)]);
+        this.expensesState.update((items) => [result.expense, ...items.filter((item) => item.id !== result.expense.id)].sort(compareBusinessDateDesc));
       }
       if (this.summaryGate.isLoaded) this.totalOutState.update((value) => value + result.expense.amountCents);
       this.toast.success(draft.kind === 'input-purchase'
@@ -165,7 +165,7 @@ export class FinanceStore {
     if (!payments.length) return;
     if (this.paymentsGate.isLoaded) {
       const ids = new Set(payments.map((item) => item.id));
-      this.paymentsState.update((items) => [...payments, ...items.filter((item) => !ids.has(item.id))]);
+      this.paymentsState.update((items) => [...payments, ...items.filter((item) => !ids.has(item.id))].sort(compareBusinessDateDesc));
     }
     if (this.summaryGate.isLoaded) this.paymentCountState.update((value) => value + payments.length);
   }

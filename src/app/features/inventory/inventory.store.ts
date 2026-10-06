@@ -2,7 +2,7 @@ import { effect, inject, Injectable, signal } from '@angular/core';
 import { StockMovement } from '../../domain/models/inventory.model';
 import { DataRevisionService } from '../../core/firebase/data-revision.service';
 import { StockAdjustmentResult } from '../../core/repositories/mutation-results';
-import { BusinessDateCursor } from '../../core/repositories/pagination';
+import { BusinessDateCursor, compareBusinessDateDesc } from '../../core/repositories/pagination';
 import { InventoryRepository } from '../../core/repositories/inventory.repository';
 import { ErrorService } from '../../core/services/error.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -77,7 +77,7 @@ export class InventoryStore {
       const result = await this.repository.adjust(itemType, itemId, quantity, reason, date);
       this.toast.success('Ajuste registrado com sucesso.');
       if (this.currentItemId === itemId) {
-        this.movementsState.update((items) => [result.movement, ...items.filter((item) => item.id !== result.movement.id)]);
+        this.movementsState.update((items) => [result.movement, ...items.filter((item) => item.id !== result.movement.id)].sort(compareBusinessDateDesc));
       }
       return result;
     } catch (error) {

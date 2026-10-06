@@ -8,10 +8,11 @@ import { formatBusinessDate } from '../../core/utils/date';
 import { formatCurrency } from '../../core/utils/money';
 import { BfDialog } from '../../shared/ui/dialog/dialog';
 import { BfIcon } from '../../shared/ui/icon/icon';
+import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
 
 @Component({
   selector: 'bf-sales-page',
-  imports: [BfIcon, BfDialog, SaleEditor],
+  imports: [BfIcon, BfDialog, SaleEditor, BfEmptyState],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sales.page.html',
   styleUrl: './sales.page.scss',

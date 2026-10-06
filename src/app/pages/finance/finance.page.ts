@@ -10,6 +10,7 @@ import { ExpenseDraft, ExpenseKind } from '../../domain/models/finance.model';
 import { formatBusinessDate, todayBusinessDate } from '../../core/utils/date';
 import { formatCurrency, fromCents, toCents } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
+import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
 import { BfDialog } from '../../shared/ui/dialog/dialog';
 
 interface ReceiptFormModel {
@@ -34,7 +35,7 @@ interface ExpenseFormModel {
 
 @Component({
   selector: 'bf-finance-page',
-  imports: [FormField, BfIcon, BfDialog],
+  imports: [FormField, BfIcon, BfDialog, BfEmptyState],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './finance.page.html',
   styleUrl: './finance.page.scss',

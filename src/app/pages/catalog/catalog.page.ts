@@ -5,10 +5,11 @@ import { formatCurrency } from '../../core/utils/money';
 import { CatalogEditor } from '../../features/catalog/components/catalog-editor/catalog-editor';
 import { CatalogImage } from '../../shared/media/catalog-image/catalog-image';
 import { BfIcon } from '../../shared/ui/icon/icon';
+import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
 
 @Component({
   selector: 'bf-catalog-page',
-  imports: [BfIcon, CatalogImage, CatalogEditor],
+  imports: [BfIcon, CatalogImage, CatalogEditor, BfEmptyState],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './catalog.page.html',
   styleUrl: './catalog.page.scss',

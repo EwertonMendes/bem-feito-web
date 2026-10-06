@@ -7,6 +7,7 @@ import { InventoryStore } from '../../features/inventory/inventory.store';
 import { todayBusinessDate, formatBusinessDate } from '../../core/utils/date';
 import { formatCurrency } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
+import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
 import { BfDialog } from '../../shared/ui/dialog/dialog';
 import { CatalogImage } from '../../shared/media/catalog-image/catalog-image';
 
@@ -18,7 +19,7 @@ interface AdjustmentModel {
 
 @Component({
   selector: 'bf-inventory-page',
-  imports: [FormField, BfIcon, CatalogImage, BfDialog],
+  imports: [FormField, BfIcon, CatalogImage, BfDialog, BfEmptyState],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './inventory.page.html',
   styleUrl: './inventory.page.scss',

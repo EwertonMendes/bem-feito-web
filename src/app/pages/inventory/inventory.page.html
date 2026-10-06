@@ -19,11 +19,11 @@
     @if(tab()==='product'){
       @for(item of filteredProducts();track item.id){
         <article class="stock-card"><bf-catalog-image [image]="item.image" [alt]="item.displayName" [compact]="true" /><div class="identity"><strong>{{item.displayName}}</strong><span>{{item.code}}</span></div><div class="balance" [class.bad]="item.stock<0" [class.low]="item.stock>=0 && item.stock<=item.minimumStock"><strong>{{item.stock}}</strong><span>mín. {{item.minimumStock}}</span></div><div class="stock-actions"><button class="bf-button secondary" (click)="openHistory('product',item.id)">Histórico</button><button class="bf-button" (click)="openAdjustment('product',item.id)">Ajustar</button></div></article>
-      } @empty {<div class="bf-empty"><div><strong>Nenhum produto</strong><p>Cadastre produtos no Catálogo.</p></div></div>}
+      } @empty {<bf-empty-state title="Nenhum produto" description="Cadastre produtos no Catálogo." />}
     } @else {
       @for(item of filteredInputs();track item.id){
         <article class="stock-card"><bf-catalog-image [image]="item.image" [alt]="item.name" [compact]="true" /><div class="identity"><strong>{{item.name}}</strong><span>{{item.code}} · {{unitName(item.unitId)}}</span></div><div class="balance" [class.bad]="item.stock<0" [class.low]="item.stock>=0 && item.stock<=item.minimumStock"><strong>{{item.stock}}</strong><span>mín. {{item.minimumStock}}</span></div><div class="cost"><strong>{{currency(item.averageUnitCostCents)}}</strong><span>custo médio</span></div><div class="stock-actions"><button class="bf-button secondary" (click)="openHistory('input',item.id)">Histórico</button><button class="bf-button" (click)="openAdjustment('input',item.id)">Ajustar</button></div></article>
-      } @empty {<div class="bf-empty"><div><strong>Nenhum insumo</strong><p>Cadastre insumos no Catálogo.</p></div></div>}
+      } @empty {<bf-empty-state title="Nenhum insumo" description="Cadastre insumos no Catálogo." />}
     }
   </div>
 
@@ -36,7 +36,7 @@
   <dialog bfDialog #historyDialog="bfDialog" class="bf-dialog">
     <div class="bf-dialog-header"><div><h2>Histórico de estoque</h2><small>{{selectedName()}}</small></div><button class="bf-icon-button" (click)="historyDialog.close()"><bf-icon name="close" /></button></div>
     <div class="bf-dialog-body history">
-      @for(move of store.movements();track move.id){<div class="movement"><div><strong>{{date(move.businessDate)}}</strong><span>{{movementSource(move.sourceType)}}</span></div><strong [class.positive]="move.quantityDelta>0" [class.negative]="move.quantityDelta<0">{{move.quantityDelta>0?'+':''}}{{move.quantityDelta}}</strong></div>} @empty {<div class="bf-empty"><div><strong>Sem movimentações</strong><p>Este item ainda não possui histórico.</p></div></div>}
+      @for(move of store.movements();track move.id){<div class="movement"><div><strong>{{date(move.businessDate)}}</strong><span>{{movementSource(move.sourceType)}}</span></div><strong [class.positive]="move.quantityDelta>0" [class.negative]="move.quantityDelta<0">{{move.quantityDelta>0?'+':''}}{{move.quantityDelta}}</strong></div>} @empty {<bf-empty-state title="Sem movimentações" description="Este item ainda não possui histórico." />}
     </div>
   </dialog>
 </section>

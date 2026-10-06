@@ -35,25 +35,25 @@
           <bf-catalog-image [image]="item.image" [alt]="item.displayName" />
           <div class="body"><div class="meta"><span>{{ item.code }}</span><span class="bf-badge" [class.muted]="!item.active">{{ item.active ? 'Ativo' : 'Inativo' }}</span></div><h2>{{ item.displayName }}</h2><div class="stats"><strong>{{ currency(item.salePriceCents) }}</strong><span [class.stock-danger]="item.stock < 0">{{ item.stock }} em estoque</span></div><button class="bf-button secondary" type="button" (click)="editor.editProduct(item)">Editar</button></div>
         </article>
-      } @empty { <div class="bf-empty"><div><strong>Nenhum produto ainda</strong><p>Cadastre o primeiro sabonete para começar.</p></div></div> }
+      } @empty { <bf-empty-state title="Nenhum produto ainda" description="Cadastre o primeiro sabonete para começar." /> }
     </div>
   } @else if (tab() === 'inputs') {
     <div class="list-grid">
       @for (item of filteredInputs(); track item.id) {
         <article class="list-card"><div class="input-main"><bf-catalog-image [image]="item.image" [alt]="item.name" [compact]="true" /><div><span class="code">{{ item.code }}</span><h2>{{ item.name }}</h2><p>Estoque {{ item.stock }} · mínimo {{ item.minimumStockConfigured === false ? 'não definido' : item.minimumStock }}</p></div></div><div class="row-actions"><span class="bf-badge" [class.muted]="!item.active">{{ item.active ? 'Ativo' : 'Inativo' }}</span><button class="bf-button secondary" (click)="editor.editInput(item)">Editar</button></div></article>
-      } @empty { <div class="bf-empty"><div><strong>Nenhum insumo</strong><p>Cadastre matérias-primas e embalagens.</p></div></div> }
+      } @empty { <bf-empty-state title="Nenhum insumo" description="Cadastre matérias-primas e embalagens." /> }
     </div>
   } @else if (tab() === 'kits') {
     <div class="catalog-grid">
       @for (item of filteredKits(); track item.id) {
         <article class="catalog-card"><bf-catalog-image [image]="item.image" [alt]="item.name" /><div class="body"><div class="meta"><span>{{ item.components.length }} regras</span><span class="bf-badge" [class.muted]="!item.active">{{ item.active ? 'Ativo' : 'Inativo' }}</span></div><h2>{{ item.name }}</h2><div class="stats"><strong>{{ currency(item.priceCents) }}</strong><span>{{ item.notes || 'Kit comercial' }}</span></div><button class="bf-button secondary" (click)="editor.editKit(item)">Editar</button></div></article>
-      } @empty { <div class="bf-empty"><div><strong>Nenhum kit</strong><p>Crie combinações para vender mais rápido.</p></div></div> }
+      } @empty { <bf-empty-state title="Nenhum kit" description="Crie combinações para vender mais rápido." /> }
     </div>
   } @else {
     <div class="catalog-grid">
       @for (item of filteredAdditions(); track item.id) {
         <article class="catalog-card"><bf-catalog-image [image]="item.image" [alt]="item.name" /><div class="body"><div class="meta"><span>{{ item.category }}</span><span class="bf-badge" [class.muted]="!item.active">{{ item.active ? 'Ativo' : 'Inativo' }}</span></div><h2>{{ item.name }}</h2><div class="stats"><strong>{{ currency(item.priceCents) }}</strong><span>{{ item.components.length }} consumos</span></div><button class="bf-button secondary" (click)="editor.editAddition(item)">Editar</button></div></article>
-      } @empty { <div class="bf-empty"><div><strong>Nenhum adicional</strong><p>Cadastre embalagens, incensos e outros extras.</p></div></div> }
+      } @empty { <bf-empty-state title="Nenhum adicional" description="Cadastre embalagens, incensos e outros extras." /> }
     </div>
   }
 

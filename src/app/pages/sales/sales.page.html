@@ -7,7 +7,7 @@
   </div>
 
   <div class="bf-table-wrap"><table class="bf-table"><thead><tr><th>ID</th><th>Data</th><th>Cliente</th><th>Total</th><th>Recebido</th><th>Saldo</th><th>Status</th><th></th></tr></thead><tbody>
-    @for(sale of filteredSales();track sale.id){<tr><td><strong>{{sale.code}}</strong></td><td>{{date(sale.businessDate)}}</td><td>{{sale.customerName || '—'}}</td><td>{{currency(sale.totalCents)}}</td><td>{{currency(sale.receivedCents)}}</td><td>{{currency(sale.balanceCents)}}</td><td><span class="bf-badge" [class.warning]="sale.paymentStatus!=='paid' && sale.status!=='cancelled'" [class.muted]="sale.status==='cancelled'">{{paymentStatusLabel(sale)}}</span></td><td><button class="bf-button secondary" (click)="openDetails(sale)">Ver</button></td></tr>} @empty {<tr><td colspan="8"><div class="bf-empty"><div><strong>Nenhuma venda encontrada</strong><p>Use “Nova venda” para registrar a primeira.</p></div></div></td></tr>}
+    @for(sale of filteredSales();track sale.id){<tr><td><strong>{{sale.code}}</strong></td><td>{{date(sale.businessDate)}}</td><td>{{sale.customerName || '—'}}</td><td>{{currency(sale.totalCents)}}</td><td>{{currency(sale.receivedCents)}}</td><td>{{currency(sale.balanceCents)}}</td><td><span class="bf-badge" [class.warning]="sale.paymentStatus!=='paid' && sale.status!=='cancelled'" [class.muted]="sale.status==='cancelled'">{{paymentStatusLabel(sale)}}</span></td><td><button class="bf-button secondary" (click)="openDetails(sale)">Ver</button></td></tr>} @empty {<tr><td colspan="8"><bf-empty-state title="Nenhuma venda encontrada" description="Use “Nova venda” para registrar a primeira." /></td></tr>}
   </tbody></table></div>
 
     <bf-sale-editor #saleEditor />

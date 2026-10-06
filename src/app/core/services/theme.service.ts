@@ -2,9 +2,9 @@ import { DOCUMENT } from '@angular/common';
 import { computed, effect, inject, Injectable, signal } from '@angular/core';
 
 export type BfTheme = 'light' | 'dark';
-export type BfDarkPalette = 'espresso' | 'chocolate' | 'graphite' | 'wood';
+export type BfDarkPalette = 'espresso' | 'chocolate' | 'graphite' | 'wood' | 'walnut' | 'taupe';
 
-const DARK_PALETTES: readonly BfDarkPalette[] = ['espresso', 'chocolate', 'graphite', 'wood'];
+const DARK_PALETTES: readonly BfDarkPalette[] = ['espresso', 'chocolate', 'graphite', 'wood', 'walnut', 'taupe'];
 
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
@@ -76,6 +76,8 @@ export class ThemeService {
       chocolate: '#16110d',
       graphite: '#151312',
       wood: '#241a15',
+      walnut: '#2a1e19',
+      taupe: '#29231f',
     };
 
     const meta = this.document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');

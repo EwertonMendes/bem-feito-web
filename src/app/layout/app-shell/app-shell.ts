@@ -25,6 +25,8 @@ export class AppShell {
     { id: 'chocolate', label: 'Chocolate & Marfim', shortLabel: 'Chocolate' },
     { id: 'graphite', label: 'Grafite quente & Verde botânico', shortLabel: 'Grafite' },
     { id: 'wood', label: 'Madeira & Musgo', shortLabel: 'Madeira' },
+    { id: 'walnut', label: 'Nogueira & Sálvia', shortLabel: 'Nogueira' },
+    { id: 'taupe', label: 'Taupe & Oliva', shortLabel: 'Taupe' },
   ];
   private readonly failedAvatarUrl = signal<string | null>(null);
   readonly avatarUrl = computed(() => {

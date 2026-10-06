@@ -119,6 +119,7 @@
 
 .dark-palette-lab__options {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 5px;
 }
 
@@ -130,7 +131,7 @@
   gap: 8px;
   border: 1px solid var(--line);
   border-radius: 9px;
-  padding: 0 9px;
+  padding: 0 7px;
   background: var(--surface);
   color: var(--muted-strong);
   font-size: 0.68rem;

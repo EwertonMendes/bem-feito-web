@@ -1,0 +1,92 @@
+name: Deploy DEV Preview
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: read
+  id-token: write
+
+concurrency:
+  group: bem-feito-dev
+  cancel-in-progress: true
+
+jobs:
+  deploy-preview:
+    if: >-
+      github.event.issue.pull_request &&
+      github.event.comment.body == '/deploy-dev-preview' &&
+      github.event.comment.user.login == github.repository_owner
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+      url: https://bem-feito-dev.web.app/
+    steps:
+      - name: Resolve trusted pull request
+        id: source
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pullNumber = context.issue.number;
+            const { data: pull } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: pullNumber,
+            });
+
+            if (pull.state !== 'open') {
+              core.setFailed('DEV preview only supports open pull requests.');
+              return;
+            }
+
+            if (pull.head.repo?.full_name !== `${owner}/${repo}`) {
+              core.setFailed('DEV preview only supports branches from this repository.');
+              return;
+            }
+
+            if (pull.user?.login !== owner) {
+              core.setFailed('DEV preview only supports pull requests opened by the repository owner.');
+              return;
+            }
+
+            core.setOutput('sha', pull.head.sha);
+            core.setOutput('pr', String(pull.number));
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.22.3
+          cache: npm
+
+      - run: npm ci --no-fund
+
+      - name: Prepare DEV deployment metadata
+        env:
+          DEPLOY_COMMIT: ${{ steps.source.outputs.sha }}
+          DEPLOY_SOURCE_PR: ${{ steps.source.outputs.pr }}
+        run: npm run deploy:prepare:dev
+
+      - run: npm run build:dev:hosting
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: bem-feito-dev
+          workload_identity_provider: projects/312978463343/locations/global/workloadIdentityPools/github-actions/providers/github
+          service_account: github-deploy@bem-feito-dev.iam.gserviceaccount.com
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Deploy Hosting preview to DEV
+        run: npx --yes --package firebase-tools@15.32.1 firebase deploy --project bem-feito-dev --only hosting --non-interactive
+
+      - name: Verify published commit
+        env:
+          DEPLOY_COMMIT: ${{ steps.source.outputs.sha }}
+        run: npm run deploy:verify:dev

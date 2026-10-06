@@ -113,10 +113,11 @@ export class SalesRepository {
   }
 
   async receivableTotalCents(): Promise<number> {
-    const snapshot = await getAggregateFromServer(
-      query(collection(this.firestore, 'sales'), where('status', '==', 'active')),
-      { total: sum('balanceCents') },
-    );
+    // Cancellation atomically sets balanceCents to zero, so this produces the same total
+    // without requiring a status + balanceCents composite index.
+    const snapshot = await getAggregateFromServer(collection(this.firestore, 'sales'), {
+      total: sum('balanceCents'),
+    });
     return Number(snapshot.data().total ?? 0);
   }
 

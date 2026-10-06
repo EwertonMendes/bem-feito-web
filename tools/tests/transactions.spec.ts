@@ -3,9 +3,10 @@ import { Injector, runInInjectionContext } from '@angular/core';
 import { initializeTestEnvironment, RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { readFile } from 'node:fs/promises';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { collection, doc, Firestore, getDoc, getDocs, serverTimestamp, setDoc, Transaction } from 'firebase/firestore';
+import { collection, doc, Firestore, getDoc, getDocs, serverTimestamp, setDoc, Transaction, WriteBatch } from 'firebase/firestore';
 import { AuthService } from '../../src/app/core/auth/auth.service';
 import { DataRevisionService } from '../../src/app/core/firebase/data-revision.service';
+import { ReadOptimizationBackfillService } from '../../src/app/core/migrations/read-optimization-backfill.service';
 import { FIRESTORE } from '../../src/app/core/firebase/firebase.providers';
 import { SalesRepository } from '../../src/app/core/repositories/sales.repository';
 import { ProductionRepository } from '../../src/app/core/repositories/production.repository';
@@ -47,7 +48,7 @@ beforeEach(async () => {
   injector = Injector.create({
     providers: [
       { provide: FIRESTORE, useValue: db },
-      { provide: AuthService, useValue: { user: () => ({ uid: 'operator' }) } },
+      { provide: AuthService, useValue: { user: () => ({ uid: 'operator' }), canOperate: () => true } },
       {
         provide: DataRevisionService,
         useValue: {
@@ -57,6 +58,13 @@ beforeEach(async () => {
               { source: 'transaction-test', at: serverTimestamp() },
             ]));
             transaction.set(doc(db, 'system', 'data-revisions'), patch, { merge: true });
+          },
+          touchBatch: (batch: WriteBatch, ...domains: string[]) => {
+            const patch = Object.fromEntries(domains.map((domain) => [
+              domain,
+              { source: 'transaction-test', at: serverTimestamp() },
+            ]));
+            batch.set(doc(db, 'system', 'data-revisions'), patch, { merge: true });
           },
         },
       },
@@ -157,4 +165,37 @@ describe('Actual repositories against restrictive emulator rules', () => {
     expect(await data('products', 'p')).toMatchObject({ stock: 9 });
     expect(await count('stockMovements')).toBe(1);
   });
+  it('backfills read-optimization fields in security-rules-safe chunks', async () => {
+    await env.withSecurityRulesDisabled(async context => {
+      const seed = context.firestore();
+      await Promise.all(Array.from({ length: 10 }, (_, index) =>
+        setDoc(doc(seed, 'products', `legacy-${index}`), {
+          code: `LEGACY-${index}`,
+          displayName: `LEGACY PRODUCT ${index}`,
+          active: true,
+          collectionId: 'c',
+          fragranceId: 'f',
+          formatId: 'fmt',
+          salePriceCents: 1000,
+          additionalCostCents: 0,
+          averageUnitCostCents: 100,
+          stock: index + 1,
+          minimumStock: 0,
+          recipe: [],
+          ...audit(),
+        })
+      ));
+    });
+
+    const backfill = runInInjectionContext(injector, () => new ReadOptimizationBackfillService());
+    await expect(backfill.ensure()).resolves.toBeUndefined();
+
+    expect(await data('system', 'read-optimization')).toMatchObject({ version: 1, updatedBy: 'operator' });
+    expect(await data('products', 'p')).toMatchObject({ stockStatus: 'ok' });
+    expect(await data('inputs', 'i')).toMatchObject({ stockStatus: 'ok' });
+    for (let index = 0; index < 10; index += 1) {
+      expect(await data('products', `legacy-${index}`)).toMatchObject({ stockStatus: 'ok' });
+    }
+  });
+
 });

@@ -16,7 +16,9 @@ import { DataRevisionService } from '../firebase/data-revision.service';
 import { FIRESTORE } from '../firebase/firebase.providers';
 
 const READ_OPTIMIZATION_VERSION = 1;
-const BATCH_SIZE = 400;
+// Protected writes resolve the current profile through Security Rules. Keep client batches
+// safely below the rules document-access budget instead of depending on lookup caching.
+const BATCH_SIZE = 4;
 
 type PendingUpdateData = { stockStatus: StockStatus } | SaleAnalytics;
 

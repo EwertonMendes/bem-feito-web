@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "Manrope Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url("/assets/fonts/manrope-latin-wght-normal.woff2") format("woff2-variations");
+}
+
 :root {
   color-scheme: light;
   --font-ui: "Manrope Variable", "Manrope", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;

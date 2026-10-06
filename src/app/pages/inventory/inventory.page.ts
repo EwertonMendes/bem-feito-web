@@ -4,6 +4,7 @@ import { FormField, form, required } from '@angular/forms/signals';
 import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
 import { CatalogStore } from '../../features/catalog/catalog.store';
 import { InventoryStore } from '../../features/inventory/inventory.store';
+import { NegativeStockReconciliationService } from '../../core/migrations/negative-stock-reconciliation.service';
 import { todayBusinessDate, formatBusinessDate } from '../../core/utils/date';
 import { formatCurrency } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
@@ -30,6 +31,7 @@ export class InventoryPage {
   readonly store = inject(InventoryStore);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly negativeStockReconciliation = inject(NegativeStockReconciliationService);
   private readonly adjustmentDialog = viewChild.required<BfDialog>('adjustmentDialog');
   private readonly historyDialog = viewChild.required<BfDialog>('historyDialog');
 
@@ -61,7 +63,8 @@ export class InventoryPage {
     this.destroyRef.onDestroy(() => this.store.deactivateHistory());
     this.destroyRef.onDestroy(this.catalog.activate());
     this.destroyRef.onDestroy(this.references.activate());
-    void Promise.all([this.catalog.load(), this.references.load()]).then(() => {
+    void Promise.all([this.catalog.load(), this.references.load()]).then(async () => {
+      await this.negativeStockReconciliation.ensure();
       if (this.route.snapshot.queryParamMap.get('ajuste') === '1') this.openAdjustmentFromFirst();
     });
   }

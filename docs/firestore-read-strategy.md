@@ -19,9 +19,10 @@ Stores com dados reutilizáveis usam `AsyncLoadGate`:
 - a primeira carga chega ao Firestore;
 - chamadas concorrentes são deduplicadas;
 - uma navegação posterior reutiliza a carga em memória;
-- uma revisão remota pode solicitar refresh sem duplicar requests em andamento.
+- uma revisão remota invalida o cache sem duplicar requests em andamento;
+- stores só fazem refresh imediato quando existe uma tela consumidora ativa; fora dela, os dados ficam marcados como stale e são atualizados na próxima entrada.
 
-Nenhuma página ou componente deve chamar `.load(true)`. Refresh forçado pertence à camada de store, como reação a invalidação remota.
+Nenhuma página ou componente deve chamar `.load(true)`. Refresh forçado pertence à camada de store, como reação a invalidação controlada.
 
 ## Paginação
 
@@ -44,6 +45,8 @@ Produtos e insumos persistem `stockStatus`, permitindo contagens de estoque baix
 
 Esses campos são derivados no mesmo fluxo transacional que altera os dados de origem, portanto não são uma segunda fonte manual de verdade.
 
+O Dashboard também mantém cache próprio de métricas e do gráfico anual. Sair e voltar para a tela não executa novas agregações quando nenhum domínio relevante mudou; revisões de vendas invalidam período e gráfico, enquanto revisões de financeiro/estoque invalidam apenas as métricas afetadas.
+
 ## Compatibilidade e backfill
 
 `ReadOptimizationBackfillService` possui uma migração idempotente versionada em `system/read-optimization`.
@@ -63,7 +66,7 @@ Novas importações legadas já calculam os mesmos campos durante a normalizaç�
 
 `system/data-revisions` contém stamps por domínio. Cada mutation atualiza o documento dentro da mesma batch/transaction que altera os dados.
 
-Existe apenas um listener compartilhado no cliente. Alterações feitas pela própria sessão não provocam reload: o estado local já foi atualizado pelo resultado da mutation. Alterações de outra sessão invalidam/atualizam os stores relevantes.
+Existe apenas um listener compartilhado no cliente. Alterações feitas pela própria sessão não provocam reload dos feature stores: o estado local já foi atualizado pelo resultado da mutation. O mesmo stamp também marca caches derivados, como o Dashboard, como stale para que uma futura visita não exiba métricas antigas. Alterações de outra sessão invalidam os stores relevantes e só atualizam imediatamente os que estiverem sendo consumidos por uma tela ativa.
 
 O perfil autenticado usa um listener dedicado em `users/{uid}`, substituindo leituras repetidas do perfil em guards e mantendo role/active atualizados.
 

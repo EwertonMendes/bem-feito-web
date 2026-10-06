@@ -39,13 +39,16 @@ export class DashboardStore {
   private readonly revisions = inject(DataRevisionService);
   private readonly errors = inject(ErrorService);
   private readonly toast = inject(ToastService);
-  private readonly salesRevision = this.revisions.revision('sales');
-  private readonly financeRevision = this.revisions.revision('finance');
-  private readonly catalogRevision = this.revisions.revision('catalog');
+  private readonly salesRevision = this.revisions.changeRevision('sales');
+  private readonly financeRevision = this.revisions.changeRevision('finance');
+  private readonly catalogRevision = this.revisions.changeRevision('catalog');
   private lastSalesRevision = 0;
   private lastFinanceRevision = 0;
   private lastCatalogRevision = 0;
   private active = false;
+  private initialized = false;
+  private periodStale = true;
+  private yearStale = true;
   private readonly initialPeriod = currentMonthBusinessDateRange();
   private periodRequest = 0;
   private yearRequest = 0;
@@ -105,7 +108,9 @@ export class DashboardStore {
       const revision = this.salesRevision();
       if (revision === this.lastSalesRevision) return;
       this.lastSalesRevision = revision;
-      if (this.active) void this.refreshAfterRemoteSale();
+      this.periodStale = true;
+      this.yearStale = true;
+      if (this.active && this.initialized) void this.refreshAfterSaleChange();
     });
     effect(() => {
       const finance = this.financeRevision();
@@ -113,19 +118,22 @@ export class DashboardStore {
       const changed = finance !== this.lastFinanceRevision || catalog !== this.lastCatalogRevision;
       this.lastFinanceRevision = finance;
       this.lastCatalogRevision = catalog;
-      if (changed && this.active) void this.safeRefreshPeriod();
+      if (!changed) return;
+      this.periodStale = true;
+      if (this.active && this.initialized) void this.safeRefreshPeriod();
     });
   }
 
   async load(): Promise<void> {
+    this.active = true;
     this.loading.set(true);
     try {
       await this.backfill.ensure();
-      await Promise.all([
-        this.refreshPeriod(),
-        this.refreshYear(),
-      ]);
-      this.active = true;
+      const tasks: Promise<void>[] = [];
+      if (!this.initialized || this.periodStale) tasks.push(this.refreshPeriod());
+      if (!this.initialized || this.yearStale) tasks.push(this.refreshYear());
+      await Promise.all(tasks);
+      this.initialized = true;
     } catch (error) {
       this.toast.error(this.errors.message(error));
     } finally {
@@ -160,7 +168,7 @@ export class DashboardStore {
     await this.safeRefreshPeriod();
   }
 
-  private async refreshAfterRemoteSale(): Promise<void> {
+  private async refreshAfterSaleChange(): Promise<void> {
     await Promise.all([this.safeRefreshPeriod(), this.safeRefreshYear()]);
   }
 
@@ -181,18 +189,26 @@ export class DashboardStore {
   }
 
   private async refreshPeriod(): Promise<void> {
+    this.periodStale = true;
     const request = ++this.periodRequest;
     const metrics = await this.repository.metrics(
       this.startDate(),
       this.endDate(),
       todayBusinessDate(),
     );
-    if (request === this.periodRequest) this.metricsState.set(metrics);
+    if (request === this.periodRequest) {
+      this.metricsState.set(metrics);
+      this.periodStale = false;
+    }
   }
 
   private async refreshYear(): Promise<void> {
+    this.yearStale = true;
     const request = ++this.yearRequest;
     const points = await this.repository.monthlyRevenue(this.chartYear());
-    if (request === this.yearRequest) this.monthlyRevenueState.set(points);
+    if (request === this.yearRequest) {
+      this.monthlyRevenueState.set(points);
+      this.yearStale = false;
+    }
   }
 }

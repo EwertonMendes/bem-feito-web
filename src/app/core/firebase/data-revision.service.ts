@@ -38,6 +38,14 @@ export class DataRevisionService {
     production: 0,
     inventory: 0,
   });
+  private readonly changeVersions = signal<Record<DataDomain, number>>({
+    catalog: 0,
+    settings: 0,
+    sales: 0,
+    finance: 0,
+    production: 0,
+    inventory: 0,
+  });
   private readonly lastTokens = new Map<DataDomain, string>();
 
   constructor() {
@@ -59,6 +67,7 @@ export class DataRevisionService {
             const token = `${stamp.source}:${millis}`;
             if (this.lastTokens.get(domain) === token) continue;
             this.lastTokens.set(domain, token);
+            this.changeVersions.update((current) => ({ ...current, [domain]: current[domain] + 1 }));
 
             if (stamp.source === this.source) continue;
             this.versions.update((current) => ({ ...current, [domain]: current[domain] + 1 }));
@@ -75,6 +84,10 @@ export class DataRevisionService {
 
   revision(domain: DataDomain): Signal<number> {
     return computed(() => this.versions()[domain]);
+  }
+
+  changeRevision(domain: DataDomain): Signal<number> {
+    return computed(() => this.changeVersions()[domain]);
   }
 
   touchBatch(batch: WriteBatch, ...domains: DataDomain[]): void {

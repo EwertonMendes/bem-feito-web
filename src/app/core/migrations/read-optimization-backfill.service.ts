@@ -7,9 +7,9 @@ import {
   serverTimestamp,
   writeBatch,
 } from 'firebase/firestore';
-import { summarizeSaleItems } from '../../domain/logic/sale-analytics';
+import { SaleAnalytics, summarizeSaleItems } from '../../domain/logic/sale-analytics';
 import { stockStatusForInput, stockStatusForProduct } from '../../domain/logic/stock-status';
-import { InputItem, Product } from '../../domain/models/catalog.model';
+import { InputItem, Product, StockStatus } from '../../domain/models/catalog.model';
 import { Sale } from '../../domain/models/sales.model';
 import { AuthService } from '../auth/auth.service';
 import { DataRevisionService } from '../firebase/data-revision.service';
@@ -18,10 +18,12 @@ import { FIRESTORE } from '../firebase/firebase.providers';
 const READ_OPTIMIZATION_VERSION = 1;
 const BATCH_SIZE = 400;
 
+type PendingUpdateData = { stockStatus: StockStatus } | SaleAnalytics;
+
 interface PendingUpdate {
   collectionName: 'products' | 'inputs' | 'sales';
   id: string;
-  data: Record<string, unknown>;
+  data: PendingUpdateData;
 }
 
 @Injectable({ providedIn: 'root' })

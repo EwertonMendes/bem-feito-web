@@ -3,7 +3,7 @@ import { Injector, runInInjectionContext } from '@angular/core';
 import { initializeTestEnvironment, RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { readFile } from 'node:fs/promises';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { collection, doc, Firestore, getDoc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, doc, Firestore, getDoc, getDocs, serverTimestamp, setDoc, Transaction } from 'firebase/firestore';
 import { AuthService } from '../../src/app/core/auth/auth.service';
 import { DataRevisionService } from '../../src/app/core/firebase/data-revision.service';
 import { FIRESTORE } from '../../src/app/core/firebase/firebase.providers';
@@ -48,7 +48,18 @@ beforeEach(async () => {
     providers: [
       { provide: FIRESTORE, useValue: db },
       { provide: AuthService, useValue: { user: () => ({ uid: 'operator' }) } },
-      DataRevisionService,
+      {
+        provide: DataRevisionService,
+        useValue: {
+          touchTransaction: (transaction: Transaction, ...domains: string[]) => {
+            const patch = Object.fromEntries(domains.map((domain) => [
+              domain,
+              { source: 'transaction-test', at: serverTimestamp() },
+            ]));
+            transaction.set(doc(db, 'system', 'data-revisions'), patch, { merge: true });
+          },
+        },
+      },
     ],
   });
   sales = runInInjectionContext(injector, () => new SalesRepository());

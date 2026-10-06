@@ -17,7 +17,9 @@ export class InventoryStore {
   private readonly errors = inject(ErrorService);
   private readonly remoteRevision = this.revisions.revision('inventory');
   private lastRemoteRevision = 0;
-  private activeConsumers = 0;
+  private historyConsumers = 0;
+  private historyStale = true;
+  private movementRequest = 0;
   private currentItemId = '';
   private cursor: BusinessDateCursor | null = null;
 
@@ -32,37 +34,52 @@ export class InventoryStore {
       const revision = this.remoteRevision();
       if (revision === this.lastRemoteRevision) return;
       this.lastRemoteRevision = revision;
-      if (this.activeConsumers > 0 && this.currentItemId) void this.loadMovements(this.currentItemId);
+      this.historyStale = true;
+      if (this.historyConsumers > 0 && this.currentItemId) {
+        void this.loadMovements(this.currentItemId, true);
+      }
     });
   }
 
-  activate(): () => void {
-    this.activeConsumers += 1;
-    return () => { this.activeConsumers = Math.max(0, this.activeConsumers - 1); };
+  activateHistory(): void {
+    this.historyConsumers += 1;
   }
 
-  async loadMovements(itemId: string): Promise<void> {
+  deactivateHistory(): void {
+    this.historyConsumers = Math.max(0, this.historyConsumers - 1);
+  }
+
+  async loadMovements(itemId: string, force = false): Promise<void> {
+    if (!force && itemId === this.currentItemId && !this.historyStale) return;
+
+    const request = ++this.movementRequest;
     try {
       const page = await this.repository.movementPage(itemId, PAGE_SIZE);
+      if (request !== this.movementRequest) return;
       this.currentItemId = itemId;
       this.cursor = page.nextCursor;
       this.hasMoreState.set(page.hasMore);
       this.movementsState.set(page.items);
+      this.historyStale = false;
     } catch (error) {
-      this.toast.error(this.errors.message(error));
+      if (request === this.movementRequest) this.toast.error(this.errors.message(error));
     }
   }
 
   async loadMoreMovements(): Promise<void> {
     if (!this.currentItemId || !this.cursor || !this.hasMoreState()) return;
+    const itemId = this.currentItemId;
+    const cursor = this.cursor;
+    const request = this.movementRequest;
     try {
-      const page = await this.repository.movementPage(this.currentItemId, PAGE_SIZE, this.cursor);
+      const page = await this.repository.movementPage(itemId, PAGE_SIZE, cursor);
+      if (request !== this.movementRequest || itemId !== this.currentItemId) return;
       const known = new Set(this.movementsState().map((item) => item.id));
       this.movementsState.update((items) => [...items, ...page.items.filter((item) => !known.has(item.id))]);
       this.cursor = page.nextCursor;
       this.hasMoreState.set(page.hasMore);
     } catch (error) {
-      this.toast.error(this.errors.message(error));
+      if (request === this.movementRequest) this.toast.error(this.errors.message(error));
     }
   }
 

@@ -58,9 +58,9 @@ export class InventoryPage {
   });
 
   constructor() {
+    this.destroyRef.onDestroy(() => this.store.deactivateHistory());
     this.destroyRef.onDestroy(this.catalog.activate());
     this.destroyRef.onDestroy(this.references.activate());
-    this.destroyRef.onDestroy(this.store.activate());
     void Promise.all([this.catalog.load(), this.references.load()]).then(() => {
       if (this.route.snapshot.queryParamMap.get('ajuste') === '1') this.openAdjustmentFromFirst();
     });
@@ -76,8 +76,13 @@ export class InventoryPage {
   async openHistory(type: 'product' | 'input', id: string): Promise<void> {
     this.selectedType.set(type);
     this.selectedId.set(id);
+    this.store.activateHistory();
     await this.store.loadMovements(id);
     this.historyDialog().open();
+  }
+
+  closeHistory(): void {
+    this.store.deactivateHistory();
   }
 
   async saveAdjustment(): Promise<void> {

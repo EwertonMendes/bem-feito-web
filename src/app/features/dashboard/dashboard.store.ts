@@ -51,6 +51,7 @@ export class DashboardStore {
   private initialized = false;
   private periodStale = true;
   private yearStale = true;
+  private refreshTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly initialPeriod = currentMonthBusinessDateRange();
   private periodRequest = 0;
   private yearRequest = 0;
@@ -112,7 +113,7 @@ export class DashboardStore {
       this.lastSalesRevision = revision;
       this.periodStale = true;
       this.yearStale = true;
-      if (this.active && this.initialized) void this.refreshAfterSaleChange();
+      this.scheduleRefresh();
     });
     effect(() => {
       const finance = this.financeRevision();
@@ -127,7 +128,7 @@ export class DashboardStore {
       this.lastInventoryRevision = inventory;
       if (!changed) return;
       this.periodStale = true;
-      if (this.active && this.initialized) void this.safeRefreshPeriod();
+      this.scheduleRefresh();
     });
   }
 
@@ -150,6 +151,10 @@ export class DashboardStore {
 
   deactivate(): void {
     this.active = false;
+    if (this.refreshTimer !== null) {
+      clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
   }
 
   async setStartDate(value: string): Promise<void> {
@@ -175,8 +180,16 @@ export class DashboardStore {
     await this.safeRefreshPeriod();
   }
 
-  private async refreshAfterSaleChange(): Promise<void> {
-    await Promise.all([this.safeRefreshPeriod(), this.safeRefreshYear()]);
+  private scheduleRefresh(): void {
+    if (!this.active || !this.initialized || this.refreshTimer !== null) return;
+    this.refreshTimer = setTimeout(() => {
+      this.refreshTimer = null;
+      if (!this.active) return;
+      const tasks: Promise<void>[] = [];
+      if (this.periodStale) tasks.push(this.safeRefreshPeriod());
+      if (this.yearStale) tasks.push(this.safeRefreshYear());
+      void Promise.all(tasks);
+    }, 0);
   }
 
   private async safeRefreshPeriod(): Promise<void> {

@@ -25,6 +25,8 @@ export class CatalogStore {
   private lastRemoteRevision = 0;
   private lastInventoryRevision = 0;
   private activeConsumers = 0;
+  private catalogRequest = 0;
+  private inventoryRequest = 0;
 
   private readonly productsState = signal<Product[]>([]);
   private readonly inputsState = signal<InputItem[]>([]);
@@ -78,6 +80,8 @@ export class CatalogStore {
 
   load(force = false): Promise<void> {
     return this.gate.run(async () => {
+      const request = ++this.catalogRequest;
+      this.inventoryRequest += 1;
       this.loadingState.set(true);
       try {
         const [products, inputs, kits, additions] = await Promise.all([
@@ -86,6 +90,7 @@ export class CatalogStore {
           this.kitRepository.all(),
           this.additionRepository.all(),
         ]);
+        if (request !== this.catalogRequest) return;
         this.productsState.set(products);
         this.inputsState.set(inputs);
         this.kitsState.set(kits);
@@ -102,11 +107,14 @@ export class CatalogStore {
 
   private refreshInventoryEntities(): Promise<void> {
     return this.inventoryRefreshGate.run(async () => {
+      const request = ++this.inventoryRequest;
+      const catalogRequest = this.catalogRequest;
       try {
         const [products, inputs] = await Promise.all([
           this.productRepository.all(),
           this.inputRepository.all(),
         ]);
+        if (request !== this.inventoryRequest || catalogRequest !== this.catalogRequest) return;
         this.productsState.set(products);
         this.inputsState.set(inputs);
       } catch (error) {

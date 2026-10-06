@@ -53,10 +53,11 @@ export class InventoryStore {
     if (!force && itemId === this.currentItemId && !this.historyStale) return true;
 
     const request = ++this.movementRequest;
+    this.currentItemId = itemId;
+    this.historyStale = true;
     try {
       const page = await this.repository.movementPage(itemId, PAGE_SIZE);
-      if (request !== this.movementRequest) return;
-      this.currentItemId = itemId;
+      if (request !== this.movementRequest) return true;
       this.cursor = page.nextCursor;
       this.hasMoreState.set(page.hasMore);
       this.movementsState.set(page.items);

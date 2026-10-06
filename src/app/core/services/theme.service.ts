@@ -43,6 +43,6 @@ export class ThemeService {
     root.style.colorScheme = theme;
 
     const meta = this.document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-    if (meta) meta.content = theme === 'dark' ? '#171916' : '#f8f5ef';
+    if (meta) meta.content = theme === 'dark' ? '#29231f' : '#f8f5ef';
   }
 }

@@ -20,7 +20,7 @@ jobs:
       - run: npm run security:scan
       - run: npm run test:security
       - run: npm run test:architecture
-      - run: npm ci --no-audit --no-fund
+      - run: npm ci --no-fund
       - run: npm run security:audit
       - run: npm test
       - run: npm run build:dev:hosting

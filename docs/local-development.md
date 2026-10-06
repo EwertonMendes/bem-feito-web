@@ -3,7 +3,7 @@
 Use Node 22.22.3 ou superior compatível com `package.json`.
 
 ```powershell
-npm ci --no-audit --no-fund
+npm ci
 npm run security:scan
 npm run security:audit
 npm run test:architecture
@@ -53,13 +53,13 @@ Restaure o environment real ao terminar. Não publique build com emuladores ativ
 
 ## Dependências
 
-Não use `npm audit fix --force`. O audit automático do `npm ci` mistura runtime e ferramentas de desenvolvimento, então a instalação local usa `--no-audit` e a checagem de produção é executada explicitamente:
+Não use `npm audit fix --force`. A árvore versionada deve permanecer limpa no audit normal:
 
 ```powershell
-npm run security:audit
+npm audit
 ```
 
-A justificativa para a exceção temporária do Firestore está em [dependency-security.md](dependency-security.md).
+Os overrides transitivos revisados e a decisão de manter o Firebase CLI fora de `node_modules` estão documentados em [dependency-security.md](dependency-security.md).
 
 ## Builds e deploy
 

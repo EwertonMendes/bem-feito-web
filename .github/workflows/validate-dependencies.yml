@@ -1,0 +1,22 @@
+name: Validate clean dependency tree
+
+on:
+  push:
+    branches:
+      - refactor/shared-components-architecture
+
+permissions:
+  contents: read
+
+jobs:
+  validate-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.3
+      - run: npm ci --no-fund
+      - run: npm audit
+      - run: npm run test:rules
+      - run: npm run test:transactions

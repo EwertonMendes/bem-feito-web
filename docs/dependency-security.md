@@ -2,50 +2,65 @@
 
 ## Política
 
-A CI separa duas verificações diferentes:
+O projeto mantém o `npm audit` limpo no estado versionado. Não usamos allowlist para esconder advisories conhecidos.
 
-- `npm run security:scan` procura credenciais e secrets versionados;
-- `npm run security:audit` verifica vulnerabilidades conhecidas nas dependências que fazem parte da aplicação de produção.
+A CI executa `npm ci` e, em seguida, o `npm audit` normal por meio de `npm run security:audit`. Qualquer vulnerabilidade reportada pelo npm faz a validação falhar.
 
-A instalação usa `npm ci --no-audit --no-fund` para evitar que o audit automático do npm misture dependências de runtime com ferramentas locais. O audit explícito roda logo depois e falha a CI para qualquer vulnerabilidade de produção fora da exceção documentada abaixo.
+Não use `npm audit fix --force`. Mudanças de versão precisam ser revisadas e testadas explicitamente.
 
-Não use `npm audit fix --force`. Uma correção automática que troca versões maiores pode alterar Angular, Firebase ou ferramentas de build sem uma migração revisada.
+## Firestore e gRPC
 
-## Exceção temporária do Firestore
+Em outubro de 2026, `firebase@12.19.0` / `@firebase/firestore@4.17.2` ainda declara `@grpc/grpc-js: ~1.9.0`, embora `@grpc/grpc-js@1.14.5` contenha as correções dos advisories `GHSA-m9gg-hp2v-232j` e `GHSA-f596-whhp-79r4`.
 
-Em 05/10/2026, `firebase@12.19.0` é a versão atual usada pelo projeto e `@firebase/firestore@4.17.2` ainda declara `@grpc/grpc-js: ~1.9.0`.
+O projeto usa um `overrides` raiz, recurso suportado pelo npm, limitado ao filho de `@firebase/firestore`:
 
-O npm reporta:
-
-- `GHSA-m9gg-hp2v-232j`;
-- `GHSA-f596-whhp-79r4`.
-
-Esses avisos atingem o transporte gRPC de Node. O Bem Feito é uma SPA Angular publicada no Firebase Hosting. O Firestore seleciona o bundle `browser`, que usa WebChannel; o transporte gRPC fica no export `node` e não é carregado pela aplicação publicada.
-
-O próprio repositório do Firebase acompanha essa limitação em:
-
-- https://github.com/firebase/firebase-js-sdk/issues/10400
-
-A declaração atual de exports e dependências do Firestore pode ser conferida em:
-
-- https://github.com/firebase/firebase-js-sdk/blob/main/packages/firestore/package.json
-
-A exceção da CI é deliberadamente estreita: somente os dois IDs acima e somente a cadeia `firebase -> @firebase/firestore-compat -> @firebase/firestore -> @grpc/grpc-js` podem passar. Qualquer novo advisory, novo pacote vulnerável ou mudança nessa cadeia faz `npm run security:audit` falhar.
-
-A exceção deve ser removida assim que o Firebase publicar uma versão compatível que deixe de instalar uma versão vulnerável de `@grpc/grpc-js`.
-
-## Dependências de desenvolvimento
-
-`npm audit` sem `--omit=dev` também analisa ferramentas como `firebase-tools`, emuladores e dependências transitivas que não entram no bundle Angular publicado.
-
-Esses achados devem ser revisados e atualizados quando houver release compatível, mas não são tratados como vulnerabilidades de runtime do site. Em especial, em 05/10/2026 existem advisories transitivos em ferramentas do Firebase para os quais o npm sugere downgrade ou `--force`; essas ações não devem ser aplicadas automaticamente.
-
-Para investigar manualmente:
-
-```powershell
-npm audit --omit=dev
-npm audit
-npm ls <pacote>
+```json
+{
+  "overrides": {
+    "@firebase/firestore": {
+      "@grpc/grpc-js": "1.14.5"
+    }
+  }
+}
 ```
 
-O primeiro comando representa a superfície de dependências publicada pelo aplicativo. O segundo inclui toda a toolchain local.
+Isso substitui a dependência transitiva vulnerável por uma versão corrigida da mesma major. A issue upstream é https://github.com/firebase/firebase-js-sdk/issues/10400.
+
+Esse override deve ser removido quando o Firebase passar a resolver nativamente uma versão corrigida.
+
+## Firebase CLI
+
+`firebase-tools` foi removido das `devDependencies`. A CLI não faz parte da aplicação Angular e sua árvore transitiva estava introduzindo advisories no `node_modules` do projeto.
+
+Os scripts usam uma versão fixa da CLI sob demanda:
+
+```bash
+npx --yes --package firebase-tools@15.32.1 firebase ...
+```
+
+Isso mantém emuladores e deploy reproduzíveis sem incorporar toda a árvore da CLI ao projeto.
+
+## gaxios e uuid
+
+Uma dependência de desenvolvimento usa `gaxios`, cuja faixa podia selecionar uma versão vulnerável de `uuid`. O projeto aplica um override limitado a esse pai:
+
+```json
+{
+  "overrides": {
+    "gaxios": {
+      "uuid": "11.1.1"
+    }
+  }
+}
+```
+
+`uuid@11.1.1` contém a correção de `GHSA-w5hq-g745-h8pq`.
+
+## Resultado esperado
+
+```powershell
+npm ci
+npm audit
+```
+
+Ambos devem terminar sem vulnerabilidades. Os overrides são específicos e devem ser removidos quando as dependências upstream deixarem de precisar deles.

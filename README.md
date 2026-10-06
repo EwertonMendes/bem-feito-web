@@ -48,7 +48,7 @@ nvm use
 Depois:
 
 ```bash
-npm ci --no-audit --no-fund
+npm ci
 npm run security:audit
 npm start
 ```
@@ -90,7 +90,7 @@ Não versione service accounts, chaves privadas, OAuth client secrets, access to
 
 Firebase Web config, OAuth Client ID e a Picker API Key de uma SPA são públicos por natureza. Mesmo assim, as chaves públicas devem ser restritas aos origins/APIs esperados. Execute `npm run security:scan` antes de enviar alterações.
 
-A segurança das dependências de produção é verificada por `npm run security:audit`. A política e a exceção temporária do transporte Node do Firestore estão documentadas em [docs/dependency-security.md](docs/dependency-security.md).
+A árvore de dependências versionada deve permanecer com `npm audit` limpo. Os overrides transitivos revisados e a separação do Firebase CLI estão documentados em [docs/dependency-security.md](docs/dependency-security.md).
 
 As dependências entre camadas são validadas por `npm run test:architecture`. Consulte [docs/architecture.md](docs/architecture.md) antes de criar uma nova abstração compartilhada ou mover código entre `core`, `features`, `shared` e `domain`.
 

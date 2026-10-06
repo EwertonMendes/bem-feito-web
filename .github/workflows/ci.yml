@@ -24,6 +24,7 @@ jobs:
       - run: npm run security:scan
       - run: npm run test:security
       - run: npm run test:architecture
+      - run: npm run test:ci-config
       - run: npm ci --no-fund
       - run: npm run security:audit
       - run: npm test

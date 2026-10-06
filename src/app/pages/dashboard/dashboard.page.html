@@ -42,8 +42,14 @@
       </div>
     </article>
 
-    <a class="metric-card attention-card" routerLink="/catalogo">
-      <span class="metric-icon blush"><bf-icon name="alert" /></span>
+    <a
+      class="metric-card attention-card"
+      [class.resolved]="store.missingCostItems() === 0"
+      routerLink="/catalogo"
+    >
+      <span class="metric-icon attention-icon">
+        <bf-icon [name]="store.missingCostItems() ? 'alert' : 'check'" />
+      </span>
       <div class="metric-copy">
         <span>Custos pendentes</span>
         <strong>{{ store.missingCostItems() ? store.missingCostItems() + ' itens' : 'Tudo em dia' }}</strong>

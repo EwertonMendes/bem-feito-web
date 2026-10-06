@@ -123,9 +123,28 @@
   background: linear-gradient(125deg, var(--accent-soft), color-mix(in srgb, var(--surface) 88%, var(--accent-soft)));
 }
 
+.attention-card .attention-icon {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
 .attention-card .metric-copy > span,
 .attention-card .metric-copy strong {
   color: color-mix(in srgb, var(--danger) 72%, var(--text));
+}
+
+.attention-card.resolved {
+  background: linear-gradient(125deg, var(--success-soft), color-mix(in srgb, var(--surface) 88%, var(--success-soft)));
+}
+
+.attention-card.resolved .attention-icon {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.attention-card.resolved .metric-copy > span,
+.attention-card.resolved .metric-copy strong {
+  color: color-mix(in srgb, var(--success) 78%, var(--text));
 }
 
 .metric-chevron {

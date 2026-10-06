@@ -30,5 +30,18 @@ jobs:
       - run: npm test
       - run: npm run test:rules
       - run: npm run test:transactions
+      - name: Prepare DEV artifact metadata
+        env:
+          DEPLOY_COMMIT: ${{ github.sha }}
+          DEPLOY_SOURCE_PR: ci
+        run: npm run deploy:prepare:dev
       - run: npm run build:dev:hosting
+      - name: Upload DEV hosting artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-hosting-${{ github.sha }}
+          path: dist/bem-feito-web/browser
+          if-no-files-found: error
+          retention-days: 2
+      - run: rm -f public/deployment.json
       - run: npm run build:prod

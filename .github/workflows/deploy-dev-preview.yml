@@ -5,6 +5,7 @@ on:
     types: [created]
 
 permissions:
+  actions: read
   contents: read
   pull-requests: read
   id-token: write
@@ -52,8 +53,62 @@ jobs:
               return;
             }
 
+            const changedFiles = await github.paginate(
+              github.rest.pulls.listFiles,
+              {
+                owner,
+                repo,
+                pull_number: pullNumber,
+                per_page: 100,
+              },
+            );
+            const exactFirestorePaths = new Set([
+              'firestore.rules',
+              'firestore.indexes.json',
+              'firebase.json',
+              'package.json',
+            ]);
+            const firestorePrefixes = [
+              'src/app/core/repositories/',
+              'src/app/core/firebase/',
+              'src/app/core/migrations/',
+              'tools/deploy/',
+              '.github/workflows/',
+            ];
+            const firestoreChanged = changedFiles.some(({ filename }) =>
+              exactFirestorePaths.has(filename) ||
+              firestorePrefixes.some((prefix) => filename.startsWith(prefix))
+            );
+
+            const { data: runs } = await github.rest.actions.listWorkflowRuns({
+              owner,
+              repo,
+              workflow_id: 'ci.yml',
+              head_sha: pull.head.sha,
+              event: 'push',
+              status: 'success',
+              per_page: 10,
+            });
+            const ciRun = runs.workflow_runs.find((run) =>
+              run.head_sha === pull.head.sha &&
+              run.event === 'push' &&
+              run.conclusion === 'success'
+            );
+
+            if (!ciRun) {
+              core.setFailed(`No successful CI push run found for ${pull.head.sha}. Wait for CI to finish before deploying DEV.`);
+              return;
+            }
+
+            core.notice(
+              firestoreChanged
+                ? 'Firestore-sensitive changes detected; full Firestore validation will run.'
+                : 'No Firestore-sensitive changes detected; using fast Hosting-only DEV deploy.'
+            );
             core.setOutput('sha', pull.head.sha);
             core.setOutput('pr', String(pull.number));
+            core.setOutput('ci_run', String(ciRun.id));
+            core.setOutput('firestore', firestoreChanged ? 'true' : 'false');
 
       - uses: actions/checkout@v7
         with:
@@ -64,15 +119,18 @@ jobs:
           node-version: 22.22.3
           cache: npm
 
-      - run: npm ci --no-fund
+      - name: Download validated DEV build
+        uses: actions/download-artifact@v4
+        with:
+          name: dev-hosting-${{ steps.source.outputs.sha }}
+          path: dist/bem-feito-web/browser
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.source.outputs.ci_run }}
 
-      - name: Prepare DEV deployment metadata
-        env:
-          DEPLOY_COMMIT: ${{ steps.source.outputs.sha }}
-          DEPLOY_SOURCE_PR: ${{ steps.source.outputs.pr }}
-        run: npm run deploy:prepare:dev
-
-      - run: npm run build:dev:hosting
+      - name: Install dependencies for Firestore validation
+        if: ${{ steps.source.outputs.firestore == 'true' }}
+        run: npm ci --no-fund
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
@@ -83,15 +141,18 @@ jobs:
           create_credentials_file: true
           export_environment_variables: true
 
-
       - name: Deploy Firestore rules and indexes
+        if: ${{ steps.source.outputs.firestore == 'true' }}
         run: npm run firebase:deploy:dev:firestore
 
       - name: Wait for Firestore indexes
+        if: ${{ steps.source.outputs.firestore == 'true' }}
         run: npm run firebase:wait-indexes:dev
 
       - name: Verify Firestore query paths
+        if: ${{ steps.source.outputs.firestore == 'true' }}
         run: npm run firebase:verify-queries:dev
+
       - name: Deploy Hosting preview to DEV
         run: npm run firebase:deploy:dev:hosting
 

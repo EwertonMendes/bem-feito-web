@@ -8,6 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
   pull-requests: read
   id-token: write
@@ -24,6 +25,9 @@ jobs:
       deploy: ${{ steps.source.outputs.deploy }}
       sha: ${{ steps.source.outputs.sha }}
       pr: ${{ steps.source.outputs.pr }}
+      ci_run: ${{ steps.source.outputs.ci_run }}
+      artifact: ${{ steps.source.outputs.artifact }}
+      firestore: ${{ steps.source.outputs.firestore }}
     steps:
       - name: Resolve deployment source
         id: source
@@ -34,6 +38,9 @@ jobs:
               core.setOutput('deploy', 'true');
               core.setOutput('sha', context.sha);
               core.setOutput('pr', 'manual');
+              core.setOutput('ci_run', 'manual');
+              core.setOutput('artifact', 'false');
+              core.setOutput('firestore', 'true');
               return;
             }
 
@@ -57,12 +64,50 @@ jobs:
               core.notice(`Skipping ${sha}: it is not associated with a merged PR into master.`);
               core.setOutput('deploy', 'false');
               core.setOutput('pr', 'none');
+              core.setOutput('ci_run', 'none');
+              core.setOutput('artifact', 'false');
+              core.setOutput('firestore', 'false');
               return;
             }
 
+            const changedFiles = await github.paginate(
+              github.rest.pulls.listFiles,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: merged.number,
+                per_page: 100,
+              },
+            );
+            const exactFirestorePaths = new Set([
+              'firestore.rules',
+              'firestore.indexes.json',
+              'firebase.json',
+              'package.json',
+            ]);
+            const firestorePrefixes = [
+              'src/app/core/repositories/',
+              'src/app/core/firebase/',
+              'src/app/core/migrations/',
+              'tools/deploy/',
+              '.github/workflows/',
+            ];
+            const firestoreChanged = changedFiles.some(({ filename }) =>
+              exactFirestorePaths.has(filename) ||
+              firestorePrefixes.some((prefix) => filename.startsWith(prefix))
+            );
+
             core.notice(`Deploying master commit ${sha} from PR #${merged.number}.`);
+            core.notice(
+              firestoreChanged
+                ? 'Firestore-sensitive changes detected; full Firestore validation will run.'
+                : 'No Firestore-sensitive changes detected; using fast Hosting-only DEV deploy.'
+            );
             core.setOutput('deploy', 'true');
             core.setOutput('pr', String(merged.number));
+            core.setOutput('ci_run', String(context.payload.workflow_run.id));
+            core.setOutput('artifact', 'true');
+            core.setOutput('firestore', firestoreChanged ? 'true' : 'false');
 
   deploy:
     needs: gate
@@ -78,13 +123,34 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ needs.gate.outputs.sha }}
+
       - uses: actions/setup-node@v7
         with:
           node-version: 22.22.3
           cache: npm
-      - run: npm ci --no-fund
-      - run: npm run deploy:prepare:dev
-      - run: npm run build:dev:hosting
+
+      - name: Download validated DEV build
+        if: ${{ needs.gate.outputs.artifact == 'true' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: dev-hosting-${{ needs.gate.outputs.sha }}
+          path: dist/bem-feito-web/browser
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.gate.outputs.ci_run }}
+
+      - name: Install dependencies
+        if: ${{ needs.gate.outputs.artifact != 'true' || needs.gate.outputs.firestore == 'true' }}
+        run: npm ci --no-fund
+
+      - name: Prepare manual DEV deployment metadata
+        if: ${{ needs.gate.outputs.artifact != 'true' }}
+        run: npm run deploy:prepare:dev
+
+      - name: Build manual DEV deployment
+        if: ${{ needs.gate.outputs.artifact != 'true' }}
+        run: npm run build:dev:hosting
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
@@ -93,12 +159,20 @@ jobs:
           service_account: github-deploy@bem-feito-dev.iam.gserviceaccount.com
           create_credentials_file: true
           export_environment_variables: true
+
       - name: Deploy Firestore rules and indexes
+        if: ${{ needs.gate.outputs.firestore == 'true' }}
         run: npm run firebase:deploy:dev:firestore
+
       - name: Wait for Firestore indexes
+        if: ${{ needs.gate.outputs.firestore == 'true' }}
         run: npm run firebase:wait-indexes:dev
+
       - name: Verify Firestore query paths
+        if: ${{ needs.gate.outputs.firestore == 'true' }}
         run: npm run firebase:verify-queries:dev
+
       - name: Deploy Hosting
         run: npm run firebase:deploy:dev:hosting
+
       - run: npm run deploy:verify:dev

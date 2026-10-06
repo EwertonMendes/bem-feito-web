@@ -64,7 +64,7 @@ Novas importações legadas já calculam os mesmos campos durante a normalizaç�
 
 ## Sincronização entre usuários
 
-`system/data-revisions` contém stamps por domínio. Cada mutation atualiza o documento dentro da mesma batch/transaction que altera os dados.
+`system/data-revisions` contém stamps por domínio. Referências estruturais (coleções, fragrâncias, formatos, preços e unidades) usam um domínio separado de catálogo/estoque para que uma venda não provoque releitura desses cadastros estáveis. Cada mutation atualiza o documento dentro da mesma batch/transaction que altera os dados.
 
 Existe apenas um listener compartilhado no cliente. Alterações feitas pela própria sessão não provocam reload dos feature stores: o estado local já foi atualizado pelo resultado da mutation. O mesmo stamp também marca caches derivados, como o Dashboard, como stale para que uma futura visita não exiba métricas antigas. Alterações de outra sessão invalidam os stores relevantes e só atualizam imediatamente os que estiverem sendo consumidos por uma tela ativa.
 

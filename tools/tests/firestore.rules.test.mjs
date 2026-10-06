@@ -104,6 +104,7 @@ try {
 
   await pass(setDoc(doc(operator, 'system', 'data-revisions'), {
     catalog: { source: 'rules-test', at: serverTimestamp() },
+    references: { source: 'rules-test', at: serverTimestamp() },
     sales: { source: 'rules-test', at: serverTimestamp() },
   }));
   await pass(updateDoc(doc(operator, 'system', 'data-revisions'), {

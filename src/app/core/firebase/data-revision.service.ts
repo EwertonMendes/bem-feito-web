@@ -9,10 +9,11 @@ import {
 import { AuthService } from '../auth/auth.service';
 import { FIRESTORE } from './firebase.providers';
 
-export type DataDomain = 'catalog' | 'settings' | 'sales' | 'finance' | 'production' | 'inventory';
+export type DataDomain = 'catalog' | 'references' | 'settings' | 'sales' | 'finance' | 'production' | 'inventory';
 
 const DOMAINS: readonly DataDomain[] = [
   'catalog',
+  'references',
   'settings',
   'sales',
   'finance',
@@ -32,6 +33,7 @@ export class DataRevisionService {
   private readonly source = crypto.randomUUID();
   private readonly versions = signal<Record<DataDomain, number>>({
     catalog: 0,
+    references: 0,
     settings: 0,
     sales: 0,
     finance: 0,
@@ -40,6 +42,7 @@ export class DataRevisionService {
   });
   private readonly changeVersions = signal<Record<DataDomain, number>>({
     catalog: 0,
+    references: 0,
     settings: 0,
     sales: 0,
     finance: 0,
@@ -48,6 +51,7 @@ export class DataRevisionService {
   });
   private readonly localVersions = signal<Record<DataDomain, number>>({
     catalog: 0,
+    references: 0,
     settings: 0,
     sales: 0,
     finance: 0,

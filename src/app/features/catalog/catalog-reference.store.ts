@@ -17,7 +17,7 @@ export class CatalogReferenceStore {
   private readonly errors = inject(ErrorService);
   private readonly toast = inject(ToastService);
   private readonly gate = new AsyncLoadGate();
-  private readonly remoteRevision = this.revisions.revision('catalog');
+  private readonly remoteRevision = this.revisions.revision('references');
   private lastRemoteRevision = 0;
   private activeConsumers = 0;
 

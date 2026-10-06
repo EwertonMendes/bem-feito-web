@@ -32,25 +32,25 @@ export class AdditionRepository extends FirestoreRepository<Addition> {
 
 @Injectable({ providedIn: 'root' })
 export class CollectionRepository extends FirestoreRepository<CollectionDefinition> {
-  constructor() { super('collections', 'catalog'); }
+  constructor() { super('collections', 'references'); }
 }
 
 @Injectable({ providedIn: 'root' })
 export class FragranceRepository extends FirestoreRepository<FragranceDefinition> {
-  constructor() { super('fragrances', 'catalog'); }
+  constructor() { super('fragrances', 'references'); }
 }
 
 @Injectable({ providedIn: 'root' })
 export class FormatRepository extends FirestoreRepository<FormatDefinition> {
-  constructor() { super('formats', 'catalog'); }
+  constructor() { super('formats', 'references'); }
 }
 
 @Injectable({ providedIn: 'root' })
 export class FormatPriceRepository extends FirestoreRepository<FormatPrice> {
-  constructor() { super('formatPrices', 'catalog'); }
+  constructor() { super('formatPrices', 'references'); }
 }
 
 @Injectable({ providedIn: 'root' })
 export class UnitRepository extends FirestoreRepository<UnitDefinition> {
-  constructor() { super('units', 'catalog'); }
+  constructor() { super('units', 'references'); }
 }

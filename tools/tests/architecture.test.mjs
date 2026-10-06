@@ -57,6 +57,20 @@ test('application layer dependencies stay directional', () => {
       if (relativeFile.startsWith('shared/ui/') && /^(core|domain|features|pages|layout|shared\/media|shared\/feedback)\//.test(target)) {
         violations.push(`${relativeFile} -> ${target}`);
       }
+
+      if (relativeFile.startsWith('shared/media/') && /^(features|pages|layout)\//.test(target)) {
+        violations.push(`${relativeFile} -> ${target}`);
+      }
+
+      if (relativeFile.startsWith('shared/feedback/') && /^(features|pages|layout)\//.test(target)) {
+        violations.push(`${relativeFile} -> ${target}`);
+      }
+
+      const sourceFeature = relativeFile.match(/^features\/([^/]+)\//)?.[1];
+      const targetFeature = target.match(/^features\/([^/]+)\/components\//)?.[1];
+      if (sourceFeature && targetFeature && sourceFeature !== targetFeature) {
+        violations.push(`${relativeFile} -> ${target}`);
+      }
     }
   }
 
@@ -74,4 +88,21 @@ test('app-specific integrations do not live under shared ui', () => {
     catch { return false; }
   });
   assert.deepEqual(existing, []);
+});
+
+test('native dialog lifecycle stays encapsulated by BfDialog', () => {
+  const violations = [];
+  for (const file of walk(appRoot)) {
+    const relativeFile = relative(appRoot, file).split(sep).join('/');
+    if (relativeFile === 'shared/ui/dialog/dialog.ts') continue;
+    const source = readFileSync(file, 'utf8');
+    if (
+      source.includes('HTMLDialogElement') ||
+      source.includes('.showModal()') ||
+      source.includes('.nativeElement.close()')
+    ) {
+      violations.push(relativeFile);
+    }
+  }
+  assert.deepEqual(violations, []);
 });

@@ -55,40 +55,100 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  /* Forest & Ivory: derived from the dark Bem Feito mark.
-     Near-black forest surfaces carry the brand quietly; warm ivory is used
-     for high-value interaction instead of washing the whole UI in pale green. */
-  --bg: #0d120e;
-  --surface: #151a15;
-  --surface-2: #1b211a;
-  --surface-3: #222a20;
-  --surface-elevated: #192018;
-  --text: #f4f1dd;
-  --muted: #aaa58e;
-  --muted-strong: #d1ccb4;
-  --line: rgba(244, 241, 221, 0.105);
+  /* Dark-mode lab — Palette 1: Espresso & Sálvia (default/fallback). */
+  --bg: #14110f;
+  --surface: #1b1714;
+  --surface-2: #221d19;
+  --surface-3: #2a2420;
+  --surface-elevated: #241e1a;
+  --text: #f4eedf;
+  --muted: #b2a79a;
+  --muted-strong: #cec3b6;
+  --line: rgba(244, 238, 223, 0.1);
 
-  --brand: #e7e3c7;
-  --brand-hover: #f2eed2;
-  --brand-strong: #faf5d9;
-  --brand-soft: #253025;
-  --brand-contrast: #123014;
-  --brand-botanical: #557451;
+  --brand: #6f8a63;
+  --brand-hover: #7f9a73;
+  --brand-strong: #95ad89;
+  --brand-soft: #263127;
+  --brand-contrast: #f7f2e8;
+  --brand-botanical: #6f8a63;
 
-  --accent: #c98982;
-  --accent-soft: #372522;
-  --sand: #c3a36a;
-  --sand-soft: #312a1f;
-  --warning: #d4ad61;
-  --warning-soft: #342b1c;
-  --danger: #df8187;
-  --danger-soft: #3a2428;
-  --success: #86a272;
-  --success-soft: #243321;
+  --accent: #c98a82;
+  --accent-soft: #352523;
+  --sand: #c4a06c;
+  --sand-soft: #33291f;
+  --warning: #d0a257;
+  --warning-soft: #372c1d;
+  --danger: #d97e86;
+  --danger-soft: #3a2427;
+  --success: #7e9a73;
+  --success-soft: #243022;
 
   --shadow-sm: 0 10px 30px rgba(0, 0, 0, 0.22);
   --shadow: 0 24px 68px rgba(0, 0, 0, 0.3);
   --shadow-dialog: 0 38px 116px rgba(0, 0, 0, 0.5);
+}
+
+:root[data-theme='dark'][data-dark-palette='chocolate'] {
+  /* Dark-mode lab — Palette 2: Chocolate & Marfim. */
+  --bg: #16110d;
+  --surface: #1e1814;
+  --surface-2: #251e19;
+  --surface-3: #2d241e;
+  --surface-elevated: #27201a;
+  --text: #f6efe3;
+  --muted: #b6aa9c;
+  --muted-strong: #d2c7ba;
+  --line: rgba(246, 239, 227, 0.1);
+
+  --brand: #738b66;
+  --brand-hover: #829a75;
+  --brand-strong: #9bb28d;
+  --brand-soft: #293228;
+  --brand-contrast: #f8f2e7;
+  --brand-botanical: #738b66;
+
+  --accent: #c9888b;
+  --accent-soft: #382426;
+  --sand: #c9a36a;
+  --sand-soft: #35291d;
+  --warning: #d1a14c;
+  --warning-soft: #392b1a;
+  --danger: #d76f78;
+  --danger-soft: #3b2225;
+  --success: #819a72;
+  --success-soft: #273122;
+}
+
+:root[data-theme='dark'][data-dark-palette='graphite'] {
+  /* Dark-mode lab — Palette 3: Grafite quente & Verde botânico. */
+  --bg: #151312;
+  --surface: #1c1917;
+  --surface-2: #23201d;
+  --surface-3: #2a2623;
+  --surface-elevated: #26221f;
+  --text: #f2ece1;
+  --muted: #aaa095;
+  --muted-strong: #cac0b5;
+  --line: rgba(242, 236, 225, 0.1);
+
+  --brand: #708a67;
+  --brand-hover: #7e9874;
+  --brand-strong: #97af8d;
+  --brand-soft: #283028;
+  --brand-contrast: #f5f0e7;
+  --brand-botanical: #708a67;
+
+  --accent: #c88984;
+  --accent-soft: #352524;
+  --sand: #be9a67;
+  --sand-soft: #31291f;
+  --warning: #cc9d50;
+  --warning-soft: #352b1c;
+  --danger: #d97882;
+  --danger-soft: #392326;
+  --success: #7f9874;
+  --success-soft: #263024;
 }
 
 * { box-sizing: border-box; }

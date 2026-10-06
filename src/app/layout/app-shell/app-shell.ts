@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
-import { ThemeService } from '../../core/services/theme.service';
+import { BfDarkPalette, ThemeService } from '../../core/services/theme.service';
 import { DriveConnectionBanner } from '../../features/google-drive/components/drive-connection-banner';
 import { BfIcon, BfIconName } from '../../shared/ui/icon/icon';
 
@@ -20,6 +20,11 @@ export class AppShell {
   private readonly router = inject(Router);
 
   readonly mobileMenuOpen = signal(false);
+  readonly darkPalettes: ReadonlyArray<{ id: BfDarkPalette; label: string; shortLabel: string }> = [
+    { id: 'espresso', label: 'Espresso & Sálvia', shortLabel: 'Espresso' },
+    { id: 'chocolate', label: 'Chocolate & Marfim', shortLabel: 'Chocolate' },
+    { id: 'graphite', label: 'Grafite quente & Verde botânico', shortLabel: 'Grafite' },
+  ];
   private readonly failedAvatarUrl = signal<string | null>(null);
   readonly avatarUrl = computed(() => {
     const photoUrl = this.auth.user()?.photoURL?.trim() ?? '';

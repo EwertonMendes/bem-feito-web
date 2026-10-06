@@ -19,6 +19,28 @@
     </nav>
 
     <div class="sidebar-footer">
+      @if (theme.darkMode()) {
+        <section class="dark-palette-lab" aria-label="Comparador de paletas do tema escuro">
+          <div class="dark-palette-lab__head">
+            <strong>Comparador dark</strong>
+            <small>temporário</small>
+          </div>
+          <div class="dark-palette-lab__options" role="group" aria-label="Paleta escura">
+            @for (palette of darkPalettes; track palette.id; let index = $index) {
+              <button
+                type="button"
+                [class.active]="theme.darkPalette() === palette.id"
+                [attr.aria-pressed]="theme.darkPalette() === palette.id"
+                [attr.title]="palette.label"
+                (click)="theme.setDarkPalette(palette.id)"
+              >
+                <span>{{ index + 1 }}</span>
+                {{ palette.shortLabel }}
+              </button>
+            }
+          </div>
+        </section>
+      }
       <button type="button" class="utility" (click)="theme.toggle()">
         <bf-icon [name]="theme.darkMode() ? 'sun' : 'moon'" />
         <span>{{ theme.darkMode() ? 'Tema claro' : 'Tema escuro' }}</span>

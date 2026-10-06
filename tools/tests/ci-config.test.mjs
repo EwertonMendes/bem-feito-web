@@ -78,7 +78,7 @@ test('Dashboard aggregation indexes cover every filtered sum query', () => {
   for (const expected of [
     'sales|status:ASCENDING|businessDate:ASCENDING|totalCents:ASCENDING',
     'sales|status:ASCENDING|analyticsVersion:ASCENDING|businessDate:ASCENDING|cogsCents:ASCENDING|itemsSold:ASCENDING|missingCostItems:ASCENDING',
-    'payments|status:ASCENDING|businessDate:ASCENDING|appliedCents:ASCENDING|amountReceivedCents:ASCENDING|tipCents:ASCENDING',
+    'payments|status:ASCENDING|businessDate:ASCENDING|amountReceivedCents:ASCENDING|appliedCents:ASCENDING|tipCents:ASCENDING',
     'expenses|businessDate:ASCENDING|amountCents:ASCENDING',
     'expenses|kind:ASCENDING|businessDate:ASCENDING|amountCents:ASCENDING',
   ]) {

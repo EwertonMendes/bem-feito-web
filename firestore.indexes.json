@@ -227,11 +227,11 @@
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "appliedCents",
+          "fieldPath": "amountReceivedCents",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "amountReceivedCents",
+          "fieldPath": "appliedCents",
           "order": "ASCENDING"
         },
         {

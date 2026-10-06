@@ -28,7 +28,21 @@
         <span>Sair</span>
       </button>
       <div class="profile">
-        <span class="avatar">{{ auth.profile()?.displayName?.slice(0,1) || 'B' }}</span>
+        @if (avatarUrl(); as photoUrl) {
+          <img
+            class="avatar avatar-photo"
+            [src]="photoUrl"
+            width="38"
+            height="38"
+            alt=""
+            aria-hidden="true"
+            decoding="async"
+            referrerpolicy="no-referrer"
+            (error)="onAvatarError()"
+          />
+        } @else {
+          <span class="avatar">{{ auth.profile()?.displayName?.slice(0,1) || 'B' }}</span>
+        }
         <span class="profile-copy">
           <strong>{{ auth.profile()?.displayName || 'Bem Feito' }}</strong>
           <small>{{ auth.profile()?.role || '' }}</small>

@@ -115,12 +115,21 @@
 .avatar {
   width: 38px;
   height: 38px;
+  flex: 0 0 38px;
   border-radius: 50%;
   display: grid;
   place-items: center;
+  overflow: hidden;
   background: var(--brand);
   color: var(--brand-contrast);
   font-weight: 760;
+}
+
+.avatar-photo {
+  display: block;
+  object-fit: cover;
+  background: var(--surface-2);
+  border: 1px solid color-mix(in srgb, var(--line) 80%, var(--brand) 20%);
 }
 
 .content {

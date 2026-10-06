@@ -42,9 +42,11 @@ export class DashboardStore {
   private readonly salesRevision = this.revisions.changeRevision('sales');
   private readonly financeRevision = this.revisions.changeRevision('finance');
   private readonly catalogRevision = this.revisions.changeRevision('catalog');
+  private readonly inventoryRevision = this.revisions.changeRevision('inventory');
   private lastSalesRevision = 0;
   private lastFinanceRevision = 0;
   private lastCatalogRevision = 0;
+  private lastInventoryRevision = 0;
   private active = false;
   private initialized = false;
   private periodStale = true;
@@ -115,9 +117,14 @@ export class DashboardStore {
     effect(() => {
       const finance = this.financeRevision();
       const catalog = this.catalogRevision();
-      const changed = finance !== this.lastFinanceRevision || catalog !== this.lastCatalogRevision;
+      const inventory = this.inventoryRevision();
+      const changed =
+        finance !== this.lastFinanceRevision ||
+        catalog !== this.lastCatalogRevision ||
+        inventory !== this.lastInventoryRevision;
       this.lastFinanceRevision = finance;
       this.lastCatalogRevision = catalog;
+      this.lastInventoryRevision = inventory;
       if (!changed) return;
       this.periodStale = true;
       if (this.active && this.initialized) void this.safeRefreshPeriod();

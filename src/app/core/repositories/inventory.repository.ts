@@ -142,7 +142,7 @@ export class InventoryRepository {
         updatedBy: userId,
       } satisfies Omit<StockMovement, 'id'>);
 
-      this.revisions.touchTransaction(transaction, 'inventory', 'catalog');
+      this.revisions.touchTransaction(transaction, 'inventory');
 
       return {
         adjustment,

@@ -204,7 +204,7 @@ export class ProductionRepository {
         updatedBy: userId,
       } satisfies Omit<Production, 'id'>);
 
-      this.revisions.touchTransaction(transaction, 'production', 'catalog', 'inventory');
+      this.revisions.touchTransaction(transaction, 'production', 'inventory');
       return { production, stockChanges };
     });
   }

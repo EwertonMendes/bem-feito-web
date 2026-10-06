@@ -20,6 +20,7 @@ Stores com dados reutilizáveis usam `AsyncLoadGate`:
 - chamadas concorrentes são deduplicadas;
 - uma navegação posterior reutiliza a carga em memória;
 - uma revisão remota invalida o cache sem duplicar requests em andamento;
+- mudanças apenas de estoque usam o domínio de inventário, permitindo atualizar produtos/insumos sem reler kits, adicionais ou referências estáveis;
 - stores só fazem refresh imediato quando existe uma tela consumidora ativa; fora dela, os dados ficam marcados como stale e são atualizados na próxima entrada.
 
 Nenhuma página ou componente deve chamar `.load(true)`. Refresh forçado pertence à camada de store, como reação a invalidação controlada.

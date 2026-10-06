@@ -19,8 +19,11 @@ export class CatalogStore {
   private readonly errors = inject(ErrorService);
   private readonly toast = inject(ToastService);
   private readonly gate = new AsyncLoadGate();
+  private readonly inventoryRefreshGate = new AsyncLoadGate();
   private readonly remoteRevision = this.revisions.revision('catalog');
+  private readonly inventoryRevision = this.revisions.revision('inventory');
   private lastRemoteRevision = 0;
+  private lastInventoryRevision = 0;
   private activeConsumers = 0;
 
   private readonly productsState = signal<Product[]>([]);
@@ -46,6 +49,18 @@ export class CatalogStore {
   readonly negativeProducts = computed(() => this.productsState().filter((item) => item.stock < 0));
 
   constructor() {
+    effect(() => {
+      const revision = this.inventoryRevision();
+      if (revision === this.lastInventoryRevision) return;
+      this.lastInventoryRevision = revision;
+
+      if (this.activeConsumers > 0 && this.gate.isLoaded) {
+        void this.refreshInventoryEntities();
+      } else {
+        this.gate.invalidate();
+      }
+    });
+
     effect(() => {
       const revision = this.remoteRevision();
       if (revision === this.lastRemoteRevision) return;
@@ -83,6 +98,22 @@ export class CatalogStore {
         this.loadingState.set(false);
       }
     }, force).catch(() => undefined);
+  }
+
+  private refreshInventoryEntities(): Promise<void> {
+    return this.inventoryRefreshGate.run(async () => {
+      try {
+        const [products, inputs] = await Promise.all([
+          this.productRepository.all(),
+          this.inputRepository.all(),
+        ]);
+        this.productsState.set(products);
+        this.inputsState.set(inputs);
+      } catch (error) {
+        this.toast.error(this.errors.message(error));
+        throw error;
+      }
+    }, true).catch(() => undefined);
   }
 
   async saveProduct(product: Product): Promise<string> {

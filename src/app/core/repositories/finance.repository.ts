@@ -140,7 +140,7 @@ export class FinanceRepository {
       this.revisions.touchTransaction(
         transaction,
         'finance',
-        ...(stockChange ? ['catalog', 'inventory'] as const : []),
+        ...(stockChange ? ['inventory'] as const : []),
       );
 
       return { expense, stockChange };

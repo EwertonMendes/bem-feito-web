@@ -335,7 +335,7 @@ export class SalesRepository {
         updatedBy: userId,
       } satisfies Omit<Sale, 'id'>);
 
-      this.revisions.touchTransaction(transaction, 'sales', 'finance', 'catalog', 'inventory');
+      this.revisions.touchTransaction(transaction, 'sales', 'finance', 'inventory');
       return { sale, payments, stockChanges };
     });
   }
@@ -569,7 +569,7 @@ export class SalesRepository {
         updatedBy: userId,
       });
 
-      this.revisions.touchTransaction(transaction, 'sales', 'finance', 'catalog', 'inventory');
+      this.revisions.touchTransaction(transaction, 'sales', 'finance', 'inventory');
       return { sale, previousBalanceCents: currentSale.balanceCents, reversedPaymentIds, stockChanges };
     });
   }

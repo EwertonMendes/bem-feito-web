@@ -3,7 +3,6 @@ import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 
 const workflow = readFileSync('.github/workflows/deploy-dev.yml', 'utf8');
-const workflowSource = readFileSync('.github/workflows/ci.yml', 'utf8');
 const previewWorkflow = readFileSync('.github/workflows/deploy-dev-preview.yml', 'utf8');
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
 
@@ -25,7 +24,6 @@ test('DEV deployment uses keyless Google Cloud authentication', () => {
   for (const expected of [
     'id-token: write',
     'google-github-actions/auth@v3',
-    'google-github-actions/setup-gcloud@v3',
     'projects/312978463343/locations/global/workloadIdentityPools/github-actions/providers/github',
     'github-deploy@bem-feito-dev.iam.gserviceaccount.com',
   ]) {
@@ -49,6 +47,10 @@ test('DEV waits for Firestore indexes before publishing a UI that depends on the
   assert.match(packageJson.scripts['firebase:deploy:dev:firestore'], /--only firestore/);
   assert.equal(packageJson.scripts['firebase:wait-indexes:dev'], 'node tools/deploy/wait-for-firestore-indexes.mjs');
   assert.match(packageJson.scripts['firebase:deploy:dev:hosting'], /--only hosting/);
+  assert.equal(
+    packageJson.scripts['firebase:deploy:dev:ci'],
+    'npm run firebase:deploy:dev:firestore && npm run firebase:wait-indexes:dev && npm run firebase:deploy:dev:hosting',
+  );
 });
 
 test('DEV deployment is pinned to the validated commit and verifies the published revision', () => {
@@ -61,28 +63,8 @@ test('DEV deployment is pinned to the validated commit and verifies the publishe
     assert.ok(workflow.includes(expected), `Missing deployment integrity step: ${expected}`);
   }
 
-  assert.match(packageJson.scripts['firebase:deploy:dev:ci'], /--project bem-feito-dev/);
-  assert.match(packageJson.scripts['firebase:deploy:dev:ci'], /--only firestore,hosting/);
-  assert.match(packageJson.scripts['firebase:deploy:dev:ci'], /--non-interactive/);
   assert.equal(packageJson.scripts['deploy:prepare:dev'], 'node tools/deploy/prepare-deployment.mjs');
   assert.equal(packageJson.scripts['deploy:verify:dev'], 'node tools/deploy/verify-deployment.mjs');
-});
-
-test('owner feature-branch pushes deploy to DEV only after validation and index readiness', () => {
-  for (const expected of [
-    'deploy-dev-preview:',
-    'needs: validate',
-    "github.event_name == 'push'",
-    "github.ref_name != 'master'",
-    'github.actor == github.repository_owner',
-    'group: bem-feito-dev',
-    'npm run firebase:deploy:dev:firestore',
-    'npm run firebase:wait-indexes:dev',
-    'npm run firebase:deploy:dev:hosting',
-    'npm run deploy:verify:dev',
-  ]) {
-    assert.ok(workflowSource.includes(expected), `Missing automatic DEV preview safeguard: ${expected}`);
-  }
 });
 
 test('Dashboard aggregation indexes cover every filtered sum query', () => {

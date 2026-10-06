@@ -83,9 +83,6 @@ jobs:
           create_credentials_file: true
           export_environment_variables: true
 
-      - uses: google-github-actions/setup-gcloud@v3
-        with:
-          project_id: bem-feito-dev
 
       - name: Deploy Firestore rules and indexes
         run: npm run firebase:deploy:dev:firestore

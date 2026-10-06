@@ -18,7 +18,7 @@
     "test:watch": "vitest",
     "firebase:emulators": "npx --yes --package firebase-tools@15.32.1 firebase emulators:start",
     "firebase:deploy:dev": "npm run build:dev:hosting && npx --yes --package firebase-tools@15.32.1 firebase deploy --project bem-feito-dev --only firestore,hosting",
-    "firebase:deploy:dev:ci": "npx --yes --package firebase-tools@15.32.1 firebase deploy --project bem-feito-dev --only firestore,hosting --non-interactive",
+    "firebase:deploy:dev:ci": "npm run firebase:deploy:dev:firestore && npm run firebase:wait-indexes:dev && npm run firebase:deploy:dev:hosting",
     "firebase:deploy:prod": "npx --yes --package firebase-tools@15.32.1 firebase use prod && npm run build:prod && npx --yes --package firebase-tools@15.32.1 firebase deploy --only firestore,hosting",
     "deploy:prepare:dev": "node tools/deploy/prepare-deployment.mjs",
     "deploy:verify:dev": "node tools/deploy/verify-deployment.mjs",

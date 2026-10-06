@@ -18,8 +18,12 @@ import { ToastService } from '../../../core/services/toast.service';
     }
   `,
   styles: [`
-    :host{display:block}.banner{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 24px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow)}.banner div{display:grid;gap:2px}.banner span{font-size:.8rem;color:var(--muted)}
-    @media(max-width:700px){.banner{margin:0 14px;align-items:stretch;flex-direction:column}.banner .bf-button{width:100%}}
+    :host{display:block}
+    .banner{width:min(calc(100% - 68px),calc(var(--content-max) - 68px));display:flex;align-items:center;justify-content:space-between;gap:16px;margin:28px auto 0;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow)}
+    .banner div{display:grid;gap:2px}.banner span{font-size:.8rem;color:var(--muted)}
+    @media(max-width:980px){.banner{width:calc(100% - 40px);margin-top:24px}}
+    @media(max-width:700px){.banner{align-items:stretch;flex-direction:column}.banner .bf-button{width:100%}}
+    @media(max-width:640px){.banner{width:calc(100% - 32px);margin-top:20px}}
   `],
 })
 export class DriveConnectionBanner {

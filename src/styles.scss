@@ -129,7 +129,7 @@ a { color: inherit; }
 .bf-page {
   width: min(100%, var(--content-max));
   margin: 0 auto;
-  padding: 36px 34px 110px;
+  padding: 28px 34px 110px;
 }
 
 .bf-page-header {
@@ -504,7 +504,7 @@ a { color: inherit; }
 
 @media (max-width: 980px) {
   .bf-page {
-    padding: 28px 20px 112px;
+    padding: 24px 20px 112px;
   }
 
   .bf-grid.four,
@@ -515,7 +515,7 @@ a { color: inherit; }
 
 @media (max-width: 640px) {
   .bf-page {
-    padding: 22px 16px 112px;
+    padding: 20px 16px 112px;
   }
 
   .bf-page-header {

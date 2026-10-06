@@ -25,6 +25,7 @@
   --brand-strong: #3f5e3d;
   --brand-soft: #e8ede3;
   --brand-contrast: #ffffff;
+  --brand-botanical: #687f5e;
 
   --accent: #cf8c90;
   --accent-soft: #fae8e7;
@@ -54,38 +55,40 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  /* Warm charcoal surfaces keep the interface neutral while brand color
-     remains reserved for navigation, actions and semantic emphasis. */
-  --bg: #151513;
-  --surface: #1d1d1a;
-  --surface-2: #24231f;
-  --surface-3: #2c2a25;
-  --surface-elevated: #27251f;
-  --text: #f4f0e9;
-  --muted: #a9a197;
-  --muted-strong: #cec6bc;
-  --line: rgba(244, 240, 233, 0.11);
+  /* Forest & Ivory: derived from the dark Bem Feito mark.
+     Near-black forest surfaces carry the brand quietly; warm ivory is used
+     for high-value interaction instead of washing the whole UI in pale green. */
+  --bg: #0d120e;
+  --surface: #151a15;
+  --surface-2: #1b211a;
+  --surface-3: #222a20;
+  --surface-elevated: #192018;
+  --text: #f4f1dd;
+  --muted: #aaa58e;
+  --muted-strong: #d1ccb4;
+  --line: rgba(244, 241, 221, 0.105);
 
-  --brand: #a8b89b;
-  --brand-hover: #b8c7ab;
-  --brand-strong: #d4dec9;
-  --brand-soft: #30332b;
-  --brand-contrast: #171914;
+  --brand: #e7e3c7;
+  --brand-hover: #f2eed2;
+  --brand-strong: #faf5d9;
+  --brand-soft: #253025;
+  --brand-contrast: #123014;
+  --brand-botanical: #557451;
 
-  --accent: #d59a9e;
-  --accent-soft: #382829;
-  --sand: #cfa06f;
-  --sand-soft: #332a21;
-  --warning: #deb06f;
-  --warning-soft: #352c20;
-  --danger: #ee969f;
-  --danger-soft: #39272a;
-  --success: #a4bd98;
-  --success-soft: #2d3229;
+  --accent: #c98982;
+  --accent-soft: #372522;
+  --sand: #c3a36a;
+  --sand-soft: #312a1f;
+  --warning: #d4ad61;
+  --warning-soft: #342b1c;
+  --danger: #df8187;
+  --danger-soft: #3a2428;
+  --success: #86a272;
+  --success-soft: #243321;
 
-  --shadow-sm: 0 10px 28px rgba(0, 0, 0, 0.18);
-  --shadow: 0 22px 64px rgba(0, 0, 0, 0.24);
-  --shadow-dialog: 0 36px 110px rgba(0, 0, 0, 0.44);
+  --shadow-sm: 0 10px 30px rgba(0, 0, 0, 0.22);
+  --shadow: 0 24px 68px rgba(0, 0, 0, 0.3);
+  --shadow-dialog: 0 38px 116px rgba(0, 0, 0, 0.5);
 }
 
 * { box-sizing: border-box; }

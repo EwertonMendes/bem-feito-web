@@ -43,6 +43,38 @@ describe('Google login routing', () => {
     });
   });
 
+  it('allows the profile listener to retry after a transient Firestore error', async () => {
+    mocks.profile = { active: true, role: 'owner' };
+    mocks.profileListener
+      .mockImplementationOnce((_ref, _next, error) => {
+        error({ code: 'unavailable' });
+        return () => {};
+      })
+      .mockImplementationOnce((_ref, next) => {
+        next({
+          exists: () => true,
+          id: 'test-user',
+          data: () => mocks.profile,
+        });
+        return () => {};
+      });
+
+    const injector = Injector.create({ providers: [
+      { provide: FIREBASE_AUTH, useValue: {} },
+      { provide: FIRESTORE, useValue: {} },
+      { provide: Router, useValue: { navigateByUrl: mocks.navigate } },
+    ] });
+    const auth = runInInjectionContext(injector, () => new AuthService());
+
+    await auth.loginWithGoogle();
+    expect(mocks.navigate).not.toHaveBeenCalled();
+
+    await auth.loginWithGoogle();
+    expect(mocks.profileListener).toHaveBeenCalledTimes(2);
+    expect(mocks.navigate).toHaveBeenCalledWith('/dashboard');
+    injector.destroy();
+  });
+
   for (const [profile, route] of [
     [{ active: true, role: 'owner' }, '/dashboard'],
     [{ active: false, role: 'viewer' }, '/acesso-negado'],

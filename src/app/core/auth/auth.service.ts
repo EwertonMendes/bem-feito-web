@@ -119,6 +119,9 @@ export class AuthService {
         },
         (error) => {
           this.profileState.set(null);
+          this.profileUnsubscribe = null;
+          this.profileUid = null;
+          this.profileReady = null;
           if (initial) {
             initial = false;
             reject(error);

@@ -7,9 +7,9 @@ import { DriveApiService, DriveFileMetadata } from './drive-api.service';
 import { DriveAuthService, DriveAuthorizationRequiredError } from './drive-auth.service';
 import { DriveIntegrationService } from './drive-integration.service';
 
-@Injectable({ providedIn: 'root' })
 const MAX_CACHED_IMAGE_URLS = 128;
 
+@Injectable({ providedIn: 'root' })
 export class GoogleDriveImageStorageService extends ImageStoragePort {
   private readonly processor = inject(ImageProcessorService);
   private readonly api = inject(DriveApiService);

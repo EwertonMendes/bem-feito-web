@@ -49,8 +49,8 @@ export class InventoryStore {
     this.historyConsumers = Math.max(0, this.historyConsumers - 1);
   }
 
-  async loadMovements(itemId: string, force = false): Promise<void> {
-    if (!force && itemId === this.currentItemId && !this.historyStale) return;
+  async loadMovements(itemId: string, force = false): Promise<boolean> {
+    if (!force && itemId === this.currentItemId && !this.historyStale) return true;
 
     const request = ++this.movementRequest;
     try {
@@ -61,8 +61,10 @@ export class InventoryStore {
       this.hasMoreState.set(page.hasMore);
       this.movementsState.set(page.items);
       this.historyStale = false;
+      return true;
     } catch (error) {
       if (request === this.movementRequest) this.toast.error(this.errors.message(error));
+      return false;
     }
   }
 

@@ -77,7 +77,11 @@ export class InventoryPage {
     this.selectedType.set(type);
     this.selectedId.set(id);
     this.store.activateHistory();
-    await this.store.loadMovements(id);
+    const loaded = await this.store.loadMovements(id);
+    if (!loaded) {
+      this.store.deactivateHistory();
+      return;
+    }
     this.historyDialog().open();
   }
 

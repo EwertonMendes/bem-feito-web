@@ -3,7 +3,7 @@ import { Sale } from '../../domain/models/sales.model';
 import { FinanceStore } from '../finance/finance.store';
 import { SalesStore } from '../sales/sales.store';
 import { CatalogStore } from '../catalog/catalog.store';
-import { daysAgoBusinessDate, todayBusinessDate } from '../../core/utils/date';
+import { businessMonthDateRange, currentMonthBusinessDateRange, todayBusinessDate } from '../../core/utils/date';
 
 @Injectable({ providedIn: 'root' })
 export class DashboardStore {
@@ -11,9 +11,25 @@ export class DashboardStore {
   private readonly financeStore = inject(FinanceStore);
   private readonly catalogStore = inject(CatalogStore);
 
-  readonly startDate = signal(daysAgoBusinessDate(29));
-  readonly endDate = signal(todayBusinessDate());
+  private readonly initialPeriod = currentMonthBusinessDateRange();
+
+  readonly startDate = signal(this.initialPeriod.startDate);
+  readonly endDate = signal(this.initialPeriod.endDate);
   readonly loading = signal(false);
+  readonly chartYear = computed(() => {
+    const year = Number(this.endDate().slice(0, 4));
+    return Number.isInteger(year) && year > 0 ? year : new Date().getFullYear();
+  });
+  readonly selectedMonthIndex = computed(() => {
+    const year = this.chartYear();
+    for (let monthIndex = 0; monthIndex < 12; monthIndex += 1) {
+      const range = businessMonthDateRange(year, monthIndex);
+      if (range.startDate === this.startDate() && range.endDate === this.endDate()) {
+        return monthIndex;
+      }
+    }
+    return -1;
+  });
 
   readonly periodSales = computed(() =>
     this.salesStore.sales().filter((sale) =>
@@ -70,8 +86,14 @@ export class DashboardStore {
     this.loading.set(false);
   }
 
+  selectMonth(monthIndex: number): void {
+    const range = businessMonthDateRange(this.chartYear(), monthIndex);
+    this.startDate.set(range.startDate);
+    this.endDate.set(range.endDate);
+  }
+
   private buildMonthly(sales: Sale[]): { month: string; valueCents: number }[] {
-    const year = Number(this.endDate().slice(0, 4));
+    const year = this.chartYear();
     return Array.from({ length: 12 }, (_, index) => {
       const prefix = `${year}-${String(index + 1).padStart(2, '0')}`;
       return {

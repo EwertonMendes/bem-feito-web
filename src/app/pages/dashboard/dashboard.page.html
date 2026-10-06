@@ -81,7 +81,7 @@
       <div class="section-head">
         <div>
           <h2>Faturamento por mês</h2>
-          <p>Ano de {{ store.endDate().slice(0, 4) }}</p>
+          <p>Ano de {{ store.chartYear() }}</p>
         </div>
         <div class="period-total">
           <span>Total no período</span>
@@ -102,17 +102,21 @@
           </div>
           <div class="bars">
             @for (month of store.monthlyRevenue(); track month.month; let i = $index) {
-              <div
+              <button
                 class="bar-column"
+                type="button"
                 [class.has-value]="month.valueCents > 0"
-                [class.current]="i === currentMonthIndex()"
-                [title]="month.month + ': ' + currency(month.valueCents)"
+                [class.selected]="i === store.selectedMonthIndex()"
+                [attr.aria-pressed]="i === store.selectedMonthIndex()"
+                [attr.aria-label]="'Selecionar ' + month.month + ' de ' + store.chartYear() + ', faturamento ' + currency(month.valueCents)"
+                [title]="'Selecionar ' + month.month + ' · ' + currency(month.valueCents)"
+                (click)="store.selectMonth(i)"
               >
-                <div class="bar-slot">
-                  <div class="bar" [style.height.%]="(month.valueCents / chartCeiling()) * 100"></div>
-                </div>
+                <span class="bar-slot" aria-hidden="true">
+                  <span class="bar" [style.height.%]="(month.valueCents / chartCeiling()) * 100"></span>
+                </span>
                 <span>{{ month.month }}</span>
-              </div>
+              </button>
             }
           </div>
         </div>

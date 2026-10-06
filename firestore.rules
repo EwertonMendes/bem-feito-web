@@ -60,10 +60,8 @@ service cloud.firestore {
       return value is number && value >= 0 && value <= 1000000;
     }
 
-    // Imported deficits can be preserved or corrected, never created or made worse by clients.
     function stock(value) {
-      return quantity(value) || (value is number && value >= -1000000 && value < 0
-        && resource != null && resource.data.stock < 0 && value >= resource.data.stock);
+      return quantity(value);
     }
 
     function text(value) {

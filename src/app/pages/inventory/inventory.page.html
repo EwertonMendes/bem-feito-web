@@ -27,13 +27,13 @@
     }
   </div>
 
-  <dialog #adjustmentDialog class="bf-dialog">
+  <dialog bfDialog #adjustmentDialog="bfDialog" class="bf-dialog">
     <div class="bf-dialog-header"><div><h2>Ajustar estoque</h2><small>{{selectedName()}}</small></div><button class="bf-icon-button" (click)="adjustmentDialog.close()"><bf-icon name="close" /></button></div>
     <div class="bf-dialog-body"><div class="callout">Use número positivo para entrada e negativo para saída. Ajustes ficam registrados no histórico.</div><div class="bf-grid two"><label class="bf-field"><span>Quantidade (+/-)</span><input class="bf-input" type="number" step="0.001" [formField]="adjustmentForm.quantity" /></label><label class="bf-field"><span>Data</span><input class="bf-input" type="date" [formField]="adjustmentForm.businessDate" /></label><label class="bf-field full"><span>Motivo</span><textarea class="bf-textarea" [formField]="adjustmentForm.reason" placeholder="Inventário, perda, amostra, correção..."></textarea></label></div></div>
     <div class="bf-dialog-footer"><button class="bf-button secondary" (click)="adjustmentDialog.close()">Cancelar</button><button class="bf-button" (click)="saveAdjustment()">Registrar ajuste</button></div>
   </dialog>
 
-  <dialog #historyDialog class="bf-dialog">
+  <dialog bfDialog #historyDialog="bfDialog" class="bf-dialog">
     <div class="bf-dialog-header"><div><h2>Histórico de estoque</h2><small>{{selectedName()}}</small></div><button class="bf-icon-button" (click)="historyDialog.close()"><bf-icon name="close" /></button></div>
     <div class="bf-dialog-body history">
       @for(move of store.movements();track move.id){<div class="movement"><div><strong>{{date(move.businessDate)}}</strong><span>{{movementSource(move.sourceType)}}</span></div><strong [class.positive]="move.quantityDelta>0" [class.negative]="move.quantityDelta<0">{{move.quantityDelta>0?'+':''}}{{move.quantityDelta}}</strong></div>} @empty {<div class="bf-empty"><div><strong>Sem movimentações</strong><p>Este item ainda não possui histórico.</p></div></div>}

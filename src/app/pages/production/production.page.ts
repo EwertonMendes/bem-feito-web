@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { FormField, form, min, required } from '@angular/forms/signals';
 import { CatalogStore } from '../../features/catalog/catalog.store';
@@ -6,6 +6,7 @@ import { ProductionStore } from '../../features/production/production.store';
 import { todayBusinessDate, formatBusinessDate } from '../../core/utils/date';
 import { formatCurrency } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
+import { BfDialog } from '../../shared/ui/dialog/dialog';
 import { CatalogImage } from '../../shared/media/catalog-image/catalog-image';
 
 interface ProductionFormModel {
@@ -17,7 +18,7 @@ interface ProductionFormModel {
 
 @Component({
   selector: 'bf-production-page',
-  imports: [FormField, BfIcon, CatalogImage],
+  imports: [FormField, BfIcon, CatalogImage, BfDialog],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './production.page.html',
   styleUrl: './production.page.scss',
@@ -26,7 +27,7 @@ export class ProductionPage {
   readonly catalog = inject(CatalogStore);
   readonly store = inject(ProductionStore);
   private readonly route = inject(ActivatedRoute);
-  private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('productionDialog');
+  private readonly dialog = viewChild.required<BfDialog>('productionDialog');
 
   readonly currency = formatCurrency;
   readonly date = formatBusinessDate;
@@ -56,7 +57,7 @@ export class ProductionPage {
 
   open(): void {
     this.model.set({ productId: this.catalog.activeProducts()[0]?.id ?? '', quantity: 1, businessDate: todayBusinessDate(), notes: '' });
-    this.dialog().nativeElement.showModal();
+    this.dialog().open();
   }
 
   async save(): Promise<void> {
@@ -65,7 +66,7 @@ export class ProductionPage {
     const ok = await this.store.create(value.productId, value.quantity, value.businessDate, value.notes);
     if (ok) {
       await this.catalog.load(true);
-      this.dialog().nativeElement.close();
+      this.dialog().close();
     }
   }
 }

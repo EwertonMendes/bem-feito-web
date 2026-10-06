@@ -24,7 +24,7 @@
     </tbody></table></div>
   }
 
-  <dialog #expenseDialog class="bf-dialog">
+  <dialog bfDialog #expenseDialog="bfDialog" class="bf-dialog">
     <div class="bf-dialog-header"><h2>Registrar saída</h2><button class="bf-icon-button" (click)="expenseDialog.close()"><bf-icon name="close" /></button></div>
     <div class="bf-dialog-body">
       <div class="kind-grid">
@@ -51,7 +51,7 @@
     <div class="bf-dialog-footer"><button class="bf-button secondary" (click)="expenseDialog.close()">Cancelar</button><button class="bf-button" (click)="save()">Registrar</button></div>
   </dialog>
 
-  <dialog #receiptDialog class="bf-dialog">
+  <dialog bfDialog #receiptDialog="bfDialog" class="bf-dialog">
     <div class="bf-dialog-header"><div><h2>Registrar recebimento</h2><small>{{selectedReceivable()?.code}} · {{selectedReceivable()?.customerName || 'Cliente'}}</small></div><button class="bf-icon-button" type="button" (click)="receiptDialog.close()"><bf-icon name="close" /></button></div>
     <div class="bf-dialog-body">
       <div class="receipt-balance"><span>Saldo atual</span><strong>{{currency(selectedReceivable()?.balanceCents || 0)}}</strong></div>

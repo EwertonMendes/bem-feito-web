@@ -10,7 +10,7 @@
     @for(sale of filteredSales();track sale.id){<tr><td><strong>{{sale.code}}</strong></td><td>{{date(sale.businessDate)}}</td><td>{{sale.customerName || '—'}}</td><td>{{currency(sale.totalCents)}}</td><td>{{currency(sale.receivedCents)}}</td><td>{{currency(sale.balanceCents)}}</td><td><span class="bf-badge" [class.warning]="sale.paymentStatus!=='paid' && sale.status!=='cancelled'" [class.muted]="sale.status==='cancelled'">{{paymentStatusLabel(sale)}}</span></td><td><button class="bf-button secondary" (click)="openDetails(sale)">Ver</button></td></tr>} @empty {<tr><td colspan="8"><div class="bf-empty"><div><strong>Nenhuma venda encontrada</strong><p>Use “Nova venda” para registrar a primeira.</p></div></div></td></tr>}
   </tbody></table></div>
 
-  <dialog #saleDialog class="sale-dialog">
+  <dialog bfDialog #saleDialog="bfDialog" class="sale-dialog">
     <div class="sale-header"><div><span class="eyebrow">Nova venda</span><h2>{{cartPhysicalItems()}} itens · {{currency(totalCents())}}</h2></div><button class="bf-icon-button" (click)="saleDialog.close()"><bf-icon name="close" /></button></div>
     <div class="sale-layout">
       <section class="picker">
@@ -52,7 +52,7 @@
     </div>
   </dialog>
 
-  <dialog #detailDialog class="bf-dialog">
+  <dialog bfDialog #detailDialog="bfDialog" class="bf-dialog">
     @if(selectedSale();as sale){<div class="bf-dialog-header"><div><h2>{{sale.code}}</h2><small>{{date(sale.businessDate)}} · {{sale.customerName || 'Sem cliente'}}</small></div><button class="bf-icon-button" (click)="detailDialog.close()"><bf-icon name="close" /></button></div><div class="bf-dialog-body"><div class="detail-total"><span>Total</span><strong>{{currency(sale.totalCents)}}</strong></div><div class="detail-grid"><div><span>Recebido</span><strong>{{currency(sale.receivedCents)}}</strong></div><div><span>Saldo</span><strong>{{currency(sale.balanceCents)}}</strong></div><div><span>Gorjeta</span><strong>{{currency(sale.tipCents)}}</strong></div></div><section class="detail-items"><h3>Itens</h3>@for(item of sale.items;track item.id){<div><span>{{item.quantity}}× {{item.name}}</span><strong>{{currency(item.totalCents)}}</strong></div>}</section>@if(sale.notes){<p class="notes">{{sale.notes}}</p>}</div><div class="bf-dialog-footer">@if(sale.status!=='cancelled'){<button class="bf-button danger" (click)="cancelSelected()">Cancelar venda</button>}<button class="bf-button secondary" (click)="detailDialog.close()">Fechar</button></div>}
   </dialog>
 </section>

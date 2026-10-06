@@ -30,7 +30,7 @@
     </table>
   </div>
 
-  <dialog #editor class="bf-dialog">
+  <dialog bfDialog #editor="bfDialog" class="bf-dialog">
     <div class="bf-dialog-header"><h2>{{editingId()?'Editar':'Novo cadastro'}}</h2><button class="bf-icon-button" (click)="editor.close()"><bf-icon name="close" /></button></div>
     <div class="bf-dialog-body">
       @if(tab()==='fragrances'){

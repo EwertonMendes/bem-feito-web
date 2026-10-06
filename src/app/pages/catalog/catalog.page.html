@@ -57,7 +57,7 @@
     </div>
   }
 
-  <dialog #editor class="bf-dialog">
+  <dialog bfDialog #editor="bfDialog" class="bf-dialog">
     <div class="bf-dialog-header"><h2>{{ editingId() ? 'Editar' : 'Novo' }} {{ tab() === 'products' ? 'produto' : tab() === 'inputs' ? 'insumo' : tab() === 'kits' ? 'kit' : 'adicional' }}</h2><button type="button" class="bf-icon-button" (click)="editor.close()"><bf-icon name="close" /></button></div>
     <div class="bf-dialog-body">
       @if (tab() === 'products') {

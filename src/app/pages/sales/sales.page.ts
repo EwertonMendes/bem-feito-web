@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { FormField, form, min, required } from '@angular/forms/signals';
 import { Addition, Kit, Product } from '../../domain/models/catalog.model';
@@ -11,6 +11,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { todayBusinessDate, formatBusinessDate } from '../../core/utils/date';
 import { formatCurrency, toCents } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
+import { BfDialog } from '../../shared/ui/dialog/dialog';
 import { CatalogImage } from '../../shared/media/catalog-image/catalog-image';
 
 interface SaleFormModel { businessDate: string; customerName: string; dueDate: string; discount: number; notes: string; }
@@ -23,7 +24,7 @@ interface KitSlot { index: number; label: string; candidates: Product[]; }
 
 @Component({
   selector: 'bf-sales-page',
-  imports: [FormField, BfIcon, CatalogImage],
+  imports: [FormField, BfIcon, CatalogImage, BfDialog],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sales.page.html',
   styleUrl: './sales.page.scss',
@@ -34,8 +35,8 @@ export class SalesPage {
   readonly settings = inject(SettingsStore);
   private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(ToastService);
-  private readonly saleDialog = viewChild.required<ElementRef<HTMLDialogElement>>('saleDialog');
-  private readonly detailDialog = viewChild.required<ElementRef<HTMLDialogElement>>('detailDialog');
+  private readonly saleDialog = viewChild.required<BfDialog>('saleDialog');
+  private readonly detailDialog = viewChild.required<BfDialog>('detailDialog');
 
   readonly currency = formatCurrency;
   readonly date = formatBusinessDate;
@@ -79,7 +80,7 @@ export class SalesPage {
     const method = this.settings.paymentMethods().find((item) => item.active);
     this.payments.set(method ? [{ id: crypto.randomUUID(), methodId: method.id, amount: 0 }] : []);
     this.catalogTab.set('products');
-    this.saleDialog().nativeElement.showModal();
+    this.saleDialog().open();
   }
 
   addProduct(product: Product): void {
@@ -152,14 +153,14 @@ export class SalesPage {
       payments: this.payments().filter((item) => item.methodId && item.amount > 0).map((item): PaymentDraft => ({ methodId: item.methodId, amountReceivedCents: toCents(item.amount) })),
     };
     const ok = await this.store.create(draft);
-    if (ok) { await this.catalog.load(true); this.saleDialog().nativeElement.close(); }
+    if (ok) { await this.catalog.load(true); this.saleDialog().close(); }
   }
 
-  openDetails(sale: Sale): void { this.selectedSale.set(sale); this.detailDialog().nativeElement.showModal(); }
+  openDetails(sale: Sale): void { this.selectedSale.set(sale); this.detailDialog().open(); }
   async cancelSelected(): Promise<void> {
     const sale = this.selectedSale();
     if (!sale || sale.status === 'cancelled' || !window.confirm(`Cancelar ${sale.code}? O estoque será revertido e os recebimentos serão estornados.`)) return;
-    await this.store.cancel(sale); await this.catalog.load(true); this.detailDialog().nativeElement.close();
+    await this.store.cancel(sale); await this.catalog.load(true); this.detailDialog().close();
   }
 
   lineName(line: CartLine): string {

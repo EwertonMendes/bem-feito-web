@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
 import { Addition, AdditionComponent, InputItem, Kit, KitComponent, Product, RecipeComponent } from '../../domain/models/catalog.model';
 import { CatalogImageEntityKind, CatalogImageRef } from '../../domain/models/image.model';
@@ -8,6 +8,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { ErrorService } from '../../core/services/error.service';
 import { toCents, fromCents, formatCurrency } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
+import { BfDialog } from '../../shared/ui/dialog/dialog';
 import { CatalogImage } from '../../shared/media/catalog-image/catalog-image';
 
 interface ProductFormModel { code: string; collectionId: string; fragranceId: string; formatId: string; salePrice: number; additionalCost: number; minimumStock: number; active: boolean; }
@@ -17,7 +18,7 @@ interface AdditionFormModel { name: string; category: string; price: number; not
 
 @Component({
   selector: 'bf-catalog-page',
-  imports: [FormField, BfIcon, CatalogImage],
+  imports: [FormField, BfIcon, CatalogImage, BfDialog],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './catalog.page.html',
   styleUrl: './catalog.page.scss',
@@ -28,7 +29,7 @@ export class CatalogPage {
   readonly imagesEnabled = this.images.enabled;
   private readonly toast = inject(ToastService);
   private readonly errors = inject(ErrorService);
-  private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('editor');
+  private readonly dialog = viewChild.required<BfDialog>('editor');
 
   readonly currency = formatCurrency;
   readonly skeletonItems = [1, 2, 3, 4, 5, 6, 7, 8];
@@ -96,34 +97,34 @@ export class CatalogPage {
       this.additionModel.set({ name: '', category: 'Embalagem', price: 0, notes: '', active: true });
       this.additionComponents.set([]);
     }
-    this.dialog().nativeElement.showModal();
+    this.dialog().open();
   }
 
   editProduct(item: Product): void {
     this.tab.set('products'); this.editingId.set(item.id); this.resetImageChange();
     this.productModel.set({ code: item.code, collectionId: item.collectionId, fragranceId: item.fragranceId, formatId: item.formatId, salePrice: fromCents(item.salePriceCents), additionalCost: fromCents(item.additionalCostCents), minimumStock: item.minimumStock, active: item.active });
     this.recipe.set(item.recipe.map((component) => ({ ...component })));
-    this.dialog().nativeElement.showModal();
+    this.dialog().open();
   }
 
   editInput(item: InputItem): void {
     this.tab.set('inputs'); this.editingId.set(item.id); this.resetImageChange();
     this.inputModel.set({ code: item.code, name: item.name, unitId: item.unitId, minimumStock: item.minimumStockConfigured === false ? null : item.minimumStock, active: item.active });
-    this.dialog().nativeElement.showModal();
+    this.dialog().open();
   }
 
   editKit(item: Kit): void {
     this.tab.set('kits'); this.editingId.set(item.id); this.resetImageChange();
     this.kitModel.set({ name: item.name, price: fromCents(item.priceCents), notes: item.notes ?? '', active: item.active });
     this.kitComponents.set(item.components.map((component) => ({ ...component })));
-    this.dialog().nativeElement.showModal();
+    this.dialog().open();
   }
 
   editAddition(item: Addition): void {
     this.tab.set('additions'); this.editingId.set(item.id); this.resetImageChange();
     this.additionModel.set({ name: item.name, category: item.category, price: fromCents(item.priceCents), notes: item.notes ?? '', active: item.active });
     this.additionComponents.set(item.components.map((component) => ({ ...component })));
-    this.dialog().nativeElement.showModal();
+    this.dialog().open();
   }
 
   addRecipeComponent(): void {
@@ -165,7 +166,7 @@ export class CatalogPage {
       else if (this.tab() === 'kits') await this.saveKit();
       else await this.saveAddition();
       this.toast.success('Cadastro salvo com sucesso.');
-      this.dialog().nativeElement.close();
+      this.dialog().close();
     } catch (error) {
       this.toast.error(this.errors.message(error));
     }

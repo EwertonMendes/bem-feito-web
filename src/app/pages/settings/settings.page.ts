@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ElementRef, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal, viewChild } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
 import {
   CollectionDefinition,
@@ -16,6 +16,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { ErrorService } from '../../core/services/error.service';
 import { fromCents, toCents } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
+import { BfDialog } from '../../shared/ui/dialog/dialog';
 import { GoogleDriveSettingsCard } from '../../features/google-drive/components/google-drive-settings-card';
 
 type SettingTab = 'collections' | 'fragrances' | 'formats' | 'prices' | 'units' | 'payments' | 'expenseCategories' | 'expenseTypes';
@@ -29,7 +30,7 @@ interface ExpenseTypeModel extends SimpleModel { kind: ExpenseType['kind']; }
 
 @Component({
   selector: 'bf-settings-page',
-  imports: [FormField, BfIcon, GoogleDriveSettingsCard],
+  imports: [FormField, BfIcon, GoogleDriveSettingsCard, BfDialog],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './settings.page.html',
   styleUrl: './settings.page.scss',
@@ -39,7 +40,7 @@ export class SettingsPage {
   readonly settings = inject(SettingsStore);
   private readonly toast = inject(ToastService);
   private readonly errors = inject(ErrorService);
-  private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('editor');
+  private readonly dialog = viewChild.required<BfDialog>('editor');
 
   readonly tab = signal<SettingTab>('collections');
   readonly editingId = signal('');
@@ -65,37 +66,37 @@ export class SettingsPage {
     this.formatModel.set({ name: '', approximateWeightGrams: 0, active: true });
     this.priceModel.set({ collectionId: '', formatId: '', price: 0, active: true });
     this.expenseTypeModel.set({ name: '', kind: 'operating-expense', active: true });
-    this.dialog().nativeElement.showModal();
+    this.dialog().open();
   }
 
   editSimple(item: SimpleSetting): void {
     this.editingId.set(item.id);
     this.simpleModel.set({ name: item.name, active: item.active });
-    this.dialog().nativeElement.showModal();
+    this.dialog().open();
   }
 
   editFragrance(item: FragranceDefinition): void {
     this.editingId.set(item.id);
     this.fragranceModel.set({ name: item.name, collectionId: item.collectionId, active: item.active });
-    this.dialog().nativeElement.showModal();
+    this.dialog().open();
   }
 
   editFormat(item: FormatDefinition): void {
     this.editingId.set(item.id);
     this.formatModel.set({ name: item.name, approximateWeightGrams: item.approximateWeightGrams ?? 0, active: item.active });
-    this.dialog().nativeElement.showModal();
+    this.dialog().open();
   }
 
   editPrice(item: FormatPrice): void {
     this.editingId.set(item.id);
     this.priceModel.set({ collectionId: item.collectionId, formatId: item.formatId, price: fromCents(item.priceCents), active: item.active });
-    this.dialog().nativeElement.showModal();
+    this.dialog().open();
   }
 
   editExpenseType(item: ExpenseType): void {
     this.editingId.set(item.id);
     this.expenseTypeModel.set({ name: item.name, kind: item.kind, active: item.active });
-    this.dialog().nativeElement.showModal();
+    this.dialog().open();
   }
 
   async save(): Promise<void> {
@@ -112,7 +113,7 @@ export class SettingsPage {
       else if (this.tab() === 'expenseCategories') await this.settings.saveExpenseCategory({ id, ...this.simpleModel() } as ExpenseCategory);
       else await this.settings.saveExpenseType({ id, ...this.expenseTypeModel() } as ExpenseType);
       this.toast.success('Configuração salva.');
-      this.dialog().nativeElement.close();
+      this.dialog().close();
     } catch (error) {
       this.toast.error(this.errors.message(error));
     }

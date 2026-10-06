@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { FormField, form, min, required } from '@angular/forms/signals';
 import { CatalogStore } from '../../features/catalog/catalog.store';
@@ -9,6 +9,7 @@ import { ExpenseDraft, ExpenseKind } from '../../domain/models/finance.model';
 import { formatBusinessDate, todayBusinessDate } from '../../core/utils/date';
 import { formatCurrency, fromCents, toCents } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
+import { BfDialog } from '../../shared/ui/dialog/dialog';
 
 interface ReceiptFormModel {
   saleId: string;
@@ -32,7 +33,7 @@ interface ExpenseFormModel {
 
 @Component({
   selector: 'bf-finance-page',
-  imports: [FormField, BfIcon],
+  imports: [FormField, BfIcon, BfDialog],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './finance.page.html',
   styleUrl: './finance.page.scss',
@@ -43,8 +44,8 @@ export class FinancePage {
   readonly sales = inject(SalesStore);
   readonly settings = inject(SettingsStore);
   private readonly route = inject(ActivatedRoute);
-  private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('expenseDialog');
-  private readonly receiptDialog = viewChild.required<ElementRef<HTMLDialogElement>>('receiptDialog');
+  private readonly dialog = viewChild.required<BfDialog>('expenseDialog');
+  private readonly receiptDialog = viewChild.required<BfDialog>('receiptDialog');
 
   readonly tab = signal<'expenses' | 'receivables' | 'payments'>('expenses');
   readonly currency = formatCurrency;
@@ -96,7 +97,7 @@ export class FinancePage {
       notes: '',
       link: '',
     });
-    this.dialog().nativeElement.showModal();
+    this.dialog().open();
   }
 
   openReceipt(saleId: string): void {
@@ -108,7 +109,7 @@ export class FinancePage {
       methodId: this.settings.paymentMethods().find((item) => item.active)?.id ?? '',
       amount: fromCents(sale.balanceCents),
     });
-    this.receiptDialog().nativeElement.showModal();
+    this.receiptDialog().open();
   }
 
   async saveReceipt(): Promise<void> {
@@ -117,7 +118,7 @@ export class FinancePage {
     const ok = await this.sales.addPayment(value.saleId, value.businessDate, value.methodId, toCents(value.amount));
     if (ok) {
       await this.store.load();
-      this.receiptDialog().nativeElement.close();
+      this.receiptDialog().close();
     }
   }
 
@@ -145,7 +146,7 @@ export class FinancePage {
     const ok = await this.store.createExpense(draft);
     if (ok) {
       await this.catalog.load(true);
-      this.dialog().nativeElement.close();
+      this.dialog().close();
     }
   }
 

@@ -39,17 +39,19 @@ test('DEV waits for Firestore indexes before publishing a UI that depends on the
   for (const source of [workflow, previewWorkflow]) {
     const firestore = source.indexOf('npm run firebase:deploy:dev:firestore');
     const wait = source.indexOf('npm run firebase:wait-indexes:dev');
+    const verify = source.indexOf('npm run firebase:verify-queries:dev');
     const hosting = source.indexOf('npm run firebase:deploy:dev:hosting');
-    assert.ok(firestore >= 0 && wait > firestore && hosting > wait, 'Firestore, index wait and hosting must stay ordered.');
+    assert.ok(firestore >= 0 && wait > firestore && verify > wait && hosting > verify, 'Firestore, index wait, query verification and hosting must stay ordered.');
   }
 
   assert.match(packageJson.scripts['firebase:deploy:dev:firestore'], /--project bem-feito-dev/);
   assert.match(packageJson.scripts['firebase:deploy:dev:firestore'], /--only firestore/);
   assert.equal(packageJson.scripts['firebase:wait-indexes:dev'], 'node tools/deploy/wait-for-firestore-indexes.mjs');
+  assert.equal(packageJson.scripts['firebase:verify-queries:dev'], 'node tools/deploy/verify-firestore-queries.mjs');
   assert.match(packageJson.scripts['firebase:deploy:dev:hosting'], /--only hosting/);
   assert.equal(
     packageJson.scripts['firebase:deploy:dev:ci'],
-    'npm run firebase:deploy:dev:firestore && npm run firebase:wait-indexes:dev && npm run firebase:deploy:dev:hosting',
+    'npm run firebase:deploy:dev:firestore && npm run firebase:wait-indexes:dev && npm run firebase:verify-queries:dev && npm run firebase:deploy:dev:hosting',
   );
 });
 

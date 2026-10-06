@@ -90,6 +90,8 @@ jobs:
       - name: Wait for Firestore indexes
         run: npm run firebase:wait-indexes:dev
 
+      - name: Verify Firestore query paths
+        run: npm run firebase:verify-queries:dev
       - name: Deploy Hosting preview to DEV
         run: npm run firebase:deploy:dev:hosting
 

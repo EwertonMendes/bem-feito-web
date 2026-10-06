@@ -1,0 +1,42 @@
+name: Temporary DEV Firestore Preview Deploy
+
+on:
+  push:
+    branches:
+      - perf/firestore-read-optimization
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: bem-feito-dev-firestore-preview
+  cancel-in-progress: true
+
+jobs:
+  deploy-firestore:
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.22.3
+          cache: npm
+
+      - run: npm ci --no-fund
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: bem-feito-dev
+          workload_identity_provider: projects/312978463343/locations/global/workloadIdentityPools/github-actions/providers/github
+          service_account: github-deploy@bem-feito-dev.iam.gserviceaccount.com
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Deploy Firestore rules and indexes to DEV
+        run: npx --yes --package firebase-tools@15.32.1 firebase deploy --project bem-feito-dev --only firestore --non-interactive

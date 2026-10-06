@@ -1,23 +1,62 @@
 import { inject, Injectable } from '@angular/core';
-import { collection, doc, getDocs, limit, orderBy, query, runTransaction, serverTimestamp } from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  documentId,
+  getAggregateFromServer,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  runTransaction,
+  serverTimestamp,
+  startAfter,
+  sum,
+} from 'firebase/firestore';
+import { inputStockStatus } from '../../domain/logic/stock-status';
 import { InputItem } from '../../domain/models/catalog.model';
 import { Expense, ExpenseDraft } from '../../domain/models/finance.model';
 import { StockMovement } from '../../domain/models/inventory.model';
 import { AuthService } from '../auth/auth.service';
+import { DataRevisionService } from '../firebase/data-revision.service';
 import { FIRESTORE } from '../firebase/firebase.providers';
 import { entityCode } from '../utils/ids';
+import { ExpenseCreateResult } from './mutation-results';
+import { BusinessDateCursor, PageResult } from './pagination';
 
 @Injectable({ providedIn: 'root' })
 export class FinanceRepository {
   private readonly firestore = inject(FIRESTORE);
   private readonly auth = inject(AuthService);
+  private readonly revisions = inject(DataRevisionService);
 
-  async recentExpenses(max = 150): Promise<Expense[]> {
-    const snapshot = await getDocs(query(collection(this.firestore, 'expenses'), orderBy('businessDate', 'desc'), limit(max)));
-    return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as Expense);
+  async expensePage(pageSize = 40, cursor?: BusinessDateCursor | null): Promise<PageResult<Expense>> {
+    const constraints = [
+      orderBy('businessDate', 'desc'),
+      orderBy(documentId(), 'desc'),
+      ...(cursor ? [startAfter(cursor.businessDate, cursor.id)] : []),
+      limit(pageSize + 1),
+    ];
+    const snapshot = await getDocs(query(collection(this.firestore, 'expenses'), ...constraints));
+    const hasMore = snapshot.docs.length > pageSize;
+    const docs = snapshot.docs.slice(0, pageSize);
+    const items = docs.map((item) => ({ id: item.id, ...item.data() }) as Expense);
+    const last = items.at(-1);
+    return {
+      items,
+      hasMore,
+      nextCursor: hasMore && last ? { businessDate: last.businessDate, id: last.id } : null,
+    };
   }
 
-  async createExpense(draft: ExpenseDraft): Promise<string> {
+  async totalExpensesCents(): Promise<number> {
+    const snapshot = await getAggregateFromServer(collection(this.firestore, 'expenses'), {
+      total: sum('amountCents'),
+    });
+    return Number(snapshot.data().total ?? 0);
+  }
+
+  async createExpense(draft: ExpenseDraft): Promise<ExpenseCreateResult> {
     const userId = this.auth.user()?.uid;
     if (!userId) throw new Error('Sessão inválida.');
     if (!draft.businessDate) throw new Error('Informe a data.');
@@ -30,7 +69,7 @@ export class FinanceRepository {
       const counterRef = doc(this.firestore, 'counters', 'expense');
       const counterSnapshot = await transaction.get(counterRef);
       let input: InputItem | null = null;
-      let inputRef = draft.inputId ? doc(this.firestore, 'inputs', draft.inputId) : null;
+      const inputRef = draft.inputId ? doc(this.firestore, 'inputs', draft.inputId) : null;
 
       if (draft.kind === 'input-purchase' && inputRef) {
         const inputSnapshot = await transaction.get(inputRef);
@@ -41,18 +80,31 @@ export class FinanceRepository {
 
       const sequence = Number(counterSnapshot.data()?.['value'] ?? 0) + 1;
       const expenseRef = doc(collection(this.firestore, 'expenses'));
+      const code = entityCode('M', sequence, 6);
       transaction.set(counterRef, { value: sequence, updatedAt: serverTimestamp() }, { merge: true });
 
+      let stockChange: ExpenseCreateResult['stockChange'];
       if (input && inputRef && draft.quantity) {
         const quantity = draft.quantity;
         const positiveStock = Math.max(0, input.stock);
-        const newAverage = Math.round((positiveStock * input.averageUnitCostCents + draft.amountCents) / (positiveStock + quantity));
+        const stock = input.stock + quantity;
+        const averageUnitCostCents = Math.round(
+          (positiveStock * input.averageUnitCostCents + draft.amountCents) / (positiveStock + quantity),
+        );
         transaction.update(inputRef, {
-          stock: input.stock + quantity,
-          averageUnitCostCents: newAverage,
+          stock,
+          stockStatus: inputStockStatus(stock, input.minimumStock, input.minimumStockConfigured !== false),
+          averageUnitCostCents,
           updatedAt: serverTimestamp(),
           updatedBy: userId,
         });
+
+        stockChange = {
+          itemType: 'input',
+          itemId: input.id,
+          stock,
+          averageUnitCostCents,
+        };
 
         const movementRef = doc(collection(this.firestore, 'stockMovements'));
         transaction.set(movementRef, {
@@ -71,16 +123,27 @@ export class FinanceRepository {
         } satisfies Omit<StockMovement, 'id'>);
       }
 
+      const expense: Expense = {
+        id: expenseRef.id,
+        ...draft,
+        code,
+      };
       transaction.set(expenseRef, {
         ...draft,
-        code: entityCode('M', sequence, 6),
+        code,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         createdBy: userId,
         updatedBy: userId,
       } satisfies Omit<Expense, 'id'>);
 
-      return expenseRef.id;
+      this.revisions.touchTransaction(
+        transaction,
+        'finance',
+        ...(stockChange ? ['catalog', 'inventory'] as const : []),
+      );
+
+      return { expense, stockChange };
     });
   }
 }

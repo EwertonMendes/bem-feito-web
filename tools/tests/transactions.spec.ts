@@ -48,7 +48,7 @@ beforeEach(async () => {
   injector = Injector.create({
     providers: [
       { provide: FIRESTORE, useValue: db },
-      { provide: AuthService, useValue: { user: () => ({ uid: 'operator' }), canOperate: () => true } },
+      { provide: AuthService, useValue: { user: () => ({ uid: 'operator' }), canOperate: () => true, canAdminister: () => true } },
       {
         provide: DataRevisionService,
         useValue: {
@@ -128,6 +128,47 @@ describe('Actual repositories against restrictive emulator rules', () => {
     expect(await data('products', 'p')).toMatchObject({ stock: 11 });
     expect(await count('expenses')).toBe(2);
     expect(await count('stockAdjustments')).toBe(2);
+  });
+  it('rejects inventory adjustments that would make stock negative without partial writes', async () => {
+    await expect(inventory.adjust('product', 'p', -11, 'TEST ONLY', day)).rejects.toThrow('Estoque insuficiente');
+    expect(await data('products', 'p')).toMatchObject({ stock: 10 });
+    expect(await count('stockAdjustments')).toBe(0);
+    expect(await count('stockMovements')).toBe(0);
+    expect(await data('counters', 'stockAdjustment')).toBeUndefined();
+  });
+  it('reconciles a legacy negative balance to zero once while preserving the audit trail', async () => {
+    await env.withSecurityRulesDisabled(async context => {
+      const seed = context.firestore();
+      await setDoc(doc(seed, 'products', 'legacy-negative'), {
+        code: 'LEGACY-NEG',
+        displayName: 'LEGACY NEGATIVE',
+        active: true,
+        collectionId: 'c',
+        fragranceId: 'f',
+        formatId: 'fmt',
+        salePriceCents: 1000,
+        additionalCostCents: 0,
+        averageUnitCostCents: 100,
+        stock: -3,
+        minimumStock: 0,
+        stockStatus: 'negative',
+        recipe: [],
+        ...audit(),
+      });
+    });
+
+    const first = await inventory.reconcileNegativeToZero('product', 'legacy-negative', 'LEGACY RECONCILIATION', day);
+    expect(first).not.toBeNull();
+    expect(first?.adjustment).toMatchObject({ itemType: 'product', itemId: 'legacy-negative', quantityDelta: 3 });
+    expect(first?.movement).toMatchObject({ itemType: 'product', itemId: 'legacy-negative', quantityDelta: 3, sourceType: 'adjustment' });
+    expect(await data('products', 'legacy-negative')).toMatchObject({ stock: 0, stockStatus: 'low' });
+    expect(await count('stockAdjustments')).toBe(1);
+    expect(await count('stockMovements')).toBe(1);
+
+    const second = await inventory.reconcileNegativeToZero('product', 'legacy-negative', 'LEGACY RECONCILIATION', day);
+    expect(second).toBeNull();
+    expect(await count('stockAdjustments')).toBe(1);
+    expect(await count('stockMovements')).toBe(1);
   });
   for (const operation of ['sale', 'production', 'purchase', 'adjustment'] as const) {
     it(`rolls back every staged document when rules reject ${operation}`, async () => {

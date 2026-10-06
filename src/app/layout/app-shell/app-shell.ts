@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { ThemeService } from '../../core/services/theme.service';
@@ -20,6 +20,12 @@ export class AppShell {
   private readonly router = inject(Router);
 
   readonly mobileMenuOpen = signal(false);
+  private readonly failedAvatarUrl = signal<string | null>(null);
+  readonly avatarUrl = computed(() => {
+    const photoUrl = this.auth.user()?.photoURL?.trim() ?? '';
+    return photoUrl && this.failedAvatarUrl() !== photoUrl ? photoUrl : null;
+  });
+
   readonly nav: NavItem[] = [
     { label: 'Dashboard', path: '/dashboard', icon: 'dashboard' },
     { label: 'Vendas', path: '/vendas', icon: 'sales' },
@@ -29,6 +35,11 @@ export class AppShell {
     { label: 'Catálogo', path: '/catalogo', icon: 'catalog' },
     { label: 'Configurações', path: '/configuracoes', icon: 'settings' },
   ];
+
+  onAvatarError(): void {
+    const photoUrl = this.auth.user()?.photoURL?.trim();
+    if (photoUrl) this.failedAvatarUrl.set(photoUrl);
+  }
 
   async quickNavigate(path: string): Promise<void> {
     this.mobileMenuOpen.set(false);

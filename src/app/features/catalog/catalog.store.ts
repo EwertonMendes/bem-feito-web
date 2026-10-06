@@ -48,7 +48,6 @@ export class CatalogStore {
   readonly activeAdditions = computed(() => this.additionsState().filter((item) => item.active));
   readonly lowStockProducts = computed(() => this.productsState().filter((item) => item.active && ['negative', 'low'].includes(stockStatusForProduct(item))));
   readonly lowStockInputs = computed(() => this.inputsState().filter((item) => item.active && ['negative', 'low'].includes(stockStatusForInput(item))));
-  readonly negativeProducts = computed(() => this.productsState().filter((item) => item.stock < 0));
 
   constructor() {
     effect(() => {

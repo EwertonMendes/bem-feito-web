@@ -1,7 +1,13 @@
 import { EnvironmentProviders, InjectionToken, makeEnvironmentProviders } from '@angular/core';
 import { FirebaseApp, initializeApp } from 'firebase/app';
 import { Auth, connectAuthEmulator, getAuth } from 'firebase/auth';
-import { Firestore, connectFirestoreEmulator, initializeFirestore } from 'firebase/firestore';
+import {
+  Firestore,
+  connectFirestoreEmulator,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from 'firebase/firestore';
 import { environment } from '../../../environments/environment';
 
 export const FIREBASE_APP = new InjectionToken<FirebaseApp>('FIREBASE_APP');
@@ -29,7 +35,12 @@ export function provideFirebase(): EnvironmentProviders {
       provide: FIRESTORE,
       deps: [FIREBASE_APP],
       useFactory: (app: FirebaseApp) => {
-        const firestore = initializeFirestore(app, { ignoreUndefinedProperties: true });
+        const firestore = initializeFirestore(app, {
+          ignoreUndefinedProperties: true,
+          localCache: persistentLocalCache({
+            tabManager: persistentMultipleTabManager(),
+          }),
+        });
         if (environment.useEmulators) {
           try { connectFirestoreEmulator(firestore, environment.emulatorHost, 8080); } catch {}
         }

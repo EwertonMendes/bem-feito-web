@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { Sale } from '../../domain/models/sales.model';
 import { CatalogStore } from '../../features/catalog/catalog.store';
@@ -20,6 +20,7 @@ import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
 export class SalesPage {
   readonly store = inject(SalesStore);
   readonly catalog = inject(CatalogStore);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
   private readonly detailDialog = viewChild.required<BfDialog>('detailDialog');
   private readonly saleEditor = viewChild.required<SaleEditor>('saleEditor');
@@ -41,6 +42,8 @@ export class SalesPage {
   });
 
   constructor() {
+    this.destroyRef.onDestroy(this.store.activateSales());
+    this.destroyRef.onDestroy(this.catalog.activate());
     void Promise.all([this.store.load(), this.catalog.load()]);
     const openRequested = this.route.snapshot.queryParamMap.get('novo') === '1';
     afterNextRender(() => {
@@ -56,8 +59,10 @@ export class SalesPage {
   async cancelSelected(): Promise<void> {
     const sale = this.selectedSale();
     if (!sale || sale.status === 'cancelled' || !window.confirm('Cancelar ' + sale.code + '? O estoque será revertido e os recebimentos serão estornados.')) return;
-    await this.store.cancel(sale);
-    await this.catalog.load(true);
+    const result = await this.store.cancel(sale);
+    if (!result) return;
+    this.catalog.applyStockChanges(result.stockChanges);
+    this.selectedSale.set(result.sale);
     this.detailDialog().close();
   }
 

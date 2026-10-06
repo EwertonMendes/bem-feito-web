@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
 import { Addition, AdditionComponent, InputItem, Kit, KitComponent, Product, RecipeComponent } from '../../../../domain/models/catalog.model';
 import { CatalogImageEntityKind, CatalogImageRef } from '../../../../domain/models/image.model';
@@ -26,6 +26,7 @@ interface AdditionFormModel { name: string; category: string; price: number; not
 export class CatalogEditor {
   readonly store = inject(CatalogStore);
   readonly references = inject(CatalogReferenceStore);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly images = inject(ImageService);
   private readonly toast = inject(ToastService);
   private readonly errors = inject(ErrorService);
@@ -74,6 +75,7 @@ export class CatalogEditor {
   readonly availableFragrances = computed(() => this.references.fragrances().filter((item) => item.active && (!this.productModel().collectionId || item.collectionId === this.productModel().collectionId)));
 
   constructor() {
+    this.destroyRef.onDestroy(this.references.activate());
     void Promise.all([this.store.load(), this.references.load()]);
   }
 
@@ -212,7 +214,7 @@ export class CatalogEditor {
       stock: existing?.stock ?? 0, minimumStock: model.minimumStock, image: existing?.image,
       recipe: this.recipe().filter((item) => item.inputId && item.quantity > 0 && item.unitId),
     };
-    const id = await this.store.saveProduct(product, !this.hasImageChange());
+    const id = await this.store.saveProduct(product);
     await this.applyImageChange('products', id, existing?.image, (image) => this.store.setProductImage(id, image));
   }
 
@@ -225,7 +227,7 @@ export class CatalogEditor {
       stock: existing?.stock ?? 0, minimumStock: model.minimumStock ?? 0, minimumStockConfigured: model.minimumStock !== null,
       averageUnitCostCents: existing?.averageUnitCostCents ?? 0, image: existing?.image,
     };
-    const id = await this.store.saveInput(input, !this.hasImageChange());
+    const id = await this.store.saveInput(input);
     await this.applyImageChange('inputs', id, existing?.image, (image) => this.store.setInputImage(id, image));
   }
 
@@ -239,7 +241,7 @@ export class CatalogEditor {
       notes: model.notes.trim() || undefined, image: existing?.image,
       components: this.kitComponents().filter((item) => item.formatId && item.quantity > 0),
     };
-    const id = await this.store.saveKit(kit, !this.hasImageChange());
+    const id = await this.store.saveKit(kit);
     await this.applyImageChange('kits', id, existing?.image, (image) => this.store.setKitImage(id, image));
   }
 
@@ -252,7 +254,7 @@ export class CatalogEditor {
       notes: model.notes.trim() || undefined, image: existing?.image,
       components: this.additionComponents().filter((item) => item.inputId && item.quantity > 0 && item.unitId),
     };
-    const id = await this.store.saveAddition(addition, !this.hasImageChange());
+    const id = await this.store.saveAddition(addition);
     await this.applyImageChange('additions', id, existing?.image, (image) => this.store.setAdditionImage(id, image));
   }
 
@@ -272,10 +274,6 @@ export class CatalogEditor {
       await persist(null);
       await this.images.removeCatalogImage(kind, id, existing);
     }
-  }
-
-  private hasImageChange(): boolean {
-    return Boolean(this.imageFile()) || this.removeImage();
   }
 
   private resetImageChange(): void {

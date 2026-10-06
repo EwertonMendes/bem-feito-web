@@ -1,10 +1,16 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import {
-  Auth, GoogleAuthProvider, User, getRedirectResult, onAuthStateChanged,
-  signInWithPopup, signInWithRedirect, signOut,
+  Auth,
+  GoogleAuthProvider,
+  User,
+  getRedirectResult,
+  onAuthStateChanged,
+  signInWithPopup,
+  signInWithRedirect,
+  signOut,
 } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { Unsubscribe, doc, onSnapshot } from 'firebase/firestore';
 import { UserProfile } from '../../domain/models/common.model';
 import { FIREBASE_AUTH, FIRESTORE } from '../firebase/firebase.providers';
 
@@ -18,6 +24,9 @@ export class AuthService {
   private readonly profileState = signal<UserProfile | null>(null);
   private readonly busyState = signal(false);
   private readonly errorState = signal<string | null>(null);
+  private profileUid: string | null = null;
+  private profileUnsubscribe: Unsubscribe | null = null;
+  private profileReady: Promise<UserProfile | null> | null = null;
 
   readonly user = computed(() => this.userState() ?? null);
   readonly profile = this.profileState.asReadonly();
@@ -31,7 +40,13 @@ export class AuthService {
   constructor() {
     onAuthStateChanged(this.auth, (user) => {
       this.userState.set(user);
-      if (!user) this.profileState.set(null);
+      if (user) {
+        void this.ensureProfileListener(user).catch((error) => {
+          this.errorState.set(this.authError(error));
+        });
+      } else {
+        this.clearProfileListener();
+      }
     });
     void this.completeRedirect();
   }
@@ -57,7 +72,7 @@ export class AuthService {
 
   async logout(): Promise<void> {
     await signOut(this.auth);
-    this.profileState.set(null);
+    this.clearProfileListener();
     await this.router.navigateByUrl('/login');
   }
 
@@ -77,17 +92,53 @@ export class AuthService {
 
   async resolveProfile(user: User | null): Promise<UserProfile | null> {
     if (!user) {
-      this.profileState.set(null);
+      this.clearProfileListener();
       return null;
     }
-    const snapshot = await getDoc(doc(this.firestore, 'users', user.uid));
-    if (!snapshot.exists()) {
-      this.profileState.set(null);
-      return null;
-    }
-    const profile = { id: snapshot.id, ...snapshot.data() } as UserProfile;
-    this.profileState.set(profile);
-    return profile;
+    return this.ensureProfileListener(user);
+  }
+
+  private ensureProfileListener(user: User): Promise<UserProfile | null> {
+    if (this.profileUid === user.uid && this.profileReady) return this.profileReady;
+
+    this.clearProfileListener();
+    this.profileUid = user.uid;
+    this.profileReady = new Promise<UserProfile | null>((resolve, reject) => {
+      let initial = true;
+      this.profileUnsubscribe = onSnapshot(
+        doc(this.firestore, 'users', user.uid),
+        (snapshot) => {
+          const profile = snapshot.exists()
+            ? ({ id: snapshot.id, ...snapshot.data() } as UserProfile)
+            : null;
+          this.profileState.set(profile);
+          if (initial) {
+            initial = false;
+            resolve(profile);
+          }
+        },
+        (error) => {
+          this.profileState.set(null);
+          this.profileUnsubscribe = null;
+          this.profileUid = null;
+          this.profileReady = null;
+          if (initial) {
+            initial = false;
+            reject(error);
+          }
+        },
+      );
+    });
+
+    return this.profileReady;
+  }
+
+  private clearProfileListener(): void {
+    this.profileUnsubscribe?.();
+    this.profileUnsubscribe = null;
+    this.profileUid = null;
+    this.profileReady = null;
+    this.profileState.set(null);
   }
 
   private async completeRedirect(): Promise<void> {

@@ -51,6 +51,10 @@ export interface Sale extends AuditFields {
   items: SaleLineSnapshot[];
   paymentIds: string[];
   stockEffects: StockEffect[];
+  analyticsVersion?: 1;
+  cogsCents?: number;
+  itemsSold?: number;
+  missingCostItems?: number;
   cancelledAt?: unknown;
   cancelledBy?: string;
 }

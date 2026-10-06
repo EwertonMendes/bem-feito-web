@@ -83,8 +83,8 @@ jobs:
           create_credentials_file: true
           export_environment_variables: true
 
-      - name: Deploy Hosting preview to DEV
-        run: npx --yes --package firebase-tools@15.32.1 firebase deploy --project bem-feito-dev --only hosting --non-interactive
+      - name: Deploy Firestore and Hosting preview to DEV
+        run: npm run firebase:deploy:dev:ci
 
       - name: Verify published commit
         env:

@@ -46,9 +46,12 @@ for (const item of list('inputs')) {
   if (!units.has(item.unitId)) errors.push(`inputs/${item.id}: unitId inválido.`);
   if (item.stock < 0) warnings.push(`inputs/${item.id}: estoque negativo ${item.stock}.`);
   if (!item.averageUnitCostCents) warnings.push(`inputs/${item.id}: custo médio ausente.`);
+  const expectedStatus = inputStockStatus(item.stock, item.minimumStock, item.minimumStockConfigured !== false);
+  if (item.stockStatus !== expectedStatus) errors.push(`inputs/${item.id}: stockStatus divergente.`);
 }
 for (const item of list('products')) {
   if (!collections.has(item.collectionId)) errors.push(`products/${item.id}: collectionId inválido.`);
+  if (item.stockStatus !== productStockStatus(item.stock, item.minimumStock)) errors.push(`products/${item.id}: stockStatus divergente.`);
   if (!fragrances.has(item.fragranceId)) errors.push(`products/${item.id}: fragranceId inválido.`);
   if (!formats.has(item.formatId)) errors.push(`products/${item.id}: formatId inválido.`);
   if (item.stock < 0) warnings.push(`products/${item.id}: estoque negativo ${item.stock}.`);
@@ -93,6 +96,25 @@ const finite = (value) => typeof value === 'number' && Number.isFinite(value);
 const positive = (value) => finite(value) && value > 0 && value <= 1000000;
 const idValid = (value) => typeof value === 'string' && value.length > 0 && value.length <= 500 && !value.includes('/');
 const paymentMethods = index('paymentMethods');
+const productStockStatus = (stock, minimumStock) => stock < 0 ? 'negative' : stock <= minimumStock ? 'low' : 'ok';
+const inputStockStatus = (stock, minimumStock, configured) => !configured ? 'untracked' : stock < 0 ? 'negative' : stock <= minimumStock ? 'low' : 'ok';
+const expectedSaleAnalytics = (items) => {
+  let cogsCents = 0;
+  let itemsSold = 0;
+  let missingCostItems = 0;
+  for (const item of items ?? []) {
+    cogsCents += item.totalCostCents;
+    if (item.kind === 'product') {
+      itemsSold += item.quantity;
+      if (item.totalCostCents <= 0) missingCostItems++;
+    } else if (item.kind === 'kit') {
+      const components = item.components ?? [];
+      itemsSold += components.reduce((sum, component) => sum + component.quantity, 0);
+      missingCostItems += components.filter((component) => component.unitCostCents <= 0).length;
+    }
+  }
+  return { analyticsVersion: 1, cogsCents, itemsSold, missingCostItems };
+};
 for (const [name, records] of Object.entries(data)) {
   if (!Array.isArray(records)) continue;
   for (const item of records) {
@@ -131,6 +153,13 @@ for (const payment of list('payments')) {
 }
 for (const sale of list('sales')) {
   const linked = list('payments').filter((item) => item.saleId === sale.id && item.status === 'active');
+  const analytics = expectedSaleAnalytics(sale.items);
+  if (
+    sale.analyticsVersion !== analytics.analyticsVersion ||
+    sale.cogsCents !== analytics.cogsCents ||
+    sale.itemsSold !== analytics.itemsSold ||
+    sale.missingCostItems !== analytics.missingCostItems
+  ) errors.push(`sales/${sale.id}: analytics divergente.`);
   if (!sale.items?.length || !['active', 'cancelled'].includes(sale.status)) errors.push(`sales/${sale.id}: venda inválida.`);
   if (sale.subtotalCents !== sale.items.reduce((sum, item) => sum + item.totalCents, 0) || sale.totalCents !== sale.subtotalCents - sale.discountCents) errors.push(`sales/${sale.id}: total divergente.`);
   if (sale.status === 'active' && (sale.receivedCents !== linked.reduce((sum, item) => sum + item.appliedCents, 0) || sale.tipCents !== linked.reduce((sum, item) => sum + item.tipCents, 0) || sale.balanceCents !== sale.totalCents - sale.receivedCents)) errors.push(`sales/${sale.id}: recebimentos/saldo divergentes.`);

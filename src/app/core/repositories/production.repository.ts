@@ -1,24 +1,59 @@
 import { inject, Injectable } from '@angular/core';
-import { collection, doc, getDocs, limit, orderBy, query, runTransaction, serverTimestamp } from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  documentId,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  runTransaction,
+  serverTimestamp,
+  startAfter,
+} from 'firebase/firestore';
+import { inputStockStatus, productStockStatus } from '../../domain/logic/stock-status';
 import { InputItem, Product } from '../../domain/models/catalog.model';
 import { StockMovement } from '../../domain/models/inventory.model';
 import { Production, ProductionConsumption } from '../../domain/models/production.model';
 import { AuthService } from '../auth/auth.service';
+import { DataRevisionService } from '../firebase/data-revision.service';
 import { FIRESTORE } from '../firebase/firebase.providers';
 import { entityCode } from '../utils/ids';
 import { aggregateRecipe } from '../utils/recipe';
+import { ProductionCreateResult } from './mutation-results';
+import { BusinessDateCursor, PageResult } from './pagination';
 
 @Injectable({ providedIn: 'root' })
 export class ProductionRepository {
   private readonly firestore = inject(FIRESTORE);
   private readonly auth = inject(AuthService);
+  private readonly revisions = inject(DataRevisionService);
 
-  async recent(max = 100): Promise<Production[]> {
-    const snapshot = await getDocs(query(collection(this.firestore, 'productions'), orderBy('businessDate', 'desc'), limit(max)));
-    return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as Production);
+  async page(pageSize = 40, cursor?: BusinessDateCursor | null): Promise<PageResult<Production>> {
+    const constraints = [
+      orderBy('businessDate', 'desc'),
+      orderBy(documentId(), 'desc'),
+      ...(cursor ? [startAfter(cursor.businessDate, cursor.id)] : []),
+      limit(pageSize + 1),
+    ];
+    const snapshot = await getDocs(query(collection(this.firestore, 'productions'), ...constraints));
+    const hasMore = snapshot.docs.length > pageSize;
+    const docs = snapshot.docs.slice(0, pageSize);
+    const items = docs.map((item) => ({ id: item.id, ...item.data() }) as Production);
+    const last = items.at(-1);
+    return {
+      items,
+      hasMore,
+      nextCursor: hasMore && last ? { businessDate: last.businessDate, id: last.id } : null,
+    };
   }
 
-  async create(productId: string, quantity: number, businessDate: string, notes?: string): Promise<string> {
+  async create(
+    productId: string,
+    quantity: number,
+    businessDate: string,
+    notes?: string,
+  ): Promise<ProductionCreateResult> {
     const userId = this.auth.user()?.uid;
     if (!userId) throw new Error('Sessão inválida.');
     if (!productId) throw new Error('Selecione o produto.');
@@ -74,17 +109,21 @@ export class ProductionRepository {
 
       transaction.set(counterRef, { value: sequence, updatedAt: serverTimestamp() }, { merge: true });
 
+      const stockChanges: ProductionCreateResult['stockChanges'] = [];
       for (let index = 0; index < consumptions.length; index++) {
         const consumption = consumptions[index];
         const snapshot = inputSnapshots[index];
         if (!consumption || !snapshot?.exists()) continue;
         const input = { id: snapshot.id, ...snapshot.data() } as InputItem;
+        const stock = input.stock - consumption.quantity;
 
         transaction.update(snapshot.ref, {
-          stock: input.stock - consumption.quantity,
+          stock,
+          stockStatus: inputStockStatus(stock, input.minimumStock, input.minimumStockConfigured !== false),
           updatedAt: serverTimestamp(),
           updatedBy: userId,
         });
+        stockChanges.push({ itemType: 'input', itemId: input.id, stock });
 
         const movementRef = doc(collection(this.firestore, 'stockMovements'));
         transaction.set(movementRef, {
@@ -103,11 +142,19 @@ export class ProductionRepository {
         } satisfies Omit<StockMovement, 'id'>);
       }
 
+      const productStock = product.stock + quantity;
       transaction.update(productRef, {
-        stock: product.stock + quantity,
+        stock: productStock,
+        stockStatus: productStockStatus(productStock, product.minimumStock),
         averageUnitCostCents: newAverage,
         updatedAt: serverTimestamp(),
         updatedBy: userId,
+      });
+      stockChanges.push({
+        itemType: 'product',
+        itemId: product.id,
+        stock: productStock,
+        averageUnitCostCents: newAverage,
       });
 
       const productMovementRef = doc(collection(this.firestore, 'stockMovements'));
@@ -126,7 +173,8 @@ export class ProductionRepository {
         updatedBy: userId,
       } satisfies Omit<StockMovement, 'id'>);
 
-      transaction.set(productionRef, {
+      const production: Production = {
+        id: productionRef.id,
         code: entityCode('PR', sequence, 5),
         businessDate,
         productId: product.id,
@@ -137,13 +185,27 @@ export class ProductionRepository {
         costPending: product.recipe.length === 0 || consumptions.some((item) => item.unitCostCents <= 0),
         consumptions,
         notes: notes?.trim() || undefined,
+      };
+
+      transaction.set(productionRef, {
+        code: production.code,
+        businessDate,
+        productId: product.id,
+        productName: product.displayName,
+        quantity,
+        unitCostCents,
+        totalCostCents,
+        costPending: production.costPending,
+        consumptions,
+        notes: production.notes,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         createdBy: userId,
         updatedBy: userId,
       } satisfies Omit<Production, 'id'>);
 
-      return productionRef.id;
+      this.revisions.touchTransaction(transaction, 'production', 'inventory');
+      return { production, stockChanges };
     });
   }
 }

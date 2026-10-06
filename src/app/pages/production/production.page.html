@@ -14,6 +14,9 @@
       </tbody>
     </table>
   </div>
+  @if (store.hasMore()) {
+    <div class="bf-actions"><button class="bf-button secondary" type="button" (click)="store.loadMore()">Carregar mais</button></div>
+  }
 
   <dialog bfDialog #productionDialog="bfDialog" class="bf-dialog">
     <div class="bf-dialog-header"><h2>Registrar produção</h2><button class="bf-icon-button" type="button" (click)="productionDialog.close()"><bf-icon name="close" /></button></div>

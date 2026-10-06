@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { CatalogImageEntityKind } from '../../domain/models/image.model';
 import { CatalogStore } from '../../features/catalog/catalog.store';
 import { formatCurrency } from '../../core/utils/money';
@@ -16,6 +16,7 @@ import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
 })
 export class CatalogPage {
   readonly store = inject(CatalogStore);
+  private readonly destroyRef = inject(DestroyRef);
   readonly currency = formatCurrency;
   readonly skeletonItems = [1, 2, 3, 4, 5, 6, 7, 8];
   readonly tab = signal<CatalogImageEntityKind>('products');
@@ -27,6 +28,7 @@ export class CatalogPage {
   readonly filteredAdditions = computed(() => this.filter(this.store.additions(), (item) => item.name + ' ' + item.category));
 
   constructor() {
+    this.destroyRef.onDestroy(this.store.activate());
     void this.store.load();
   }
 

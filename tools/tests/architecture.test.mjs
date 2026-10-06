@@ -106,3 +106,23 @@ test('native dialog lifecycle stays encapsulated by BfDialog', () => {
   }
   assert.deepEqual(violations, []);
 });
+
+test('read-sensitive UI never forces whole-store reloads', () => {
+  const violations = [];
+  for (const file of walk(appRoot)) {
+    const relativeFile = relative(appRoot, file).split(sep).join('/');
+    if (!/^(pages|features\/[^/]+\/components)\//.test(relativeFile)) continue;
+    const source = readFileSync(file, 'utf8');
+    if (source.includes('.load(true)')) violations.push(relativeFile);
+  }
+  assert.deepEqual(violations, [], `Forced full reloads from UI: ${violations.join(', ')}`);
+});
+
+test('dashboard stays decoupled from bulk feature stores', () => {
+  const file = resolve(appRoot, 'features/dashboard/dashboard.store.ts');
+  const imports = importsOf(file);
+  const forbidden = imports.filter((specifier) =>
+    /features\/(sales|finance|catalog)/.test(normalize(resolve(dirname(file), specifier)).split(sep).join('/'))
+  );
+  assert.deepEqual(forbidden, []);
+});

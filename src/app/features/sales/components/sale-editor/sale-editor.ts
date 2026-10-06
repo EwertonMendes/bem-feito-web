@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
 import { Addition, Kit, Product } from '../../../../domain/models/catalog.model';
 import { CatalogImageRef } from '../../../../domain/models/image.model';
@@ -35,6 +35,7 @@ export class SaleEditor {
   readonly catalog = inject(CatalogStore);
   readonly references = inject(CatalogReferenceStore);
   readonly settings = inject(SettingsStore);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly toast = inject(ToastService);
   private readonly dialog = viewChild.required<BfDialog>('saleDialog');
 
@@ -92,6 +93,11 @@ export class SaleEditor {
   readonly remainingCents = computed(() => Math.max(0, this.totalCents() - this.paymentCents()));
   readonly expectedTipCents = computed(() => Math.max(0, this.paymentCents() - this.totalCents()));
   readonly cartPhysicalItems = computed(() => this.cart().reduce((sum, line) => line.kind === 'product' ? sum + line.quantity : line.kind === 'kit' ? sum + line.componentProductIds.length : sum, 0));
+
+  constructor() {
+    this.destroyRef.onDestroy(this.references.activate());
+    this.destroyRef.onDestroy(this.settings.activate());
+  }
 
   async open(): Promise<void> {
     await Promise.all([this.catalog.load(), this.references.load(), this.settings.load()]);
@@ -221,9 +227,9 @@ export class SaleEditor {
         .map((item): PaymentDraft => ({ methodId: item.methodId, amountReceivedCents: toCents(item.amount) })),
     };
 
-    const ok = await this.store.create(draft);
-    if (!ok) return;
-    await this.catalog.load(true);
+    const result = await this.store.create(draft);
+    if (!result) return;
+    this.catalog.applyStockChanges(result.stockChanges);
     this.dialog().close();
   }
 

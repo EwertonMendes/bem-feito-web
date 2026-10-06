@@ -1,33 +1,126 @@
 import { inject, Injectable } from '@angular/core';
 import {
-  DocumentSnapshot, collection, doc, getDocs, limit, orderBy, query, runTransaction, serverTimestamp,
+  DocumentSnapshot,
+  collection,
+  doc,
+  documentId,
+  getAggregateFromServer,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  runTransaction,
+  serverTimestamp,
+  startAfter,
+  count,
+  sum,
+  where,
 } from 'firebase/firestore';
+import { summarizeSaleItems } from '../../domain/logic/sale-analytics';
+import { inputStockStatus, productStockStatus } from '../../domain/logic/stock-status';
 import { Addition, InputItem, Kit, Product } from '../../domain/models/catalog.model';
 import { StockMovement } from '../../domain/models/inventory.model';
 import { Payment, Sale, SaleDraft } from '../../domain/models/sales.model';
 import { resolveSaleDraft } from '../../domain/logic/sale-resolution';
 import { AuthService } from '../auth/auth.service';
+import { DataRevisionService } from '../firebase/data-revision.service';
 import { FIRESTORE } from '../firebase/firebase.providers';
 import { todayBusinessDate } from '../utils/date';
 import { entityCode } from '../utils/ids';
 import { allocatePayments, paymentStatus } from '../utils/sale-calculations';
+import {
+  SaleCancellationResult,
+  SaleCreateResult,
+  SalePaymentResult,
+  SalePaymentReversalResult,
+  StockChange,
+} from './mutation-results';
+import { BusinessDateCursor, PageResult } from './pagination';
 
 @Injectable({ providedIn: 'root' })
 export class SalesRepository {
   private readonly firestore = inject(FIRESTORE);
   private readonly auth = inject(AuthService);
+  private readonly revisions = inject(DataRevisionService);
 
-  async recent(max = 100): Promise<Sale[]> {
-    const snapshot = await getDocs(query(collection(this.firestore, 'sales'), orderBy('businessDate', 'desc'), limit(max)));
-    return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as Sale);
+  async page(pageSize = 40, cursor?: BusinessDateCursor | null): Promise<PageResult<Sale>> {
+    const constraints = [
+      orderBy('businessDate', 'desc'),
+      orderBy(documentId(), 'desc'),
+      ...(cursor ? [startAfter(cursor.businessDate, cursor.id)] : []),
+      limit(pageSize + 1),
+    ];
+    const snapshot = await getDocs(query(collection(this.firestore, 'sales'), ...constraints));
+    const hasMore = snapshot.docs.length > pageSize;
+    const docs = snapshot.docs.slice(0, pageSize);
+    const items = docs.map((item) => ({ id: item.id, ...item.data() }) as Sale);
+    const last = items.at(-1);
+    return {
+      items,
+      hasMore,
+      nextCursor: hasMore && last ? { businessDate: last.businessDate, id: last.id } : null,
+    };
   }
 
-  async payments(max = 200): Promise<Payment[]> {
-    const snapshot = await getDocs(query(collection(this.firestore, 'payments'), orderBy('businessDate', 'desc'), limit(max)));
-    return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as Payment);
+  async receivablePage(
+    pageSize = 40,
+    cursor?: BusinessDateCursor | null,
+  ): Promise<PageResult<Sale>> {
+    const constraints = [
+      where('status', '==', 'active'),
+      where('paymentStatus', 'in', ['pending', 'partial']),
+      orderBy('businessDate', 'desc'),
+      orderBy(documentId(), 'desc'),
+      ...(cursor ? [startAfter(cursor.businessDate, cursor.id)] : []),
+      limit(pageSize + 1),
+    ];
+    const snapshot = await getDocs(query(collection(this.firestore, 'sales'), ...constraints));
+    const hasMore = snapshot.docs.length > pageSize;
+    const docs = snapshot.docs.slice(0, pageSize);
+    const items = docs.map((item) => ({ id: item.id, ...item.data() }) as Sale);
+    const last = items.at(-1);
+    return {
+      items,
+      hasMore,
+      nextCursor: hasMore && last ? { businessDate: last.businessDate, id: last.id } : null,
+    };
   }
 
-  async create(draft: SaleDraft): Promise<string> {
+  async paymentPage(pageSize = 40, cursor?: BusinessDateCursor | null): Promise<PageResult<Payment>> {
+    const constraints = [
+      orderBy('businessDate', 'desc'),
+      orderBy(documentId(), 'desc'),
+      ...(cursor ? [startAfter(cursor.businessDate, cursor.id)] : []),
+      limit(pageSize + 1),
+    ];
+    const snapshot = await getDocs(query(collection(this.firestore, 'payments'), ...constraints));
+    const hasMore = snapshot.docs.length > pageSize;
+    const docs = snapshot.docs.slice(0, pageSize);
+    const items = docs.map((item) => ({ id: item.id, ...item.data() }) as Payment);
+    const last = items.at(-1);
+    return {
+      items,
+      hasMore,
+      nextCursor: hasMore && last ? { businessDate: last.businessDate, id: last.id } : null,
+    };
+  }
+
+  async paymentCount(): Promise<number> {
+    const snapshot = await getAggregateFromServer(collection(this.firestore, 'payments'), {
+      total: count(),
+    });
+    return Number(snapshot.data().total ?? 0);
+  }
+
+  async receivableTotalCents(): Promise<number> {
+    const snapshot = await getAggregateFromServer(
+      query(collection(this.firestore, 'sales'), where('status', '==', 'active')),
+      { total: sum('balanceCents') },
+    );
+    return Number(snapshot.data().total ?? 0);
+  }
+
+  async create(draft: SaleDraft): Promise<SaleCreateResult> {
     const userId = this.auth.user()?.uid;
     if (!userId) throw new Error('Sessão inválida.');
     if (!draft.lines.length) throw new Error('Adicione pelo menos um item à venda.');
@@ -35,9 +128,7 @@ export class SalesRepository {
 
     return runTransaction(this.firestore, async (transaction) => {
       const saleCounterRef = doc(this.firestore, 'counters', 'sale');
-      const paymentCounterRef = doc(this.firestore, 'counters', 'payment');
       const saleCounterSnapshot = await transaction.get(saleCounterRef);
-      const paymentCounterSnapshot = await transaction.get(paymentCounterRef);
 
       const productLineIds = draft.lines.filter((line) => line.kind === 'product').map((line) => line.sourceId);
       const kitIds = draft.lines.filter((line) => line.kind === 'kit').map((line) => line.sourceId);
@@ -97,27 +188,42 @@ export class SalesRepository {
         additions,
         inputs,
       });
+      const analytics = summarizeSaleItems(lines);
 
       const allocations = allocatePayments(totalCents, draft.payments);
+      const paymentCounterRef = doc(this.firestore, 'counters', 'payment');
+      const paymentCounterSnapshot = allocations.length
+        ? await transaction.get(paymentCounterRef)
+        : null;
       const receivedCents = allocations.reduce((sum, item) => sum + item.appliedCents, 0);
       const tipCents = allocations.reduce((sum, item) => sum + item.tipCents, 0);
       const balanceCents = Math.max(0, totalCents - receivedCents);
 
-      if (balanceCents > 0 && !draft.customerName?.trim()) throw new Error('Informe o cliente quando houver saldo a receber.');
+      if (balanceCents > 0 && !draft.customerName?.trim()) {
+        throw new Error('Informe o cliente quando houver saldo a receber.');
+      }
 
       const saleSequence = Number(saleCounterSnapshot.data()?.['value'] ?? 0) + 1;
-      let paymentSequence = Number(paymentCounterSnapshot.data()?.['value'] ?? 0);
+      let paymentSequence = Number(paymentCounterSnapshot?.data()?.['value'] ?? 0);
       const saleRef = doc(collection(this.firestore, 'sales'));
       const paymentIds: string[] = [];
+      const payments: Payment[] = [];
 
       transaction.set(saleCounterRef, { value: saleSequence, updatedAt: serverTimestamp() }, { merge: true });
-      if (allocations.length) transaction.set(paymentCounterRef, { value: paymentSequence + allocations.length, updatedAt: serverTimestamp() }, { merge: true });
+      if (allocations.length) {
+        transaction.set(
+          paymentCounterRef,
+          { value: paymentSequence + allocations.length, updatedAt: serverTimestamp() },
+          { merge: true },
+        );
+      }
 
       for (const allocation of allocations) {
         paymentSequence += 1;
         const paymentRef = doc(collection(this.firestore, 'payments'));
         paymentIds.push(paymentRef.id);
-        transaction.set(paymentRef, {
+        const payment: Payment = {
+          id: paymentRef.id,
           code: entityCode('P', paymentSequence, 6),
           saleId: saleRef.id,
           businessDate: draft.businessDate,
@@ -126,6 +232,17 @@ export class SalesRepository {
           appliedCents: allocation.appliedCents,
           tipCents: allocation.tipCents,
           status: 'active',
+        };
+        payments.push(payment);
+        transaction.set(paymentRef, {
+          code: payment.code,
+          saleId: payment.saleId,
+          businessDate: payment.businessDate,
+          methodId: payment.methodId,
+          amountReceivedCents: payment.amountReceivedCents,
+          appliedCents: payment.appliedCents,
+          tipCents: payment.tipCents,
+          status: payment.status,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           createdBy: userId,
@@ -133,16 +250,28 @@ export class SalesRepository {
         } satisfies Omit<Payment, 'id'>);
       }
 
+      const stockChanges: StockChange[] = [];
       for (const effect of stockEffects) {
         const targetRef = doc(this.firestore, effect.itemType === 'product' ? 'products' : 'inputs', effect.itemId);
         const entity = effect.itemType === 'product' ? products.get(effect.itemId) : inputs.get(effect.itemId);
         if (!entity) continue;
 
+        const stock = entity.stock + effect.quantityDelta;
+        const stockStatus = effect.itemType === 'product'
+          ? productStockStatus(stock, (entity as Product).minimumStock)
+          : inputStockStatus(
+              stock,
+              (entity as InputItem).minimumStock,
+              (entity as InputItem).minimumStockConfigured !== false,
+            );
+
         transaction.update(targetRef, {
-          stock: entity.stock + effect.quantityDelta,
+          stock,
+          stockStatus,
           updatedAt: serverTimestamp(),
           updatedBy: userId,
         });
+        stockChanges.push({ itemType: effect.itemType, itemId: effect.itemId, stock });
 
         const movementRef = doc(collection(this.firestore, 'stockMovements'));
         transaction.set(movementRef, {
@@ -161,7 +290,8 @@ export class SalesRepository {
         } satisfies Omit<StockMovement, 'id'>);
       }
 
-      transaction.set(saleRef, {
+      const sale: Sale = {
+        id: saleRef.id,
         code: entityCode('V', saleSequence, 5),
         businessDate: draft.businessDate,
         customerName: draft.customerName?.trim() || undefined,
@@ -178,53 +308,107 @@ export class SalesRepository {
         items: lines,
         paymentIds,
         stockEffects,
+        ...analytics,
+      };
+
+      transaction.set(saleRef, {
+        code: sale.code,
+        businessDate: sale.businessDate,
+        customerName: sale.customerName,
+        dueDate: sale.dueDate,
+        discountCents,
+        subtotalCents,
+        totalCents,
+        receivedCents,
+        tipCents,
+        balanceCents,
+        paymentStatus: sale.paymentStatus,
+        status: sale.status,
+        notes: sale.notes,
+        items: lines,
+        paymentIds,
+        stockEffects,
+        ...analytics,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         createdBy: userId,
         updatedBy: userId,
       } satisfies Omit<Sale, 'id'>);
 
-      return saleRef.id;
+      this.revisions.touchTransaction(
+        transaction,
+        'sales',
+        'inventory',
+        ...(allocations.length ? ['payments'] as const : []),
+      );
+      return { sale, payments, stockChanges };
     });
   }
 
-  async addPayment(saleId: string, businessDate: string, methodId: string, amountReceivedCents: number): Promise<void> {
+  async addPayment(
+    saleId: string,
+    businessDate: string,
+    methodId: string,
+    amountReceivedCents: number,
+  ): Promise<SalePaymentResult> {
     const userId = this.auth.user()?.uid;
     if (!userId) throw new Error('Sessão inválida.');
     if (!businessDate) throw new Error('Informe a data do recebimento.');
     if (!methodId) throw new Error('Selecione a forma de pagamento.');
-    if (!Number.isFinite(amountReceivedCents) || amountReceivedCents <= 0) throw new Error('Informe um valor válido.');
+    if (!Number.isFinite(amountReceivedCents) || amountReceivedCents <= 0) {
+      throw new Error('Informe um valor válido.');
+    }
 
-    await runTransaction(this.firestore, async (transaction) => {
+    return runTransaction(this.firestore, async (transaction) => {
       const saleRef = doc(this.firestore, 'sales', saleId);
       const counterRef = doc(this.firestore, 'counters', 'payment');
       const saleSnapshot = await transaction.get(saleRef);
       const counterSnapshot = await transaction.get(counterRef);
       if (!saleSnapshot.exists()) throw new Error('Venda não encontrada.');
 
-      const sale = { id: saleSnapshot.id, ...saleSnapshot.data() } as Sale;
-      if (sale.status !== 'active') throw new Error('Não é possível receber uma venda cancelada.');
-      if (sale.balanceCents <= 0) throw new Error('Esta venda já está totalmente paga.');
+      const current = { id: saleSnapshot.id, ...saleSnapshot.data() } as Sale;
+      if (current.status !== 'active') throw new Error('Não é possível receber uma venda cancelada.');
+      if (current.balanceCents <= 0) throw new Error('Esta venda já está totalmente paga.');
 
       const received = Math.round(amountReceivedCents);
-      const applied = Math.min(sale.balanceCents, received);
+      const applied = Math.min(current.balanceCents, received);
       const tip = Math.max(0, received - applied);
-      const newReceived = sale.receivedCents + applied;
-      const newTip = sale.tipCents + tip;
-      const newBalance = Math.max(0, sale.totalCents - newReceived);
+      const newReceived = current.receivedCents + applied;
+      const newTip = current.tipCents + tip;
+      const newBalance = Math.max(0, current.totalCents - newReceived);
       const sequence = Number(counterSnapshot.data()?.['value'] ?? 0) + 1;
       const paymentRef = doc(collection(this.firestore, 'payments'));
 
-      transaction.set(counterRef, { value: sequence, updatedAt: serverTimestamp() }, { merge: true });
-      transaction.set(paymentRef, {
+      const payment: Payment = {
+        id: paymentRef.id,
         code: entityCode('P', sequence, 6),
-        saleId: sale.id,
+        saleId: current.id,
         businessDate,
         methodId,
         amountReceivedCents: received,
         appliedCents: applied,
         tipCents: tip,
         status: 'active',
+      };
+      const sale: Sale = {
+        ...current,
+        receivedCents: newReceived,
+        tipCents: newTip,
+        balanceCents: newBalance,
+        paymentStatus: paymentStatus(current.totalCents, newReceived),
+        paymentIds: [...current.paymentIds, paymentRef.id],
+      };
+
+      transaction.set(counterRef, { value: sequence, updatedAt: serverTimestamp() }, { merge: true });
+      transaction.set(paymentRef, {
+        code: payment.code,
+        saleId: payment.saleId,
+        businessDate: payment.businessDate,
+        methodId: payment.methodId,
+        amountReceivedCents: payment.amountReceivedCents,
+        appliedCents: payment.appliedCents,
+        tipCents: payment.tipCents,
+        status: payment.status,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         createdBy: userId,
@@ -232,88 +416,118 @@ export class SalesRepository {
       } satisfies Omit<Payment, 'id'>);
 
       transaction.update(saleRef, {
-        receivedCents: newReceived,
-        tipCents: newTip,
-        balanceCents: newBalance,
-        paymentStatus: paymentStatus(sale.totalCents, newReceived),
-        paymentIds: [...sale.paymentIds, paymentRef.id],
+        receivedCents: sale.receivedCents,
+        tipCents: sale.tipCents,
+        balanceCents: sale.balanceCents,
+        paymentStatus: sale.paymentStatus,
+        paymentIds: sale.paymentIds,
         updatedAt: serverTimestamp(),
         updatedBy: userId,
       });
+
+      this.revisions.touchTransaction(transaction, 'sales', 'payments');
+      return { sale, payment, previousBalanceCents: current.balanceCents };
     });
   }
 
-  async reversePayment(paymentId: string): Promise<void> {
+  async reversePayment(paymentId: string): Promise<SalePaymentReversalResult> {
     const userId = this.auth.user()?.uid;
     if (!userId) throw new Error('Sessão inválida.');
 
-    await runTransaction(this.firestore, async (transaction) => {
+    return runTransaction(this.firestore, async (transaction) => {
       const paymentRef = doc(this.firestore, 'payments', paymentId);
       const paymentSnapshot = await transaction.get(paymentRef);
       if (!paymentSnapshot.exists()) throw new Error('Recebimento não encontrado.');
 
-      const payment = { id: paymentSnapshot.id, ...paymentSnapshot.data() } as Payment;
-      if (payment.status !== 'active') throw new Error('Este recebimento já foi estornado.');
+      const currentPayment = { id: paymentSnapshot.id, ...paymentSnapshot.data() } as Payment;
+      if (currentPayment.status !== 'active') throw new Error('Este recebimento já foi estornado.');
 
-      const saleRef = doc(this.firestore, 'sales', payment.saleId);
+      const saleRef = doc(this.firestore, 'sales', currentPayment.saleId);
       const saleSnapshot = await transaction.get(saleRef);
       if (!saleSnapshot.exists()) throw new Error('Venda vinculada não encontrada.');
 
-      const sale = { id: saleSnapshot.id, ...saleSnapshot.data() } as Sale;
-      if (sale.status !== 'active') throw new Error('A venda está cancelada.');
+      const currentSale = { id: saleSnapshot.id, ...saleSnapshot.data() } as Sale;
+      if (currentSale.status !== 'active') throw new Error('A venda está cancelada.');
 
-      const newReceived = Math.max(0, sale.receivedCents - payment.appliedCents);
-      const newTip = Math.max(0, sale.tipCents - payment.tipCents);
-      const newBalance = Math.max(0, sale.totalCents - newReceived);
+      const newReceived = Math.max(0, currentSale.receivedCents - currentPayment.appliedCents);
+      const newTip = Math.max(0, currentSale.tipCents - currentPayment.tipCents);
+      const newBalance = Math.max(0, currentSale.totalCents - newReceived);
+
+      const payment: Payment = { ...currentPayment, status: 'reversed' };
+      const sale: Sale = {
+        ...currentSale,
+        receivedCents: newReceived,
+        tipCents: newTip,
+        balanceCents: newBalance,
+        paymentStatus: paymentStatus(currentSale.totalCents, newReceived),
+      };
 
       transaction.update(paymentRef, {
         status: 'reversed',
         updatedAt: serverTimestamp(),
         updatedBy: userId,
       });
-
       transaction.update(saleRef, {
-        receivedCents: newReceived,
-        tipCents: newTip,
-        balanceCents: newBalance,
-        paymentStatus: paymentStatus(sale.totalCents, newReceived),
+        receivedCents: sale.receivedCents,
+        tipCents: sale.tipCents,
+        balanceCents: sale.balanceCents,
+        paymentStatus: sale.paymentStatus,
         updatedAt: serverTimestamp(),
         updatedBy: userId,
       });
+
+      this.revisions.touchTransaction(transaction, 'sales', 'payments');
+      return { sale, payment, previousBalanceCents: currentSale.balanceCents };
     });
   }
 
-  async cancel(saleId: string): Promise<void> {
+  async cancel(saleId: string): Promise<SaleCancellationResult> {
     const userId = this.auth.user()?.uid;
     if (!userId) throw new Error('Sessão inválida.');
 
-    await runTransaction(this.firestore, async (transaction) => {
+    return runTransaction(this.firestore, async (transaction) => {
       const saleRef = doc(this.firestore, 'sales', saleId);
       const saleSnapshot = await transaction.get(saleRef);
       if (!saleSnapshot.exists()) throw new Error('Venda não encontrada.');
 
-      const sale = { id: saleSnapshot.id, ...saleSnapshot.data() } as Sale;
-      if (sale.status === 'cancelled') return;
+      const currentSale = { id: saleSnapshot.id, ...saleSnapshot.data() } as Sale;
+      if (currentSale.status === 'cancelled') {
+        return { sale: currentSale, previousBalanceCents: currentSale.balanceCents, reversedPaymentIds: [], stockChanges: [] };
+      }
 
       const stockSnapshots = new Map<string, DocumentSnapshot>();
-      for (const effect of sale.stockEffects) {
+      for (const effect of currentSale.stockEffects) {
         const ref = doc(this.firestore, effect.itemType === 'product' ? 'products' : 'inputs', effect.itemId);
         stockSnapshots.set(`${effect.itemType}:${effect.itemId}`, await transaction.get(ref));
       }
 
       const paymentSnapshots = [];
-      for (const paymentId of sale.paymentIds) paymentSnapshots.push(await transaction.get(doc(this.firestore, 'payments', paymentId)));
+      for (const paymentId of currentSale.paymentIds) {
+        paymentSnapshots.push(await transaction.get(doc(this.firestore, 'payments', paymentId)));
+      }
 
-      for (const effect of sale.stockEffects) {
+      const stockChanges: StockChange[] = [];
+      for (const effect of currentSale.stockEffects) {
         const snapshot = stockSnapshots.get(`${effect.itemType}:${effect.itemId}`);
         if (!snapshot?.exists()) throw new Error('Não foi possível reverter o estoque da venda.');
 
-        const currentStock = Number(snapshot.data()['stock'] ?? 0);
+        const entity = { id: snapshot.id, ...snapshot.data() } as Product | InputItem;
+        const stock = Number(snapshot.data()['stock'] ?? 0) - effect.quantityDelta;
+        const stockStatus = effect.itemType === 'product'
+          ? productStockStatus(stock, (entity as Product).minimumStock)
+          : inputStockStatus(
+              stock,
+              (entity as InputItem).minimumStock,
+              (entity as InputItem).minimumStockConfigured !== false,
+            );
+
         transaction.update(snapshot.ref, {
-          stock: currentStock - effect.quantityDelta,
+          stock,
+          stockStatus,
           updatedAt: serverTimestamp(),
           updatedBy: userId,
         });
+        stockChanges.push({ itemType: effect.itemType, itemId: effect.itemId, stock });
 
         const movementRef = doc(collection(this.firestore, 'stockMovements'));
         transaction.set(movementRef, {
@@ -323,7 +537,7 @@ export class SalesRepository {
           unitCostCents: effect.unitCostCents,
           totalCostCents: Math.round(Math.abs(effect.quantityDelta) * effect.unitCostCents),
           sourceType: 'sale-cancellation',
-          sourceId: sale.id,
+          sourceId: currentSale.id,
           businessDate: todayBusinessDate(),
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -332,8 +546,10 @@ export class SalesRepository {
         } satisfies Omit<StockMovement, 'id'>);
       }
 
+      const reversedPaymentIds: string[] = [];
       for (const paymentSnapshot of paymentSnapshots) {
         if (!paymentSnapshot.exists() || paymentSnapshot.data()['status'] !== 'active') continue;
+        reversedPaymentIds.push(paymentSnapshot.id);
         transaction.update(paymentSnapshot.ref, {
           status: 'reversed',
           updatedAt: serverTimestamp(),
@@ -341,6 +557,13 @@ export class SalesRepository {
         });
       }
 
+      const sale: Sale = {
+        ...currentSale,
+        status: 'cancelled',
+        paymentStatus: 'cancelled',
+        balanceCents: 0,
+        cancelledBy: userId,
+      };
       transaction.update(saleRef, {
         status: 'cancelled',
         paymentStatus: 'cancelled',
@@ -350,6 +573,14 @@ export class SalesRepository {
         updatedAt: serverTimestamp(),
         updatedBy: userId,
       });
+
+      this.revisions.touchTransaction(
+        transaction,
+        'sales',
+        'inventory',
+        ...(reversedPaymentIds.length ? ['payments'] as const : []),
+      );
+      return { sale, previousBalanceCents: currentSale.balanceCents, reversedPaymentIds, stockChanges };
     });
   }
 }

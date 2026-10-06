@@ -34,6 +34,25 @@ const lower = (value) => text(value).toLocaleLowerCase('pt-BR');
 const omitEmpty = (object) => Object.fromEntries(Object.entries(object).filter(([, value]) => value !== '' && value !== undefined && value !== null));
 const sequence = (value) => Number(text(value).match(/(\d+)$/)?.[1] ?? 0);
 const byName = (items) => new Map(items.map((item) => [lower(item.name), item.id]));
+const productStockStatus = (stock, minimumStock) => stock < 0 ? 'negative' : stock <= minimumStock ? 'low' : 'ok';
+const inputStockStatus = (stock, minimumStock, configured) => !configured ? 'untracked' : stock < 0 ? 'negative' : stock <= minimumStock ? 'low' : 'ok';
+const saleAnalytics = (items) => {
+  let cogsCents = 0;
+  let itemsSold = 0;
+  let missingCostItems = 0;
+  for (const item of items) {
+    cogsCents += item.totalCostCents;
+    if (item.kind === 'product') {
+      itemsSold += item.quantity;
+      if (item.totalCostCents <= 0) missingCostItems++;
+    } else if (item.kind === 'kit') {
+      const components = item.components ?? [];
+      itemsSold += components.reduce((sum, component) => sum + component.quantity, 0);
+      missingCostItems += components.filter((component) => component.unitCostCents <= 0).length;
+    }
+  }
+  return { analyticsVersion: 1, cogsCents, itemsSold, missingCostItems };
+};
 
 const cadastros = rows('Cadastros');
 const typeRows = (type) => cadastros.filter((row) => text(row.Tipo) === type);
@@ -92,17 +111,23 @@ const formatPrices = rows('Preços de Formato').map((row) => ({
   active: active(row.Ativo),
 }));
 
-const inputs = rows('Insumos').map((row) => ({
-  id: text(row.Insumo_ID),
-  code: text(row.Insumo_ID),
-  active: active(row.Ativo),
-  name: text(row.Insumo),
-  unitId: unitIds.get(lower(row['Unidade Base'])) ?? '',
-  stock: number(row['Estoque Atual']),
-  minimumStock: number(row['Estoque Mínimo']),
-  minimumStockConfigured: row['Estoque Mínimo'] !== '' && row['Estoque Mínimo'] !== null && row['Estoque Mínimo'] !== undefined,
-  averageUnitCostCents: cents(row['Custo Médio Unit.']),
-}));
+const inputs = rows('Insumos').map((row) => {
+  const stock = number(row['Estoque Atual']);
+  const minimumStock = number(row['Estoque Mínimo']);
+  const minimumStockConfigured = row['Estoque Mínimo'] !== '' && row['Estoque Mínimo'] !== null && row['Estoque Mínimo'] !== undefined;
+  return {
+    id: text(row.Insumo_ID),
+    code: text(row.Insumo_ID),
+    active: active(row.Ativo),
+    name: text(row.Insumo),
+    unitId: unitIds.get(lower(row['Unidade Base'])) ?? '',
+    stock,
+    minimumStock,
+    minimumStockConfigured,
+    stockStatus: inputStockStatus(stock, minimumStock, minimumStockConfigured),
+    averageUnitCostCents: cents(row['Custo Médio Unit.']),
+  };
+});
 const inputById = new Map(inputs.map((item) => [item.id, item]));
 
 const recipeByProduct = new Map();
@@ -120,21 +145,26 @@ for (const row of rows('Receitas')) {
   recipeByProduct.set(productId, list);
 }
 
-const products = rows('Produtos').map((row) => ({
-  id: text(row.Produto_ID),
-  code: text(row.Produto_ID),
-  active: active(row.Ativo),
-  collectionId: collectionIds.get(lower(row.Coleção)) ?? '',
-  fragranceId: fragranceId(row.Fragrância, row.Coleção),
-  formatId: formatIds.get(lower(row.Formato)) ?? '',
-  displayName: text(row['Nome de Exibição']),
-  salePriceCents: cents(row['Preço de Venda']),
-  additionalCostCents: cents(row['Custo Adicional Unit.']),
-  averageUnitCostCents: cents(row['Custo Unitário']),
-  stock: number(row['Estoque Atual']),
-  minimumStock: number(row['Estoque Mínimo']),
-  recipe: recipeByProduct.get(text(row.Produto_ID)) ?? [],
-}));
+const products = rows('Produtos').map((row) => {
+  const stock = number(row['Estoque Atual']);
+  const minimumStock = number(row['Estoque Mínimo']);
+  return {
+    id: text(row.Produto_ID),
+    code: text(row.Produto_ID),
+    active: active(row.Ativo),
+    collectionId: collectionIds.get(lower(row.Coleção)) ?? '',
+    fragranceId: fragranceId(row.Fragrância, row.Coleção),
+    formatId: formatIds.get(lower(row.Formato)) ?? '',
+    displayName: text(row['Nome de Exibição']),
+    salePriceCents: cents(row['Preço de Venda']),
+    additionalCostCents: cents(row['Custo Adicional Unit.']),
+    averageUnitCostCents: cents(row['Custo Unitário']),
+    stock,
+    minimumStock,
+    stockStatus: productStockStatus(stock, minimumStock),
+    recipe: recipeByProduct.get(text(row.Produto_ID)) ?? [],
+  };
+});
 const productById = new Map(products.map((item) => [item.id, item]));
 
 const kitComponents = new Map();
@@ -414,6 +444,7 @@ for (const row of rows('Vendas')) {
     items: saleLines,
     paymentIds: salePayments.map((payment) => payment.id),
     stockEffects: [...stockEffects.values()],
+    ...saleAnalytics(saleLines),
   }));
 }
 

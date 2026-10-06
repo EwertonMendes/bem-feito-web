@@ -29,6 +29,7 @@ test('Migration excludes template slots, converts Sheets dates, preserves source
     assert.equal(data.productions.length, 0);
     assert.equal(data.inputs[0].minimumStockConfigured, false);
     assert.equal(data.inputs[0].stock, 2);
+    assert.equal(data.inputs[0].stockStatus, 'untracked');
     assert.equal(data.expenses[0].businessDate, '2026-10-01');
     assert.equal(data.expenses[0].amountCents, 125);
     assert.equal(run('validate-export.mjs', dataPath).status, 0);

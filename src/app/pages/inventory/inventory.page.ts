@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { FormField, form, required } from '@angular/forms/signals';
 import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
@@ -29,6 +29,7 @@ export class InventoryPage {
   readonly references = inject(CatalogReferenceStore);
   readonly store = inject(InventoryStore);
   private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly adjustmentDialog = viewChild.required<BfDialog>('adjustmentDialog');
   private readonly historyDialog = viewChild.required<BfDialog>('historyDialog');
 
@@ -57,6 +58,9 @@ export class InventoryPage {
   });
 
   constructor() {
+    this.destroyRef.onDestroy(() => this.store.deactivateHistory());
+    this.destroyRef.onDestroy(this.catalog.activate());
+    this.destroyRef.onDestroy(this.references.activate());
     void Promise.all([this.catalog.load(), this.references.load()]).then(() => {
       if (this.route.snapshot.queryParamMap.get('ajuste') === '1') this.openAdjustmentFromFirst();
     });
@@ -72,16 +76,25 @@ export class InventoryPage {
   async openHistory(type: 'product' | 'input', id: string): Promise<void> {
     this.selectedType.set(type);
     this.selectedId.set(id);
-    await this.store.loadMovements(id);
+    this.store.activateHistory();
+    const loaded = await this.store.loadMovements(id);
+    if (!loaded) {
+      this.store.deactivateHistory();
+      return;
+    }
     this.historyDialog().open();
+  }
+
+  closeHistory(): void {
+    this.store.deactivateHistory();
   }
 
   async saveAdjustment(): Promise<void> {
     if (this.adjustmentForm().invalid() || !this.model().quantity) return;
     const value = this.model();
-    const ok = await this.store.adjust(this.selectedType(), this.selectedId(), value.quantity, value.reason, value.businessDate);
-    if (ok) {
-      await this.catalog.load(true);
+    const result = await this.store.adjust(this.selectedType(), this.selectedId(), value.quantity, value.reason, value.businessDate);
+    if (result) {
+      this.catalog.applyStockChanges([result.stockChange]);
       this.adjustmentDialog().close();
     }
   }

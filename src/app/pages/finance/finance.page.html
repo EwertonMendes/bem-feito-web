@@ -7,21 +7,24 @@
   <div class="bf-grid three summary">
     <article><span>Saldo a receber</span><strong>{{currency(totalReceivable())}}</strong></article>
     <article><span>Saídas registradas</span><strong>{{currency(totalOut())}}</strong></article>
-    <article><span>Recebimentos</span><strong>{{store.payments().length}}</strong></article>
+    <article><span>Recebimentos</span><strong>{{store.paymentCount()}}</strong></article>
   </div>
 
-  <div class="bf-segments tabs"><button [class.active]="tab()==='expenses'" (click)="tab.set('expenses')">Saídas</button><button [class.active]="tab()==='receivables'" (click)="tab.set('receivables')">A receber</button><button [class.active]="tab()==='payments'" (click)="tab.set('payments')">Recebimentos</button></div>
+  <div class="bf-segments tabs"><button [class.active]="tab()==='expenses'" (click)="selectTab('expenses')">Saídas</button><button [class.active]="tab()==='receivables'" (click)="selectTab('receivables')">A receber</button><button [class.active]="tab()==='payments'" (click)="selectTab('payments')">Recebimentos</button></div>
 
   @if(tab()==='expenses'){
     <div class="bf-table-wrap"><table class="bf-table"><thead><tr><th>ID</th><th>Data</th><th>Tipo</th><th>Categoria / Insumo</th><th>Valor</th><th>Forma</th></tr></thead><tbody>
       @for(item of store.expenses();track item.id){<tr><td><strong>{{item.code}}</strong></td><td>{{date(item.businessDate)}}</td><td>{{item.kind}}</td><td>{{item.kind==='input-purchase'?inputName(item.inputId):categoryName(item.categoryId)}}</td><td>{{currency(item.amountCents)}}</td><td>{{paymentName(item.paymentMethodId || '')}}</td></tr>} @empty {<tr><td colspan="6"><bf-empty-state title="Nenhuma saída registrada" description="Compras de insumos e despesas aparecem aqui." /></td></tr>}
     </tbody></table></div>
+    @if (store.expenseHasMore()) { <div class="bf-actions"><button class="bf-button secondary" type="button" (click)="store.loadMoreExpenses()">Carregar mais</button></div> }
   } @else if(tab()==='receivables'){
     <div class="receivable-list">@for(item of sales.openSales();track item.id){<article><div><strong>{{item.customerName || 'Cliente não informado'}}</strong><span>{{item.code}} · {{date(item.businessDate)}}</span></div><div class="amount"><strong>{{currency(item.balanceCents)}}</strong><span>{{item.dueDate ? 'vence ' + date(item.dueDate) : 'sem vencimento'}}</span></div><button class="bf-button" type="button" (click)="openReceipt(item.id)">Receber</button></article>} @empty {<bf-empty-state title="Nada a receber" description="Todas as vendas estão quitadas." />}</div>
+    @if (sales.receivableHasMore()) { <div class="bf-actions"><button class="bf-button secondary" type="button" (click)="sales.loadMoreReceivables()">Carregar mais</button></div> }
   } @else {
     <div class="bf-table-wrap"><table class="bf-table"><thead><tr><th>ID</th><th>Data</th><th>Venda</th><th>Forma</th><th>Aplicado</th><th>Gorjeta</th><th>Status</th><th></th></tr></thead><tbody>
       @for(item of store.payments();track item.id){<tr><td><strong>{{item.code}}</strong></td><td>{{date(item.businessDate)}}</td><td>{{item.saleId.slice(0,8)}}</td><td>{{paymentName(item.methodId)}}</td><td>{{currency(item.appliedCents)}}</td><td>{{currency(item.tipCents)}}</td><td><span class="bf-badge" [class.muted]="item.status!=='active'">{{item.status==='active'?'Ativo':'Estornado'}}</span></td><td>@if(item.status==='active'){<button class="bf-button secondary" type="button" (click)="reversePayment(item.id)">Estornar</button>}</td></tr>} @empty {<tr><td colspan="8"><bf-empty-state title="Nenhum recebimento" description="Pagamentos de vendas aparecem aqui." /></td></tr>}
     </tbody></table></div>
+    @if (store.paymentHasMore()) { <div class="bf-actions"><button class="bf-button secondary" type="button" (click)="store.loadMorePayments()">Carregar mais</button></div> }
   }
 
   <dialog bfDialog #expenseDialog="bfDialog" class="bf-dialog">

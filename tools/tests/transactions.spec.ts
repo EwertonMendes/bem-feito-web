@@ -3,8 +3,9 @@ import { Injector, runInInjectionContext } from '@angular/core';
 import { initializeTestEnvironment, RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { readFile } from 'node:fs/promises';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { collection, doc, Firestore, getDoc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, doc, Firestore, getDoc, getDocs, serverTimestamp, setDoc, Transaction } from 'firebase/firestore';
 import { AuthService } from '../../src/app/core/auth/auth.service';
+import { DataRevisionService } from '../../src/app/core/firebase/data-revision.service';
 import { FIRESTORE } from '../../src/app/core/firebase/firebase.providers';
 import { SalesRepository } from '../../src/app/core/repositories/sales.repository';
 import { ProductionRepository } from '../../src/app/core/repositories/production.repository';
@@ -43,7 +44,24 @@ beforeEach(async () => {
     ]);
   });
   db = env.authenticatedContext('operator').firestore({ ignoreUndefinedProperties: true });
-  injector = Injector.create({ providers: [{ provide: FIRESTORE, useValue: db }, { provide: AuthService, useValue: { user: () => ({ uid: 'operator' }) } }] });
+  injector = Injector.create({
+    providers: [
+      { provide: FIRESTORE, useValue: db },
+      { provide: AuthService, useValue: { user: () => ({ uid: 'operator' }) } },
+      {
+        provide: DataRevisionService,
+        useValue: {
+          touchTransaction: (transaction: Transaction, ...domains: string[]) => {
+            const patch = Object.fromEntries(domains.map((domain) => [
+              domain,
+              { source: 'transaction-test', at: serverTimestamp() },
+            ]));
+            transaction.set(doc(db, 'system', 'data-revisions'), patch, { merge: true });
+          },
+        },
+      },
+    ],
+  });
   sales = runInInjectionContext(injector, () => new SalesRepository());
   production = runInInjectionContext(injector, () => new ProductionRepository());
   finance = runInInjectionContext(injector, () => new FinanceRepository());
@@ -53,11 +71,14 @@ afterAll(async () => { injector?.destroy(); await env?.cleanup(); });
 
 describe('Actual repositories against restrictive emulator rules', () => {
   it('creates a sale with product, kit, addition, multiple methods and tip; cancellation restores stocks once', async () => {
-    const id = await sales.create({ ...draft(), lines: [
+    const created = await sales.create({ ...draft(), lines: [
       { kind: 'product', sourceId: 'p', quantity: 1 },
       { kind: 'kit', sourceId: 'k', quantity: 1, componentProductIds: ['p', 'p'] },
       { kind: 'addition', sourceId: 'a', quantity: 2 },
     ], payments: [{ methodId: 'cash', amountReceivedCents: 1000 }, { methodId: 'pix', amountReceivedCents: 2300 }] });
+    const id = created.sale.id;
+    expect(created.sale).toMatchObject({ cogsCents: 500, itemsSold: 3, missingCostItems: 0, analyticsVersion: 1 });
+    expect(created.stockChanges).toHaveLength(2);
     expect(await data('products', 'p')).toMatchObject({ stock: 7 });
     expect(await data('inputs', 'i')).toMatchObject({ stock: 18 });
     expect(await data('sales', id)).toMatchObject({ totalCents: 3200, receivedCents: 3200, tipCents: 100, balanceCents: 0, paymentStatus: 'paid' });
@@ -70,7 +91,7 @@ describe('Actual repositories against restrictive emulator rules', () => {
     expect(await data('products', 'p')).toMatchObject({ stock: 10 });
   });
   it('receives a pending sale, reverses the receipt and accepts partial payment', async () => {
-    const id = await sales.create(draft());
+    const id = (await sales.create(draft())).sale.id;
     expect(await data('sales', id)).toMatchObject({ paymentStatus: 'pending', balanceCents: 1000 });
     await sales.addPayment(id, day, 'pix', 1200);
     const sale = (await data('sales', id))!;
@@ -79,9 +100,11 @@ describe('Actual repositories against restrictive emulator rules', () => {
     expect(await data('sales', id)).toMatchObject({ paymentStatus: 'pending', receivedCents: 0, tipCents: 0, balanceCents: 1000 });
     await sales.addPayment(id, day, 'cash', 400);
     expect(await data('sales', id)).toMatchObject({ paymentStatus: 'partial', balanceCents: 600 });
+    const receivables = await sales.receivablePage();
+    expect(receivables.items.map((item) => item.id)).toContain(id);
   });
   it('aggregates repeated recipe inputs and records costs and both stock movements', async () => {
-    const id = await production.create('p', 2, day);
+    const id = (await production.create('p', 2, day)).production.id;
     expect(await data('inputs', 'i')).toMatchObject({ stock: 10 });
     expect(await data('products', 'p')).toMatchObject({ stock: 12 });
     expect(await data('productions', id)).toMatchObject({ totalCostCents: 1000, unitCostCents: 500, consumptions: [{ inputId: 'i', quantity: 10 }] });
@@ -107,18 +130,21 @@ describe('Actual repositories against restrictive emulator rules', () => {
       await expect(action).rejects.toBeDefined();
       expect(await data('products', 'p')).toMatchObject({ stock: 10 });
       expect(await data('inputs', 'i')).toMatchObject({ stock: 20 });
-      for (const name of ['sales', 'payments', 'productions', 'expenses', 'stockAdjustments', 'stockMovements', 'counters']) expect(await count(name)).toBe(0);
+      for (const name of ['sales', 'payments', 'productions', 'expenses', 'stockAdjustments', 'stockMovements', 'counters']) {
+        expect(await count(name)).toBe(0);
+      }
+      expect(await data('system', 'data-revisions')).toBeUndefined();
     });
   }
   it('rolls back sale totals and counter when a receipt is rejected', async () => {
-    const id = await sales.create(draft());
+    const id = (await sales.create(draft())).sale.id;
     await expect(sales.addPayment(id, 'invalid', 'pix', 500)).rejects.toBeDefined();
     expect(await data('sales', id)).toMatchObject({ receivedCents: 0, balanceCents: 1000, paymentIds: [] });
     expect(await count('payments')).toBe(0);
     expect(await data('counters', 'payment')).toBeUndefined();
   });
   it('rolls back reversal and cancellation if a linked active payment is malformed', async () => {
-    const id = await sales.create({ ...draft(), payments: [{ methodId: 'pix', amountReceivedCents: 1000 }] });
+    const id = (await sales.create({ ...draft(), payments: [{ methodId: 'pix', amountReceivedCents: 1000 }] })).sale.id;
     const paymentId = (await data('sales', id))!['paymentIds'][0];
     await env.withSecurityRulesDisabled(async context => {
       const ref = doc(context.firestore(), 'payments', paymentId);

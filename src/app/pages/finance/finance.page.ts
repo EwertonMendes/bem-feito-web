@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { FormField, form, min, required } from '@angular/forms/signals';
 import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
@@ -47,6 +47,7 @@ export class FinancePage {
   readonly sales = inject(SalesStore);
   readonly settings = inject(SettingsStore);
   private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly dialog = viewChild.required<BfDialog>('expenseDialog');
   private readonly receiptDialog = viewChild.required<BfDialog>('receiptDialog');
 
@@ -70,8 +71,8 @@ export class FinancePage {
     required(p.kind);
     min(p.amount, 0.01);
   });
-  readonly totalReceivable = computed(() => this.sales.openSales().reduce((sum, sale) => sum + sale.balanceCents, 0));
-  readonly totalOut = computed(() => this.store.expenses().reduce((sum, item) => sum + item.amountCents, 0));
+  readonly totalReceivable = this.sales.receivableTotalCents;
+  readonly totalOut = this.store.totalOutCents;
   readonly receiptModel = signal<ReceiptFormModel>({ saleId: '', businessDate: todayBusinessDate(), methodId: '', amount: 0 });
   readonly receiptForm = form(this.receiptModel, (p) => {
     required(p.saleId);
@@ -82,9 +83,33 @@ export class FinancePage {
   readonly selectedReceivable = computed(() => this.sales.openSales().find((sale) => sale.id === this.receiptModel().saleId));
 
   constructor() {
-    void Promise.all([this.catalog.load(), this.references.load(), this.store.load(), this.sales.load(), this.settings.load()]).then(() => {
+    this.destroyRef.onDestroy(this.catalog.activate());
+    this.destroyRef.onDestroy(this.references.activate());
+    this.destroyRef.onDestroy(this.store.activate());
+    this.destroyRef.onDestroy(this.sales.activateReceivables());
+    this.destroyRef.onDestroy(this.settings.activate());
+    void Promise.all([
+      this.catalog.load(),
+      this.references.load(),
+      this.store.loadExpenses(),
+      this.store.loadSummary(),
+      this.sales.loadReceivableSummary(),
+      this.settings.load(),
+    ]).then(() => {
       if (this.route.snapshot.queryParamMap.get('novo') === '1') this.openExpense();
     });
+  }
+
+  async selectTab(tab: 'expenses' | 'receivables' | 'payments'): Promise<void> {
+    this.tab.set(tab);
+    if (tab === 'payments') await this.store.loadPayments();
+    if (tab === 'expenses') await this.store.loadExpenses();
+    if (tab === 'receivables') {
+      await Promise.all([
+        this.sales.loadReceivables(),
+        this.sales.loadReceivableSummary(),
+      ]);
+    }
   }
 
   openExpense(kind: ExpenseKind = 'operating-expense'): void {
@@ -118,17 +143,17 @@ export class FinancePage {
   async saveReceipt(): Promise<void> {
     if (this.receiptForm().invalid()) return;
     const value = this.receiptModel();
-    const ok = await this.sales.addPayment(value.saleId, value.businessDate, value.methodId, toCents(value.amount));
-    if (ok) {
-      await this.store.load();
+    const result = await this.sales.addPayment(value.saleId, value.businessDate, value.methodId, toCents(value.amount));
+    if (result) {
+      this.store.applyPayment(result.payment);
       this.receiptDialog().close();
     }
   }
 
   async reversePayment(paymentId: string): Promise<void> {
     if (!window.confirm('Estornar este recebimento? O saldo da venda será reaberto.')) return;
-    const ok = await this.sales.reversePayment(paymentId);
-    if (ok) await this.store.load();
+    const result = await this.sales.reversePayment(paymentId);
+    if (result) this.store.applyPaymentReversal(result.payment);
   }
 
   async save(): Promise<void> {
@@ -146,9 +171,9 @@ export class FinancePage {
       notes: value.notes.trim() || undefined,
       link: value.link.trim() || undefined,
     };
-    const ok = await this.store.createExpense(draft);
-    if (ok) {
-      await this.catalog.load(true);
+    const result = await this.store.createExpense(draft);
+    if (result) {
+      if (result.stockChange) this.catalog.applyStockChanges([result.stockChange]);
       this.dialog().close();
     }
   }

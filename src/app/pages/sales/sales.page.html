@@ -99,6 +99,9 @@
         </article>
       }
     </div>
+    @if (store.hasMore()) {
+      <div class="bf-actions"><button class="bf-button secondary" type="button" [disabled]="store.loadingMore()" (click)="store.loadMore()">{{ store.loadingMore() ? 'Carregando...' : 'Carregar mais' }}</button></div>
+    }
   } @else {
     <div class="empty-sales">
       <bf-empty-state title="Nenhuma venda encontrada" description="Use “Nova venda” para registrar a primeira." />

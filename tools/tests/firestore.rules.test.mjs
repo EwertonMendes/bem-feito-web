@@ -48,6 +48,11 @@ try {
   await deny(deleteDoc(doc(viewer, 'products', 'p1')));
   await pass(setDoc(doc(operator, 'products', 'p2'), { ...product, ...audit('operator') }));
   await pass(updateDoc(doc(operator, 'products', 'p2'), { stock: 9, updatedAt: serverTimestamp(), updatedBy: 'operator' }));
+  await pass(setDoc(doc(operator, 'products', 'status-ok'), { ...product, stockStatus: 'ok', ...audit('operator') }));
+  await deny(setDoc(doc(operator, 'products', 'status-wrong'), { ...product, stockStatus: 'low', ...audit('operator') }));
+  const untrackedInput = { name: 'Sem mínimo', code: 'IU', active: true, unitId: 'u', stock: 0, minimumStock: 0, minimumStockConfigured: false, stockStatus: 'untracked', averageUnitCostCents: 100 };
+  await pass(setDoc(doc(operator, 'inputs', 'status-untracked'), { ...untrackedInput, ...audit('operator') }));
+  await deny(setDoc(doc(operator, 'inputs', 'status-wrong'), { ...untrackedInput, stockStatus: 'low', ...audit('operator') }));
   for (const uid of ['operator', 'viewer']) {
     await deny(updateDoc(doc(dbs[uid], 'users', uid), { role: 'owner' }));
     await deny(updateDoc(doc(dbs[uid], 'users', uid), { active: false }));
@@ -88,6 +93,60 @@ try {
   await deny(deleteDoc(doc(owner, 'counters', 'sale')));
   for (const db of [owner, operator, viewer, anonymous]) await deny(setDoc(doc(db, 'migrationRuns', 'r'), { source: 'test' }));
   await deny(setDoc(doc(operator, 'unexpectedCollection', 'x'), { value: true }));
+
+  // Shared read-optimization metadata stays readable to active users but writable only by operators.
+  for (const db of [owner, operator, viewer]) {
+    await pass(getDoc(doc(db, 'system', 'data-revisions')));
+    await pass(getDoc(doc(db, 'system', 'read-optimization')));
+  }
+  await deny(getDoc(doc(anonymous, 'system', 'data-revisions')));
+  await deny(getDoc(doc(anonymous, 'system', 'read-optimization')));
+
+  await pass(setDoc(doc(operator, 'system', 'data-revisions'), {
+    catalog: { source: 'rules-test', at: serverTimestamp() },
+    references: { source: 'rules-test', at: serverTimestamp() },
+    sales: { source: 'rules-test', at: serverTimestamp() },
+  }));
+  await pass(updateDoc(doc(operator, 'system', 'data-revisions'), {
+    expenses: { source: 'rules-test', at: serverTimestamp() },
+    payments: { source: 'rules-test', at: serverTimestamp() },
+    finance: { source: 'rules-test', at: serverTimestamp() },
+  }));
+  await deny(setDoc(doc(viewer, 'system', 'data-revisions'), {
+    catalog: { source: 'viewer', at: serverTimestamp() },
+  }));
+  await deny(updateDoc(doc(operator, 'system', 'data-revisions'), {
+    catalog: { source: '', at: serverTimestamp() },
+  }));
+  await deny(updateDoc(doc(operator, 'system', 'data-revisions'), {
+    catalog: { source: 'stale', at: new Date(0) },
+  }));
+
+  await pass(setDoc(doc(operator, 'system', 'read-optimization'), {
+    version: 1,
+    updatedAt: serverTimestamp(),
+    updatedBy: 'operator',
+  }));
+  await pass(updateDoc(doc(operator, 'system', 'read-optimization'), {
+    version: 2,
+    updatedAt: serverTimestamp(),
+    updatedBy: 'operator',
+  }));
+  await deny(updateDoc(doc(operator, 'system', 'read-optimization'), {
+    version: 1,
+    updatedAt: serverTimestamp(),
+    updatedBy: 'operator',
+  }));
+  await deny(updateDoc(doc(viewer, 'system', 'read-optimization'), {
+    version: 3,
+    updatedAt: serverTimestamp(),
+    updatedBy: 'viewer',
+  }));
+  await deny(updateDoc(doc(operator, 'system', 'read-optimization'), {
+    version: 3,
+    updatedAt: serverTimestamp(),
+    updatedBy: 'owner',
+  }));
   // Exercise each collection schema with both legitimate and malformed writes.
   const named = { name: 'DEV fixture', active: true };
   const fixtures = {

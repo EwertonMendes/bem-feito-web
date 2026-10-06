@@ -1,23 +1,64 @@
 import { inject, Injectable } from '@angular/core';
-import { collection, doc, getDocs, limit, orderBy, query, runTransaction, serverTimestamp, where } from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  documentId,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  runTransaction,
+  serverTimestamp,
+  startAfter,
+  where,
+} from 'firebase/firestore';
+import { inputStockStatus, productStockStatus } from '../../domain/logic/stock-status';
+import { InputItem, Product } from '../../domain/models/catalog.model';
 import { StockAdjustment, StockMovement } from '../../domain/models/inventory.model';
 import { AuthService } from '../auth/auth.service';
+import { DataRevisionService } from '../firebase/data-revision.service';
 import { FIRESTORE } from '../firebase/firebase.providers';
 import { entityCode } from '../utils/ids';
+import { StockAdjustmentResult } from './mutation-results';
+import { BusinessDateCursor, PageResult } from './pagination';
 
 @Injectable({ providedIn: 'root' })
 export class InventoryRepository {
   private readonly firestore = inject(FIRESTORE);
   private readonly auth = inject(AuthService);
+  private readonly revisions = inject(DataRevisionService);
 
-  async movementsFor(itemId: string, max = 100): Promise<StockMovement[]> {
-    const snapshot = await getDocs(
-      query(collection(this.firestore, 'stockMovements'), where('itemId', '==', itemId), orderBy('businessDate', 'desc'), limit(max))
-    );
-    return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as StockMovement);
+  async movementPage(
+    itemId: string,
+    pageSize = 40,
+    cursor?: BusinessDateCursor | null,
+  ): Promise<PageResult<StockMovement>> {
+    const constraints = [
+      where('itemId', '==', itemId),
+      orderBy('businessDate', 'desc'),
+      orderBy(documentId(), 'desc'),
+      ...(cursor ? [startAfter(cursor.businessDate, cursor.id)] : []),
+      limit(pageSize + 1),
+    ];
+    const snapshot = await getDocs(query(collection(this.firestore, 'stockMovements'), ...constraints));
+    const hasMore = snapshot.docs.length > pageSize;
+    const docs = snapshot.docs.slice(0, pageSize);
+    const items = docs.map((item) => ({ id: item.id, ...item.data() }) as StockMovement);
+    const last = items.at(-1);
+    return {
+      items,
+      hasMore,
+      nextCursor: hasMore && last ? { businessDate: last.businessDate, id: last.id } : null,
+    };
   }
 
-  async adjust(itemType: 'product' | 'input', itemId: string, quantityDelta: number, reason: string, businessDate: string): Promise<string> {
+  async adjust(
+    itemType: 'product' | 'input',
+    itemId: string,
+    quantityDelta: number,
+    reason: string,
+    businessDate: string,
+  ): Promise<StockAdjustmentResult> {
     const userId = this.auth.user()?.uid;
     if (!userId) throw new Error('Sessão inválida.');
     if (!quantityDelta) throw new Error('Informe uma quantidade diferente de zero.');
@@ -34,27 +75,49 @@ export class InventoryRepository {
       const adjustmentRef = doc(collection(this.firestore, 'stockAdjustments'));
       const movementRef = doc(collection(this.firestore, 'stockMovements'));
       const currentStock = Number(itemSnapshot.data()['stock'] ?? 0);
+      const stock = currentStock + quantityDelta;
       const unitCostCents = Number(itemSnapshot.data()['averageUnitCostCents'] ?? 0);
+      const item = { id: itemSnapshot.id, ...itemSnapshot.data() } as Product | InputItem;
+      const stockStatus = itemType === 'product'
+        ? productStockStatus(stock, (item as Product).minimumStock)
+        : inputStockStatus(
+            stock,
+            (item as InputItem).minimumStock,
+            (item as InputItem).minimumStockConfigured !== false,
+          );
 
       transaction.set(counterRef, { value: sequence, updatedAt: serverTimestamp() }, { merge: true });
       transaction.update(itemRef, {
-        stock: currentStock + quantityDelta,
+        stock,
+        stockStatus,
         updatedAt: serverTimestamp(),
         updatedBy: userId,
       });
-      transaction.set(adjustmentRef, {
+
+      const adjustment: StockAdjustment = {
+        id: adjustmentRef.id,
         code: entityCode('AJ', sequence, 5),
         businessDate,
         itemType,
         itemId,
         quantityDelta,
         reason: reason.trim(),
+      };
+
+      transaction.set(adjustmentRef, {
+        code: adjustment.code,
+        businessDate,
+        itemType,
+        itemId,
+        quantityDelta,
+        reason: adjustment.reason,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         createdBy: userId,
         updatedBy: userId,
       } satisfies Omit<StockAdjustment, 'id'>);
-      transaction.set(movementRef, {
+      const movement: StockMovement = {
+        id: movementRef.id,
         itemType,
         itemId,
         quantityDelta,
@@ -63,13 +126,29 @@ export class InventoryRepository {
         sourceType: 'adjustment',
         sourceId: adjustmentRef.id,
         businessDate,
+      };
+      transaction.set(movementRef, {
+        itemType: movement.itemType,
+        itemId: movement.itemId,
+        quantityDelta: movement.quantityDelta,
+        unitCostCents: movement.unitCostCents,
+        totalCostCents: movement.totalCostCents,
+        sourceType: movement.sourceType,
+        sourceId: movement.sourceId,
+        businessDate: movement.businessDate,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         createdBy: userId,
         updatedBy: userId,
       } satisfies Omit<StockMovement, 'id'>);
 
-      return adjustmentRef.id;
+      this.revisions.touchTransaction(transaction, 'inventory');
+
+      return {
+        adjustment,
+        movement,
+        stockChange: { itemType, itemId, stock },
+      };
     });
   }
 }

@@ -4,7 +4,7 @@ import { FormField, form, required } from '@angular/forms/signals';
 import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
 import { CatalogStore } from '../../features/catalog/catalog.store';
 import { InventoryStore } from '../../features/inventory/inventory.store';
-import { NegativeStockReconciliationService } from '../../core/migrations/negative-stock-reconciliation.service';
+import { NegativeStockReconciliationService } from '../../features/inventory/negative-stock-reconciliation.service';
 import { todayBusinessDate, formatBusinessDate } from '../../core/utils/date';
 import { formatCurrency } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';

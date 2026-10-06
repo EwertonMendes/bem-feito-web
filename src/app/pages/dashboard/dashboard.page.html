@@ -1,55 +1,177 @@
-<section class="bf-page">
-  <header class="bf-page-header">
+<section class="bf-page dashboard-page">
+  <header class="bf-page-header dashboard-header">
     <div>
       <h1>Dashboard</h1>
       <p>Uma visão rápida do que entrou, do que saiu e do que precisa de atenção.</p>
     </div>
-    <div class="period">
-      <label class="bf-field"><span>De</span><input class="bf-input" type="date" [value]="store.startDate()" (change)="store.startDate.set($any($event.target).value)" /></label>
-      <label class="bf-field"><span>Até</span><input class="bf-input" type="date" [value]="store.endDate()" (change)="store.endDate.set($any($event.target).value)" /></label>
+
+    <div class="period" aria-label="Período do dashboard">
+      <label class="bf-field">
+        <span>De</span>
+        <input class="bf-input" type="date" [value]="store.startDate()" (change)="store.startDate.set($any($event.target).value)" />
+      </label>
+      <label class="bf-field">
+        <span>Até</span>
+        <input class="bf-input" type="date" [value]="store.endDate()" (change)="store.endDate.set($any($event.target).value)" />
+      </label>
     </div>
   </header>
 
-  <div class="bf-grid four kpis">
-    <article class="bf-kpi"><span>Faturamento</span><strong>{{ currency(store.revenueCents()) }}</strong></article>
-    <article class="bf-kpi"><span>Recebido</span><strong>{{ currency(store.receivedCents()) }}</strong></article>
-    <article class="bf-kpi"><span>Saldo a receber</span><strong>{{ currency(store.receivableCents()) }}</strong></article>
-    <article class="bf-kpi result"><span>Resultado estimado</span><strong>{{ store.missingCostItems() ? 'Custos pendentes' : currency(store.resultCents()) }}</strong><small>{{ store.missingCostItems() ? store.missingCostItems() + ' itens sem custo conhecido' : 'Receita + gorjetas - CMV - despesas operacionais' }}</small></article>
+  <div class="metric-grid">
+    <article class="metric-card tint-sage">
+      <span class="metric-icon sage"><bf-icon name="chart" /></span>
+      <div class="metric-copy">
+        <span>Faturamento</span>
+        <strong>{{ currency(store.revenueCents()) }}</strong>
+      </div>
+    </article>
+
+    <article class="metric-card">
+      <span class="metric-icon sage"><bf-icon name="wallet" /></span>
+      <div class="metric-copy">
+        <span>Recebido</span>
+        <strong>{{ currency(store.receivedCents()) }}</strong>
+      </div>
+    </article>
+
+    <article class="metric-card">
+      <span class="metric-icon sand"><bf-icon name="clock" /></span>
+      <div class="metric-copy">
+        <span>Saldo a receber</span>
+        <strong>{{ currency(store.receivableCents()) }}</strong>
+      </div>
+    </article>
+
+    <a class="metric-card attention-card" routerLink="/catalogo">
+      <span class="metric-icon blush"><bf-icon name="alert" /></span>
+      <div class="metric-copy">
+        <span>Custos pendentes</span>
+        <strong>{{ store.missingCostItems() ? store.missingCostItems() + ' itens' : 'Tudo em dia' }}</strong>
+        <small>{{ store.missingCostItems() ? 'sem custo cadastrado' : 'Todos os custos conhecidos' }}</small>
+      </div>
+      <bf-icon class="metric-chevron" name="chevron-right" />
+    </a>
   </div>
 
-  <div class="bf-grid four compact-kpis">
-    <article class="mini"><span>Vendas</span><strong>{{ store.saleCount() }}</strong></article>
-    <article class="mini"><span>Ticket médio</span><strong>{{ currency(store.averageTicketCents()) }}</strong></article>
-    <article class="mini"><span>Itens vendidos</span><strong>{{ store.itemsSold() }}</strong></article>
-    <article class="mini"><span>Gorjetas</span><strong>{{ currency(store.tipsCents()) }}</strong></article>
+  <div class="compact-metrics">
+    <article class="compact-card">
+      <span class="compact-icon"><bf-icon name="sales" /></span>
+      <span>Vendas</span>
+      <strong>{{ store.saleCount() }}</strong>
+    </article>
+    <article class="compact-card">
+      <span class="compact-icon"><bf-icon name="tag" /></span>
+      <span>Ticket médio</span>
+      <strong>{{ currency(store.averageTicketCents()) }}</strong>
+    </article>
+    <article class="compact-card">
+      <span class="compact-icon"><bf-icon name="box" /></span>
+      <span>Itens vendidos</span>
+      <strong>{{ store.itemsSold() }}</strong>
+    </article>
+    <article class="compact-card">
+      <span class="compact-icon blush"><bf-icon name="heart" /></span>
+      <span>Gorjetas</span>
+      <strong>{{ currency(store.tipsCents()) }}</strong>
+    </article>
   </div>
 
   <div class="main-grid">
-    <section class="bf-panel chart-panel">
-      <div class="section-head"><div><h2>Faturamento por mês</h2><p>Ano de {{ store.endDate().slice(0, 4) }}</p></div><strong>{{ currency(store.revenueCents()) }}</strong></div>
-      <div class="bars">
-        @for (month of store.monthlyRevenue(); track month.month) {
-          <div class="bar-column" [title]="month.month + ': ' + currency(month.valueCents)">
-            <div class="bar-track"><div class="bar" [style.height.%]="(month.valueCents / maxMonth()) * 100"></div></div>
-            <span>{{ month.month }}</span>
+    <section class="dashboard-panel chart-panel">
+      <div class="section-head">
+        <div>
+          <h2>Faturamento por mês</h2>
+          <p>Ano de {{ store.endDate().slice(0, 4) }}</p>
+        </div>
+        <div class="period-total">
+          <span>Total no período</span>
+          <strong>{{ currency(store.revenueCents()) }}</strong>
+        </div>
+      </div>
+
+      <div class="chart">
+        <div class="chart-axis" aria-hidden="true">
+          @for (label of chartLabels(); track $index) {
+            <span>{{ chartAmount(label) }}</span>
+          }
+        </div>
+
+        <div class="chart-stage">
+          <div class="chart-guides" aria-hidden="true">
+            <i></i><i></i><i></i><i></i><i></i>
           </div>
-        }
+          <div class="bars">
+            @for (month of store.monthlyRevenue(); track month.month; let i = $index) {
+              <div
+                class="bar-column"
+                [class.has-value]="month.valueCents > 0"
+                [class.current]="i === currentMonthIndex()"
+                [title]="month.month + ': ' + currency(month.valueCents)"
+              >
+                <div class="bar-slot">
+                  <div class="bar" [style.height.%]="(month.valueCents / chartCeiling()) * 100"></div>
+                </div>
+                <span>{{ month.month }}</span>
+              </div>
+            }
+          </div>
+        </div>
       </div>
     </section>
 
-    <section class="bf-panel alerts">
-      <div class="section-head"><div><h2>Atenção</h2><p>Itens que merecem ação.</p></div></div>
-      <a routerLink="/estoque" class="alert-row"><span><strong>{{ store.negativeProducts().length }}</strong> produtos negativos</span><span>Corrigir →</span></a>
-      <a routerLink="/estoque" class="alert-row"><span><strong>{{ store.lowStockProducts().length }}</strong> produtos em estoque baixo</span><span>Ver →</span></a>
-      <a routerLink="/estoque" class="alert-row"><span><strong>{{ store.lowStockInputs().length }}</strong> insumos em estoque baixo</span><span>Ver →</span></a>
-      <a routerLink="/financeiro" class="alert-row"><span><strong>{{ store.overdueCount() }}</strong> contas vencidas</span><span>Cobrar →</span></a>
-      <a routerLink="/catalogo" class="alert-row"><span><strong>{{ store.missingCostItems() }}</strong> itens vendidos sem custo</span><span>Completar →</span></a>
+    <section class="dashboard-panel alerts">
+      <div class="section-head">
+        <div class="attention-title">
+          <span class="section-icon"><bf-icon name="leaf" /></span>
+          <div><h2>Atenção</h2><p>Itens que merecem ação.</p></div>
+        </div>
+      </div>
+
+      <a routerLink="/estoque" class="alert-row danger-row">
+        <span class="alert-icon"><bf-icon name="arrow-down-right" /></span>
+        <span class="alert-count">{{ store.negativeProducts().length }}</span>
+        <span class="alert-label">produtos negativos</span>
+        <span class="alert-action">Corrigir <bf-icon name="arrow-right" /></span>
+      </a>
+      <a routerLink="/estoque" class="alert-row">
+        <span class="alert-icon"><bf-icon name="box" /></span>
+        <span class="alert-count">{{ store.lowStockProducts().length }}</span>
+        <span class="alert-label">produtos em estoque baixo</span>
+        <span class="alert-action">Ver <bf-icon name="arrow-right" /></span>
+      </a>
+      <a routerLink="/estoque" class="alert-row">
+        <span class="alert-icon sage"><bf-icon name="leaf" /></span>
+        <span class="alert-count">{{ store.lowStockInputs().length }}</span>
+        <span class="alert-label">insumos em estoque baixo</span>
+        <span class="alert-action">Ver <bf-icon name="arrow-right" /></span>
+      </a>
+      <a routerLink="/financeiro" class="alert-row warning-row">
+        <span class="alert-icon"><bf-icon name="receipt" /></span>
+        <span class="alert-count">{{ store.overdueCount() }}</span>
+        <span class="alert-label">contas vencidas</span>
+        <span class="alert-action">Cobrar <bf-icon name="arrow-right" /></span>
+      </a>
+      <a routerLink="/catalogo" class="alert-row">
+        <span class="alert-icon"><bf-icon name="settings" /></span>
+        <span class="alert-count">{{ store.missingCostItems() }}</span>
+        <span class="alert-label">itens vendidos sem custo</span>
+        <span class="alert-action">Completar <bf-icon name="arrow-right" /></span>
+      </a>
     </section>
   </div>
 
-  <div class="bf-grid three financial-strip">
-    <article><span>CMV conhecido</span><strong>{{ currency(store.cogsCents()) }}</strong></article>
-    <article><span>Saídas de caixa</span><strong>{{ currency(store.cashOutCents()) }}</strong></article>
-    <article><span>Fluxo de caixa</span><strong [class.negative]="store.cashFlowCents() < 0">{{ currency(store.cashFlowCents()) }}</strong></article>
+  <div class="financial-strip">
+    <article class="financial-card tint-sage">
+      <span class="financial-icon"><bf-icon name="chart" /></span>
+      <div><span>CMV conhecido</span><strong>{{ currency(store.cogsCents()) }}</strong></div>
+    </article>
+    <article class="financial-card tint-sand">
+      <span class="financial-icon sand"><bf-icon name="wallet" /></span>
+      <div><span>Saídas de caixa</span><strong>{{ currency(store.cashOutCents()) }}</strong></div>
+    </article>
+    <article class="financial-card tint-sage">
+      <span class="financial-icon"><bf-icon name="chart" /></span>
+      <div><span>Fluxo de caixa</span><strong [class.negative]="store.cashFlowCents() < 0">{{ currency(store.cashFlowCents()) }}</strong></div>
+    </article>
   </div>
 </section>

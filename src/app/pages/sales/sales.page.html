@@ -1,20 +1,140 @@
-<section class="bf-page">
-  <header class="bf-page-header"><div><h1>Vendas</h1><p>Venda rápido, receba em uma ou mais formas e deixe o estoque cuidar do resto.</p></div><button class="bf-button" type="button" (click)="saleEditor.open()"><bf-icon name="plus" /> Nova venda</button></header>
+<section class="bf-page sales-page">
+  <header class="bf-page-header">
+    <div>
+      <h1>Vendas</h1>
+      <p>Venda rápido, receba em uma ou mais formas e deixe o estoque cuidar do resto.</p>
+    </div>
+    <button class="bf-button new-sale" type="button" (click)="saleEditor.open()">
+      <bf-icon name="plus" /> Nova venda
+    </button>
+  </header>
 
   <div class="filters">
-    <label class="search"><bf-icon name="search" /><input type="search" placeholder="Cliente ou ID" [value]="search()" (input)="search.set($any($event.target).value)" /></label>
-    <div class="bf-segments"><button [class.active]="statusFilter()==='all'" (click)="statusFilter.set('all')">Todas</button><button [class.active]="statusFilter()==='paid'" (click)="statusFilter.set('paid')">Pagas</button><button [class.active]="statusFilter()==='open'" (click)="statusFilter.set('open')">Em aberto</button><button [class.active]="statusFilter()==='cancelled'" (click)="statusFilter.set('cancelled')">Canceladas</button></div>
+    <label class="search">
+      <bf-icon name="search" />
+      <input type="search" placeholder="Cliente ou ID" [value]="search()" (input)="search.set($any($event.target).value)" />
+    </label>
+
+    <div class="bf-segments status-tabs" aria-label="Filtrar vendas por status">
+      <button [class.active]="statusFilter()==='all'" (click)="statusFilter.set('all')">Todas</button>
+      <button [class.active]="statusFilter()==='paid'" (click)="statusFilter.set('paid')">Pagas</button>
+      <button [class.active]="statusFilter()==='open'" (click)="statusFilter.set('open')">Em aberto</button>
+      <button [class.active]="statusFilter()==='cancelled'" (click)="statusFilter.set('cancelled')">Canceladas</button>
+    </div>
   </div>
 
-  <div class="bf-table-wrap"><table class="bf-table"><thead><tr><th>ID</th><th>Data</th><th>Cliente</th><th>Total</th><th>Recebido</th><th>Saldo</th><th>Status</th><th></th></tr></thead><tbody>
-    @for(sale of filteredSales();track sale.id){<tr><td><strong>{{sale.code}}</strong></td><td>{{date(sale.businessDate)}}</td><td>{{sale.customerName || '—'}}</td><td>{{currency(sale.totalCents)}}</td><td>{{currency(sale.receivedCents)}}</td><td>{{currency(sale.balanceCents)}}</td><td><span class="bf-badge" [class.warning]="sale.paymentStatus!=='paid' && sale.status!=='cancelled'" [class.muted]="sale.status==='cancelled'">{{paymentStatusLabel(sale)}}</span></td><td><button class="bf-button secondary" (click)="openDetails(sale)">Ver</button></td></tr>} @empty {<tr><td colspan="8"><bf-empty-state title="Nenhuma venda encontrada" description="Use “Nova venda” para registrar a primeira." /></td></tr>}
-  </tbody></table></div>
+  @if (filteredSales().length) {
+    <div class="sales-table-wrap">
+      <table class="bf-table sales-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Data</th>
+            <th>Cliente</th>
+            <th>Total</th>
+            <th>Recebido</th>
+            <th>Saldo</th>
+            <th>Status</th>
+            <th>Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (sale of filteredSales(); track sale.id) {
+            <tr>
+              <td><strong class="sale-code">{{ sale.code }}</strong></td>
+              <td>{{ date(sale.businessDate) }}</td>
+              <td>
+                <div class="client-cell">
+                  <span class="client-avatar" [attr.data-tone]="clientTone(sale)">{{ clientInitial(sale) }}</span>
+                  <span>{{ sale.customerName || 'Sem cliente' }}</span>
+                </div>
+              </td>
+              <td>{{ currency(sale.totalCents) }}</td>
+              <td>{{ currency(sale.receivedCents) }}</td>
+              <td>{{ currency(sale.balanceCents) }}</td>
+              <td>
+                <span
+                  class="bf-badge"
+                  [class.warning]="sale.paymentStatus!=='paid' && sale.status!=='cancelled'"
+                  [class.muted]="sale.status==='cancelled'"
+                >{{ paymentStatusLabel(sale) }}</span>
+              </td>
+              <td>
+                <button class="view-sale" type="button" (click)="openDetails(sale)">
+                  <bf-icon name="eye" /> <span>Ver</span>
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
 
-    <bf-sale-editor #saleEditor />
+    <div class="sales-mobile-list">
+      @for (sale of filteredSales(); track sale.id) {
+        <article class="sale-mobile-card">
+          <button type="button" class="mobile-card-button" (click)="openDetails(sale)">
+            <div class="mobile-sale-top">
+              <div class="client-cell">
+                <span class="client-avatar" [attr.data-tone]="clientTone(sale)">{{ clientInitial(sale) }}</span>
+                <div class="mobile-client-copy">
+                  <strong>{{ sale.customerName || 'Sem cliente' }}</strong>
+                  <span>{{ sale.code }} · {{ date(sale.businessDate) }}</span>
+                </div>
+              </div>
+              <span
+                class="bf-badge"
+                [class.warning]="sale.paymentStatus!=='paid' && sale.status!=='cancelled'"
+                [class.muted]="sale.status==='cancelled'"
+              >{{ paymentStatusLabel(sale) }}</span>
+            </div>
 
+            <div class="mobile-values">
+              <span><small>Total</small><strong>{{ currency(sale.totalCents) }}</strong></span>
+              <span><small>Recebido</small><strong>{{ currency(sale.receivedCents) }}</strong></span>
+              <span><small>Saldo</small><strong>{{ currency(sale.balanceCents) }}</strong></span>
+              <bf-icon name="chevron-right" />
+            </div>
+          </button>
+        </article>
+      }
+    </div>
+  } @else {
+    <div class="empty-sales">
+      <bf-empty-state title="Nenhuma venda encontrada" description="Use “Nova venda” para registrar a primeira." />
+    </div>
+  }
 
+  <bf-sale-editor #saleEditor />
 
   <dialog bfDialog #detailDialog="bfDialog" class="bf-dialog">
-    @if(selectedSale();as sale){<div class="bf-dialog-header"><div><h2>{{sale.code}}</h2><small>{{date(sale.businessDate)}} · {{sale.customerName || 'Sem cliente'}}</small></div><button class="bf-icon-button" (click)="detailDialog.close()"><bf-icon name="close" /></button></div><div class="bf-dialog-body"><div class="detail-total"><span>Total</span><strong>{{currency(sale.totalCents)}}</strong></div><div class="detail-grid"><div><span>Recebido</span><strong>{{currency(sale.receivedCents)}}</strong></div><div><span>Saldo</span><strong>{{currency(sale.balanceCents)}}</strong></div><div><span>Gorjeta</span><strong>{{currency(sale.tipCents)}}</strong></div></div><section class="detail-items"><h3>Itens</h3>@for(item of sale.items;track item.id){<div><span>{{item.quantity}}× {{item.name}}</span><strong>{{currency(item.totalCents)}}</strong></div>}</section>@if(sale.notes){<p class="notes">{{sale.notes}}</p>}</div><div class="bf-dialog-footer">@if(sale.status!=='cancelled'){<button class="bf-button danger" (click)="cancelSelected()">Cancelar venda</button>}<button class="bf-button secondary" (click)="detailDialog.close()">Fechar</button></div>}
+    @if (selectedSale(); as sale) {
+      <div class="bf-dialog-header">
+        <div>
+          <h2>{{ sale.code }}</h2>
+          <small>{{ date(sale.businessDate) }} · {{ sale.customerName || 'Sem cliente' }}</small>
+        </div>
+        <button class="bf-icon-button" type="button" aria-label="Fechar detalhes" (click)="detailDialog.close()"><bf-icon name="close" /></button>
+      </div>
+      <div class="bf-dialog-body">
+        <div class="detail-total"><span>Total</span><strong>{{ currency(sale.totalCents) }}</strong></div>
+        <div class="detail-grid">
+          <div><span>Recebido</span><strong>{{ currency(sale.receivedCents) }}</strong></div>
+          <div><span>Saldo</span><strong>{{ currency(sale.balanceCents) }}</strong></div>
+          <div><span>Gorjeta</span><strong>{{ currency(sale.tipCents) }}</strong></div>
+        </div>
+        <section class="detail-items">
+          <h3>Itens</h3>
+          @for (item of sale.items; track item.id) {
+            <div><span>{{ item.quantity }}× {{ item.name }}</span><strong>{{ currency(item.totalCents) }}</strong></div>
+          }
+        </section>
+        @if (sale.notes) { <p class="notes">{{ sale.notes }}</p> }
+      </div>
+      <div class="bf-dialog-footer">
+        @if (sale.status!=='cancelled') { <button class="bf-button danger" type="button" (click)="cancelSelected()">Cancelar venda</button> }
+        <button class="bf-button secondary" type="button" (click)="detailDialog.close()">Fechar</button>
+      </div>
+    }
   </dialog>
 </section>

@@ -2,10 +2,11 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { RouterLink } from '@angular/router';
 import { DashboardStore } from '../../features/dashboard/dashboard.store';
 import { formatCurrency } from '../../core/utils/money';
+import { BfIcon } from '../../shared/ui/icon/icon';
 
 @Component({
   selector: 'bf-dashboard-page',
-  imports: [RouterLink],
+  imports: [RouterLink, BfIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './dashboard.page.html',
   styleUrl: './dashboard.page.scss',
@@ -13,9 +14,25 @@ import { formatCurrency } from '../../core/utils/money';
 export class DashboardPage {
   readonly store = inject(DashboardStore);
   readonly currency = formatCurrency;
-  readonly maxMonth = computed(() => Math.max(1, ...this.store.monthlyRevenue().map((item) => item.valueCents)));
+
+  readonly chartCeiling = computed(() => {
+    const max = Math.max(0, ...this.store.monthlyRevenue().map((item) => item.valueCents));
+    if (!max) return 10000;
+    return Math.max(5000, Math.ceil((max * 1.15) / 5000) * 5000);
+  });
+
+  readonly chartLabels = computed(() => {
+    const max = this.chartCeiling();
+    return [max, Math.round(max * 0.75), Math.round(max * 0.5), Math.round(max * 0.25), 0];
+  });
+
+  readonly currentMonthIndex = computed(() => Math.max(0, Number(this.store.endDate().slice(5, 7)) - 1));
 
   constructor() {
     void this.store.load();
+  }
+
+  chartAmount(cents: number): string {
+    return 'R$ ' + Math.round(cents / 100).toLocaleString('pt-BR');
   }
 }

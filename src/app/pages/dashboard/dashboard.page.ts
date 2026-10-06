@@ -26,8 +26,6 @@ export class DashboardPage {
     return [max, Math.round(max * 0.75), Math.round(max * 0.5), Math.round(max * 0.25), 0];
   });
 
-  readonly currentMonthIndex = computed(() => Math.max(0, Number(this.store.endDate().slice(5, 7)) - 1));
-
   constructor() {
     void this.store.load();
   }

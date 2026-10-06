@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { FormField, form, min, required } from '@angular/forms/signals';
 import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
@@ -47,6 +47,7 @@ export class FinancePage {
   readonly sales = inject(SalesStore);
   readonly settings = inject(SettingsStore);
   private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly dialog = viewChild.required<BfDialog>('expenseDialog');
   private readonly receiptDialog = viewChild.required<BfDialog>('receiptDialog');
 
@@ -82,6 +83,11 @@ export class FinancePage {
   readonly selectedReceivable = computed(() => this.sales.openSales().find((sale) => sale.id === this.receiptModel().saleId));
 
   constructor() {
+    this.destroyRef.onDestroy(this.catalog.activate());
+    this.destroyRef.onDestroy(this.references.activate());
+    this.destroyRef.onDestroy(this.store.activate());
+    this.destroyRef.onDestroy(this.sales.activateReceivables());
+    this.destroyRef.onDestroy(this.settings.activate());
     void Promise.all([
       this.catalog.load(),
       this.references.load(),

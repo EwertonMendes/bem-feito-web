@@ -10,8 +10,8 @@ export function inputStockStatus(
   minimumStock: number,
   minimumStockConfigured = true,
 ): StockStatus {
-  if (stock < 0) return 'negative';
   if (!minimumStockConfigured) return 'untracked';
+  if (stock < 0) return 'negative';
   return stock <= minimumStock ? 'low' : 'ok';
 }
 

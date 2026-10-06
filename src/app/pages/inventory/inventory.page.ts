@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { FormField, form, required } from '@angular/forms/signals';
 import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
@@ -29,6 +29,7 @@ export class InventoryPage {
   readonly references = inject(CatalogReferenceStore);
   readonly store = inject(InventoryStore);
   private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly adjustmentDialog = viewChild.required<BfDialog>('adjustmentDialog');
   private readonly historyDialog = viewChild.required<BfDialog>('historyDialog');
 
@@ -57,6 +58,9 @@ export class InventoryPage {
   });
 
   constructor() {
+    this.destroyRef.onDestroy(this.catalog.activate());
+    this.destroyRef.onDestroy(this.references.activate());
+    this.destroyRef.onDestroy(this.store.activate());
     void Promise.all([this.catalog.load(), this.references.load()]).then(() => {
       if (this.route.snapshot.queryParamMap.get('ajuste') === '1') this.openAdjustmentFromFirst();
     });

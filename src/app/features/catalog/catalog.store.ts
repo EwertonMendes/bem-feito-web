@@ -21,6 +21,7 @@ export class CatalogStore {
   private readonly gate = new AsyncLoadGate();
   private readonly remoteRevision = this.revisions.revision('catalog');
   private lastRemoteRevision = 0;
+  private activeConsumers = 0;
 
   private readonly productsState = signal<Product[]>([]);
   private readonly inputsState = signal<InputItem[]>([]);
@@ -40,8 +41,8 @@ export class CatalogStore {
   readonly activeInputs = computed(() => this.inputsState().filter((item) => item.active));
   readonly activeKits = computed(() => this.kitsState().filter((item) => item.active));
   readonly activeAdditions = computed(() => this.additionsState().filter((item) => item.active));
-  readonly lowStockProducts = computed(() => this.productsState().filter((item) => item.active && stockStatusForProduct(item) === 'low'));
-  readonly lowStockInputs = computed(() => this.inputsState().filter((item) => item.active && stockStatusForInput(item) === 'low'));
+  readonly lowStockProducts = computed(() => this.productsState().filter((item) => item.active && ['negative', 'low'].includes(stockStatusForProduct(item))));
+  readonly lowStockInputs = computed(() => this.inputsState().filter((item) => item.active && ['negative', 'low'].includes(stockStatusForInput(item))));
   readonly negativeProducts = computed(() => this.productsState().filter((item) => item.stock < 0));
 
   constructor() {
@@ -49,8 +50,15 @@ export class CatalogStore {
       const revision = this.remoteRevision();
       if (revision === this.lastRemoteRevision) return;
       this.lastRemoteRevision = revision;
-      if (this.gate.isLoaded) void this.load(true);
+      const refresh = this.activeConsumers > 0 && this.gate.isLoaded;
+      this.gate.invalidate();
+      if (refresh) void this.load();
     });
+  }
+
+  activate(): () => void {
+    this.activeConsumers += 1;
+    return () => { this.activeConsumers = Math.max(0, this.activeConsumers - 1); };
   }
 
   load(force = false): Promise<void> {

@@ -40,6 +40,18 @@ describe('AsyncLoadGate', () => {
     expect(calls).toBe(2);
   });
 
+  it('invalidates cached data without starting a read by itself', async () => {
+    const gate = new AsyncLoadGate();
+    let calls = 0;
+    const loader = async () => { calls += 1; };
+
+    await gate.run(loader);
+    gate.invalidate();
+    expect(calls).toBe(1);
+    await gate.run(loader);
+    expect(calls).toBe(2);
+  });
+
   it('allows explicit refresh after the cached load', async () => {
     const gate = new AsyncLoadGate();
     let calls = 0;

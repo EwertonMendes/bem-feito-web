@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { FormField, form, min, required } from '@angular/forms/signals';
 import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
@@ -30,6 +30,7 @@ export class ProductionPage {
   readonly references = inject(CatalogReferenceStore);
   readonly store = inject(ProductionStore);
   private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly dialog = viewChild.required<BfDialog>('productionDialog');
 
   readonly currency = formatCurrency;
@@ -53,6 +54,9 @@ export class ProductionPage {
   });
 
   constructor() {
+    this.destroyRef.onDestroy(this.catalog.activate());
+    this.destroyRef.onDestroy(this.references.activate());
+    this.destroyRef.onDestroy(this.store.activate());
     void Promise.all([this.catalog.load(), this.references.load(), this.store.load()]).then(() => {
       if (this.route.snapshot.queryParamMap.get('novo') === '1') this.open();
     });

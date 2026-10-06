@@ -19,15 +19,18 @@ export interface SaleCreateResult {
 export interface SalePaymentResult {
   sale: Sale;
   payment: Payment;
+  previousBalanceCents: number;
 }
 
 export interface SalePaymentReversalResult {
   sale: Sale;
   payment: Payment;
+  previousBalanceCents: number;
 }
 
 export interface SaleCancellationResult {
   sale: Sale;
+  previousBalanceCents: number;
   reversedPaymentIds: string[];
   stockChanges: StockChange[];
 }

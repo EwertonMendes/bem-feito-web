@@ -10,7 +10,8 @@ describe('stock status', () => {
 
   it('keeps inputs without a configured minimum out of low-stock alerts', () => {
     expect(inputStockStatus(0, 0, false)).toBe('untracked');
-    expect(inputStockStatus(-1, 0, false)).toBe('negative');
+    expect(inputStockStatus(-1, 0, false)).toBe('untracked');
+    expect(inputStockStatus(-1, 0, true)).toBe('negative');
     expect(inputStockStatus(0, 0, true)).toBe('low');
   });
 });

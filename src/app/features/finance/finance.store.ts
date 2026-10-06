@@ -24,6 +24,7 @@ export class FinanceStore {
   private readonly summaryGate = new AsyncLoadGate();
   private readonly remoteRevision = this.revisions.revision('finance');
   private lastRemoteRevision = 0;
+  private activeConsumers = 0;
   private expenseCursor: BusinessDateCursor | null = null;
   private paymentCursor: BusinessDateCursor | null = null;
 
@@ -50,10 +51,21 @@ export class FinanceStore {
       const revision = this.remoteRevision();
       if (revision === this.lastRemoteRevision) return;
       this.lastRemoteRevision = revision;
-      if (this.expensesGate.isLoaded) void this.loadExpenses(true);
-      if (this.paymentsGate.isLoaded) void this.loadPayments(true);
-      if (this.summaryGate.isLoaded) void this.loadSummary(true);
+      const refreshExpenses = this.activeConsumers > 0 && this.expensesGate.isLoaded;
+      const refreshPayments = this.activeConsumers > 0 && this.paymentsGate.isLoaded;
+      const refreshSummary = this.activeConsumers > 0 && this.summaryGate.isLoaded;
+      this.expensesGate.invalidate();
+      this.paymentsGate.invalidate();
+      this.summaryGate.invalidate();
+      if (refreshExpenses) void this.loadExpenses();
+      if (refreshPayments) void this.loadPayments();
+      if (refreshSummary) void this.loadSummary();
     });
+  }
+
+  activate(): () => void {
+    this.activeConsumers += 1;
+    return () => { this.activeConsumers = Math.max(0, this.activeConsumers - 1); };
   }
 
   loadExpenses(force = false): Promise<void> {

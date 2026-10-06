@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal, viewChild } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
 import {
   CollectionDefinition,
@@ -39,6 +39,7 @@ export class SettingsPage {
   readonly references = inject(CatalogReferenceStore);
   readonly settings = inject(SettingsStore);
   private readonly toast = inject(ToastService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly errors = inject(ErrorService);
   private readonly dialog = viewChild.required<BfDialog>('editor');
 
@@ -56,6 +57,8 @@ export class SettingsPage {
   readonly expenseTypeForm = form(this.expenseTypeModel, (p) => { required(p.name); required(p.kind); });
 
   constructor() {
+    this.destroyRef.onDestroy(this.references.activate());
+    this.destroyRef.onDestroy(this.settings.activate());
     void Promise.all([this.references.load(), this.settings.load()]);
   }
 

@@ -26,6 +26,8 @@ export class SalesStore {
   private readonly receivablesGate = new AsyncLoadGate();
   private readonly remoteRevision = this.revisions.revision('sales');
   private lastRemoteRevision = 0;
+  private salesConsumers = 0;
+  private receivableConsumers = 0;
   private cursor: BusinessDateCursor | null = null;
   private receivableCursor: BalanceCursor | null = null;
 
@@ -50,9 +52,23 @@ export class SalesStore {
       const revision = this.remoteRevision();
       if (revision === this.lastRemoteRevision) return;
       this.lastRemoteRevision = revision;
-      if (this.salesGate.isLoaded) void this.load(true);
-      if (this.receivablesGate.isLoaded) void this.loadReceivables(true);
+      const refreshSales = this.salesConsumers > 0 && this.salesGate.isLoaded;
+      const refreshReceivables = this.receivableConsumers > 0 && this.receivablesGate.isLoaded;
+      this.salesGate.invalidate();
+      this.receivablesGate.invalidate();
+      if (refreshSales) void this.load();
+      if (refreshReceivables) void this.loadReceivables();
     });
+  }
+
+  activateSales(): () => void {
+    this.salesConsumers += 1;
+    return () => { this.salesConsumers = Math.max(0, this.salesConsumers - 1); };
+  }
+
+  activateReceivables(): () => void {
+    this.receivableConsumers += 1;
+    return () => { this.receivableConsumers = Math.max(0, this.receivableConsumers - 1); };
   }
 
   load(force = false): Promise<void> {
@@ -139,10 +155,9 @@ export class SalesStore {
     amountReceivedCents: number,
   ): Promise<SalePaymentResult | null> {
     try {
-      const previousBalance = this.balanceFor(saleId);
       const result = await this.repository.addPayment(saleId, businessDate, methodId, amountReceivedCents);
       this.patchSale(result.sale);
-      this.syncReceivable(result.sale, previousBalance);
+      this.syncReceivable(result.sale, result.previousBalanceCents);
       this.toast.success('Recebimento registrado com sucesso.');
       return result;
     } catch (error) {
@@ -154,9 +169,8 @@ export class SalesStore {
   async reversePayment(paymentId: string): Promise<SalePaymentReversalResult | null> {
     try {
       const result = await this.repository.reversePayment(paymentId);
-      const previousBalance = Math.max(0, result.sale.balanceCents - result.payment.appliedCents);
       this.patchSale(result.sale);
-      this.syncReceivable(result.sale, previousBalance);
+      this.syncReceivable(result.sale, result.previousBalanceCents);
       this.toast.success('Recebimento estornado.');
       return result;
     } catch (error) {
@@ -167,10 +181,9 @@ export class SalesStore {
 
   async cancel(sale: Sale): Promise<SaleCancellationResult | null> {
     try {
-      const previousBalance = sale.balanceCents;
       const result = await this.repository.cancel(sale.id);
       this.patchSale(result.sale);
-      this.syncReceivable(result.sale, previousBalance);
+      this.syncReceivable(result.sale, result.previousBalanceCents);
       this.toast.success(`${sale.code} cancelada e estoque revertido.`);
       return result;
     } catch (error) {
@@ -198,12 +211,6 @@ export class SalesStore {
       if (currentBalance <= 0) return without;
       return [sale, ...without].sort((a, b) => b.balanceCents - a.balanceCents);
     });
-  }
-
-  private balanceFor(saleId: string): number {
-    return this.receivablesState().find((item) => item.id === saleId)?.balanceCents
-      ?? this.salesState().find((item) => item.id === saleId)?.balanceCents
-      ?? 0;
   }
 
 }

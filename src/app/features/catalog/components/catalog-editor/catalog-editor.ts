@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
 import { Addition, AdditionComponent, InputItem, Kit, KitComponent, Product, RecipeComponent } from '../../../../domain/models/catalog.model';
 import { CatalogImageEntityKind, CatalogImageRef } from '../../../../domain/models/image.model';
@@ -26,6 +26,7 @@ interface AdditionFormModel { name: string; category: string; price: number; not
 export class CatalogEditor {
   readonly store = inject(CatalogStore);
   readonly references = inject(CatalogReferenceStore);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly images = inject(ImageService);
   private readonly toast = inject(ToastService);
   private readonly errors = inject(ErrorService);
@@ -74,6 +75,7 @@ export class CatalogEditor {
   readonly availableFragrances = computed(() => this.references.fragrances().filter((item) => item.active && (!this.productModel().collectionId || item.collectionId === this.productModel().collectionId)));
 
   constructor() {
+    this.destroyRef.onDestroy(this.references.activate());
     void Promise.all([this.store.load(), this.references.load()]);
   }
 

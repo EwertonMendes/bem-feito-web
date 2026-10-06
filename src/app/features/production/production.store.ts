@@ -19,6 +19,7 @@ export class ProductionStore {
   private readonly gate = new AsyncLoadGate();
   private readonly remoteRevision = this.revisions.revision('production');
   private lastRemoteRevision = 0;
+  private activeConsumers = 0;
   private cursor: BusinessDateCursor | null = null;
 
   private readonly itemsState = signal<Production[]>([]);
@@ -34,8 +35,15 @@ export class ProductionStore {
       const revision = this.remoteRevision();
       if (revision === this.lastRemoteRevision) return;
       this.lastRemoteRevision = revision;
-      if (this.gate.isLoaded) void this.load(true);
+      const refresh = this.activeConsumers > 0 && this.gate.isLoaded;
+      this.gate.invalidate();
+      if (refresh) void this.load();
     });
+  }
+
+  activate(): () => void {
+    this.activeConsumers += 1;
+    return () => { this.activeConsumers = Math.max(0, this.activeConsumers - 1); };
   }
 
   load(force = false): Promise<void> {

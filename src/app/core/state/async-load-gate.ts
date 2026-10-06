@@ -29,6 +29,11 @@ export class AsyncLoadGate {
     return this.inFlight;
   }
 
+  invalidate(): void {
+    this.loaded = false;
+    if (this.inFlight) this.refreshRequested = true;
+  }
+
   reset(): void {
     this.loaded = false;
     this.inFlight = null;

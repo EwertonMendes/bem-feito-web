@@ -17,6 +17,7 @@ export class InventoryStore {
   private readonly errors = inject(ErrorService);
   private readonly remoteRevision = this.revisions.revision('inventory');
   private lastRemoteRevision = 0;
+  private activeConsumers = 0;
   private currentItemId = '';
   private cursor: BusinessDateCursor | null = null;
 
@@ -31,8 +32,13 @@ export class InventoryStore {
       const revision = this.remoteRevision();
       if (revision === this.lastRemoteRevision) return;
       this.lastRemoteRevision = revision;
-      if (this.currentItemId) void this.loadMovements(this.currentItemId);
+      if (this.activeConsumers > 0 && this.currentItemId) void this.loadMovements(this.currentItemId);
     });
+  }
+
+  activate(): () => void {
+    this.activeConsumers += 1;
+    return () => { this.activeConsumers = Math.max(0, this.activeConsumers - 1); };
   }
 
   async loadMovements(itemId: string): Promise<void> {

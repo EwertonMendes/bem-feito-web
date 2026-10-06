@@ -35,7 +35,7 @@ const omitEmpty = (object) => Object.fromEntries(Object.entries(object).filter((
 const sequence = (value) => Number(text(value).match(/(\d+)$/)?.[1] ?? 0);
 const byName = (items) => new Map(items.map((item) => [lower(item.name), item.id]));
 const productStockStatus = (stock, minimumStock) => stock < 0 ? 'negative' : stock <= minimumStock ? 'low' : 'ok';
-const inputStockStatus = (stock, minimumStock, configured) => stock < 0 ? 'negative' : !configured ? 'untracked' : stock <= minimumStock ? 'low' : 'ok';
+const inputStockStatus = (stock, minimumStock, configured) => !configured ? 'untracked' : stock < 0 ? 'negative' : stock <= minimumStock ? 'low' : 'ok';
 const saleAnalytics = (items) => {
   let cogsCents = 0;
   let itemsSold = 0;

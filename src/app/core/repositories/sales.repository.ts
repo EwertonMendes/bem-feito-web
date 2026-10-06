@@ -421,7 +421,7 @@ export class SalesRepository {
       });
 
       this.revisions.touchTransaction(transaction, 'sales', 'finance');
-      return { sale, payment };
+      return { sale, payment, previousBalanceCents: current.balanceCents };
     });
   }
 
@@ -472,7 +472,7 @@ export class SalesRepository {
       });
 
       this.revisions.touchTransaction(transaction, 'sales', 'finance');
-      return { sale, payment };
+      return { sale, payment, previousBalanceCents: currentSale.balanceCents };
     });
   }
 
@@ -487,7 +487,7 @@ export class SalesRepository {
 
       const currentSale = { id: saleSnapshot.id, ...saleSnapshot.data() } as Sale;
       if (currentSale.status === 'cancelled') {
-        return { sale: currentSale, reversedPaymentIds: [], stockChanges: [] };
+        return { sale: currentSale, previousBalanceCents: currentSale.balanceCents, reversedPaymentIds: [], stockChanges: [] };
       }
 
       const stockSnapshots = new Map<string, DocumentSnapshot>();
@@ -570,7 +570,7 @@ export class SalesRepository {
       });
 
       this.revisions.touchTransaction(transaction, 'sales', 'finance', 'catalog', 'inventory');
-      return { sale, reversedPaymentIds, stockChanges };
+      return { sale, previousBalanceCents: currentSale.balanceCents, reversedPaymentIds, stockChanges };
     });
   }
 }

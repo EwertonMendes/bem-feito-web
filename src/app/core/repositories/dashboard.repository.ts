@@ -212,8 +212,8 @@ export class DashboardRepository {
         { value: count() },
       ),
       getAggregateFromServer(query(products, where('stockStatus', '==', 'negative')), { value: count() }),
-      getAggregateFromServer(query(products, where('active', '==', true), where('stockStatus', '==', 'low')), { value: count() }),
-      getAggregateFromServer(query(inputs, where('active', '==', true), where('stockStatus', '==', 'low')), { value: count() }),
+      getAggregateFromServer(query(products, where('active', '==', true), where('stockStatus', 'in', ['negative', 'low'])), { value: count() }),
+      getAggregateFromServer(query(inputs, where('active', '==', true), where('stockStatus', 'in', ['negative', 'low'])), { value: count() }),
     ]);
 
     const productsComplete = Number(productOptimized.data().value ?? 0) === Number(productTotal.data().value ?? 0);
@@ -239,12 +239,12 @@ export class DashboardRepository {
       const product = { id: snapshot.id, ...snapshot.data() } as Product;
       const status = stockStatusForProduct(product);
       if (status === 'negative') negative += 1;
-      if (product.active && status === 'low') lowProducts += 1;
+      if (product.active && ['negative', 'low'].includes(status)) lowProducts += 1;
     }
 
     for (const snapshot of inputSnapshot.docs) {
       const input = { id: snapshot.id, ...snapshot.data() } as InputItem;
-      if (input.active && stockStatusForInput(input) === 'low') lowInputs += 1;
+      if (input.active && ['negative', 'low'].includes(stockStatusForInput(input))) lowInputs += 1;
     }
 
     return {

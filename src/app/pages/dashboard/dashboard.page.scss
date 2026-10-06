@@ -322,7 +322,7 @@
 }
 
 .bar-column.has-value .bar {
-  background: color-mix(in srgb, var(--brand-botanical, var(--brand)) 68%, var(--brand-soft));
+  background: color-mix(in srgb, var(--brand) 58%, var(--brand-soft));
 }
 
 .bar-column.selected .bar {
@@ -360,7 +360,7 @@
   width: 31px;
   height: 31px;
   background: transparent;
-  color: var(--brand-botanical, var(--brand));
+  color: var(--brand);
 }
 
 .section-icon bf-icon {
@@ -392,7 +392,7 @@
 }
 
 .alert-icon.sage {
-  color: var(--brand-botanical, var(--brand));
+  color: var(--brand);
 }
 
 .alert-count {

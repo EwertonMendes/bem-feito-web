@@ -25,13 +25,7 @@
         try {
           const theme =
             localStorage.getItem("bf-theme") === "dark" ? "dark" : "light";
-          const storedPalette = localStorage.getItem("bf-dark-palette");
-          const darkPalette = ["espresso", "chocolate", "graphite", "wood", "walnut", "taupe"].includes(storedPalette)
-            ? storedPalette
-            : "espresso";
-
           document.documentElement.dataset.theme = theme;
-          document.documentElement.dataset.darkPalette = darkPalette;
           document.documentElement.style.colorScheme = theme;
         } catch {}
       })();

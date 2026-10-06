@@ -3,7 +3,9 @@
 Use Node 22.22.3 ou superior compatível com `package.json`.
 
 ```powershell
-npm ci
+npm ci --no-audit --no-fund
+npm run security:scan
+npm run security:audit
 npm run test:architecture
 npm test
 npm run test:migration
@@ -49,10 +51,21 @@ O Google Drive não é emulado pelo Firebase. Os testes unitários não usam cre
 
 Restaure o environment real ao terminar. Não publique build com emuladores ativados.
 
+## Dependências
+
+Não use `npm audit fix --force`. O audit automático do `npm ci` mistura runtime e ferramentas de desenvolvimento, então a instalação local usa `--no-audit` e a checagem de produção é executada explicitamente:
+
+```powershell
+npm run security:audit
+```
+
+A justificativa para a exceção temporária do Firestore está em [dependency-security.md](dependency-security.md).
+
 ## Builds e deploy
 
 ```powershell
 npm run security:scan
+npm run security:audit
 npm run test:architecture
 npm test
 npm run test:rules

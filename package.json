@@ -5,6 +5,7 @@
   "packageManager": "npm@10.9.2",
   "scripts": {
     "security:scan": "node tools/security/check-secrets.mjs",
+    "security:audit": "node tools/security/audit-dependencies.mjs",
     "test:security": "node --test tools/tests/secret-scan.test.mjs",
     "ng": "ng",
     "start": "ng serve --configuration development",

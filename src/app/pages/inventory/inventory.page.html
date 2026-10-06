@@ -1,11 +1,10 @@
 <section class="bf-page">
   <header class="bf-page-header">
-    <div><h1>Estoque</h1><p>Saldo atual, mínimos, negativos e histórico completo de cada movimentação.</p></div>
+    <div><h1>Estoque</h1><p>Saldo atual, mínimos e histórico completo de cada movimentação.</p></div>
   </header>
 
   <div class="summary">
     <div><strong>{{ catalog.products().length }}</strong><span>produtos</span></div>
-    <div class="danger"><strong>{{ catalog.negativeProducts().length }}</strong><span>negativos</span></div>
     <div class="warning"><strong>{{ catalog.lowStockProducts().length }}</strong><span>produtos baixos</span></div>
     <div><strong>{{ catalog.lowStockInputs().length }}</strong><span>insumos baixos</span></div>
   </div>
@@ -29,7 +28,7 @@
 
   <dialog bfDialog #adjustmentDialog="bfDialog" class="bf-dialog">
     <div class="bf-dialog-header"><div><h2>Ajustar estoque</h2><small>{{selectedName()}}</small></div><button class="bf-icon-button" (click)="adjustmentDialog.close()"><bf-icon name="close" /></button></div>
-    <div class="bf-dialog-body"><div class="callout">Use número positivo para entrada e negativo para saída. Ajustes ficam registrados no histórico.</div><div class="bf-grid two"><label class="bf-field"><span>Quantidade (+/-)</span><input class="bf-input" type="number" step="0.001" [formField]="adjustmentForm.quantity" /></label><label class="bf-field"><span>Data</span><input class="bf-input" type="date" [formField]="adjustmentForm.businessDate" /></label><label class="bf-field full"><span>Motivo</span><textarea class="bf-textarea" [formField]="adjustmentForm.reason" placeholder="Inventário, perda, amostra, correção..."></textarea></label></div></div>
+    <div class="bf-dialog-body"><div class="callout">Use número positivo para entrada e negativo para saída. O saldo não pode ficar negativo e todos os ajustes ficam registrados no histórico.</div><div class="bf-grid two"><label class="bf-field"><span>Quantidade (+/-)</span><input class="bf-input" type="number" step="0.001" [formField]="adjustmentForm.quantity" /></label><label class="bf-field"><span>Data</span><input class="bf-input" type="date" [formField]="adjustmentForm.businessDate" /></label><label class="bf-field full"><span>Motivo</span><textarea class="bf-textarea" [formField]="adjustmentForm.reason" placeholder="Inventário, perda, amostra, correção..."></textarea></label></div></div>
     <div class="bf-dialog-footer"><button class="bf-button secondary" (click)="adjustmentDialog.close()">Cancelar</button><button class="bf-button" (click)="saveAdjustment()">Registrar ajuste</button></div>
   </dialog>
 

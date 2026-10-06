@@ -129,6 +129,13 @@ describe('Actual repositories against restrictive emulator rules', () => {
     expect(await count('expenses')).toBe(2);
     expect(await count('stockAdjustments')).toBe(2);
   });
+  it('rejects inventory adjustments that would make stock negative without partial writes', async () => {
+    await expect(inventory.adjust('product', 'p', -11, 'TEST ONLY', day)).rejects.toThrow('Estoque insuficiente');
+    expect(await data('products', 'p')).toMatchObject({ stock: 10 });
+    expect(await count('stockAdjustments')).toBe(0);
+    expect(await count('stockMovements')).toBe(0);
+    expect(await data('counters', 'stockAdjustment')).toBeUndefined();
+  });
   for (const operation of ['sale', 'production', 'purchase', 'adjustment'] as const) {
     it(`rolls back every staged document when rules reject ${operation}`, async () => {
       const action = operation === 'sale' ? sales.create(draft('invalid'))

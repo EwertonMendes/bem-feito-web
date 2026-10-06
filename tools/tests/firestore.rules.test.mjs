@@ -33,9 +33,9 @@ try {
     await deny(setDoc(doc(db, 'products', 'blocked'), { ...product, ...audit('operator') }));
   }
   for (const db of [owner, operator, viewer]) await pass(getDoc(doc(db, 'products', 'p1')));
-  await pass(updateDoc(doc(operator, 'products', 'legacy-deficit'), { salePriceCents: 1200, updatedAt: serverTimestamp(), updatedBy: 'operator' }));
+  await deny(updateDoc(doc(operator, 'products', 'legacy-deficit'), { salePriceCents: 1200, updatedAt: serverTimestamp(), updatedBy: 'operator' }));
   await deny(updateDoc(doc(operator, 'products', 'legacy-deficit'), { stock: -4, updatedAt: serverTimestamp(), updatedBy: 'operator' }));
-  await pass(updateDoc(doc(operator, 'products', 'legacy-deficit'), { stock: -2, updatedAt: serverTimestamp(), updatedBy: 'operator' }));
+  await deny(updateDoc(doc(operator, 'products', 'legacy-deficit'), { stock: -2, updatedAt: serverTimestamp(), updatedBy: 'operator' }));
   await pass(updateDoc(doc(operator, 'products', 'legacy-deficit'), { stock: 0, updatedAt: serverTimestamp(), updatedBy: 'operator' }));
   await deny(updateDoc(doc(operator, 'products', 'legacy-deficit'), { stock: -1, updatedAt: serverTimestamp(), updatedBy: 'operator' }));
   await pass(getDoc(doc(owner, 'migrationSources', 'test-run', 'sheets', 'test')));

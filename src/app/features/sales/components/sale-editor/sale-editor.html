@@ -1,0 +1,41 @@
+<dialog bfDialog #saleDialog="bfDialog" class="sale-dialog">
+    <div class="sale-header"><div><span class="eyebrow">Nova venda</span><h2>{{cartPhysicalItems()}} itens · {{currency(totalCents())}}</h2></div><button class="bf-icon-button" (click)="saleDialog.close()"><bf-icon name="close" /></button></div>
+    <div class="sale-layout">
+      <section class="picker">
+        <div class="picker-top"><div class="bf-segments"><button [class.active]="catalogTab()==='products'" (click)="catalogTab.set('products')">Produtos</button><button [class.active]="catalogTab()==='kits'" (click)="catalogTab.set('kits')">Kits</button><button [class.active]="catalogTab()==='additions'" (click)="catalogTab.set('additions')">Adicionais</button></div></div>
+        <div class="picker-grid">
+          @if(catalogTab()==='products'){
+            @for(product of catalog.activeProducts();track product.id){<button class="pick-card" type="button" [disabled]="product.stock<=0" (click)="addProduct(product)"><bf-catalog-image [image]="product.image" [alt]="product.displayName" /><span><strong>{{product.displayName}}</strong><small>{{currency(product.salePriceCents)}} · estoque {{product.stock}}</small></span><span class="add">+</span></button>}
+          } @else if(catalogTab()==='kits'){
+            @for(kit of catalog.activeKits();track kit.id){<button class="pick-card" type="button" (click)="addKit(kit)"><bf-catalog-image [image]="kit.image" [alt]="kit.name" /><span><strong>{{kit.name}}</strong><small>{{currency(kit.priceCents)}}</small></span><span class="add">+</span></button>}
+          } @else {
+            @for(addition of catalog.activeAdditions();track addition.id){<button class="pick-card" type="button" (click)="addAddition(addition)"><bf-catalog-image [image]="addition.image" [alt]="addition.name" /><span><strong>{{addition.name}}</strong><small>{{currency(addition.priceCents)}}</small></span><span class="add">+</span></button>}
+          }
+        </div>
+      </section>
+
+      <aside class="cart-panel">
+        <div class="cart-scroll">
+          <h3>Pedido</h3>
+          @for(line of cart();track line.key){
+            <article class="cart-line"><bf-catalog-image [image]="lineImage(line)" [alt]="lineName(line)" [compact]="true" /><div class="line-main"><strong>{{lineName(line)}}</strong><small>{{currency(lineUnitPrice(line))}}</small>
+              @if(line.kind==='kit'){
+                <div class="kit-config">@for(slot of kitSlots(line);track slot.index){<label><span>{{slot.label}}</span><select [value]="line.componentProductIds[slot.index]" (change)="changeKitSelection(line,slot.index,$any($event.target).value)">@for(product of slot.candidates;track product.id){<option [value]="product.id">{{product.displayName}}</option>}</select></label>}</div>
+              }
+            </div><div class="quantity"><button (click)="changeQuantity(line,-1)">−</button><span>{{line.quantity}}</span><button (click)="changeQuantity(line,1)">+</button></div><strong class="line-total">{{currency(lineUnitPrice(line)*line.quantity)}}</strong></article>
+          } @empty {<div class="cart-empty"><strong>Pedido vazio</strong><span>Escolha produtos, kits ou adicionais.</span></div>}
+
+          <section class="sale-data">
+            <div class="bf-grid two"><label class="bf-field"><span>Data</span><input class="bf-input" type="date" [formField]="saleForm.businessDate" /></label><label class="bf-field"><span>Desconto</span><input class="bf-input" type="number" step="0.01" [formField]="saleForm.discount" /></label></div>
+            @if(remainingCents()>0){<div class="open-balance">Falta receber <strong>{{currency(remainingCents())}}</strong>. Informe o cliente para salvar a conta.</div>}
+            <div class="bf-grid two"><label class="bf-field"><span>Cliente {{remainingCents()>0?'*':''}}</span><input class="bf-input" [formField]="saleForm.customerName" placeholder="Nome" /></label><label class="bf-field"><span>Vencimento</span><input class="bf-input" type="date" [formField]="saleForm.dueDate" /></label><label class="bf-field full"><span>Observações</span><textarea class="bf-textarea" [formField]="saleForm.notes"></textarea></label></div>
+          </section>
+
+          <section class="payments"><div class="payments-head"><div><h3>Pagamento</h3><small>Você pode dividir em várias formas.</small></div><button class="bf-button secondary" (click)="addPayment()">+ Forma</button></div>
+            @for(payment of payments();track payment.id;let i=$index){<div class="payment-row"><select class="bf-select" [value]="payment.methodId" (change)="patchPayment(i,{methodId:$any($event.target).value})">@for(method of settings.paymentMethods();track method.id){@if(method.active){<option [value]="method.id">{{method.name}}</option>}}</select><input class="bf-input" type="number" min="0" step="0.01" [value]="payment.amount" (input)="patchPayment(i,{amount:+$any($event.target).value})" /><button class="fill" type="button" (click)="fillRemaining(i)">Restante</button><button class="bf-icon-button" type="button" (click)="removePayment(i)"><bf-icon name="trash" /></button></div>}
+          </section>
+        </div>
+        <footer class="checkout"><div class="totals"><span>Subtotal <strong>{{currency(subtotalCents())}}</strong></span><span>Total <strong>{{currency(totalCents())}}</strong></span>@if(expectedTipCents()>0){<span class="tip">Gorjeta <strong>{{currency(expectedTipCents())}}</strong></span>}</div><button class="bf-button confirm" type="button" [disabled]="!cart().length" (click)="submit()">Confirmar venda · {{currency(totalCents())}}</button></footer>
+      </aside>
+    </div>
+  </dialog>

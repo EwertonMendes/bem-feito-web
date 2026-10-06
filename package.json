@@ -5,6 +5,7 @@
   "packageManager": "npm@10.9.2",
   "scripts": {
     "security:scan": "node tools/security/check-secrets.mjs",
+    "security:audit": "npm audit",
     "test:security": "node --test tools/tests/secret-scan.test.mjs",
     "ng": "ng",
     "start": "ng serve --configuration development",
@@ -14,18 +15,19 @@
     "build:prod": "ng build --configuration production",
     "test": "vitest run src",
     "test:watch": "vitest",
-    "firebase:emulators": "firebase emulators:start",
-    "firebase:deploy:dev": "firebase use dev && npm run build:dev:hosting && firebase deploy --only firestore,hosting",
-    "firebase:deploy:prod": "firebase use prod && npm run build:prod && firebase deploy --only firestore,hosting",
+    "firebase:emulators": "npx --yes --package firebase-tools@15.32.1 firebase emulators:start",
+    "firebase:deploy:dev": "npm run build:dev:hosting && npx --yes --package firebase-tools@15.32.1 firebase deploy --project bem-feito-dev --only firestore,hosting",
+    "firebase:deploy:prod": "npx --yes --package firebase-tools@15.32.1 firebase use prod && npm run build:prod && npx --yes --package firebase-tools@15.32.1 firebase deploy --only firestore,hosting",
     "migration:normalize": "node tools/migration/normalize-legacy.mjs",
     "migration:validate": "node tools/migration/validate-export.mjs",
     "migration:reconcile": "node tools/migration/reconcile.mjs",
     "migration:import": "node tools/migration/import-firestore.mjs",
     "migration:verify": "node tools/migration/verify-firestore.mjs",
     "test:migration": "node --test tools/tests/migration.test.mjs",
-    "test:transactions": "firebase emulators:exec --only firestore --project demo-bem-feito \"vitest run tools/tests/transactions.spec.ts\"",
+    "test:transactions": "npx --yes --package firebase-tools@15.32.1 firebase emulators:exec --only firestore --project demo-bem-feito \"vitest run tools/tests/transactions.spec.ts\"",
     "admin:user": "node tools/admin/upsert-user.mjs",
-    "test:rules": "firebase emulators:exec --only firestore --project demo-bem-feito \"node tools/tests/firestore.rules.test.mjs && node tools/tests/drive-integration.rules.test.mjs\""
+    "test:rules": "npx --yes --package firebase-tools@15.32.1 firebase emulators:exec --only firestore --project demo-bem-feito \"node tools/tests/firestore.rules.test.mjs && node tools/tests/drive-integration.rules.test.mjs\"",
+    "test:architecture": "node --test tools/tests/architecture.test.mjs"
   },
   "dependencies": {
     "@angular/common": "^22.2.1",
@@ -44,11 +46,18 @@
     "@angular/compiler-cli": "^22.2.1",
     "@firebase/rules-unit-testing": "^5.0.2",
     "firebase-admin": "^14.5.0",
-    "firebase-tools": "^15.30.2",
     "typescript": "~6.0.2",
     "vitest": "^5.0.3"
   },
   "engines": {
     "node": ">=22.22.3"
+  },
+  "overrides": {
+    "@firebase/firestore": {
+      "@grpc/grpc-js": "1.14.5"
+    },
+    "gaxios": {
+      "uuid": "11.1.1"
+    }
   }
 }

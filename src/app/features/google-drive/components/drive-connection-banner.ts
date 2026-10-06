@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { DriveIntegrationService } from '../../core/google-drive/drive-integration.service';
-import { ErrorService } from '../../core/services/error.service';
-import { ToastService } from '../../core/services/toast.service';
+import { DriveIntegrationService } from '../../../core/google-drive/drive-integration.service';
+import { ErrorService } from '../../../core/services/error.service';
+import { ToastService } from '../../../core/services/toast.service';
 
 @Component({
   selector: 'bf-drive-connection-banner',

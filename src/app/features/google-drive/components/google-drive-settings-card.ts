@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { AuthService } from '../../core/auth/auth.service';
-import { DriveIntegrationService } from '../../core/google-drive/drive-integration.service';
-import { ErrorService } from '../../core/services/error.service';
-import { ToastService } from '../../core/services/toast.service';
-import { BfIcon } from '../ui/icon/icon';
+import { AuthService } from '../../../core/auth/auth.service';
+import { DriveIntegrationService } from '../../../core/google-drive/drive-integration.service';
+import { ErrorService } from '../../../core/services/error.service';
+import { ToastService } from '../../../core/services/toast.service';
+import { BfIcon } from '../../../shared/ui/icon/icon';
 
 @Component({
   selector: 'bf-google-drive-settings-card',

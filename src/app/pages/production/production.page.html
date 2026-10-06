@@ -10,12 +10,12 @@
       <tbody>
         @for (item of store.items(); track item.id) {
           <tr><td><strong>{{ item.code }}</strong></td><td>{{ date(item.businessDate) }}</td><td>{{ item.productName }}</td><td>{{ item.quantity }}</td><td>{{ currency(item.unitCostCents) }}</td><td><span class="bf-badge" [class.warning]="item.costPending">{{ item.costPending ? 'Pendente' : 'Calculado' }}</span></td></tr>
-        } @empty { <tr><td colspan="6"><div class="bf-empty"><div><strong>Nenhuma produção registrada</strong><p>Quando produzir, registre aqui para atualizar estoque e custo.</p></div></div></td></tr> }
+        } @empty { <tr><td colspan="6"><bf-empty-state title="Nenhuma produção registrada" description="Quando produzir, registre aqui para atualizar estoque e custo." /></td></tr> }
       </tbody>
     </table>
   </div>
 
-  <dialog #productionDialog class="bf-dialog">
+  <dialog bfDialog #productionDialog="bfDialog" class="bf-dialog">
     <div class="bf-dialog-header"><h2>Registrar produção</h2><button class="bf-icon-button" type="button" (click)="productionDialog.close()"><bf-icon name="close" /></button></div>
     <div class="bf-dialog-body">
       <div class="bf-grid two">

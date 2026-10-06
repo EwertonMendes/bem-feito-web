@@ -4,7 +4,8 @@ import {
 } from 'firebase/firestore';
 import { Addition, InputItem, Kit, Product } from '../../domain/models/catalog.model';
 import { StockMovement } from '../../domain/models/inventory.model';
-import { Payment, Sale, SaleDraft, SaleLineSnapshot, StockEffect } from '../../domain/models/sales.model';
+import { Payment, Sale, SaleDraft } from '../../domain/models/sales.model';
+import { resolveSaleDraft } from '../../domain/logic/sale-resolution';
 import { AuthService } from '../auth/auth.service';
 import { FIRESTORE } from '../firebase/firebase.providers';
 import { todayBusinessDate } from '../utils/date';
@@ -90,119 +91,13 @@ export class SalesRepository {
         inputs.set(id, input);
       }
 
-      const lines: SaleLineSnapshot[] = [];
-      const effects = new Map<string, StockEffect>();
-      const addEffect = (effect: StockEffect): void => {
-        const key = `${effect.itemType}:${effect.itemId}`;
-        const current = effects.get(key);
-        effects.set(key, current ? { ...current, quantityDelta: current.quantityDelta + effect.quantityDelta } : effect);
-      };
+      const { lines, stockEffects, subtotalCents, discountCents, totalCents } = resolveSaleDraft(draft, {
+        products,
+        kits,
+        additions,
+        inputs,
+      });
 
-      for (const line of draft.lines) {
-        if (!Number.isFinite(line.quantity) || line.quantity <= 0) throw new Error('Há um item com quantidade inválida.');
-
-        if (line.kind === 'product') {
-          const product = products.get(line.sourceId);
-          if (!product) throw new Error('Produto inválido.');
-          const unitPriceCents = line.manualUnitPriceCents ?? product.salePriceCents;
-          lines.push({
-            id: crypto.randomUUID(),
-            kind: 'product',
-            sourceId: product.id,
-            name: product.displayName,
-            image: product.image,
-            quantity: line.quantity,
-            unitPriceCents,
-            unitCostCents: product.averageUnitCostCents,
-            totalCents: Math.round(unitPriceCents * line.quantity),
-            totalCostCents: Math.round(product.averageUnitCostCents * line.quantity),
-          });
-          addEffect({ itemType: 'product', itemId: product.id, quantityDelta: -line.quantity, unitCostCents: product.averageUnitCostCents });
-          continue;
-        }
-
-        if (line.kind === 'kit') {
-          const kit = kits.get(line.sourceId);
-          if (!kit) throw new Error('Kit inválido.');
-          const expectedSlots = kit.components.reduce((sum, component) => sum + component.quantity, 0);
-          if (line.componentProductIds.length !== expectedSlots) throw new Error(`Configure todos os itens do kit ${kit.name}.`);
-
-          const resolved = [];
-          let cursor = 0;
-          let kitCostCents = 0;
-
-          for (const component of [...kit.components].sort((a, b) => a.order - b.order)) {
-            for (let slot = 0; slot < component.quantity; slot++) {
-              const productId = line.componentProductIds[cursor++];
-              const product = productId ? products.get(productId) : undefined;
-              if (!product) throw new Error(`Seleção inválida no kit ${kit.name}.`);
-              if (product.formatId !== component.formatId) throw new Error(`Formato inválido no kit ${kit.name}.`);
-              if (component.collectionId && product.collectionId !== component.collectionId) throw new Error(`Coleção inválida no kit ${kit.name}.`);
-              if (component.fragranceId && product.fragranceId !== component.fragranceId) throw new Error(`Fragrância inválida no kit ${kit.name}.`);
-
-              kitCostCents += product.averageUnitCostCents;
-              resolved.push({ productId: product.id, name: product.displayName, quantity: 1, unitCostCents: product.averageUnitCostCents });
-              addEffect({ itemType: 'product', itemId: product.id, quantityDelta: -1, unitCostCents: product.averageUnitCostCents });
-            }
-          }
-
-          lines.push({
-            id: crypto.randomUUID(),
-            kind: 'kit',
-            sourceId: kit.id,
-            name: kit.name,
-            image: kit.image,
-            quantity: 1,
-            unitPriceCents: kit.priceCents,
-            unitCostCents: kitCostCents,
-            totalCents: kit.priceCents,
-            totalCostCents: kitCostCents,
-            components: resolved,
-          });
-          continue;
-        }
-
-        const addition = additions.get(line.sourceId);
-        if (!addition) throw new Error('Adicional inválido.');
-        let unitCostCents = 0;
-        for (const component of addition.components) {
-          const input = inputs.get(component.inputId);
-          if (!input) throw new Error(`Insumo inválido no adicional ${addition.name}.`);
-          unitCostCents += Math.round(component.quantity * input.averageUnitCostCents);
-          addEffect({
-            itemType: 'input',
-            itemId: input.id,
-            quantityDelta: -(component.quantity * line.quantity),
-            unitCostCents: input.averageUnitCostCents,
-          });
-        }
-
-        lines.push({
-          id: crypto.randomUUID(),
-          kind: 'addition',
-          sourceId: addition.id,
-          name: addition.name,
-          image: addition.image,
-          quantity: line.quantity,
-          unitPriceCents: addition.priceCents,
-          unitCostCents,
-          totalCents: Math.round(addition.priceCents * line.quantity),
-          totalCostCents: unitCostCents * line.quantity,
-        });
-      }
-
-      for (const effect of effects.values()) {
-        const entity = effect.itemType === 'product' ? products.get(effect.itemId) : inputs.get(effect.itemId);
-        if (!entity) throw new Error('Item de estoque não encontrado.');
-        if (entity.stock + effect.quantityDelta < 0) {
-          const name = 'displayName' in entity ? entity.displayName : entity.name;
-          throw new Error(`Estoque insuficiente de ${name}.`);
-        }
-      }
-
-      const subtotalCents = lines.reduce((sum, line) => sum + line.totalCents, 0);
-      const discountCents = Math.min(Math.max(0, draft.discountCents), subtotalCents);
-      const totalCents = Math.max(0, subtotalCents - discountCents);
       const allocations = allocatePayments(totalCents, draft.payments);
       const receivedCents = allocations.reduce((sum, item) => sum + item.appliedCents, 0);
       const tipCents = allocations.reduce((sum, item) => sum + item.tipCents, 0);
@@ -238,7 +133,6 @@ export class SalesRepository {
         } satisfies Omit<Payment, 'id'>);
       }
 
-      const stockEffects = [...effects.values()];
       for (const effect of stockEffects) {
         const targetRef = doc(this.firestore, effect.itemType === 'product' ? 'products' : 'inputs', effect.itemId);
         const entity = effect.itemType === 'product' ? products.get(effect.itemId) : inputs.get(effect.itemId);

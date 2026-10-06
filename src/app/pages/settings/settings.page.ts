@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ElementRef, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal, viewChild } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
 import {
   CollectionDefinition,
@@ -10,15 +10,17 @@ import {
   PaymentMethod,
   UnitDefinition,
 } from '../../domain/models/catalog.model';
-import { CatalogStore } from '../../features/catalog/catalog.store';
+import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
 import { SettingsStore } from '../../features/settings/settings.store';
 import { ToastService } from '../../core/services/toast.service';
 import { ErrorService } from '../../core/services/error.service';
 import { fromCents, toCents } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
-import { GoogleDriveSettingsCard } from '../../shared/integrations/google-drive-settings-card';
+import { BfDialog } from '../../shared/ui/dialog/dialog';
+import { GoogleDriveSettingsCard } from '../../features/google-drive/components/google-drive-settings-card';
 
 type SettingTab = 'collections' | 'fragrances' | 'formats' | 'prices' | 'units' | 'payments' | 'expenseCategories' | 'expenseTypes';
+type SimpleSetting = CollectionDefinition | UnitDefinition | PaymentMethod | ExpenseCategory;
 
 interface SimpleModel { name: string; active: boolean; }
 interface FragranceModel extends SimpleModel { collectionId: string; }
@@ -28,17 +30,17 @@ interface ExpenseTypeModel extends SimpleModel { kind: ExpenseType['kind']; }
 
 @Component({
   selector: 'bf-settings-page',
-  imports: [FormField, BfIcon, GoogleDriveSettingsCard],
+  imports: [FormField, BfIcon, GoogleDriveSettingsCard, BfDialog],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './settings.page.html',
   styleUrl: './settings.page.scss',
 })
 export class SettingsPage {
-  readonly catalog = inject(CatalogStore);
+  readonly references = inject(CatalogReferenceStore);
   readonly settings = inject(SettingsStore);
   private readonly toast = inject(ToastService);
   private readonly errors = inject(ErrorService);
-  private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('editor');
+  private readonly dialog = viewChild.required<BfDialog>('editor');
 
   readonly tab = signal<SettingTab>('collections');
   readonly editingId = signal('');
@@ -54,7 +56,7 @@ export class SettingsPage {
   readonly expenseTypeForm = form(this.expenseTypeModel, (p) => { required(p.name); required(p.kind); });
 
   constructor() {
-    void Promise.all([this.catalog.load(), this.settings.load()]);
+    void Promise.all([this.references.load(), this.settings.load()]);
   }
 
   openNew(): void {
@@ -64,51 +66,64 @@ export class SettingsPage {
     this.formatModel.set({ name: '', approximateWeightGrams: 0, active: true });
     this.priceModel.set({ collectionId: '', formatId: '', price: 0, active: true });
     this.expenseTypeModel.set({ name: '', kind: 'operating-expense', active: true });
-    this.dialog().nativeElement.showModal();
+    this.dialog().open();
   }
 
-  edit(item: unknown): void {
-    const value = item as Record<string, unknown>;
-    this.editingId.set(String(value['id'] ?? ''));
-    if (this.tab() === 'fragrances') {
-      this.fragranceModel.set({ name: String(value['name'] ?? ''), collectionId: String(value['collectionId'] ?? ''), active: Boolean(value['active']) });
-    } else if (this.tab() === 'formats') {
-      this.formatModel.set({ name: String(value['name'] ?? ''), approximateWeightGrams: Number(value['approximateWeightGrams'] ?? 0), active: Boolean(value['active']) });
-    } else if (this.tab() === 'prices') {
-      this.priceModel.set({ collectionId: String(value['collectionId'] ?? ''), formatId: String(value['formatId'] ?? ''), price: fromCents(Number(value['priceCents'] ?? 0)), active: Boolean(value['active']) });
-    } else if (this.tab() === 'expenseTypes') {
-      this.expenseTypeModel.set({ name: String(value['name'] ?? ''), kind: value['kind'] as ExpenseType['kind'], active: Boolean(value['active']) });
-    } else {
-      this.simpleModel.set({ name: String(value['name'] ?? ''), active: Boolean(value['active']) });
-    }
-    this.dialog().nativeElement.showModal();
+  editSimple(item: SimpleSetting): void {
+    this.editingId.set(item.id);
+    this.simpleModel.set({ name: item.name, active: item.active });
+    this.dialog().open();
+  }
+
+  editFragrance(item: FragranceDefinition): void {
+    this.editingId.set(item.id);
+    this.fragranceModel.set({ name: item.name, collectionId: item.collectionId, active: item.active });
+    this.dialog().open();
+  }
+
+  editFormat(item: FormatDefinition): void {
+    this.editingId.set(item.id);
+    this.formatModel.set({ name: item.name, approximateWeightGrams: item.approximateWeightGrams ?? 0, active: item.active });
+    this.dialog().open();
+  }
+
+  editPrice(item: FormatPrice): void {
+    this.editingId.set(item.id);
+    this.priceModel.set({ collectionId: item.collectionId, formatId: item.formatId, price: fromCents(item.priceCents), active: item.active });
+    this.dialog().open();
+  }
+
+  editExpenseType(item: ExpenseType): void {
+    this.editingId.set(item.id);
+    this.expenseTypeModel.set({ name: item.name, kind: item.kind, active: item.active });
+    this.dialog().open();
   }
 
   async save(): Promise<void> {
     try {
       const id = this.editingId();
-      if (this.tab() === 'collections') await this.catalog.saveCollection({ id, ...this.simpleModel() } as CollectionDefinition);
-      else if (this.tab() === 'fragrances') await this.catalog.saveFragrance({ id, ...this.fragranceModel() } as FragranceDefinition);
-      else if (this.tab() === 'formats') await this.catalog.saveFormat({ id, ...this.formatModel() } as FormatDefinition);
+      if (this.tab() === 'collections') await this.references.saveCollection({ id, ...this.simpleModel() } as CollectionDefinition);
+      else if (this.tab() === 'fragrances') await this.references.saveFragrance({ id, ...this.fragranceModel() } as FragranceDefinition);
+      else if (this.tab() === 'formats') await this.references.saveFormat({ id, ...this.formatModel() } as FormatDefinition);
       else if (this.tab() === 'prices') {
         const model = this.priceModel();
-        await this.catalog.saveFormatPrice({ id, collectionId: model.collectionId, formatId: model.formatId, priceCents: toCents(model.price), active: model.active } as FormatPrice);
-      } else if (this.tab() === 'units') await this.catalog.saveUnit({ id, ...this.simpleModel() } as UnitDefinition);
+        await this.references.saveFormatPrice({ id, collectionId: model.collectionId, formatId: model.formatId, priceCents: toCents(model.price), active: model.active } as FormatPrice);
+      } else if (this.tab() === 'units') await this.references.saveUnit({ id, ...this.simpleModel() } as UnitDefinition);
       else if (this.tab() === 'payments') await this.settings.savePaymentMethod({ id, ...this.simpleModel() } as PaymentMethod);
       else if (this.tab() === 'expenseCategories') await this.settings.saveExpenseCategory({ id, ...this.simpleModel() } as ExpenseCategory);
       else await this.settings.saveExpenseType({ id, ...this.expenseTypeModel() } as ExpenseType);
       this.toast.success('Configuração salva.');
-      this.dialog().nativeElement.close();
+      this.dialog().close();
     } catch (error) {
       this.toast.error(this.errors.message(error));
     }
   }
 
   collectionName(id: string): string {
-    return this.catalog.collections().find((item) => item.id === id)?.name ?? '—';
+    return this.references.collections().find((item) => item.id === id)?.name ?? '—';
   }
 
   formatName(id: string): string {
-    return this.catalog.formats().find((item) => item.id === id)?.name ?? '—';
+    return this.references.formats().find((item) => item.id === id)?.name ?? '—';
   }
 }

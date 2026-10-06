@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
-import { DriveConnectionBanner } from '../../shared/integrations/drive-connection-banner';
+import { DriveConnectionBanner } from '../../features/google-drive/components/drive-connection-banner';
 import { BfIcon, BfIconName } from '../../shared/ui/icon/icon';
 
 interface NavItem { label: string; path: string; icon: BfIconName; }

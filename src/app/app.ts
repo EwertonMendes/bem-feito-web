@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { ToastContainer } from './shared/ui/toast/toast-container';
+import { ToastContainer } from './shared/feedback/toast-container';
 
 @Component({
   selector: 'bf-root',

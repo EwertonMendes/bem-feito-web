@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { FormField, form, min, required } from '@angular/forms/signals';
+import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
 import { CatalogStore } from '../../features/catalog/catalog.store';
 import { FinanceStore } from '../../features/finance/finance.store';
 import { SalesStore } from '../../features/sales/sales.store';
@@ -9,6 +10,8 @@ import { ExpenseDraft, ExpenseKind } from '../../domain/models/finance.model';
 import { formatBusinessDate, todayBusinessDate } from '../../core/utils/date';
 import { formatCurrency, fromCents, toCents } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
+import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
+import { BfDialog } from '../../shared/ui/dialog/dialog';
 
 interface ReceiptFormModel {
   saleId: string;
@@ -32,19 +35,20 @@ interface ExpenseFormModel {
 
 @Component({
   selector: 'bf-finance-page',
-  imports: [FormField, BfIcon],
+  imports: [FormField, BfIcon, BfDialog, BfEmptyState],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './finance.page.html',
   styleUrl: './finance.page.scss',
 })
 export class FinancePage {
   readonly catalog = inject(CatalogStore);
+  readonly references = inject(CatalogReferenceStore);
   readonly store = inject(FinanceStore);
   readonly sales = inject(SalesStore);
   readonly settings = inject(SettingsStore);
   private readonly route = inject(ActivatedRoute);
-  private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('expenseDialog');
-  private readonly receiptDialog = viewChild.required<ElementRef<HTMLDialogElement>>('receiptDialog');
+  private readonly dialog = viewChild.required<BfDialog>('expenseDialog');
+  private readonly receiptDialog = viewChild.required<BfDialog>('receiptDialog');
 
   readonly tab = signal<'expenses' | 'receivables' | 'payments'>('expenses');
   readonly currency = formatCurrency;
@@ -78,7 +82,7 @@ export class FinancePage {
   readonly selectedReceivable = computed(() => this.sales.openSales().find((sale) => sale.id === this.receiptModel().saleId));
 
   constructor() {
-    void Promise.all([this.catalog.load(), this.store.load(), this.sales.load(), this.settings.load()]).then(() => {
+    void Promise.all([this.catalog.load(), this.references.load(), this.store.load(), this.sales.load(), this.settings.load()]).then(() => {
       if (this.route.snapshot.queryParamMap.get('novo') === '1') this.openExpense();
     });
   }
@@ -90,13 +94,13 @@ export class FinancePage {
       categoryId: this.settings.expenseCategories().find((item) => item.active)?.id ?? '',
       inputId: this.catalog.activeInputs()[0]?.id ?? '',
       quantity: 1,
-      unitId: this.catalog.units().find((item) => item.active)?.id ?? '',
+      unitId: this.references.units().find((item) => item.active)?.id ?? '',
       amount: 0,
       paymentMethodId: this.settings.paymentMethods().find((item) => item.active)?.id ?? '',
       notes: '',
       link: '',
     });
-    this.dialog().nativeElement.showModal();
+    this.dialog().open();
   }
 
   openReceipt(saleId: string): void {
@@ -108,7 +112,7 @@ export class FinancePage {
       methodId: this.settings.paymentMethods().find((item) => item.active)?.id ?? '',
       amount: fromCents(sale.balanceCents),
     });
-    this.receiptDialog().nativeElement.showModal();
+    this.receiptDialog().open();
   }
 
   async saveReceipt(): Promise<void> {
@@ -117,7 +121,7 @@ export class FinancePage {
     const ok = await this.sales.addPayment(value.saleId, value.businessDate, value.methodId, toCents(value.amount));
     if (ok) {
       await this.store.load();
-      this.receiptDialog().nativeElement.close();
+      this.receiptDialog().close();
     }
   }
 
@@ -145,7 +149,7 @@ export class FinancePage {
     const ok = await this.store.createExpense(draft);
     if (ok) {
       await this.catalog.load(true);
-      this.dialog().nativeElement.close();
+      this.dialog().close();
     }
   }
 

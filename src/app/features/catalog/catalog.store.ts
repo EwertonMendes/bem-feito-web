@@ -1,13 +1,7 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import {
-  Addition, CollectionDefinition, FormatDefinition, FormatPrice, FragranceDefinition,
-  InputItem, Kit, Product, UnitDefinition,
-} from '../../domain/models/catalog.model';
+import { Addition, InputItem, Kit, Product } from '../../domain/models/catalog.model';
 import { CatalogImageRef } from '../../domain/models/image.model';
-import {
-  AdditionRepository, CollectionRepository, FormatPriceRepository, FormatRepository,
-  FragranceRepository, InputRepository, KitRepository, ProductRepository, UnitRepository,
-} from '../../core/repositories/catalog.repository';
+import { AdditionRepository, InputRepository, KitRepository, ProductRepository } from '../../core/repositories/catalog.repository';
 import { ErrorService } from '../../core/services/error.service';
 import { ToastService } from '../../core/services/toast.service';
 
@@ -17,11 +11,6 @@ export class CatalogStore {
   private readonly inputRepository = inject(InputRepository);
   private readonly kitRepository = inject(KitRepository);
   private readonly additionRepository = inject(AdditionRepository);
-  private readonly collectionRepository = inject(CollectionRepository);
-  private readonly fragranceRepository = inject(FragranceRepository);
-  private readonly formatRepository = inject(FormatRepository);
-  private readonly formatPriceRepository = inject(FormatPriceRepository);
-  private readonly unitRepository = inject(UnitRepository);
   private readonly errors = inject(ErrorService);
   private readonly toast = inject(ToastService);
 
@@ -29,11 +18,6 @@ export class CatalogStore {
   private readonly inputsState = signal<InputItem[]>([]);
   private readonly kitsState = signal<Kit[]>([]);
   private readonly additionsState = signal<Addition[]>([]);
-  private readonly collectionsState = signal<CollectionDefinition[]>([]);
-  private readonly fragrancesState = signal<FragranceDefinition[]>([]);
-  private readonly formatsState = signal<FormatDefinition[]>([]);
-  private readonly formatPricesState = signal<FormatPrice[]>([]);
-  private readonly unitsState = signal<UnitDefinition[]>([]);
   private readonly loadingState = signal(false);
   private readonly initializedState = signal(false);
   private loaded = false;
@@ -42,11 +26,6 @@ export class CatalogStore {
   readonly inputs = this.inputsState.asReadonly();
   readonly kits = this.kitsState.asReadonly();
   readonly additions = this.additionsState.asReadonly();
-  readonly collections = this.collectionsState.asReadonly();
-  readonly fragrances = this.fragrancesState.asReadonly();
-  readonly formats = this.formatsState.asReadonly();
-  readonly formatPrices = this.formatPricesState.asReadonly();
-  readonly units = this.unitsState.asReadonly();
   readonly loading = this.loadingState.asReadonly();
   readonly initialized = this.initializedState.asReadonly();
 
@@ -62,26 +41,16 @@ export class CatalogStore {
     if (this.loaded && !force) return;
     this.loadingState.set(true);
     try {
-      const [products, inputs, kits, additions, collections, fragrances, formats, formatPrices, units] = await Promise.all([
+      const [products, inputs, kits, additions] = await Promise.all([
         this.productRepository.all(),
         this.inputRepository.all(),
         this.kitRepository.all(),
         this.additionRepository.all(),
-        this.collectionRepository.list(),
-        this.fragranceRepository.list(),
-        this.formatRepository.list(),
-        this.formatPriceRepository.list(),
-        this.unitRepository.list(),
       ]);
       this.productsState.set(products);
       this.inputsState.set(inputs);
       this.kitsState.set(kits);
       this.additionsState.set(additions);
-      this.collectionsState.set(collections);
-      this.fragrancesState.set(fragrances);
-      this.formatsState.set(formats);
-      this.formatPricesState.set(formatPrices);
-      this.unitsState.set(units);
       this.loaded = true;
     } catch (error) {
       this.toast.error(this.errors.message(error));
@@ -140,36 +109,6 @@ export class CatalogStore {
   async setAdditionImage(id: string, image: CatalogImageRef | null): Promise<void> {
     if (image) await this.additionRepository.patch(id, { image });
     else await this.additionRepository.clearField(id, 'image');
-    await this.load(true);
-  }
-
-  async saveCollection(item: CollectionDefinition): Promise<void> {
-    if (item.id) await this.collectionRepository.replace(item);
-    else await this.collectionRepository.create(this.withoutId(item));
-    await this.load(true);
-  }
-
-  async saveFragrance(item: FragranceDefinition): Promise<void> {
-    if (item.id) await this.fragranceRepository.replace(item);
-    else await this.fragranceRepository.create(this.withoutId(item));
-    await this.load(true);
-  }
-
-  async saveFormat(item: FormatDefinition): Promise<void> {
-    if (item.id) await this.formatRepository.replace(item);
-    else await this.formatRepository.create(this.withoutId(item));
-    await this.load(true);
-  }
-
-  async saveFormatPrice(item: FormatPrice): Promise<void> {
-    if (item.id) await this.formatPriceRepository.replace(item);
-    else await this.formatPriceRepository.create(this.withoutId(item));
-    await this.load(true);
-  }
-
-  async saveUnit(item: UnitDefinition): Promise<void> {
-    if (item.id) await this.unitRepository.replace(item);
-    else await this.unitRepository.create(this.withoutId(item));
     await this.load(true);
   }
 

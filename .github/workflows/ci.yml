@@ -19,7 +19,9 @@ jobs:
           node-version: 22.22.3
       - run: npm run security:scan
       - run: npm run test:security
-      - run: npm ci --no-audit --no-fund
+      - run: npm run test:architecture
+      - run: npm ci --no-fund
+      - run: npm run security:audit
       - run: npm test
       - run: npm run build:dev:hosting
       - run: npm run build:prod

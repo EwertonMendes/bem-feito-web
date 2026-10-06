@@ -54,15 +54,15 @@ import { BfIcon } from '../../../shared/ui/icon/icon';
   `,
   styles: [`
     :host{display:contents}
-    .drive-notice{position:fixed;right:24px;bottom:24px;z-index:55;width:min(560px,calc(100vw - var(--sidebar) - 48px));display:grid;grid-template-columns:44px minmax(0,1fr) auto;align-items:center;gap:14px;padding:16px 48px 16px 18px;border:1px solid var(--line);border-radius:18px;background:color-mix(in srgb,var(--surface) 96%,transparent);box-shadow:var(--shadow-dialog);backdrop-filter:blur(18px)}
+    .drive-notice{position:fixed;left:50%;bottom:24px;z-index:55;width:min(560px,calc(100vw - 48px));transform:translateX(-50%);display:grid;grid-template-columns:44px minmax(0,1fr) auto;align-items:center;gap:14px;padding:16px 48px 16px 18px;border:1px solid var(--line);border-radius:18px;background:color-mix(in srgb,var(--surface) 96%,transparent);box-shadow:var(--shadow-dialog);backdrop-filter:blur(18px)}
     .drive-logo{display:block;width:42px;height:38px;object-fit:contain;align-self:center}
     .copy{display:grid;gap:3px;min-width:0;padding-right:2px}.copy strong{font-size:.9rem}.copy span{font-size:.78rem;line-height:1.4;color:var(--muted)}
     .connect{white-space:nowrap;align-self:center}
     .close{position:absolute;top:9px;right:9px;width:32px;height:32px;display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;background:color-mix(in srgb,var(--surface-2) 92%,transparent);color:var(--muted-strong);cursor:pointer;transition:background 140ms ease,color 140ms ease,transform 140ms ease}
     .close:hover{background:var(--surface-3);color:var(--text);transform:scale(1.03)}
     .close bf-icon{width:17px;height:17px}
-    @media(max-width:980px){.drive-notice{left:20px;right:20px;bottom:calc(94px + env(safe-area-inset-bottom));width:auto}}
-    @media(max-width:700px){.drive-notice{left:16px;right:16px;grid-template-columns:40px minmax(0,1fr);gap:10px 12px;padding:15px 46px 15px 16px}.drive-logo{width:38px;height:34px}.connect{grid-column:2;justify-self:start}.copy{padding-right:0}}
+    @media(max-width:980px){.drive-notice{bottom:calc(94px + env(safe-area-inset-bottom));width:calc(100vw - 40px)}}
+    @media(max-width:700px){.drive-notice{width:calc(100vw - 32px);grid-template-columns:40px minmax(0,1fr);gap:10px 12px;padding:15px 46px 15px 16px}.drive-logo{width:38px;height:34px}.connect{grid-column:2;justify-self:start}.copy{padding-right:0}}
   `],
 })
 export class DriveConnectionBanner {

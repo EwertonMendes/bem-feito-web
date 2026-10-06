@@ -36,7 +36,7 @@ export class SalesPage {
       if (this.statusFilter() === 'paid' && sale.paymentStatus !== 'paid') return false;
       if (this.statusFilter() === 'open' && !(sale.status === 'active' && sale.balanceCents > 0)) return false;
       if (this.statusFilter() === 'cancelled' && sale.status !== 'cancelled') return false;
-      return !term || `${sale.code} ${sale.customerName ?? ''}`.toLocaleLowerCase('pt-BR').includes(term);
+      return !term || (sale.code + ' ' + (sale.customerName ?? '')).toLocaleLowerCase('pt-BR').includes(term);
     });
   });
 
@@ -55,7 +55,7 @@ export class SalesPage {
 
   async cancelSelected(): Promise<void> {
     const sale = this.selectedSale();
-    if (!sale || sale.status === 'cancelled' || !window.confirm(`Cancelar ${sale.code}? O estoque será revertido e os recebimentos serão estornados.`)) return;
+    if (!sale || sale.status === 'cancelled' || !window.confirm('Cancelar ' + sale.code + '? O estoque será revertido e os recebimentos serão estornados.')) return;
     await this.store.cancel(sale);
     await this.catalog.load(true);
     this.detailDialog().close();
@@ -66,5 +66,14 @@ export class SalesPage {
     if (sale.paymentStatus === 'paid') return 'Pago';
     if (sale.paymentStatus === 'partial') return 'Parcial';
     return 'Pendente';
+  }
+
+  clientInitial(sale: Sale): string {
+    return sale.customerName?.trim().slice(0, 1).toLocaleUpperCase('pt-BR') || '—';
+  }
+
+  clientTone(sale: Sale): string {
+    const value = (sale.customerName || sale.code).split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+    return String(value % 4);
   }
 }

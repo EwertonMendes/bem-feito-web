@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
+import { ThemeService } from '../../core/services/theme.service';
 import { DriveConnectionBanner } from '../../features/google-drive/components/drive-connection-banner';
 import { BfIcon, BfIconName } from '../../shared/ui/icon/icon';
 
@@ -15,9 +16,10 @@ interface NavItem { label: string; path: string; icon: BfIconName; }
 })
 export class AppShell {
   readonly auth = inject(AuthService);
+  readonly theme = inject(ThemeService);
   private readonly router = inject(Router);
+
   readonly mobileMenuOpen = signal(false);
-  readonly darkMode = signal(localStorage.getItem('bf-theme') === 'dark');
   readonly nav: NavItem[] = [
     { label: 'Dashboard', path: '/dashboard', icon: 'dashboard' },
     { label: 'Vendas', path: '/vendas', icon: 'sales' },
@@ -28,20 +30,8 @@ export class AppShell {
     { label: 'Configurações', path: '/configuracoes', icon: 'settings' },
   ];
 
-  constructor() { this.applyTheme(); }
-
-  toggleTheme(): void {
-    this.darkMode.update((value) => !value);
-    localStorage.setItem('bf-theme', this.darkMode() ? 'dark' : 'light');
-    this.applyTheme();
-  }
-
   async quickNavigate(path: string): Promise<void> {
     this.mobileMenuOpen.set(false);
     await this.router.navigateByUrl(path);
-  }
-
-  private applyTheme(): void {
-    document.documentElement.dataset['theme'] = this.darkMode() ? 'dark' : 'light';
   }
 }

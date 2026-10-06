@@ -21,6 +21,7 @@ interface AdditionCartLine { key: string; kind: 'addition'; sourceId: string; qu
 type CartLine = ProductCartLine | KitCartLine | AdditionCartLine;
 interface PaymentUi { id: string; methodId: string; amount: number; }
 interface KitSlot { index: number; label: string; candidates: Product[]; }
+interface CatalogFilterOption { value: string; label: string; }
 
 @Component({
   selector: 'bf-sale-editor',
@@ -39,10 +40,51 @@ export class SaleEditor {
 
   readonly currency = formatCurrency;
   readonly catalogTab = signal<'products' | 'kits' | 'additions'>('products');
+  readonly catalogSearch = signal('');
+  readonly catalogCategory = signal('');
   readonly cart = signal<CartLine[]>([]);
   readonly payments = signal<PaymentUi[]>([]);
   readonly model = signal<SaleFormModel>({ businessDate: todayBusinessDate(), customerName: '', dueDate: '', discount: 0, notes: '' });
   readonly saleForm = form(this.model, (p) => { required(p.businessDate); min(p.discount, 0); });
+
+  readonly filteredProducts = computed(() => {
+    const term = this.normalizedSearch();
+    const category = this.catalogCategory();
+    return this.catalog.activeProducts().filter((product) =>
+      (!term || (product.displayName + ' ' + product.code).toLocaleLowerCase('pt-BR').includes(term)) &&
+      (!category || product.collectionId === category)
+    );
+  });
+
+  readonly filteredKits = computed(() => {
+    const term = this.normalizedSearch();
+    return this.catalog.activeKits().filter((kit) => !term || kit.name.toLocaleLowerCase('pt-BR').includes(term));
+  });
+
+  readonly filteredAdditions = computed(() => {
+    const term = this.normalizedSearch();
+    const category = this.catalogCategory();
+    return this.catalog.activeAdditions().filter((addition) =>
+      (!term || (addition.name + ' ' + addition.category).toLocaleLowerCase('pt-BR').includes(term)) &&
+      (!category || addition.category === category)
+    );
+  });
+
+  readonly categoryOptions = computed<CatalogFilterOption[]>(() => {
+    if (this.catalogTab() === 'products') {
+      return this.references.collections()
+        .filter((item) => item.active)
+        .map((item) => ({ value: item.id, label: item.name }));
+    }
+
+    if (this.catalogTab() === 'additions') {
+      return [...new Set(this.catalog.activeAdditions().map((item) => item.category).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+        .map((category) => ({ value: category, label: category }));
+    }
+
+    return [];
+  });
 
   readonly subtotalCents = computed(() => this.cart().reduce((sum, line) => sum + this.lineTotal(line), 0));
   readonly totalCents = computed(() => Math.max(0, this.subtotalCents() - toCents(this.model().discount)));
@@ -58,12 +100,23 @@ export class SaleEditor {
     const method = this.settings.paymentMethods().find((item) => item.active);
     this.payments.set(method ? [{ id: crypto.randomUUID(), methodId: method.id, amount: 0 }] : []);
     this.catalogTab.set('products');
+    this.catalogSearch.set('');
+    this.catalogCategory.set('');
     this.dialog().open();
+  }
+
+  selectCatalogTab(tab: 'products' | 'kits' | 'additions'): void {
+    this.catalogTab.set(tab);
+    this.catalogCategory.set('');
+  }
+
+  collectionName(collectionId: string): string {
+    return this.references.collections().find((item) => item.id === collectionId)?.name ?? 'Produto';
   }
 
   addProduct(product: Product): void {
     if (product.stock <= 0) {
-      this.toast.error(`${product.displayName} está sem estoque.`);
+      this.toast.error(product.displayName + ' está sem estoque.');
       return;
     }
     this.cart.update((items) => {
@@ -84,7 +137,7 @@ export class SaleEditor {
   addKit(kit: Kit): void {
     const slots = this.buildKitSlots(kit);
     if (slots.some((slot) => !slot.candidates.length)) {
-      this.toast.error(`Não há estoque disponível para completar o kit ${kit.name}.`);
+      this.toast.error('Não há estoque disponível para completar o kit ' + kit.name + '.');
       return;
     }
     this.cart.update((items) => [...items, { key: crypto.randomUUID(), kind: 'kit', sourceId: kit.id, quantity: 1, componentProductIds: slots.map((slot) => slot.candidates[0]?.id ?? '') }]);
@@ -99,11 +152,13 @@ export class SaleEditor {
       }
       return;
     }
+
     const next = line.quantity + delta;
     if (next <= 0) {
       this.removeLine(line.key);
       return;
     }
+
     this.cart.update((items) => items.map((item) => item.key === line.key ? { ...line, quantity: next } : item));
   }
 
@@ -190,6 +245,10 @@ export class SaleEditor {
     return this.catalog.additions().find((item) => item.id === line.sourceId)?.priceCents ?? 0;
   }
 
+  private normalizedSearch(): string {
+    return this.catalogSearch().trim().toLocaleLowerCase('pt-BR');
+  }
+
   private lineTotal(line: CartLine): number {
     return this.lineUnitPrice(line) * line.quantity;
   }
@@ -205,8 +264,8 @@ export class SaleEditor {
           (!component.collectionId || product.collectionId === component.collectionId) &&
           (!component.fragranceId || product.fragranceId === component.fragranceId)
         );
-        const format = this.references.formats().find((item) => item.id === component.formatId)?.name ?? 'Item';
-        slots.push({ index, label: `${format} ${slot + 1}`, candidates });
+        const formatName = this.references.formats().find((item) => item.id === component.formatId)?.name ?? 'Item';
+        slots.push({ index, label: formatName + ' ' + (slot + 1), candidates });
         index++;
       }
     }

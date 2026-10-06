@@ -108,17 +108,19 @@ service cloud.firestore {
           && fields(data, ['collectionId', 'formatId', 'priceCents', 'active'], [])
           && text(data.collectionId) && text(data.formatId) && money(data.priceCents) && data.active is bool)
         || (name == 'products'
-          && fields(data, ['code', 'active', 'collectionId', 'fragranceId', 'formatId', 'displayName', 'salePriceCents', 'additionalCostCents', 'averageUnitCostCents', 'stock', 'minimumStock', 'recipe'], ['image'])
+          && fields(data, ['code', 'active', 'collectionId', 'fragranceId', 'formatId', 'displayName', 'salePriceCents', 'additionalCostCents', 'averageUnitCostCents', 'stock', 'minimumStock', 'recipe'], ['image', 'stockStatus'])
           && text(data.code) && text(data.displayName) && data.active is bool
           && text(data.collectionId) && text(data.fragranceId) && text(data.formatId)
           && money(data.salePriceCents) && money(data.additionalCostCents) && money(data.averageUnitCostCents)
           && stock(data.stock) && quantity(data.minimumStock) && data.recipe is list
+          && (!('stockStatus' in data) || data.stockStatus in ['negative', 'low', 'ok'])
           && (!('image' in data) || validImage(data.image)))
         || (name == 'inputs'
-          && fields(data, ['code', 'active', 'name', 'unitId', 'stock', 'minimumStock', 'averageUnitCostCents'], ['image', 'minimumStockConfigured'])
+          && fields(data, ['code', 'active', 'name', 'unitId', 'stock', 'minimumStock', 'averageUnitCostCents'], ['image', 'minimumStockConfigured', 'stockStatus'])
           && text(data.code) && text(data.name) && text(data.unitId) && data.active is bool
           && stock(data.stock) && quantity(data.minimumStock) && money(data.averageUnitCostCents)
           && (!('minimumStockConfigured' in data) || data.minimumStockConfigured is bool)
+          && (!('stockStatus' in data) || data.stockStatus in ['negative', 'low', 'ok', 'untracked'])
           && (!('image' in data) || validImage(data.image)))
         || (name == 'kits'
           && fields(data, ['active', 'name', 'priceCents', 'components'], ['notes', 'image'])
@@ -162,7 +164,7 @@ service cloud.firestore {
 
     function validOperation(name, data) {
       return (name == 'sales'
-          && fields(data, ['code', 'businessDate', 'discountCents', 'subtotalCents', 'totalCents', 'receivedCents', 'tipCents', 'balanceCents', 'paymentStatus', 'status', 'items', 'paymentIds', 'stockEffects'], ['customerName', 'dueDate', 'notes', 'cancelledAt', 'cancelledBy'])
+          && fields(data, ['code', 'businessDate', 'discountCents', 'subtotalCents', 'totalCents', 'receivedCents', 'tipCents', 'balanceCents', 'paymentStatus', 'status', 'items', 'paymentIds', 'stockEffects'], ['customerName', 'dueDate', 'notes', 'cancelledAt', 'cancelledBy', 'analyticsVersion', 'cogsCents', 'itemsSold', 'missingCostItems'])
           && text(data.code) && businessDate(data)
           && money(data.discountCents) && money(data.subtotalCents) && money(data.totalCents)
           && money(data.receivedCents) && money(data.tipCents) && money(data.balanceCents)
@@ -175,7 +177,11 @@ service cloud.firestore {
               && ((data.balanceCents == 0 && data.paymentStatus == 'paid')
                 || (data.balanceCents > 0 && data.receivedCents == 0 && data.paymentStatus == 'pending')
                 || (data.balanceCents > 0 && data.receivedCents > 0 && data.paymentStatus == 'partial'))))
-          && data.items is list && data.items.size() > 0 && data.paymentIds is list && data.stockEffects is list)
+          && data.items is list && data.items.size() > 0 && data.paymentIds is list && data.stockEffects is list
+          && ((!(('analyticsVersion' in data) || ('cogsCents' in data) || ('itemsSold' in data) || ('missingCostItems' in data)))
+            || (data.analyticsVersion == 1 && money(data.cogsCents)
+              && data.itemsSold is int && data.itemsSold >= 0
+              && data.missingCostItems is int && data.missingCostItems >= 0)))
         || (name == 'payments'
           && fields(data, ['code', 'saleId', 'businessDate', 'methodId', 'amountReceivedCents', 'appliedCents', 'tipCents', 'status'], ['notes', 'reversalOf'])
           && text(data.code) && text(data.saleId) && text(data.methodId) && businessDate(data)
@@ -204,8 +210,45 @@ service cloud.firestore {
           && data.sourceType in ['sale', 'sale-cancellation', 'production', 'purchase', 'adjustment']);
     }
 
+
+    function validRevisionStamp(value) {
+      return value is map
+        && value.keys().hasOnly(['source', 'at'])
+        && value.source is string && value.source.size() > 0 && value.source.size() <= 100
+        && value.at == request.time;
+    }
+
+    function validDataRevisions(data) {
+      return data.keys().hasOnly(['catalog', 'settings', 'sales', 'finance', 'production', 'inventory'])
+        && (!('catalog' in data) || validRevisionStamp(data.catalog))
+        && (!('settings' in data) || validRevisionStamp(data.settings))
+        && (!('sales' in data) || validRevisionStamp(data.sales))
+        && (!('finance' in data) || validRevisionStamp(data.finance))
+        && (!('production' in data) || validRevisionStamp(data.production))
+        && (!('inventory' in data) || validRevisionStamp(data.inventory));
+    }
+
     function quantityDelta(value) {
       return value is number && value != 0 && value >= -1000000 && value <= 1000000;
+    }
+
+
+    match /system/data-revisions {
+      allow read: if activeUser();
+      allow create, update: if canOperate() && validDataRevisions(request.resource.data);
+      allow delete: if false;
+    }
+
+    match /system/read-optimization {
+      allow read: if activeUser();
+      allow create, update: if canOperate()
+        && request.resource.data.keys().hasOnly(['version', 'updatedAt', 'updatedBy'])
+        && request.resource.data.version is int
+        && request.resource.data.version >= 1
+        && request.resource.data.version <= 1000
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if false;
     }
 
     match /users/{userId} {

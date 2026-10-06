@@ -1,6 +1,8 @@
 import { AuditFields } from './common.model';
 import { CatalogImageRef } from './image.model';
 
+export type StockStatus = 'negative' | 'low' | 'ok' | 'untracked';
+
 export interface RecipeComponent {
   inputId: string;
   quantity: number;
@@ -20,6 +22,7 @@ export interface Product extends AuditFields {
   averageUnitCostCents: number;
   stock: number;
   minimumStock: number;
+  stockStatus?: StockStatus;
   image?: CatalogImageRef;
   recipe: RecipeComponent[];
 }
@@ -33,6 +36,7 @@ export interface InputItem extends AuditFields {
   stock: number;
   minimumStock: number;
   minimumStockConfigured?: boolean;
+  stockStatus?: StockStatus;
   averageUnitCostCents: number;
   image?: CatalogImageRef;
 }

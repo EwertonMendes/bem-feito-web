@@ -32,3 +32,49 @@ jobs:
       - run: npm run test:transactions
       - run: npm run build:dev:hosting
       - run: npm run build:prod
+
+  deploy-dev-preview:
+    needs: validate
+    if: ${{ github.event_name == 'push' && github.ref_name != 'master' && github.actor == github.repository_owner }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    environment:
+      name: dev
+      url: https://bem-feito-dev.web.app/
+    concurrency:
+      group: bem-feito-dev
+      cancel-in-progress: true
+    env:
+      DEPLOY_COMMIT: ${{ github.sha }}
+      DEPLOY_SOURCE_PR: branch-preview
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.22.3
+          cache: npm
+      - run: npm ci --no-fund
+      - run: npm run deploy:prepare:dev
+      - run: npm run build:dev:hosting
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: bem-feito-dev
+          workload_identity_provider: projects/312978463343/locations/global/workloadIdentityPools/github-actions/providers/github
+          service_account: github-deploy@bem-feito-dev.iam.gserviceaccount.com
+          create_credentials_file: true
+          export_environment_variables: true
+      - uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: bem-feito-dev
+      - name: Deploy Firestore rules and indexes
+        run: npm run firebase:deploy:dev:firestore
+      - name: Wait for Firestore indexes
+        run: npm run firebase:wait-indexes:dev
+      - name: Deploy Hosting
+        run: npm run firebase:deploy:dev:hosting
+      - run: npm run deploy:verify:dev

@@ -3,6 +3,7 @@ import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 
 const workflow = readFileSync('.github/workflows/deploy-dev.yml', 'utf8');
+const workflowSource = readFileSync('.github/workflows/ci.yml', 'utf8');
 const previewWorkflow = readFileSync('.github/workflows/deploy-dev-preview.yml', 'utf8');
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
 
@@ -65,4 +66,38 @@ test('DEV deployment is pinned to the validated commit and verifies the publishe
   assert.match(packageJson.scripts['firebase:deploy:dev:ci'], /--non-interactive/);
   assert.equal(packageJson.scripts['deploy:prepare:dev'], 'node tools/deploy/prepare-deployment.mjs');
   assert.equal(packageJson.scripts['deploy:verify:dev'], 'node tools/deploy/verify-deployment.mjs');
+});
+
+test('owner feature-branch pushes deploy to DEV only after validation and index readiness', () => {
+  for (const expected of [
+    'deploy-dev-preview:',
+    'needs: validate',
+    "github.event_name == 'push'",
+    "github.ref_name != 'master'",
+    'github.actor == github.repository_owner',
+    'group: bem-feito-dev',
+    'npm run firebase:deploy:dev:firestore',
+    'npm run firebase:wait-indexes:dev',
+    'npm run firebase:deploy:dev:hosting',
+    'npm run deploy:verify:dev',
+  ]) {
+    assert.ok(workflowSource.includes(expected), `Missing automatic DEV preview safeguard: ${expected}`);
+  }
+});
+
+test('Dashboard aggregation indexes cover every filtered sum query', () => {
+  const indexConfig = JSON.parse(readFileSync('firestore.indexes.json', 'utf8'));
+  const keys = new Set(indexConfig.indexes.map((index) =>
+    `${index.collectionGroup}|${index.fields.map((field) => `${field.fieldPath}:${field.order ?? field.arrayConfig}`).join('|')}`
+  ));
+
+  for (const expected of [
+    'sales|status:ASCENDING|businessDate:ASCENDING|totalCents:ASCENDING',
+    'sales|status:ASCENDING|analyticsVersion:ASCENDING|businessDate:ASCENDING|cogsCents:ASCENDING|itemsSold:ASCENDING|missingCostItems:ASCENDING',
+    'payments|status:ASCENDING|businessDate:ASCENDING|appliedCents:ASCENDING|amountReceivedCents:ASCENDING|tipCents:ASCENDING',
+    'expenses|businessDate:ASCENDING|amountCents:ASCENDING',
+    'expenses|kind:ASCENDING|businessDate:ASCENDING|amountCents:ASCENDING',
+  ]) {
+    assert.ok(keys.has(expected), `Missing Dashboard aggregation index: ${expected}`);
+  }
 });

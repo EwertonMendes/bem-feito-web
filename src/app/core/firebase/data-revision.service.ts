@@ -90,6 +90,10 @@ export class DataRevisionService {
     return computed(() => this.changeVersions()[domain]);
   }
 
+  localRevision(domain: DataDomain): Signal<number> {
+    return computed(() => this.changeVersions()[domain] - this.versions()[domain]);
+  }
+
   touchBatch(batch: WriteBatch, ...domains: DataDomain[]): void {
     if (!domains.length) return;
     batch.set(this.revisionRef(), this.patch(domains), { merge: true });

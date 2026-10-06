@@ -8,7 +8,6 @@ import { todayBusinessDate } from '../../../../core/utils/date';
 import { formatCurrency, toCents } from '../../../../core/utils/money';
 import { CatalogReferenceStore } from '../../../catalog/catalog-reference.store';
 import { CatalogStore } from '../../../catalog/catalog.store';
-import { FinanceStore } from '../../../finance/finance.store';
 import { SettingsStore } from '../../../settings/settings.store';
 import { SalesStore } from '../../sales.store';
 import { CatalogImage } from '../../../../shared/media/catalog-image/catalog-image';
@@ -36,7 +35,6 @@ export class SaleEditor {
   readonly catalog = inject(CatalogStore);
   readonly references = inject(CatalogReferenceStore);
   readonly settings = inject(SettingsStore);
-  private readonly finance = inject(FinanceStore);
   private readonly destroyRef = inject(DestroyRef);
   private readonly toast = inject(ToastService);
   private readonly dialog = viewChild.required<BfDialog>('saleDialog');
@@ -232,7 +230,6 @@ export class SaleEditor {
     const result = await this.store.create(draft);
     if (!result) return;
     this.catalog.applyStockChanges(result.stockChanges);
-    this.finance.applyPayments(result.payments);
     this.dialog().close();
   }
 

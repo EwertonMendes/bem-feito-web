@@ -4,7 +4,6 @@ import { Sale } from '../../domain/models/sales.model';
 import { CatalogStore } from '../../features/catalog/catalog.store';
 import { SaleEditor } from '../../features/sales/components/sale-editor/sale-editor';
 import { SalesStore } from '../../features/sales/sales.store';
-import { FinanceStore } from '../../features/finance/finance.store';
 import { formatBusinessDate } from '../../core/utils/date';
 import { formatCurrency } from '../../core/utils/money';
 import { BfDialog } from '../../shared/ui/dialog/dialog';
@@ -21,7 +20,6 @@ import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
 export class SalesPage {
   readonly store = inject(SalesStore);
   readonly catalog = inject(CatalogStore);
-  private readonly finance = inject(FinanceStore);
   private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
   private readonly detailDialog = viewChild.required<BfDialog>('detailDialog');
@@ -64,7 +62,6 @@ export class SalesPage {
     const result = await this.store.cancel(sale);
     if (!result) return;
     this.catalog.applyStockChanges(result.stockChanges);
-    this.finance.markPaymentsReversed(result.reversedPaymentIds);
     this.selectedSale.set(result.sale);
     this.detailDialog().close();
   }

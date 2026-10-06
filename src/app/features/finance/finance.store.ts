@@ -23,7 +23,9 @@ export class FinanceStore {
   private readonly paymentsGate = new AsyncLoadGate();
   private readonly summaryGate = new AsyncLoadGate();
   private readonly remoteRevision = this.revisions.revision('finance');
+  private readonly localRevision = this.revisions.localRevision('finance');
   private lastRemoteRevision = 0;
+  private lastLocalRevision = 0;
   private activeConsumers = 0;
   private expenseCursor: BusinessDateCursor | null = null;
   private paymentCursor: BusinessDateCursor | null = null;
@@ -47,6 +49,16 @@ export class FinanceStore {
   readonly paymentHasMore = this.paymentHasMoreState.asReadonly();
 
   constructor() {
+    effect(() => {
+      const revision = this.localRevision();
+      if (revision === this.lastLocalRevision) return;
+      this.lastLocalRevision = revision;
+      if (this.activeConsumers > 0) return;
+      this.expensesGate.invalidate();
+      this.paymentsGate.invalidate();
+      this.summaryGate.invalidate();
+    });
+
     effect(() => {
       const revision = this.remoteRevision();
       if (revision === this.lastRemoteRevision) return;

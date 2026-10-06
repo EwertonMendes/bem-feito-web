@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   gate:
-    if: ${{ github.event_name == 'workflow_dispatch' || (vars.DEV_AUTO_DEPLOY_ENABLED == 'true' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') }}
     runs-on: ubuntu-latest
     outputs:
       deploy: ${{ steps.source.outputs.deploy }}

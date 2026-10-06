@@ -5,7 +5,7 @@ import { test } from 'node:test';
 const workflow = readFileSync('.github/workflows/deploy-dev.yml', 'utf8');
 const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
 
-test('DEV deployment waits for successful master CI and a merged PR', () => {
+test('DEV deployment automatically follows successful master CI from a merged PR', () => {
   for (const expected of [
     'workflow_run:',
     'workflows: [CI]',
@@ -14,7 +14,6 @@ test('DEV deployment waits for successful master CI and a merged PR', () => {
     "github.event.workflow_run.event == 'push'",
     'listPullRequestsAssociatedWithCommit',
     "pull.base.ref === 'master'",
-    'DEV_AUTO_DEPLOY_ENABLED',
   ]) {
     assert.ok(workflow.includes(expected), `Missing deployment safeguard: ${expected}`);
   }

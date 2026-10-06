@@ -155,4 +155,110 @@ export class InventoryRepository {
       };
     });
   }
+
+  async reconcileNegativeToZero(
+    itemType: 'product' | 'input',
+    itemId: string,
+    reason: string,
+    businessDate: string,
+  ): Promise<StockAdjustmentResult | null> {
+    const userId = this.auth.user()?.uid;
+    if (!userId) throw new Error('Sessão inválida.');
+    if (!this.auth.canAdminister()) throw new Error('Somente o proprietário pode regularizar saldos legados.');
+    if (!reason.trim()) throw new Error('Informe o motivo do ajuste.');
+    if (!businessDate) throw new Error('Informe a data do ajuste.');
+
+    return runTransaction(this.firestore, async (transaction) => {
+      const itemRef = doc(this.firestore, itemType === 'product' ? 'products' : 'inputs', itemId);
+      const itemSnapshot = await transaction.get(itemRef);
+      if (!itemSnapshot.exists()) throw new Error('Item não encontrado.');
+
+      const currentStock = Number(itemSnapshot.data()['stock'] ?? 0);
+      if (currentStock >= 0) return null;
+
+      const counterRef = doc(this.firestore, 'counters', 'stockAdjustment');
+      const counterSnapshot = await transaction.get(counterRef);
+      const sequence = Number(counterSnapshot.data()?.['value'] ?? 0) + 1;
+      const quantityDelta = Math.abs(currentStock);
+      const stock = 0;
+      const adjustmentRef = doc(collection(this.firestore, 'stockAdjustments'));
+      const movementRef = doc(collection(this.firestore, 'stockMovements'));
+      const unitCostCents = Number(itemSnapshot.data()['averageUnitCostCents'] ?? 0);
+      const item = { id: itemSnapshot.id, ...itemSnapshot.data() } as Product | InputItem;
+      const stockStatus = itemType === 'product'
+        ? productStockStatus(stock, (item as Product).minimumStock)
+        : inputStockStatus(
+            stock,
+            (item as InputItem).minimumStock,
+            (item as InputItem).minimumStockConfigured !== false,
+          );
+
+      transaction.set(counterRef, { value: sequence, updatedAt: serverTimestamp() }, { merge: true });
+      transaction.update(itemRef, {
+        stock,
+        stockStatus,
+        updatedAt: serverTimestamp(),
+        updatedBy: userId,
+      });
+
+      const adjustment: StockAdjustment = {
+        id: adjustmentRef.id,
+        code: entityCode('AJ', sequence, 5),
+        businessDate,
+        itemType,
+        itemId,
+        quantityDelta,
+        reason: reason.trim(),
+      };
+
+      transaction.set(adjustmentRef, {
+        code: adjustment.code,
+        businessDate,
+        itemType,
+        itemId,
+        quantityDelta,
+        reason: adjustment.reason,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        createdBy: userId,
+        updatedBy: userId,
+      } satisfies Omit<StockAdjustment, 'id'>);
+
+      const movement: StockMovement = {
+        id: movementRef.id,
+        itemType,
+        itemId,
+        quantityDelta,
+        unitCostCents,
+        totalCostCents: Math.round(quantityDelta * unitCostCents),
+        sourceType: 'adjustment',
+        sourceId: adjustmentRef.id,
+        businessDate,
+      };
+
+      transaction.set(movementRef, {
+        itemType: movement.itemType,
+        itemId: movement.itemId,
+        quantityDelta: movement.quantityDelta,
+        unitCostCents: movement.unitCostCents,
+        totalCostCents: movement.totalCostCents,
+        sourceType: movement.sourceType,
+        sourceId: movement.sourceId,
+        businessDate: movement.businessDate,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        createdBy: userId,
+        updatedBy: userId,
+      } satisfies Omit<StockMovement, 'id'>);
+
+      this.revisions.touchTransaction(transaction, 'inventory');
+
+      return {
+        adjustment,
+        movement,
+        stockChange: { itemType, itemId, stock },
+      };
+    });
+  }
+
 }

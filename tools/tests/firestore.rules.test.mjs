@@ -48,6 +48,11 @@ try {
   await deny(deleteDoc(doc(viewer, 'products', 'p1')));
   await pass(setDoc(doc(operator, 'products', 'p2'), { ...product, ...audit('operator') }));
   await pass(updateDoc(doc(operator, 'products', 'p2'), { stock: 9, updatedAt: serverTimestamp(), updatedBy: 'operator' }));
+  await pass(setDoc(doc(operator, 'products', 'status-ok'), { ...product, stockStatus: 'ok', ...audit('operator') }));
+  await deny(setDoc(doc(operator, 'products', 'status-wrong'), { ...product, stockStatus: 'low', ...audit('operator') }));
+  const untrackedInput = { name: 'Sem mínimo', code: 'IU', active: true, unitId: 'u', stock: 0, minimumStock: 0, minimumStockConfigured: false, stockStatus: 'untracked', averageUnitCostCents: 100 };
+  await pass(setDoc(doc(operator, 'inputs', 'status-untracked'), { ...untrackedInput, ...audit('operator') }));
+  await deny(setDoc(doc(operator, 'inputs', 'status-wrong'), { ...untrackedInput, stockStatus: 'low', ...audit('operator') }));
   for (const uid of ['operator', 'viewer']) {
     await deny(updateDoc(doc(dbs[uid], 'users', uid), { role: 'owner' }));
     await deny(updateDoc(doc(dbs[uid], 'users', uid), { active: false }));

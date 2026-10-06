@@ -91,6 +91,22 @@ service cloud.firestore {
         && data.role in ['owner', 'operator', 'viewer'] && data.active is bool;
     }
 
+    function validProductStockStatus(data) {
+      return !('stockStatus' in data)
+        || (data.stock < 0 && data.stockStatus == 'negative')
+        || (data.stock >= 0 && data.stock <= data.minimumStock && data.stockStatus == 'low')
+        || (data.stock > data.minimumStock && data.stockStatus == 'ok');
+    }
+
+    function validInputStockStatus(data) {
+      let tracked = !('minimumStockConfigured' in data) || data.minimumStockConfigured == true;
+      return !('stockStatus' in data)
+        || (!tracked && data.stockStatus == 'untracked')
+        || (tracked && data.stock < 0 && data.stockStatus == 'negative')
+        || (tracked && data.stock >= 0 && data.stock <= data.minimumStock && data.stockStatus == 'low')
+        || (tracked && data.stock > data.minimumStock && data.stockStatus == 'ok');
+    }
+
     function validCatalog(name, data) {
       return (name in ['collections', 'units', 'paymentMethods', 'expenseCategories']
           && fields(data, ['name', 'active'], []) && text(data.name) && data.active is bool)
@@ -113,14 +129,14 @@ service cloud.firestore {
           && text(data.collectionId) && text(data.fragranceId) && text(data.formatId)
           && money(data.salePriceCents) && money(data.additionalCostCents) && money(data.averageUnitCostCents)
           && stock(data.stock) && quantity(data.minimumStock) && data.recipe is list
-          && (!('stockStatus' in data) || data.stockStatus in ['negative', 'low', 'ok'])
+          && validProductStockStatus(data)
           && (!('image' in data) || validImage(data.image)))
         || (name == 'inputs'
           && fields(data, ['code', 'active', 'name', 'unitId', 'stock', 'minimumStock', 'averageUnitCostCents'], ['image', 'minimumStockConfigured', 'stockStatus'])
           && text(data.code) && text(data.name) && text(data.unitId) && data.active is bool
           && stock(data.stock) && quantity(data.minimumStock) && money(data.averageUnitCostCents)
           && (!('minimumStockConfigured' in data) || data.minimumStockConfigured is bool)
-          && (!('stockStatus' in data) || data.stockStatus in ['negative', 'low', 'ok', 'untracked'])
+          && validInputStockStatus(data)
           && (!('image' in data) || validImage(data.image)))
         || (name == 'kits'
           && fields(data, ['active', 'name', 'priceCents', 'components'], ['notes', 'image'])

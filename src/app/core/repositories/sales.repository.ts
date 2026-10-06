@@ -35,7 +35,7 @@ import {
   SalePaymentReversalResult,
   StockChange,
 } from './mutation-results';
-import { BalanceCursor, BusinessDateCursor, PageResult } from './pagination';
+import { BusinessDateCursor, PageResult } from './pagination';
 
 @Injectable({ providedIn: 'root' })
 export class SalesRepository {
@@ -64,14 +64,14 @@ export class SalesRepository {
 
   async receivablePage(
     pageSize = 40,
-    cursor?: BalanceCursor | null,
-  ): Promise<PageResult<Sale, BalanceCursor>> {
+    cursor?: BusinessDateCursor | null,
+  ): Promise<PageResult<Sale>> {
     const constraints = [
       where('status', '==', 'active'),
-      where('balanceCents', '>', 0),
-      orderBy('balanceCents', 'desc'),
+      where('paymentStatus', 'in', ['pending', 'partial']),
+      orderBy('businessDate', 'desc'),
       orderBy(documentId(), 'desc'),
-      ...(cursor ? [startAfter(cursor.balanceCents, cursor.id)] : []),
+      ...(cursor ? [startAfter(cursor.businessDate, cursor.id)] : []),
       limit(pageSize + 1),
     ];
     const snapshot = await getDocs(query(collection(this.firestore, 'sales'), ...constraints));
@@ -82,7 +82,7 @@ export class SalesRepository {
     return {
       items,
       hasMore,
-      nextCursor: hasMore && last ? { balanceCents: last.balanceCents, id: last.id } : null,
+      nextCursor: hasMore && last ? { businessDate: last.businessDate, id: last.id } : null,
     };
   }
 

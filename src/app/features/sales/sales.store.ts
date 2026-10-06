@@ -7,7 +7,7 @@ import {
   SalePaymentResult,
   SalePaymentReversalResult,
 } from '../../core/repositories/mutation-results';
-import { BalanceCursor, BusinessDateCursor } from '../../core/repositories/pagination';
+import { BusinessDateCursor } from '../../core/repositories/pagination';
 import { SalesRepository } from '../../core/repositories/sales.repository';
 import { ErrorService } from '../../core/services/error.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -29,7 +29,7 @@ export class SalesStore {
   private salesConsumers = 0;
   private receivableConsumers = 0;
   private cursor: BusinessDateCursor | null = null;
-  private receivableCursor: BalanceCursor | null = null;
+  private receivableCursor: BusinessDateCursor | null = null;
 
   private readonly salesState = signal<Sale[]>([]);
   private readonly receivablesState = signal<Sale[]>([]);
@@ -209,7 +209,7 @@ export class SalesStore {
     this.receivablesState.update((items) => {
       const without = items.filter((item) => item.id !== sale.id);
       if (currentBalance <= 0) return without;
-      return [sale, ...without].sort((a, b) => b.balanceCents - a.balanceCents);
+      return [sale, ...without].sort((a, b) => b.businessDate.localeCompare(a.businessDate) || b.id.localeCompare(a.id));
     });
   }
 

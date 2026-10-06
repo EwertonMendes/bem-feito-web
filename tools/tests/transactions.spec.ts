@@ -100,6 +100,8 @@ describe('Actual repositories against restrictive emulator rules', () => {
     expect(await data('sales', id)).toMatchObject({ paymentStatus: 'pending', receivedCents: 0, tipCents: 0, balanceCents: 1000 });
     await sales.addPayment(id, day, 'cash', 400);
     expect(await data('sales', id)).toMatchObject({ paymentStatus: 'partial', balanceCents: 600 });
+    const receivables = await sales.receivablePage();
+    expect(receivables.items.map((item) => item.id)).toContain(id);
   });
   it('aggregates repeated recipe inputs and records costs and both stock movements', async () => {
     const id = (await production.create('p', 2, day)).production.id;

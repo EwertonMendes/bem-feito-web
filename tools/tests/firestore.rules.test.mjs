@@ -108,6 +108,8 @@ try {
     sales: { source: 'rules-test', at: serverTimestamp() },
   }));
   await pass(updateDoc(doc(operator, 'system', 'data-revisions'), {
+    expenses: { source: 'rules-test', at: serverTimestamp() },
+    payments: { source: 'rules-test', at: serverTimestamp() },
     finance: { source: 'rules-test', at: serverTimestamp() },
   }));
   await deny(setDoc(doc(viewer, 'system', 'data-revisions'), {

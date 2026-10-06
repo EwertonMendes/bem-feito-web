@@ -19,13 +19,21 @@ export class FinanceStore {
   private readonly revisions = inject(DataRevisionService);
   private readonly toast = inject(ToastService);
   private readonly errors = inject(ErrorService);
+
   private readonly expensesGate = new AsyncLoadGate();
   private readonly paymentsGate = new AsyncLoadGate();
-  private readonly summaryGate = new AsyncLoadGate();
-  private readonly remoteRevision = this.revisions.revision('finance');
-  private readonly localRevision = this.revisions.localRevision('finance');
-  private lastRemoteRevision = 0;
-  private lastLocalRevision = 0;
+  private readonly expenseSummaryGate = new AsyncLoadGate();
+  private readonly paymentSummaryGate = new AsyncLoadGate();
+
+  private readonly remoteExpenseRevision = this.revisions.revision('expenses');
+  private readonly remotePaymentRevision = this.revisions.revision('payments');
+  private readonly localExpenseRevision = this.revisions.localRevision('expenses');
+  private readonly localPaymentRevision = this.revisions.localRevision('payments');
+
+  private lastRemoteExpenseRevision = 0;
+  private lastRemotePaymentRevision = 0;
+  private lastLocalExpenseRevision = 0;
+  private lastLocalPaymentRevision = 0;
   private activeConsumers = 0;
   private expenseCursor: BusinessDateCursor | null = null;
   private paymentCursor: BusinessDateCursor | null = null;
@@ -50,28 +58,39 @@ export class FinanceStore {
 
   constructor() {
     effect(() => {
-      const revision = this.localRevision();
-      if (revision === this.lastLocalRevision) return;
-      this.lastLocalRevision = revision;
-      if (this.activeConsumers > 0) return;
-      this.expensesGate.invalidate();
-      this.paymentsGate.invalidate();
-      this.summaryGate.invalidate();
+      const revision = this.localExpenseRevision();
+      if (revision === this.lastLocalExpenseRevision) return;
+      this.lastLocalExpenseRevision = revision;
+      if (this.activeConsumers === 0) this.invalidateExpenses();
     });
 
     effect(() => {
-      const revision = this.remoteRevision();
-      if (revision === this.lastRemoteRevision) return;
-      this.lastRemoteRevision = revision;
-      const refreshExpenses = this.activeConsumers > 0 && this.expensesGate.isLoaded;
-      const refreshPayments = this.activeConsumers > 0 && this.paymentsGate.isLoaded;
-      const refreshSummary = this.activeConsumers > 0 && this.summaryGate.isLoaded;
-      this.expensesGate.invalidate();
-      this.paymentsGate.invalidate();
-      this.summaryGate.invalidate();
-      if (refreshExpenses) void this.loadExpenses();
-      if (refreshPayments) void this.loadPayments();
-      if (refreshSummary) void this.loadSummary();
+      const revision = this.localPaymentRevision();
+      if (revision === this.lastLocalPaymentRevision) return;
+      this.lastLocalPaymentRevision = revision;
+      if (this.activeConsumers === 0) this.invalidatePayments();
+    });
+
+    effect(() => {
+      const revision = this.remoteExpenseRevision();
+      if (revision === this.lastRemoteExpenseRevision) return;
+      this.lastRemoteExpenseRevision = revision;
+      const refreshList = this.activeConsumers > 0 && this.expensesGate.isLoaded;
+      const refreshSummary = this.activeConsumers > 0 && this.expenseSummaryGate.isLoaded;
+      this.invalidateExpenses();
+      if (refreshList) void this.loadExpenses();
+      if (refreshSummary) void this.loadExpenseSummary();
+    });
+
+    effect(() => {
+      const revision = this.remotePaymentRevision();
+      if (revision === this.lastRemotePaymentRevision) return;
+      this.lastRemotePaymentRevision = revision;
+      const refreshList = this.activeConsumers > 0 && this.paymentsGate.isLoaded;
+      const refreshSummary = this.activeConsumers > 0 && this.paymentSummaryGate.isLoaded;
+      this.invalidatePayments();
+      if (refreshList) void this.loadPayments();
+      if (refreshSummary) void this.loadPaymentSummary();
     });
   }
 
@@ -115,19 +134,10 @@ export class FinanceStore {
   }
 
   loadSummary(force = false): Promise<void> {
-    return this.summaryGate.run(async () => {
-      try {
-        const [totalOut, paymentCount] = await Promise.all([
-          this.financeRepository.totalExpensesCents(),
-          this.salesRepository.paymentCount(),
-        ]);
-        this.totalOutState.set(totalOut);
-        this.paymentCountState.set(paymentCount);
-      } catch (error) {
-        this.toast.error(this.errors.message(error));
-        throw error;
-      }
-    }, force).catch(() => undefined);
+    return Promise.all([
+      this.loadExpenseSummary(force),
+      this.loadPaymentSummary(force),
+    ]).then(() => undefined);
   }
 
   async loadMoreExpenses(): Promise<void> {
@@ -160,9 +170,14 @@ export class FinanceStore {
     try {
       const result = await this.financeRepository.createExpense(draft);
       if (this.expensesGate.isLoaded) {
-        this.expensesState.update((items) => [result.expense, ...items.filter((item) => item.id !== result.expense.id)].sort(compareBusinessDateDesc));
+        this.expensesState.update((items) =>
+          [result.expense, ...items.filter((item) => item.id !== result.expense.id)]
+            .sort(compareBusinessDateDesc)
+        );
       }
-      if (this.summaryGate.isLoaded) this.totalOutState.update((value) => value + result.expense.amountCents);
+      if (this.expenseSummaryGate.isLoaded) {
+        this.totalOutState.update((value) => value + result.expense.amountCents);
+      }
       this.toast.success(draft.kind === 'input-purchase'
         ? 'Compra registrada e estoque atualizado.'
         : 'Saída registrada com sucesso.');
@@ -177,9 +192,14 @@ export class FinanceStore {
     if (!payments.length) return;
     if (this.paymentsGate.isLoaded) {
       const ids = new Set(payments.map((item) => item.id));
-      this.paymentsState.update((items) => [...payments, ...items.filter((item) => !ids.has(item.id))].sort(compareBusinessDateDesc));
+      this.paymentsState.update((items) =>
+        [...payments, ...items.filter((item) => !ids.has(item.id))]
+          .sort(compareBusinessDateDesc)
+      );
     }
-    if (this.summaryGate.isLoaded) this.paymentCountState.update((value) => value + payments.length);
+    if (this.paymentSummaryGate.isLoaded) {
+      this.paymentCountState.update((value) => value + payments.length);
+    }
   }
 
   applyPayment(payment: Payment): void {
@@ -188,14 +208,40 @@ export class FinanceStore {
 
   applyPaymentReversal(payment: Payment): void {
     if (!this.paymentsGate.isLoaded) return;
-    this.paymentsState.update((items) => items.map((item) => item.id === payment.id ? payment : item));
+    this.paymentsState.update((items) =>
+      items.map((item) => item.id === payment.id ? payment : item)
+    );
   }
 
-  markPaymentsReversed(paymentIds: readonly string[]): void {
-    if (!this.paymentsGate.isLoaded || !paymentIds.length) return;
-    const ids = new Set(paymentIds);
-    this.paymentsState.update((items) => items.map((item) =>
-      ids.has(item.id) ? { ...item, status: 'reversed' as const } : item
-    ));
+  private loadExpenseSummary(force = false): Promise<void> {
+    return this.expenseSummaryGate.run(async () => {
+      try {
+        this.totalOutState.set(await this.financeRepository.totalExpensesCents());
+      } catch (error) {
+        this.toast.error(this.errors.message(error));
+        throw error;
+      }
+    }, force).catch(() => undefined);
+  }
+
+  private loadPaymentSummary(force = false): Promise<void> {
+    return this.paymentSummaryGate.run(async () => {
+      try {
+        this.paymentCountState.set(await this.salesRepository.paymentCount());
+      } catch (error) {
+        this.toast.error(this.errors.message(error));
+        throw error;
+      }
+    }, force).catch(() => undefined);
+  }
+
+  private invalidateExpenses(): void {
+    this.expensesGate.invalidate();
+    this.expenseSummaryGate.invalidate();
+  }
+
+  private invalidatePayments(): void {
+    this.paymentsGate.invalidate();
+    this.paymentSummaryGate.invalidate();
   }
 }

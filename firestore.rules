@@ -235,11 +235,13 @@ service cloud.firestore {
     }
 
     function validDataRevisionsShape(data) {
-      return data.keys().hasOnly(['catalog', 'references', 'settings', 'sales', 'finance', 'production', 'inventory'])
+      return data.keys().hasOnly(['catalog', 'references', 'settings', 'sales', 'expenses', 'payments', 'finance', 'production', 'inventory'])
         && (!('catalog' in data) || validRevisionStamp(data.catalog))
         && (!('references' in data) || validRevisionStamp(data.references))
         && (!('settings' in data) || validRevisionStamp(data.settings))
         && (!('sales' in data) || validRevisionStamp(data.sales))
+        && (!('expenses' in data) || validRevisionStamp(data.expenses))
+        && (!('payments' in data) || validRevisionStamp(data.payments))
         && (!('finance' in data) || validRevisionStamp(data.finance))
         && (!('production' in data) || validRevisionStamp(data.production))
         && (!('inventory' in data) || validRevisionStamp(data.inventory));
@@ -251,6 +253,8 @@ service cloud.firestore {
         && (!('references' in data) || data.references.at == request.time)
         && (!('settings' in data) || data.settings.at == request.time)
         && (!('sales' in data) || data.sales.at == request.time)
+        && (!('expenses' in data) || data.expenses.at == request.time)
+        && (!('payments' in data) || data.payments.at == request.time)
         && (!('finance' in data) || data.finance.at == request.time)
         && (!('production' in data) || data.production.at == request.time)
         && (!('inventory' in data) || data.inventory.at == request.time);
@@ -263,6 +267,8 @@ service cloud.firestore {
         && (!changed.hasAny(['references']) || data.references.at == request.time)
         && (!changed.hasAny(['settings']) || data.settings.at == request.time)
         && (!changed.hasAny(['sales']) || data.sales.at == request.time)
+        && (!changed.hasAny(['expenses']) || data.expenses.at == request.time)
+        && (!changed.hasAny(['payments']) || data.payments.at == request.time)
         && (!changed.hasAny(['finance']) || data.finance.at == request.time)
         && (!changed.hasAny(['production']) || data.production.at == request.time)
         && (!changed.hasAny(['inventory']) || data.inventory.at == request.time);

@@ -335,7 +335,12 @@ export class SalesRepository {
         updatedBy: userId,
       } satisfies Omit<Sale, 'id'>);
 
-      this.revisions.touchTransaction(transaction, 'sales', 'finance', 'inventory');
+      this.revisions.touchTransaction(
+        transaction,
+        'sales',
+        'inventory',
+        ...(allocations.length ? ['payments'] as const : []),
+      );
       return { sale, payments, stockChanges };
     });
   }
@@ -420,7 +425,7 @@ export class SalesRepository {
         updatedBy: userId,
       });
 
-      this.revisions.touchTransaction(transaction, 'sales', 'finance');
+      this.revisions.touchTransaction(transaction, 'sales', 'payments');
       return { sale, payment, previousBalanceCents: current.balanceCents };
     });
   }
@@ -471,7 +476,7 @@ export class SalesRepository {
         updatedBy: userId,
       });
 
-      this.revisions.touchTransaction(transaction, 'sales', 'finance');
+      this.revisions.touchTransaction(transaction, 'sales', 'payments');
       return { sale, payment, previousBalanceCents: currentSale.balanceCents };
     });
   }
@@ -569,7 +574,12 @@ export class SalesRepository {
         updatedBy: userId,
       });
 
-      this.revisions.touchTransaction(transaction, 'sales', 'finance', 'inventory');
+      this.revisions.touchTransaction(
+        transaction,
+        'sales',
+        'inventory',
+        ...(reversedPaymentIds.length ? ['payments'] as const : []),
+      );
       return { sale, previousBalanceCents: currentSale.balanceCents, reversedPaymentIds, stockChanges };
     });
   }

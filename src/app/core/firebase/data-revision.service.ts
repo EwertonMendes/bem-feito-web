@@ -9,13 +9,15 @@ import {
 import { AuthService } from '../auth/auth.service';
 import { FIRESTORE } from './firebase.providers';
 
-export type DataDomain = 'catalog' | 'references' | 'settings' | 'sales' | 'finance' | 'production' | 'inventory';
+export type DataDomain = 'catalog' | 'references' | 'settings' | 'sales' | 'expenses' | 'payments' | 'finance' | 'production' | 'inventory';
 
 const DOMAINS: readonly DataDomain[] = [
   'catalog',
   'references',
   'settings',
   'sales',
+  'expenses',
+  'payments',
   'finance',
   'production',
   'inventory',
@@ -36,6 +38,8 @@ export class DataRevisionService {
     references: 0,
     settings: 0,
     sales: 0,
+    expenses: 0,
+    payments: 0,
     finance: 0,
     production: 0,
     inventory: 0,
@@ -45,6 +49,8 @@ export class DataRevisionService {
     references: 0,
     settings: 0,
     sales: 0,
+    expenses: 0,
+    payments: 0,
     finance: 0,
     production: 0,
     inventory: 0,
@@ -54,6 +60,8 @@ export class DataRevisionService {
     references: 0,
     settings: 0,
     sales: 0,
+    expenses: 0,
+    payments: 0,
     finance: 0,
     production: 0,
     inventory: 0,

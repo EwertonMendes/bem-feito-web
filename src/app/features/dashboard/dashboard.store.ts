@@ -40,11 +40,13 @@ export class DashboardStore {
   private readonly errors = inject(ErrorService);
   private readonly toast = inject(ToastService);
   private readonly salesRevision = this.revisions.changeRevision('sales');
-  private readonly financeRevision = this.revisions.changeRevision('finance');
+  private readonly expenseRevision = this.revisions.changeRevision('expenses');
+  private readonly paymentRevision = this.revisions.changeRevision('payments');
   private readonly catalogRevision = this.revisions.changeRevision('catalog');
   private readonly inventoryRevision = this.revisions.changeRevision('inventory');
   private lastSalesRevision = 0;
-  private lastFinanceRevision = 0;
+  private lastExpenseRevision = 0;
+  private lastPaymentRevision = 0;
   private lastCatalogRevision = 0;
   private lastInventoryRevision = 0;
   private active = false;
@@ -116,14 +118,17 @@ export class DashboardStore {
       this.scheduleRefresh();
     });
     effect(() => {
-      const finance = this.financeRevision();
+      const expenses = this.expenseRevision();
+      const payments = this.paymentRevision();
       const catalog = this.catalogRevision();
       const inventory = this.inventoryRevision();
       const changed =
-        finance !== this.lastFinanceRevision ||
+        expenses !== this.lastExpenseRevision ||
+        payments !== this.lastPaymentRevision ||
         catalog !== this.lastCatalogRevision ||
         inventory !== this.lastInventoryRevision;
-      this.lastFinanceRevision = finance;
+      this.lastExpenseRevision = expenses;
+      this.lastPaymentRevision = payments;
       this.lastCatalogRevision = catalog;
       this.lastInventoryRevision = inventory;
       if (!changed) return;

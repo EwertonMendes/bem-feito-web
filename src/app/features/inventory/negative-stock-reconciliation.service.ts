@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { AuthService } from '../../core/auth/auth.service';
 import { InventoryRepository } from '../../core/repositories/inventory.repository';
+import { StockChange } from '../../core/repositories/mutation-results';
 import { ErrorService } from '../../core/services/error.service';
 import { ToastService } from '../../core/services/toast.service';
 import { todayBusinessDate } from '../../core/utils/date';
@@ -41,7 +42,7 @@ export class NegativeStockReconciliationService {
       return;
     }
 
-    const stockChanges = [];
+    const stockChanges: StockChange[] = [];
     try {
       for (const target of targets) {
         const result = await this.repository.reconcileNegativeToZero(

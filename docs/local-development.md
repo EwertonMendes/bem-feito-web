@@ -4,6 +4,7 @@ Use Node 22.22.3 ou superior compatível com `package.json`.
 
 ```powershell
 npm ci
+npm run test:architecture
 npm test
 npm run test:migration
 npm run build:dev
@@ -23,7 +24,7 @@ A pasta Drive permanece privada. Cada pessoa precisa:
 - ter a pasta compartilhada com sua conta;
 - conceder `drive.file` ao app.
 
-Tokens OAuth ficam somente em memória.
+O access token curto do Drive fica em memória e em `sessionStorage` durante a sessão da aba para sobreviver a F5. Ele é descartado em logout, troca de conta, expiração ou resposta `401`; refresh tokens e client secrets nunca são persistidos.
 
 ## Emuladores
 
@@ -52,6 +53,7 @@ Restaure o environment real ao terminar. Não publique build com emuladores ativ
 
 ```powershell
 npm run security:scan
+npm run test:architecture
 npm test
 npm run test:rules
 npm run build:dev:hosting

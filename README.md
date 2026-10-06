@@ -18,12 +18,15 @@ Aplicação Angular da Bem Feito para vendas, produção, estoque, financeiro, c
 ```text
 src/
   app/
-    core/          # Firebase, auth, Google Drive, repositories, services e utilitários
-    domain/        # Models do domínio
-    features/      # Stores por feature
+    core/          # Infraestrutura: Firebase, auth, Drive, repositories e services
+    domain/        # Models e regras de negócio puras
+    features/      # Stores e componentes específicos de cada feature
     layout/        # Shell desktop/mobile
-    pages/         # Telas Angular
-    shared/        # Componentes visuais reutilizáveis
+    pages/         # Coordenação das rotas e telas
+    shared/
+      ui/          # Componentes visuais genéricos e sem dependência de negócio
+      media/       # Adaptadores visuais ligados a serviços da aplicação
+      feedback/    # Feedback global, como toasts
   environments/   # DEV e PROD
   main.ts
   styles.scss
@@ -65,6 +68,7 @@ Consulte também [docs/firebase-setup.md](docs/firebase-setup.md).
 
 ```bash
 npm run security:scan
+npm run test:architecture
 npm test
 npm run test:rules
 npm run test:transactions
@@ -83,6 +87,8 @@ npm run firebase:deploy:prod
 Não versione service accounts, chaves privadas, OAuth client secrets, access tokens, refresh tokens, cookies de sessão ou App Check debug tokens.
 
 Firebase Web config, OAuth Client ID e a Picker API Key de uma SPA são públicos por natureza. Mesmo assim, as chaves públicas devem ser restritas aos origins/APIs esperados. Execute `npm run security:scan` antes de enviar alterações.
+
+As dependências entre camadas são validadas por `npm run test:architecture`. Consulte [docs/architecture.md](docs/architecture.md) antes de criar uma nova abstração compartilhada ou mover código entre `core`, `features`, `shared` e `domain`.
 
 ## Migração
 

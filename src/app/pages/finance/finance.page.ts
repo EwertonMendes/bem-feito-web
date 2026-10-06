@@ -93,7 +93,7 @@ export class FinancePage {
       this.references.load(),
       this.store.loadExpenses(),
       this.store.loadSummary(),
-      this.sales.loadReceivables(),
+      this.sales.loadReceivableSummary(),
       this.settings.load(),
     ]).then(() => {
       if (this.route.snapshot.queryParamMap.get('novo') === '1') this.openExpense();
@@ -104,7 +104,12 @@ export class FinancePage {
     this.tab.set(tab);
     if (tab === 'payments') await this.store.loadPayments();
     if (tab === 'expenses') await this.store.loadExpenses();
-    if (tab === 'receivables') await this.sales.loadReceivables();
+    if (tab === 'receivables') {
+      await Promise.all([
+        this.sales.loadReceivables(),
+        this.sales.loadReceivableSummary(),
+      ]);
+    }
   }
 
   openExpense(kind: ExpenseKind = 'operating-expense'): void {

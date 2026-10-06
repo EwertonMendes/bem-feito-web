@@ -24,6 +24,7 @@ export class SalesStore {
   private readonly errors = inject(ErrorService);
   private readonly salesGate = new AsyncLoadGate();
   private readonly receivablesGate = new AsyncLoadGate();
+  private readonly receivableSummaryGate = new AsyncLoadGate();
   private readonly remoteRevision = this.revisions.revision('sales');
   private lastRemoteRevision = 0;
   private salesConsumers = 0;
@@ -54,10 +55,13 @@ export class SalesStore {
       this.lastRemoteRevision = revision;
       const refreshSales = this.salesConsumers > 0 && this.salesGate.isLoaded;
       const refreshReceivables = this.receivableConsumers > 0 && this.receivablesGate.isLoaded;
+      const refreshReceivableSummary = this.receivableConsumers > 0 && this.receivableSummaryGate.isLoaded;
       this.salesGate.invalidate();
       this.receivablesGate.invalidate();
+      this.receivableSummaryGate.invalidate();
       if (refreshSales) void this.load();
       if (refreshReceivables) void this.loadReceivables();
+      if (refreshReceivableSummary) void this.loadReceivableSummary();
     });
   }
 
@@ -107,14 +111,21 @@ export class SalesStore {
   loadReceivables(force = false): Promise<void> {
     return this.receivablesGate.run(async () => {
       try {
-        const [page, total] = await Promise.all([
-          this.repository.receivablePage(RECEIVABLE_PAGE_SIZE),
-          this.repository.receivableTotalCents(),
-        ]);
+        const page = await this.repository.receivablePage(RECEIVABLE_PAGE_SIZE);
         this.receivablesState.set(page.items);
         this.receivableCursor = page.nextCursor;
         this.receivableHasMoreState.set(page.hasMore);
-        this.receivableTotalState.set(total);
+      } catch (error) {
+        this.toast.error(this.errors.message(error));
+        throw error;
+      }
+    }, force).catch(() => undefined);
+  }
+
+  loadReceivableSummary(force = false): Promise<void> {
+    return this.receivableSummaryGate.run(async () => {
+      try {
+        this.receivableTotalState.set(await this.repository.receivableTotalCents());
       } catch (error) {
         this.toast.error(this.errors.message(error));
         throw error;
@@ -203,14 +214,23 @@ export class SalesStore {
   }
 
   private syncReceivable(sale: Sale, previousBalance: number): void {
-    if (!this.receivablesGate.isLoaded) return;
     const currentBalance = sale.status === 'active' ? Math.max(0, sale.balanceCents) : 0;
-    this.receivableTotalState.update((value) => Math.max(0, value - Math.max(0, previousBalance) + currentBalance));
-    this.receivablesState.update((items) => {
-      const without = items.filter((item) => item.id !== sale.id);
-      if (currentBalance <= 0) return without;
-      return [sale, ...without].sort((a, b) => b.businessDate.localeCompare(a.businessDate) || b.id.localeCompare(a.id));
-    });
+
+    if (this.receivableSummaryGate.isLoaded) {
+      this.receivableTotalState.update((value) =>
+        Math.max(0, value - Math.max(0, previousBalance) + currentBalance)
+      );
+    }
+
+    if (this.receivablesGate.isLoaded) {
+      this.receivablesState.update((items) => {
+        const without = items.filter((item) => item.id !== sale.id);
+        if (currentBalance <= 0) return without;
+        return [sale, ...without].sort((a, b) =>
+          b.businessDate.localeCompare(a.businessDate) || b.id.localeCompare(a.id)
+        );
+      });
+    }
   }
 
 }

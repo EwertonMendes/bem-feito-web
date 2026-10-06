@@ -20,11 +20,13 @@ service-account*.json
 application_default_credentials.json
 credentials.json
 client_secret*.json
+gha-creds-*.json
 *.pem
 *.key
 .env
 .env.*
 !.env.example
+/public/deployment.json
 tools/migration/legacy-export.json
 tools/migration/reconciliation.json
 tools/migration/legacy-raw.json

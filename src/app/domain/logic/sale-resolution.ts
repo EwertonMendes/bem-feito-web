@@ -121,7 +121,7 @@ export function resolveSaleDraft(
       const input = catalog.inputs.get(component.inputId);
       if (!input) throw new Error(`Insumo inválido no adicional ${addition.name}.`);
       unitCostCents += Math.round(component.quantity * input.averageUnitCostCents);
-      if (trackingModeForInput(input) === 'exact') {
+      if (trackingModeForInput(input) !== 'untracked') {
         addEffect({
           itemType: 'input',
           itemId: input.id,
@@ -145,16 +145,26 @@ export function resolveSaleDraft(
     });
   }
 
-  const stockEffects = [...effects.values()];
-  for (const effect of stockEffects) {
+  const stockEffects: StockEffect[] = [];
+  for (const effect of effects.values()) {
     const entity = effect.itemType === 'product'
       ? catalog.products.get(effect.itemId)
       : catalog.inputs.get(effect.itemId);
     if (!entity) throw new Error('Item de estoque não encontrado.');
+
+    if (effect.itemType === 'input' && trackingModeForInput(entity as InputItem) === 'estimated') {
+      const available = Math.max(0, entity.stock);
+      const requested = Math.abs(effect.quantityDelta);
+      const applied = Math.min(available, requested);
+      if (applied > 0) stockEffects.push({ ...effect, quantityDelta: -applied });
+      continue;
+    }
+
     if (entity.stock + effect.quantityDelta < 0) {
       const name = 'displayName' in entity ? entity.displayName : entity.name;
       throw new Error(`Estoque insuficiente de ${name}.`);
     }
+    stockEffects.push(effect);
   }
 
   const subtotalCents = lines.reduce((sum, line) => sum + line.totalCents, 0);

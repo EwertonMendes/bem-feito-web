@@ -87,7 +87,7 @@ describe('sale resolution', () => {
     ]);
   });
 
-  it('only changes physical input stock when the input is exact', () => {
+  it('uses exact stock strictly and estimated stock approximately', () => {
     const addition: Addition = {
       id: 'a1',
       active: true,
@@ -114,11 +114,36 @@ describe('sale resolution', () => {
       products: new Map(),
       kits: new Map(),
       additions: new Map([['a1', addition]]),
-      inputs: new Map([['i1', input('i1', 0, 'estimated')]]),
+      inputs: new Map([['i1', input('i1', 1, 'estimated')]]),
       productUnitCosts: new Map(),
     });
     expect(estimated.lines[0]?.totalCostCents).toBe(300);
-    expect(estimated.stockEffects).toEqual([]);
+    expect(estimated.stockEffects).toEqual([
+      { itemType: 'input', itemId: 'i1', quantityDelta: -1, unitCostCents: 200 },
+    ]);
+  });
+
+  it('does not block an estimated input when theoretical consumption exceeds its balance', () => {
+    const addition: Addition = {
+      id: 'a2',
+      active: true,
+      name: 'Estimado',
+      category: 'Teste',
+      priceCents: 100,
+      components: [{ id: 'c2', inputId: 'i2', quantity: 2, unitId: 'unit', order: 1 }],
+    };
+    const draft = emptyDraft();
+    draft.lines = [{ kind: 'addition', sourceId: 'a2', quantity: 2 }];
+    const resolved = resolveSaleDraft(draft, {
+      products: new Map(),
+      kits: new Map(),
+      additions: new Map([['a2', addition]]),
+      inputs: new Map([['i2', input('i2', 1, 'estimated')]]),
+      productUnitCosts: new Map(),
+    });
+    expect(resolved.stockEffects).toEqual([
+      { itemType: 'input', itemId: 'i2', quantityDelta: -1, unitCostCents: 200 },
+    ]);
   });
 
   it('rejects a sale that would make finished-product stock negative', () => {

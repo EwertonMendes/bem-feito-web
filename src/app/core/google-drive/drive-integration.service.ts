@@ -5,7 +5,7 @@ import { GoogleDriveIntegration } from '../../domain/models/integration.model';
 import { AuthService } from '../auth/auth.service';
 import { DriveIntegrationRepository } from '../repositories/drive-integration.repository';
 import { DriveApiError, DriveApiService } from './drive-api.service';
-import { DriveAuthService } from './drive-auth.service';
+import { DriveAuthService, DriveAuthorizationRequiredError } from './drive-auth.service';
 import { DrivePickerService } from './drive-picker.service';
 
 export type DriveIntegrationStatus =
@@ -74,7 +74,12 @@ export class DriveIntegrationService {
         return;
       }
 
-      await this.auth.waitForUser();
+      const firebaseUser = await this.auth.waitForUser();
+      if (!firebaseUser) {
+        this.statusState.set('disconnected');
+        return;
+      }
+
       if (!this.driveAuth.currentToken()) {
         this.statusState.set(this.driveAuth.linked() ? 'ready' : 'disconnected');
         return;
@@ -84,7 +89,10 @@ export class DriveIntegrationService {
       await this.verifyConfiguredFolder(config);
       this.statusState.set('connected');
     } catch (error) {
-      if (error instanceof DriveApiError && error.status === 401) {
+      if (
+        error instanceof DriveAuthorizationRequiredError ||
+        (error instanceof DriveApiError && error.status === 401)
+      ) {
         this.markAccessExpired(false);
         return;
       }
@@ -158,7 +166,10 @@ export class DriveIntegrationService {
       this.errorState.set(null);
       this.authorizationNeededState.set(false);
     } catch (error) {
-      if (error instanceof DriveApiError && error.status === 401) {
+      if (
+        error instanceof DriveAuthorizationRequiredError ||
+        (error instanceof DriveApiError && error.status === 401)
+      ) {
         this.markAccessExpired(true);
       } else {
         this.fail(error);

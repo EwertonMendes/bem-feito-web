@@ -1,19 +1,69 @@
-<dialog bfDialog #saleDialog="bfDialog" class="sale-dialog">
+<dialog
+  bfDialog
+  #saleDialog="bfDialog"
+  class="sale-dialog"
+  (cancel)="onDialogCancel($event)"
+>
   <header class="sale-header">
-    <div class="sale-title">
-      <h2>Nova venda</h2>
-      <span>{{ cartPhysicalItems() }} itens · <strong>{{ currency(totalCents()) }}</strong></span>
+    <div class="sale-title-group">
+      <span class="sale-header-icon" aria-hidden="true"><bf-icon name="bag" /></span>
+      <div class="sale-title">
+        <h2>Nova venda</h2>
+        <span>{{ cartItemLabel() }} · <strong>{{ currency(totalCents()) }}</strong></span>
+      </div>
     </div>
-    <button class="bf-icon-button" type="button" aria-label="Fechar nova venda" (click)="saleDialog.close()"><bf-icon name="close" /></button>
+
+    <button
+      class="bf-icon-button close-sale"
+      type="button"
+      aria-label="Fechar nova venda"
+      (click)="requestClose()"
+    >
+      <bf-icon name="close" />
+    </button>
   </header>
 
-  <div class="sale-layout">
+  <div
+    class="sale-layout"
+    [class.mobile-view-catalog]="mobileView()==='catalog'"
+    [class.mobile-view-order]="mobileView()==='order'"
+  >
+    <nav class="mobile-flow-tabs" aria-label="Etapa da venda">
+      <button
+        type="button"
+        [class.active]="mobileView()==='catalog'"
+        [attr.aria-pressed]="mobileView()==='catalog'"
+        (click)="mobileView.set('catalog')"
+      >
+        <bf-icon name="leaf" />
+        <span>Catálogo</span>
+      </button>
+      <button
+        type="button"
+        [class.active]="mobileView()==='order'"
+        [attr.aria-pressed]="mobileView()==='order'"
+        (click)="mobileView.set('order')"
+      >
+        <bf-icon name="bag" />
+        <span>Pedido ({{ cartItemCount() }})</span>
+      </button>
+    </nav>
+
     <section class="picker" aria-label="Catálogo da venda">
       <div class="picker-sticky">
-        <div class="bf-segments catalog-tabs">
-          <button [class.active]="catalogTab()==='products'" (click)="selectCatalogTab('products')">Produtos</button>
-          <button [class.active]="catalogTab()==='kits'" (click)="selectCatalogTab('kits')">Kits</button>
-          <button [class.active]="catalogTab()==='additions'" (click)="selectCatalogTab('additions')">Adicionais</button>
+        <div class="bf-segments catalog-tabs" aria-label="Tipo de item">
+          <button [class.active]="catalogTab()==='products'" (click)="selectCatalogTab('products')">
+            <bf-icon name="leaf" />
+            <span>Produtos</span>
+          </button>
+          <button [class.active]="catalogTab()==='kits'" (click)="selectCatalogTab('kits')">
+            <bf-icon name="box" />
+            <span>Kits</span>
+          </button>
+          <button [class.active]="catalogTab()==='additions'" (click)="selectCatalogTab('additions')">
+            <bf-icon name="plus" />
+            <span>Adicionais</span>
+          </button>
         </div>
 
         <div class="catalog-tools">
@@ -22,6 +72,7 @@
             <input
               type="search"
               placeholder="Buscar produto, categoria..."
+              aria-label="Buscar no catálogo"
               [value]="catalogSearch()"
               (input)="catalogSearch.set($any($event.target).value)"
             />
@@ -40,163 +91,407 @@
       <div class="picker-grid">
         @if (catalogTab()==='products') {
           @for (product of filteredProducts(); track product.id) {
-            <button class="pick-card" type="button" [disabled]="product.stock<=0" (click)="addProduct(product)">
+            @let quantity = quantityInCart('product', product.id);
+            <article class="pick-card" [class.sold-out]="product.stock<=0">
               <div class="product-media">
                 <bf-catalog-image [image]="product.image" [alt]="product.displayName" />
                 <span class="stock-chip" [class.negative]="product.stock < 0">Estoque {{ product.stock }}</span>
-                <span class="add-control" aria-hidden="true"><bf-icon name="plus" /></span>
+                <button
+                  class="media-add"
+                  type="button"
+                  [disabled]="product.stock<=quantity"
+                  [attr.aria-label]="'Adicionar ' + product.displayName"
+                  (click)="addProduct(product)"
+                >
+                  <bf-icon name="plus" />
+                </button>
               </div>
+
               <div class="product-body">
                 <span class="category-chip">{{ collectionName(product.collectionId) }}</span>
                 <strong>{{ product.displayName }}</strong>
                 <span class="product-price">{{ currency(product.salePriceCents) }}</span>
+
+                @if (quantity > 0) {
+                  <div class="catalog-quantity" aria-label="Quantidade no pedido">
+                    <button
+                      type="button"
+                      [attr.aria-label]="'Remover uma unidade de ' + product.displayName"
+                      (click)="decrementCatalogItem('product', product.id)"
+                    >
+                      <bf-icon name="minus" />
+                    </button>
+                    <span>{{ quantity }} no pedido</span>
+                    <button
+                      type="button"
+                      [disabled]="product.stock<=quantity"
+                      [attr.aria-label]="'Adicionar uma unidade de ' + product.displayName"
+                      (click)="addProduct(product)"
+                    >
+                      <bf-icon name="plus" />
+                    </button>
+                  </div>
+                } @else {
+                  <button
+                    class="add-to-order"
+                    type="button"
+                    [disabled]="product.stock<=0"
+                    (click)="addProduct(product)"
+                  >
+                    <bf-icon name="plus" />
+                    <span>{{ product.stock<=0 ? 'Sem estoque' : 'Adicionar' }}</span>
+                  </button>
+                }
               </div>
-            </button>
+            </article>
           } @empty {
             <div class="picker-empty">Nenhum produto corresponde aos filtros.</div>
           }
         } @else if (catalogTab()==='kits') {
           @for (kit of filteredKits(); track kit.id) {
-            <button class="pick-card" type="button" (click)="addKit(kit)">
+            @let quantity = quantityInCart('kit', kit.id);
+            <article class="pick-card">
               <div class="product-media">
                 <bf-catalog-image [image]="kit.image" [alt]="kit.name" />
-                <span class="add-control" aria-hidden="true"><bf-icon name="plus" /></span>
+                <button class="media-add" type="button" [attr.aria-label]="'Adicionar ' + kit.name" (click)="addKit(kit)">
+                  <bf-icon name="plus" />
+                </button>
               </div>
+
               <div class="product-body">
                 <span class="category-chip">Kit</span>
                 <strong>{{ kit.name }}</strong>
                 <span class="product-price">{{ currency(kit.priceCents) }}</span>
+
+                @if (quantity > 0) {
+                  <div class="catalog-quantity" aria-label="Quantidade no pedido">
+                    <button type="button" [attr.aria-label]="'Remover um ' + kit.name" (click)="decrementCatalogItem('kit', kit.id)">
+                      <bf-icon name="minus" />
+                    </button>
+                    <span>{{ quantity }} no pedido</span>
+                    <button type="button" [attr.aria-label]="'Adicionar um ' + kit.name" (click)="addKit(kit)">
+                      <bf-icon name="plus" />
+                    </button>
+                  </div>
+                } @else {
+                  <button class="add-to-order" type="button" (click)="addKit(kit)">
+                    <bf-icon name="plus" />
+                    <span>Adicionar</span>
+                  </button>
+                }
               </div>
-            </button>
+            </article>
           } @empty {
             <div class="picker-empty">Nenhum kit corresponde à busca.</div>
           }
         } @else {
           @for (addition of filteredAdditions(); track addition.id) {
-            <button class="pick-card" type="button" (click)="addAddition(addition)">
+            @let quantity = quantityInCart('addition', addition.id);
+            <article class="pick-card">
               <div class="product-media">
                 <bf-catalog-image [image]="addition.image" [alt]="addition.name" />
-                <span class="add-control" aria-hidden="true"><bf-icon name="plus" /></span>
+                <button
+                  class="media-add"
+                  type="button"
+                  [attr.aria-label]="'Adicionar ' + addition.name"
+                  (click)="addAddition(addition)"
+                >
+                  <bf-icon name="plus" />
+                </button>
               </div>
+
               <div class="product-body">
                 <span class="category-chip">{{ addition.category }}</span>
                 <strong>{{ addition.name }}</strong>
                 <span class="product-price">{{ currency(addition.priceCents) }}</span>
+
+                @if (quantity > 0) {
+                  <div class="catalog-quantity" aria-label="Quantidade no pedido">
+                    <button
+                      type="button"
+                      [attr.aria-label]="'Remover uma unidade de ' + addition.name"
+                      (click)="decrementCatalogItem('addition', addition.id)"
+                    >
+                      <bf-icon name="minus" />
+                    </button>
+                    <span>{{ quantity }} no pedido</span>
+                    <button
+                      type="button"
+                      [attr.aria-label]="'Adicionar uma unidade de ' + addition.name"
+                      (click)="addAddition(addition)"
+                    >
+                      <bf-icon name="plus" />
+                    </button>
+                  </div>
+                } @else {
+                  <button class="add-to-order" type="button" (click)="addAddition(addition)">
+                    <bf-icon name="plus" />
+                    <span>Adicionar</span>
+                  </button>
+                }
               </div>
-            </button>
+            </article>
           } @empty {
             <div class="picker-empty">Nenhum adicional corresponde aos filtros.</div>
           }
         }
       </div>
+
+      <button class="mobile-catalog-cta" type="button" (click)="mobileView.set('order')">
+        <bf-icon name="bag" />
+        <span>Ver pedido · {{ cartItemLabel() }} — {{ currency(totalCents()) }}</span>
+        <bf-icon name="chevron-right" />
+      </button>
     </section>
 
-    <aside class="cart-panel">
+    <aside class="cart-panel" aria-label="Pedido e pagamento">
       <div class="cart-scroll">
-        <div class="cart-heading"><bf-icon name="bag" /><h3>Pedido</h3></div>
+        <section class="order-section">
+          <div class="section-heading cart-heading">
+            <div>
+              <bf-icon name="bag" />
+              <h3>Pedido</h3>
+            </div>
 
-        <div class="cart-lines" [class.empty]="!cart().length">
-          @for (line of cart(); track line.key) {
-            <article class="cart-line">
-              <bf-catalog-image [image]="lineImage(line)" [alt]="lineName(line)" [compact]="true" />
-              <div class="line-main">
-                <strong>{{ lineName(line) }}</strong>
-                <small>{{ currency(lineUnitPrice(line)) }}</small>
-                @if (line.kind==='kit') {
-                  <div class="kit-config">
-                    @for (slot of kitSlots(line); track slot.index) {
-                      <label>
-                        <span>{{ slot.label }}</span>
-                        <bf-select
-                          [compact]="true"
-                          [ariaLabel]="slot.label"
-                          [value]="line.componentProductIds[slot.index] ?? ''"
-                          (valueChange)="changeKitSelection(line, slot.index, $event)"
-                          [options]="productSelectOptions(slot.candidates)"
-                        />
-                      </label>
-                    }
+            @if (cart().length) {
+              <button class="clear-order" type="button" (click)="clearOrder()">
+                <bf-icon name="trash" />
+                <span>Limpar pedido</span>
+              </button>
+            }
+          </div>
+
+          <div class="cart-lines" [class.empty]="!cart().length">
+            @for (line of cart(); track line.key) {
+              <article class="cart-line">
+                <bf-catalog-image [image]="lineImage(line)" [alt]="lineName(line)" [compact]="true" />
+
+                <div class="line-main">
+                  <strong>{{ lineName(line) }}</strong>
+                  <small>{{ currency(lineUnitPrice(line)) }} cada</small>
+
+                  @if (line.kind==='kit') {
+                    <div class="kit-config">
+                      @for (slot of kitSlots(line); track slot.index) {
+                        <label>
+                          <span>{{ slot.label }}</span>
+                          <bf-select
+                            [compact]="true"
+                            [ariaLabel]="slot.label"
+                            [value]="line.componentProductIds[slot.index] ?? ''"
+                            (valueChange)="changeKitSelection(line, slot.index, $event)"
+                            [options]="productSelectOptions(slot.candidates)"
+                          />
+                        </label>
+                      }
+                    </div>
+                  }
+                </div>
+
+                <div class="line-controls">
+                  <div class="quantity" aria-label="Quantidade">
+                    <button type="button" aria-label="Diminuir quantidade" (click)="changeQuantity(line,-1)">
+                      <bf-icon name="minus" />
+                    </button>
+                    <span>{{ line.quantity }}</span>
+                    <button type="button" aria-label="Aumentar quantidade" (click)="changeQuantity(line,1)">
+                      <bf-icon name="plus" />
+                    </button>
                   </div>
-                }
-              </div>
 
-              <div class="quantity" aria-label="Quantidade">
-                <button type="button" aria-label="Diminuir quantidade" (click)="changeQuantity(line,-1)"><bf-icon name="minus" /></button>
-                <span>{{ line.quantity }}</span>
-                <button type="button" aria-label="Aumentar quantidade" (click)="changeQuantity(line,1)"><bf-icon name="plus" /></button>
+                  <strong class="line-total">{{ currency(lineUnitPrice(line) * line.quantity) }}</strong>
+
+                  <button
+                    class="remove-line"
+                    type="button"
+                    [attr.aria-label]="'Remover ' + lineName(line)"
+                    (click)="removeLine(line.key)"
+                  >
+                    <bf-icon name="trash" />
+                  </button>
+                </div>
+              </article>
+            } @empty {
+              <div class="cart-empty">
+                <span class="empty-icon"><bf-icon name="bag" /></span>
+                <strong>Pedido vazio</strong>
+                <span>Escolha produtos, kits ou adicionais.</span>
+                <button class="back-to-catalog" type="button" (click)="mobileView.set('catalog')">
+                  <bf-icon name="leaf" />
+                  Ver catálogo
+                </button>
               </div>
-              <strong class="line-total">{{ currency(lineUnitPrice(line) * line.quantity) }}</strong>
-            </article>
-          } @empty {
-            <div class="cart-empty">
-              <span class="empty-icon"><bf-icon name="bag" /></span>
-              <strong>Pedido vazio</strong>
-              <span>Escolha produtos, kits ou adicionais.</span>
+            }
+          </div>
+        </section>
+
+        <section class="payments panel-section">
+          <div class="section-heading payments-head">
+            <div>
+              <span class="section-icon"><bf-icon name="card" /></span>
+              <div>
+                <h3>Pagamento</h3>
+                <small>Você pode dividir em várias formas.</small>
+              </div>
+            </div>
+
+            <button class="add-payment" type="button" (click)="addPayment()">
+              <bf-icon name="plus" />
+              <span>Forma</span>
+            </button>
+          </div>
+
+          <div class="payment-list">
+            @for (payment of payments(); track payment.id; let i=$index) {
+              <div class="payment-row">
+                <bf-select
+                  ariaLabel="Forma de pagamento"
+                  [value]="payment.methodId"
+                  (valueChange)="patchPayment(i, { methodId: $event })"
+                  [options]="paymentMethodOptions()"
+                />
+                <input
+                  class="bf-input payment-amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputmode="decimal"
+                  aria-label="Valor recebido"
+                  [value]="payment.amount"
+                  (input)="patchPayment(i,{amount:+$any($event.target).value})"
+                />
+                <button class="fill" type="button" (click)="fillRemaining(i)">Restante</button>
+                <button
+                  class="bf-icon-button remove-payment"
+                  type="button"
+                  aria-label="Remover forma de pagamento"
+                  (click)="removePayment(i)"
+                >
+                  <bf-icon name="trash" />
+                </button>
+              </div>
+            }
+          </div>
+
+          @if (remainingCents()>0 && totalCents()>0) {
+            <div class="payment-status pending">
+              <span>Falta receber</span>
+              <strong>{{ currency(remainingCents()) }}</strong>
+            </div>
+          } @else if (totalCents()>0) {
+            <div class="payment-status complete">
+              <bf-icon name="check" />
+              <span>Pagamento completo</span>
             </div>
           }
-        </div>
+        </section>
 
-        <section class="sale-data">
-          <div class="bf-grid two">
-            <label class="bf-field">
-              <span>Data</span>
-              <input class="bf-input" type="date" [formField]="saleForm.businessDate" />
-            </label>
-            <label class="bf-field">
-              <span>Desconto</span>
-              <input class="bf-input" type="number" step="0.01" [formField]="saleForm.discount" />
-            </label>
+        <section class="customer-section panel-section">
+          <div class="section-heading compact-heading">
+            <div>
+              <span class="section-icon"><bf-icon name="tag" /></span>
+              <div>
+                <h3>Cliente</h3>
+                @if (remainingCents()>0) {
+                  <small>Obrigatório quando houver saldo em aberto.</small>
+                } @else {
+                  <small>Opcional para vendas totalmente recebidas.</small>
+                }
+              </div>
+            </div>
           </div>
 
           @if (remainingCents()>0) {
-            <div class="open-balance">Falta receber <strong>{{ currency(remainingCents()) }}</strong>. Informe o cliente para salvar a conta.</div>
-          }
-
-          <div class="bf-grid two data-grid">
-            <label class="bf-field">
-              <span>Cliente {{ remainingCents()>0 ? '*' : '' }}</span>
-              <input class="bf-input" [formField]="saleForm.customerName" placeholder="Nome do cliente" />
-            </label>
-            <label class="bf-field">
-              <span>Vencimento</span>
-              <input class="bf-input" type="date" [formField]="saleForm.dueDate" />
-            </label>
-            <label class="bf-field full">
-              <span>Observações</span>
-              <textarea class="bf-textarea" [formField]="saleForm.notes" placeholder="Observações sobre a venda..."></textarea>
-            </label>
-          </div>
-        </section>
-
-        <section class="payments">
-          <div class="payments-head">
-            <div><h3>Pagamento</h3><small>Você pode dividir em várias formas.</small></div>
-            <button class="add-payment" type="button" (click)="addPayment()"><bf-icon name="plus" /> Forma</button>
-          </div>
-
-          @for (payment of payments(); track payment.id; let i=$index) {
-            <div class="payment-row">
-              <bf-select
-                ariaLabel="Forma de pagamento"
-                [value]="payment.methodId"
-                (valueChange)="patchPayment(i, { methodId: $event })"
-                [options]="paymentMethodOptions()"
-              />
-              <input class="bf-input" type="number" min="0" step="0.01" [value]="payment.amount" (input)="patchPayment(i,{amount:+$any($event.target).value})" />
-              <button class="fill" type="button" (click)="fillRemaining(i)">Restante</button>
-              <button class="bf-icon-button" type="button" aria-label="Remover forma de pagamento" (click)="removePayment(i)"><bf-icon name="trash" /></button>
+            <div class="open-balance">
+              Falta receber <strong>{{ currency(remainingCents()) }}</strong>. Informe o cliente para salvar a conta.
             </div>
           }
+
+          <label class="customer-input">
+            <bf-icon name="search" />
+            <input
+              id="sale-customer-name"
+              class="bf-input"
+              [formField]="saleForm.customerName"
+              [placeholder]="remainingCents()>0 ? 'Nome do cliente *' : 'Nome do cliente (opcional)'"
+            />
+          </label>
         </section>
+
+        <details
+          class="sale-details panel-section"
+          [open]="detailsExpanded()"
+          (toggle)="syncDetailsOpen($event)"
+        >
+          <summary>
+            <span class="summary-title">
+              <span class="section-icon"><bf-icon name="receipt" /></span>
+              <span>Mais detalhes</span>
+            </span>
+            <bf-icon class="details-chevron" name="chevron-right" />
+          </summary>
+
+          <div class="details-body">
+            <div class="bf-grid two details-grid">
+              <label class="bf-field">
+                <span>Data</span>
+                <input class="bf-input" type="date" [formField]="saleForm.businessDate" />
+              </label>
+
+              <label class="bf-field">
+                <span>Desconto (R$)</span>
+                <input class="bf-input" type="number" min="0" step="0.01" [formField]="saleForm.discount" />
+              </label>
+
+              @if (remainingCents()>0) {
+                <label class="bf-field">
+                  <span>Vencimento</span>
+                  <input class="bf-input" type="date" [formField]="saleForm.dueDate" />
+                </label>
+              }
+
+              <label class="bf-field full">
+                <span>Observações</span>
+                <textarea class="bf-textarea" [formField]="saleForm.notes" placeholder="Observações sobre a venda..."></textarea>
+              </label>
+            </div>
+          </div>
+        </details>
       </div>
 
       <footer class="checkout">
-        <div class="totals">
-          <span>Subtotal <strong>{{ currency(subtotalCents()) }}</strong></span>
-          <span class="total-line">Total <strong>{{ currency(totalCents()) }}</strong></span>
-          @if (expectedTipCents()>0) { <span class="tip">Gorjeta <strong>{{ currency(expectedTipCents()) }}</strong></span> }
+        <div class="checkout-summary">
+          <div class="totals">
+            <span>Subtotal <strong>{{ currency(subtotalCents()) }}</strong></span>
+            <span>Desconto <strong>{{ currency(discountCents()) }}</strong></span>
+            <span>Recebido <strong>{{ currency(paymentCents()) }}</strong></span>
+            @if (expectedTipCents()>0) {
+              <span class="tip">Gorjeta <strong>{{ currency(expectedTipCents()) }}</strong></span>
+            }
+            <span class="total-line">Total <strong>{{ currency(totalCents()) }}</strong></span>
+          </div>
+
+          @if (remainingCents()>0 && totalCents()>0) {
+            <div class="remaining-card">
+              <span>Falta receber</span>
+              <strong>{{ currency(remainingCents()) }}</strong>
+            </div>
+          }
         </div>
-        <button class="bf-button confirm" type="button" [disabled]="!cart().length" (click)="submit()">Confirmar venda · {{ currency(totalCents()) }}</button>
+
+        <button
+          class="bf-button confirm"
+          type="button"
+          [disabled]="!cart().length || submitting()"
+          (click)="submit()"
+        >
+          @if (submitting()) {
+            <span>Registrando venda…</span>
+          } @else {
+            <bf-icon name="tag" />
+            <span>Confirmar venda · {{ currency(totalCents()) }}</span>
+          }
+        </button>
       </footer>
     </aside>
   </div>

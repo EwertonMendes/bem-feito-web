@@ -709,6 +709,8 @@ export class SaleEditor {
       if (position >= ordered.length) return true;
 
       const requirement = ordered[position];
+      if (!requirement) return false;
+
       const candidates = [...requirement.candidates].sort(
         (a, b) => (remaining.get(b.id) ?? 0) - (remaining.get(a.id) ?? 0)
       );
@@ -758,7 +760,7 @@ export class SaleEditor {
       available: false,
       message: shortages.length
         ? 'Em falta: ' + shortages.slice(0, 2).join(' · ') + (shortages.length > 2 ? ' +' + (shortages.length - 2) : '')
-        : details[0],
+        : (details[0] ?? 'Estoque insuficiente para completar este kit.'),
       details,
       productIds: [],
     };

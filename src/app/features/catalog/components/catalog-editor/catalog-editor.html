@@ -37,9 +37,25 @@
 
       @if (imagesEnabled) {
         <div class="image-field">
-          <label class="bf-field"><span>Imagem</span><input class="bf-input" type="file" accept="image/webp,image/png,image/jpeg,image/gif,image/avif" (change)="onImage($event)" /><small>O navegador reduz para até 1200 px e converte para WebP antes do envio ao Drive.</small></label>
-          @if (currentImage() && !removeImage()) { <button class="bf-button secondary" type="button" (click)="markImageForRemoval()">Remover imagem atual</button> }
-          @if (removeImage()) { <small class="image-remove">A imagem atual será removida ao salvar.</small> }
+          <bf-image-upload
+            label="Imagem"
+            hint="O navegador reduz para até 1200 px e converte para WebP antes do envio ao Drive."
+            emptyTitle="Adicione uma imagem ao cadastro"
+            emptyDescription="Clique para escolher ou arraste uma imagem até aqui."
+            [file]="imageFile()"
+            (fileChange)="imageFile.set($event)"
+            [hasCurrent]="!!currentImage()"
+            [removeCurrent]="removeImage()"
+            (removeCurrentChange)="removeImage.set($event)"
+          >
+            @if (currentImage(); as image) {
+              <bf-catalog-image
+                bfImageUploadCurrent
+                [image]="image"
+                alt="Imagem atual do cadastro"
+              />
+            }
+          </bf-image-upload>
         </div>
       }
     </div>

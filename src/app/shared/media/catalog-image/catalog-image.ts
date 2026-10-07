@@ -7,7 +7,7 @@ import { BfImageFrame } from '../../ui/image-frame/image-frame';
   selector: 'bf-catalog-image',
   imports: [BfImageFrame],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<bf-image-frame [src]="url()" [alt]="alt()" [loading]="loading()" [compact]="compact()" />`,
+  template: `<bf-image-frame [src]="url()" [alt]="alt()" [loading]="loading()" [compact]="compact()" [fit]="fit()" />`,
 })
 export class CatalogImage {
   private readonly images = inject(ImageService);
@@ -19,6 +19,7 @@ export class CatalogImage {
   readonly image = input<CatalogImageRef | undefined>();
   readonly alt = input('Imagem do item');
   readonly compact = input(false);
+  readonly fit = input<'cover' | 'contain'>('cover');
   readonly url = signal<string | null>(null);
   readonly loading = signal(false);
 

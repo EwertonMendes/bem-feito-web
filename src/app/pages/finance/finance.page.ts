@@ -31,7 +31,6 @@ interface ExpenseFormModel {
   categoryId: string;
   inputId: string;
   quantity: number;
-  unitId: string;
   amount: number;
   paymentMethodId: string;
   notes: string;
@@ -66,7 +65,6 @@ export class FinancePage {
     categoryId: '',
     inputId: '',
     quantity: 1,
-    unitId: '',
     amount: 0,
     paymentMethodId: '',
     notes: '',
@@ -90,10 +88,11 @@ export class FinancePage {
     { value: '', label: 'Selecione' },
     ...this.catalog.activeInputs().map((item) => ({ value: item.id, label: item.name })),
   ]);
-  readonly unitOptions = computed<BfSelectOption[]>(() => [
-    { value: '', label: 'Selecione' },
-    ...this.references.units().map((item) => ({ value: item.id, label: item.name })),
-  ]);
+  readonly selectedInput = computed(() => this.catalog.inputs().find((item) => item.id === this.model().inputId));
+  readonly purchaseUnitName = computed(() => {
+    const input = this.selectedInput();
+    return input ? this.references.units().find((item) => item.id === input.unitId)?.name ?? '' : '';
+  });
   readonly expenseCategoryOptions = computed<BfSelectOption[]>(() => [
     { value: '', label: 'Sem categoria' },
     ...this.settings.expenseCategories()
@@ -192,7 +191,6 @@ export class FinancePage {
       categoryId: this.settings.expenseCategories().find((item) => item.active)?.id ?? '',
       inputId: this.catalog.activeInputs()[0]?.id ?? '',
       quantity: 1,
-      unitId: this.references.units().find((item) => item.active)?.id ?? '',
       amount: 0,
       paymentMethodId: this.settings.paymentMethods().find((item) => item.active)?.id ?? '',
       notes: '',
@@ -238,7 +236,7 @@ export class FinancePage {
       categoryId: value.categoryId || undefined,
       inputId: value.kind === 'input-purchase' ? value.inputId : undefined,
       quantity: value.kind === 'input-purchase' ? value.quantity : undefined,
-      unitId: value.kind === 'input-purchase' ? value.unitId : undefined,
+      unitId: value.kind === 'input-purchase' ? this.selectedInput()?.unitId : undefined,
       amountCents: toCents(value.amount),
       paymentMethodId: value.paymentMethodId || undefined,
       notes: value.notes.trim() || undefined,

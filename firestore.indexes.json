@@ -183,11 +183,11 @@
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "totalCents",
+          "fieldPath": "discountCents",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "discountCents",
+          "fieldPath": "totalCents",
           "order": "ASCENDING"
         }
       ]

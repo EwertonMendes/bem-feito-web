@@ -60,23 +60,165 @@
   </main>
 
   <nav class="mobile-nav" aria-label="Navegação móvel">
-    <a routerLink="/dashboard" routerLinkActive="active"><bf-icon name="dashboard" /><span>Início</span></a>
-    <a routerLink="/vendas" routerLinkActive="active"><bf-icon name="sales" /><span>Vendas</span></a>
-    <button type="button" class="quick" (click)="mobileMenuOpen.set(!mobileMenuOpen())" aria-label="Ações rápidas">
-      <bf-icon [name]="mobileMenuOpen() ? 'close' : 'plus'" />
+    @for (item of mobilePrimaryStart; track item.path) {
+      <a
+        class="mobile-nav-item"
+        [routerLink]="item.path"
+        routerLinkActive="active"
+        (click)="closeMobilePanel()"
+      >
+        <bf-icon [name]="item.icon" />
+        <span>{{ item.mobileLabel || item.label }}</span>
+      </a>
+    }
+
+    <button
+      type="button"
+      class="mobile-nav-item quick"
+      [class.active]="mobilePanel()==='quick'"
+      [attr.aria-expanded]="mobilePanel()==='quick'"
+      aria-controls="mobile-quick-sheet"
+      aria-label="Ações rápidas"
+      (click)="toggleMobilePanel('quick')"
+    >
+      <bf-icon [name]="mobilePanel()==='quick' ? 'close' : 'plus'" />
     </button>
-    <a routerLink="/estoque" routerLinkActive="active"><bf-icon name="inventory" /><span>Estoque</span></a>
-    <a routerLink="/financeiro" routerLinkActive="active"><bf-icon name="finance" /><span>Financeiro</span></a>
+
+    @for (item of mobilePrimaryEnd; track item.path) {
+      <a
+        class="mobile-nav-item"
+        [routerLink]="item.path"
+        routerLinkActive="active"
+        (click)="closeMobilePanel()"
+      >
+        <bf-icon [name]="item.icon" />
+        <span>{{ item.mobileLabel || item.label }}</span>
+      </a>
+    }
+
+    <button
+      type="button"
+      class="mobile-nav-item mobile-more"
+      [class.active]="mobileMoreActive()"
+      [class.panel-open]="mobilePanel()==='more'"
+      [attr.aria-expanded]="mobilePanel()==='more'"
+      aria-controls="mobile-more-sheet"
+      aria-label="Mais opções"
+      (click)="toggleMobilePanel('more')"
+    >
+      <bf-icon name="more" />
+      <span>Mais</span>
+    </button>
   </nav>
 
-  @if (mobileMenuOpen()) {
-    <button class="quick-backdrop" type="button" aria-label="Fechar ações rápidas" (click)="mobileMenuOpen.set(false)"></button>
-    <section class="quick-sheet" aria-label="Ações rápidas">
-      <strong>Registrar</strong>
-      <button type="button" (click)="quickNavigate('/vendas?novo=1')"><bf-icon name="sales" /> Nova venda</button>
-      <button type="button" (click)="quickNavigate('/producao?novo=1')"><bf-icon name="production" /> Produção</button>
-      <button type="button" (click)="quickNavigate('/financeiro?novo=1')"><bf-icon name="finance" /> Compra ou despesa</button>
-      <button type="button" (click)="quickNavigate('/estoque?ajuste=1')"><bf-icon name="inventory" /> Ajuste de estoque</button>
-    </section>
-  }
+  <button
+    class="mobile-sheet-backdrop"
+    [class.open]="mobilePanel() !== null"
+    type="button"
+    aria-label="Fechar menu"
+    [attr.aria-hidden]="mobilePanel() === null"
+    [attr.tabindex]="mobilePanel() === null ? -1 : 0"
+    (click)="closeMobilePanel()"
+  ></button>
+
+  <section
+    id="mobile-quick-sheet"
+    class="mobile-sheet quick-sheet"
+    [class.open]="mobilePanel()==='quick'"
+    [attr.aria-hidden]="mobilePanel()!=='quick'"
+    [attr.inert]="mobilePanel()==='quick' ? null : ''"
+    aria-label="Ações rápidas"
+  >
+    <div class="sheet-heading sheet-animate">
+      <div>
+        <strong>Registrar</strong>
+        <small>Ações frequentes sem precisar procurar pela tela.</small>
+      </div>
+    </div>
+
+    <div class="quick-actions">
+      <button class="sheet-row sheet-animate" type="button" (click)="mobileNavigate('/vendas?novo=1')">
+        <span class="sheet-row-icon"><bf-icon name="sales" /></span>
+        <span class="sheet-row-copy"><strong>Nova venda</strong><small>Registrar uma nova venda</small></span>
+        <bf-icon class="sheet-chevron" name="chevron-right" />
+      </button>
+      <button class="sheet-row sheet-animate" type="button" (click)="mobileNavigate('/producao?novo=1')">
+        <span class="sheet-row-icon"><bf-icon name="production" /></span>
+        <span class="sheet-row-copy"><strong>Produção</strong><small>Registrar uma produção</small></span>
+        <bf-icon class="sheet-chevron" name="chevron-right" />
+      </button>
+      <button class="sheet-row sheet-animate" type="button" (click)="mobileNavigate('/financeiro?novo=compra')">
+        <span class="sheet-row-icon"><bf-icon name="finance" /></span>
+        <span class="sheet-row-copy"><strong>Compra ou despesa</strong><small>Abrir em compra de insumo</small></span>
+        <bf-icon class="sheet-chevron" name="chevron-right" />
+      </button>
+    </div>
+  </section>
+
+  <section
+    id="mobile-more-sheet"
+    class="mobile-sheet more-sheet"
+    [class.open]="mobilePanel()==='more'"
+    [attr.aria-hidden]="mobilePanel()!=='more'"
+    [attr.inert]="mobilePanel()==='more' ? null : ''"
+    aria-label="Mais opções"
+  >
+    <div class="mobile-profile-card sheet-animate">
+      @if (avatarUrl(); as photoUrl) {
+        <img
+          class="avatar avatar-photo"
+          [src]="photoUrl"
+          width="44"
+          height="44"
+          alt=""
+          aria-hidden="true"
+          decoding="async"
+          referrerpolicy="no-referrer"
+          (error)="onAvatarError()"
+        />
+      } @else {
+        <span class="avatar mobile-avatar">{{ auth.profile()?.displayName?.slice(0,1) || 'B' }}</span>
+      }
+      <span class="profile-copy">
+        <strong>{{ auth.profile()?.displayName || 'Bem Feito' }}</strong>
+        <small>{{ auth.profile()?.role || '' }}</small>
+      </span>
+    </div>
+
+    <nav class="more-links" aria-label="Outras áreas">
+      @for (item of mobileMoreNav; track item.path) {
+        <a
+          class="sheet-row sheet-animate"
+          [routerLink]="item.path"
+          routerLinkActive="active"
+          (click)="closeMobilePanel()"
+        >
+          <span class="sheet-row-icon"><bf-icon [name]="item.icon" /></span>
+          <span class="sheet-row-copy"><strong>{{ item.label }}</strong></span>
+          <bf-icon class="sheet-chevron" name="chevron-right" />
+        </a>
+      }
+    </nav>
+
+    <div class="more-utilities">
+      <button class="sheet-row sheet-animate" type="button" (click)="toggleTheme()">
+        <span class="sheet-row-icon">
+          <bf-icon [name]="theme.darkMode() ? 'sun' : 'moon'" />
+        </span>
+        <span class="sheet-row-copy">
+          <strong>{{ theme.darkMode() ? 'Tema claro' : 'Tema escuro' }}</strong>
+          <small>Alternar aparência do sistema</small>
+        </span>
+        <bf-icon class="sheet-chevron" name="chevron-right" />
+      </button>
+
+      <button class="sheet-row sheet-row-danger sheet-animate" type="button" (click)="requestLogout()">
+        <span class="sheet-row-icon"><bf-icon name="logout" /></span>
+        <span class="sheet-row-copy"><strong>Sair</strong><small>Encerrar sua sessão</small></span>
+        <bf-icon class="sheet-chevron" name="chevron-right" />
+      </button>
+    </div>
+  </section>
+
+  <bf-confirm-dialog #logoutConfirm />
 </div>

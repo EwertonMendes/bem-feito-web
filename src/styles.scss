@@ -104,7 +104,9 @@ html {
 }
 
 html.bf-modal-open,
-html.bf-modal-open body {
+html.bf-modal-open body,
+html.bf-mobile-sheet-open,
+html.bf-mobile-sheet-open body {
   overflow: hidden;
   overscroll-behavior: none;
 }

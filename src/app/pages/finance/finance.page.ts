@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormField, form, min, required } from '@angular/forms/signals';
 import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
 import { CatalogStore } from '../../features/catalog/catalog.store';
@@ -51,6 +52,7 @@ export class FinancePage {
   readonly sales = inject(SalesStore);
   readonly settings = inject(SettingsStore);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private readonly dialog = viewChild.required<BfDialog>('expenseDialog');
   private readonly receiptDialog = viewChild.required<BfDialog>('receiptDialog');
@@ -133,16 +135,42 @@ export class FinancePage {
     this.destroyRef.onDestroy(this.store.activate());
     this.destroyRef.onDestroy(this.sales.activateReceivables());
     this.destroyRef.onDestroy(this.settings.activate());
-    void Promise.all([
+    const ready = Promise.all([
       this.catalog.load(),
       this.references.load(),
       this.store.loadExpenses(),
       this.store.loadSummary(),
       this.sales.loadReceivableSummary(),
       this.settings.load(),
-    ]).then(() => {
-      if (this.route.snapshot.queryParamMap.get('novo') === '1') this.openExpense();
+    ]);
+
+    this.route.queryParamMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((params) => {
+        const shortcut = params.get('novo');
+        if (!shortcut) return;
+        void ready.then(() => this.consumeExpenseShortcut(shortcut));
+      });
+  }
+
+  private async consumeExpenseShortcut(shortcut: string): Promise<void> {
+    const kind: ExpenseKind | null =
+      shortcut === 'compra'
+        ? 'input-purchase'
+        : shortcut === '1'
+          ? 'operating-expense'
+          : null;
+
+    if (!kind) return;
+
+    await this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { novo: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
     });
+
+    this.openExpense(kind);
   }
 
   async selectTab(tab: 'expenses' | 'receivables' | 'payments'): Promise<void> {

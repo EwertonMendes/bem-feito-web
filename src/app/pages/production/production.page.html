@@ -1,6 +1,6 @@
 <section class="bf-page">
   <header class="bf-page-header">
-    <div><h1>Produção</h1><p>Registre o que realmente entrou no estoque. Receitas baixam os insumos automaticamente.</p></div>
+    <div><h1>Produção</h1><p>Registre o que entrou no estoque. O custo é estimado pelo padrão e só insumos controlados têm baixa automática.</p></div>
     <button class="bf-button" type="button" (click)="open()"><bf-icon name="plus" /> Registrar produção</button>
   </header>
 
@@ -11,11 +11,11 @@
   } @else {
   <div class="bf-table-wrap">
     <table class="bf-table">
-      <thead><tr><th>ID</th><th>Data</th><th>Produto</th><th>Quantidade</th><th>Custo unit.</th><th>Status de custo</th></tr></thead>
+      <thead><tr><th>ID</th><th>Data</th><th>Produto</th><th>Quantidade</th><th>Custo padrão</th><th>Status de custo</th></tr></thead>
       <tbody>
         @for (item of store.items(); track item.id) {
           <tr><td><strong>{{ item.code }}</strong></td><td>{{ date(item.businessDate) }}</td><td>{{ item.productName }}</td><td>{{ item.quantity }}</td><td>{{ currency(item.unitCostCents) }}</td><td><span class="bf-badge" [class.warning]="item.costPending">{{ item.costPending ? 'Pendente' : 'Calculado' }}</span></td></tr>
-        } @empty { <tr><td colspan="6"><bf-empty-state title="Nenhuma produção registrada" description="Quando produzir, registre aqui para atualizar estoque e custo." /></td></tr> }
+        } @empty { <tr><td colspan="6"><bf-empty-state title="Nenhuma produção registrada" description="Quando produzir, informe apenas produto e quantidade." /></td></tr> }
       </tbody>
     </table>
   </div>
@@ -29,7 +29,7 @@
     <div class="bf-dialog-body">
       <div class="bf-grid two">
         <label class="bf-field full"><span>Produto</span><bf-select [formField]="productionForm.productId" [options]="productOptions()" ariaLabel="Produto" /></label>
-        <label class="bf-field"><span>Quantidade</span><input class="bf-input" type="number" step="1" [formField]="productionForm.quantity" /></label>
+        <label class="bf-field"><span>Quantidade produzida</span><input class="bf-input" type="number" step="1" [formField]="productionForm.quantity" /></label>
         <label class="bf-field"><span>Data</span><input class="bf-input" type="date" [formField]="productionForm.businessDate" /></label>
         <label class="bf-field full"><span>Observações</span><textarea class="bf-textarea" [formField]="productionForm.notes"></textarea></label>
       </div>
@@ -37,10 +37,12 @@
       @if (selectedProduct()) {
         <section class="preview">
           <div class="product"><bf-catalog-image [image]="selectedProduct()?.image" [alt]="selectedProduct()?.displayName || ''" [compact]="true" /><div><strong>{{ selectedProduct()?.displayName }}</strong><small>Estoque atual: {{ selectedProduct()?.stock }}</small></div></div>
-          <div class="consumption-head"><strong>Consumo previsto</strong><span>{{ estimatedConsumptions().length ? estimatedConsumptions().length + ' insumos' : 'Sem receita cadastrada' }}</span></div>
+          <div class="cost-summary"><span>Custo padrão estimado desta produção</span><strong>{{currency(estimatedTotalCostCents())}}</strong></div>
+          <div class="consumption-head"><strong>Materiais de referência</strong><span>{{ estimatedConsumptions().length ? estimatedConsumptions().length + ' itens' : 'Sem composição cadastrada' }}</span></div>
           @for (item of estimatedConsumptions(); track item.name) {
-            <div class="consumption" [class.not-enough]="!item.enough"><span>{{ item.name }}</span><strong>{{ item.quantity }} {{ item.unit }}</strong></div>
-          } @empty { <p class="warning-text">A produção será registrada, mas o custo ficará pendente até a receita do produto ser cadastrada.</p> }
+            <div class="consumption" [class.not-enough]="!item.enough"><span>{{ item.name }} <small>{{trackingLabel(item.mode)}}</small></span><strong>{{ item.quantity }} {{ item.unit }}</strong></div>
+          } @empty { <p class="warning-text">Cadastre componentes de custo em Configurações para calcular o custo padrão automaticamente.</p> }
+          <p class="preview-hint">Materiais estimados e sem controle nunca bloqueiam a produção. Apenas itens marcados como “Controlado” exigem saldo suficiente.</p>
         </section>
       }
     </div>

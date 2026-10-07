@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { FormField, form, min, required } from '@angular/forms/signals';
+import { standardCostForProduct, trackingModeForInput } from '../../domain/logic/costing';
 import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
 import { CatalogStore } from '../../features/catalog/catalog.store';
 import { ProductionStore } from '../../features/production/production.store';
@@ -54,16 +55,37 @@ export class ProductionPage {
     })),
   ]);
   readonly selectedProduct = computed(() => this.catalog.products().find((item) => item.id === this.model().productId));
-  readonly estimatedConsumptions = computed(() => {
+  readonly costPreview = computed(() => {
     const product = this.selectedProduct();
-    if (!product) return [];
-    return product.recipe.map((component) => {
+    if (!product) return null;
+    try {
+      return standardCostForProduct(product, {
+        collection: this.references.collections().find((item) => item.id === product.collectionId),
+        fragrance: this.references.fragrances().find((item) => item.id === product.fragranceId),
+        format: this.references.formats().find((item) => item.id === product.formatId),
+      }, new Map(this.catalog.inputs().map((item) => [item.id, item])));
+    } catch {
+      return null;
+    }
+  });
+  readonly estimatedConsumptions = computed(() => {
+    const preview = this.costPreview();
+    if (!preview) return [];
+    return preview.components.map((component) => {
       const input = this.catalog.inputs().find((item) => item.id === component.inputId);
       const unit = this.references.units().find((item) => item.id === component.unitId);
       const quantity = component.quantity * this.model().quantity;
-      return { name: input?.name ?? 'Insumo', quantity, unit: unit?.name ?? '', enough: (input?.stock ?? 0) >= quantity };
+      const mode = input ? trackingModeForInput(input) : 'estimated';
+      return {
+        name: input?.name ?? 'Insumo',
+        quantity,
+        unit: unit?.name ?? '',
+        mode,
+        enough: mode !== 'exact' || (input?.stock ?? 0) >= quantity,
+      };
     });
   });
+  readonly estimatedTotalCostCents = computed(() => (this.costPreview()?.unitCostCents ?? 0) * this.model().quantity);
 
   constructor() {
     this.destroyRef.onDestroy(this.catalog.activate());
@@ -77,6 +99,12 @@ export class ProductionPage {
   open(): void {
     this.model.set({ productId: this.catalog.activeProducts()[0]?.id ?? '', quantity: 1, businessDate: todayBusinessDate(), notes: '' });
     this.dialog().open();
+  }
+
+  trackingLabel(mode: 'exact' | 'estimated' | 'untracked'): string {
+    if (mode === 'exact') return 'baixa estoque';
+    if (mode === 'estimated') return 'referência';
+    return 'só custo';
   }
 
   async save(): Promise<void> {

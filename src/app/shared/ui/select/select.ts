@@ -9,6 +9,7 @@ import {
   input,
   model,
   output,
+  signal,
   viewChild,
 } from '@angular/core';
 import { FormValueControl } from '@angular/forms/signals';
@@ -46,11 +47,12 @@ export class BfSelect implements FormValueControl<string> {
   readonly ariaLabel = input('Selecionar opção');
   readonly disabled = input(false);
   readonly required = input(false);
+  readonly invalid = input(false);
   readonly compact = input(false);
   readonly touch = output<void>();
 
-  readonly open = model(false);
-  readonly activeIndex = model(-1);
+  readonly open = signal(false);
+  readonly activeIndex = signal(-1);
   readonly selectedOption = computed(() => this.options().find((option) => option.value === this.value()));
   readonly selectId = `bf-select-${++selectSequence}`;
   readonly listboxId = `${this.selectId}-listbox`;

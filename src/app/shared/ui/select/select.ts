@@ -49,6 +49,7 @@ export class BfSelect implements FormValueControl<string> {
   readonly required = input(false);
   readonly invalid = input(false);
   readonly compact = input(false);
+  readonly descriptive = input(false);
   readonly touch = output<void>();
 
   readonly open = signal(false);

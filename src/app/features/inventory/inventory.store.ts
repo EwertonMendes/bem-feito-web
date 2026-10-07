@@ -26,9 +26,13 @@ export class InventoryStore {
   private cursor: BusinessDateCursor | null = null;
 
   private readonly movementsState = signal<StockMovement[]>([]);
+  private readonly movementsLoadingState = signal(false);
+  private readonly movementsInitializedState = signal(false);
   private readonly hasMoreState = signal(false);
 
   readonly movements = this.movementsState.asReadonly();
+  readonly movementsLoading = this.movementsLoadingState.asReadonly();
+  readonly movementsInitialized = this.movementsInitializedState.asReadonly();
   readonly hasMore = this.hasMoreState.asReadonly();
 
   constructor() {
@@ -64,11 +68,13 @@ export class InventoryStore {
     const request = ++this.movementRequest;
     if (itemId !== this.currentItemId) {
       this.movementsState.set([]);
+      this.movementsInitializedState.set(false);
       this.cursor = null;
       this.hasMoreState.set(false);
     }
     this.currentItemId = itemId;
     this.historyStale = true;
+    this.movementsLoadingState.set(true);
     try {
       const page = await this.repository.movementPage(itemId, PAGE_SIZE);
       if (request !== this.movementRequest) return true;
@@ -76,10 +82,16 @@ export class InventoryStore {
       this.hasMoreState.set(page.hasMore);
       this.movementsState.set(page.items);
       this.historyStale = false;
+      this.movementsInitializedState.set(true);
       return true;
     } catch (error) {
-      if (request === this.movementRequest) this.toast.error(this.errors.message(error));
+      if (request === this.movementRequest) {
+        this.movementsInitializedState.set(true);
+        this.toast.error(this.errors.message(error));
+      }
       return false;
+    } finally {
+      if (request === this.movementRequest) this.movementsLoadingState.set(false);
     }
   }
 

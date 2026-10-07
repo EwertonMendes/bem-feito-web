@@ -252,3 +252,35 @@
     font-weight: 650;
   }
 }
+
+
+.route-progress {
+  position: fixed;
+  z-index: 70;
+  top: 0;
+  left: var(--sidebar);
+  right: 0;
+  height: 3px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--line) 48%, transparent);
+  pointer-events: none;
+}
+
+.route-progress span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 32%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--brand), var(--sand), var(--accent));
+  box-shadow: 0 0 14px color-mix(in srgb, var(--brand) 30%, transparent);
+  animation: route-progress-travel 1.15s cubic-bezier(.4,0,.2,1) infinite;
+}
+
+@keyframes route-progress-travel {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(410%); }
+}
+
+@media (max-width: 980px) {
+  .route-progress { left: 0; }
+}

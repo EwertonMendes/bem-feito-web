@@ -3,10 +3,18 @@
     <div><h1>Estoque</h1><p>Saldo atual, mínimos e histórico completo de cada movimentação.</p></div>
   </header>
 
+  @if (refreshing()) { <bf-page-refresh /> }
+
   <div class="summary">
-    <div><strong>{{ catalog.products().length }}</strong><span>produtos</span></div>
-    <div class="warning"><strong>{{ catalog.lowStockProducts().length }}</strong><span>produtos baixos</span></div>
-    <div><strong>{{ catalog.lowStockInputs().length }}</strong><span>insumos baixos</span></div>
+    @if (!initialized()) {
+      <div><bf-skeleton width="42px" height="24px" /><bf-skeleton width="70px" height="10px" radius="5px" /></div>
+      <div><bf-skeleton width="42px" height="24px" /><bf-skeleton width="94px" height="10px" radius="5px" /></div>
+      <div><bf-skeleton width="42px" height="24px" /><bf-skeleton width="86px" height="10px" radius="5px" /></div>
+    } @else {
+      <div><strong>{{ catalog.products().length }}</strong><span>produtos</span></div>
+      <div class="warning"><strong>{{ catalog.lowStockProducts().length }}</strong><span>produtos baixos</span></div>
+      <div><strong>{{ catalog.lowStockInputs().length }}</strong><span>insumos baixos</span></div>
+    }
   </div>
 
   <div class="toolbar">
@@ -15,7 +23,9 @@
   </div>
 
   <div class="stock-list">
-    @if(tab()==='product'){
+    @if (!initialized()) {
+      <bf-list-skeleton [rows]="8" />
+    } @else if(tab()==='product'){
       @for(item of filteredProducts();track item.id){
         <article class="stock-card product-card"><bf-catalog-image [image]="item.image" [alt]="item.displayName" [compact]="true" /><div class="identity"><strong>{{item.displayName}}</strong><span>{{item.code}}</span></div><div class="balance" [class.bad]="item.stock<0" [class.low]="item.stock>=0 && item.stock<=item.minimumStock"><strong>{{item.stock}}</strong><span>mín. {{item.minimumStock}}</span></div><div class="stock-actions"><button class="bf-button secondary" (click)="openHistory('product',item.id)">Histórico</button><button class="bf-button" (click)="openAdjustment('product',item.id)">Ajustar</button></div></article>
       } @empty {<bf-empty-state title="Nenhum produto" description="Cadastre produtos no Catálogo." />}
@@ -35,8 +45,12 @@
   <dialog bfDialog #historyDialog="bfDialog" class="bf-dialog" (close)="closeHistory()">
     <div class="bf-dialog-header"><div><h2>Histórico de estoque</h2><small>{{selectedName()}}</small></div><button class="bf-icon-button" (click)="historyDialog.close()"><bf-icon name="close" /></button></div>
     <div class="bf-dialog-body history">
-      @for(move of store.movements();track move.id){<div class="movement"><div><strong>{{date(move.businessDate)}}</strong><span>{{movementSource(move.sourceType)}}</span></div><strong [class.positive]="move.quantityDelta>0" [class.negative]="move.quantityDelta<0">{{move.quantityDelta>0?'+':''}}{{move.quantityDelta}}</strong></div>} @empty {<bf-empty-state title="Sem movimentações" description="Este item ainda não possui histórico." />}
-      @if (store.hasMore()) { <button class="bf-button secondary" type="button" (click)="store.loadMoreMovements()">Carregar mais</button> }
+      @if (!store.movementsInitialized()) {
+        <bf-list-skeleton [rows]="5" />
+      } @else {
+        @for(move of store.movements();track move.id){<div class="movement"><div><strong>{{date(move.businessDate)}}</strong><span>{{movementSource(move.sourceType)}}</span></div><strong [class.positive]="move.quantityDelta>0" [class.negative]="move.quantityDelta<0">{{move.quantityDelta>0?'+':''}}{{move.quantityDelta}}</strong></div>} @empty {<bf-empty-state title="Sem movimentações" description="Este item ainda não possui histórico." />}
+        @if (store.hasMore()) { <button class="bf-button secondary" type="button" (click)="store.loadMoreMovements()">Carregar mais</button> }
+      }
     </div>
   </dialog>
 </section>

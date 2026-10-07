@@ -12,6 +12,8 @@ import { formatCurrency, fromCents, toCents } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
 import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
 import { BfDialog } from '../../shared/ui/dialog/dialog';
+import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
+import { BfListSkeleton, BfSkeleton, BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
 
 interface ReceiptFormModel {
   saleId: string;
@@ -35,7 +37,7 @@ interface ExpenseFormModel {
 
 @Component({
   selector: 'bf-finance-page',
-  imports: [FormField, BfIcon, BfDialog, BfEmptyState],
+  imports: [FormField, BfIcon, BfDialog, BfEmptyState, BfPageRefresh, BfListSkeleton, BfSkeleton, BfTableSkeleton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './finance.page.html',
   styleUrl: './finance.page.scss',
@@ -81,6 +83,16 @@ export class FinancePage {
     min(p.amount, 0.01);
   });
   readonly selectedReceivable = computed(() => this.sales.openSales().find((sale) => sale.id === this.receiptModel().saleId));
+  readonly summaryInitialized = computed(() => this.store.summaryInitialized() && this.sales.receivableSummaryInitialized());
+  readonly refreshing = computed(() =>
+    this.summaryInitialized() && (
+      this.store.summaryLoading() ||
+      this.store.expensesLoading() ||
+      this.store.paymentsLoading() ||
+      this.sales.receivablesLoading() ||
+      this.sales.receivableSummaryLoading()
+    )
+  );
 
   constructor() {
     this.destroyRef.onDestroy(this.catalog.activate());

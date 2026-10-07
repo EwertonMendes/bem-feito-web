@@ -24,10 +24,12 @@ export class ProductionStore {
 
   private readonly itemsState = signal<Production[]>([]);
   private readonly loadingState = signal(false);
+  private readonly initializedState = signal(false);
   private readonly hasMoreState = signal(false);
 
   readonly items = this.itemsState.asReadonly();
   readonly loading = this.loadingState.asReadonly();
+  readonly initialized = this.initializedState.asReadonly();
   readonly hasMore = this.hasMoreState.asReadonly();
 
   constructor() {
@@ -58,6 +60,7 @@ export class ProductionStore {
         this.toast.error(this.errors.message(error));
         throw error;
       } finally {
+        this.initializedState.set(true);
         this.loadingState.set(false);
       }
     }, force).catch(() => undefined);

@@ -1,4 +1,4 @@
-import { effect, inject, Injectable, signal } from '@angular/core';
+import { computed, effect, inject, Injectable, signal } from '@angular/core';
 import { Expense, ExpenseDraft } from '../../domain/models/finance.model';
 import { Payment } from '../../domain/models/sales.model';
 import { DataRevisionService } from '../../core/firebase/data-revision.service';
@@ -43,7 +43,13 @@ export class FinanceStore {
   private readonly totalOutState = signal(0);
   private readonly paymentCountState = signal(0);
   private readonly expensesLoadingState = signal(false);
+  private readonly expensesInitializedState = signal(false);
   private readonly paymentsLoadingState = signal(false);
+  private readonly paymentsInitializedState = signal(false);
+  private readonly expenseSummaryLoadingState = signal(false);
+  private readonly expenseSummaryInitializedState = signal(false);
+  private readonly paymentSummaryLoadingState = signal(false);
+  private readonly paymentSummaryInitializedState = signal(false);
   private readonly expenseHasMoreState = signal(false);
   private readonly paymentHasMoreState = signal(false);
 
@@ -52,7 +58,11 @@ export class FinanceStore {
   readonly totalOutCents = this.totalOutState.asReadonly();
   readonly paymentCount = this.paymentCountState.asReadonly();
   readonly expensesLoading = this.expensesLoadingState.asReadonly();
+  readonly expensesInitialized = this.expensesInitializedState.asReadonly();
   readonly paymentsLoading = this.paymentsLoadingState.asReadonly();
+  readonly paymentsInitialized = this.paymentsInitializedState.asReadonly();
+  readonly summaryLoading = computed(() => this.expenseSummaryLoadingState() || this.paymentSummaryLoadingState());
+  readonly summaryInitialized = computed(() => this.expenseSummaryInitializedState() && this.paymentSummaryInitializedState());
   readonly expenseHasMore = this.expenseHasMoreState.asReadonly();
   readonly paymentHasMore = this.paymentHasMoreState.asReadonly();
 
@@ -111,6 +121,7 @@ export class FinanceStore {
         this.toast.error(this.errors.message(error));
         throw error;
       } finally {
+        this.expensesInitializedState.set(true);
         this.expensesLoadingState.set(false);
       }
     }, force).catch(() => undefined);
@@ -128,6 +139,7 @@ export class FinanceStore {
         this.toast.error(this.errors.message(error));
         throw error;
       } finally {
+        this.paymentsInitializedState.set(true);
         this.paymentsLoadingState.set(false);
       }
     }, force).catch(() => undefined);
@@ -215,22 +227,30 @@ export class FinanceStore {
 
   private loadExpenseSummary(force = false): Promise<void> {
     return this.expenseSummaryGate.run(async () => {
+      this.expenseSummaryLoadingState.set(true);
       try {
         this.totalOutState.set(await this.financeRepository.totalExpensesCents());
       } catch (error) {
         this.toast.error(this.errors.message(error));
         throw error;
+      } finally {
+        this.expenseSummaryInitializedState.set(true);
+        this.expenseSummaryLoadingState.set(false);
       }
     }, force).catch(() => undefined);
   }
 
   private loadPaymentSummary(force = false): Promise<void> {
     return this.paymentSummaryGate.run(async () => {
+      this.paymentSummaryLoadingState.set(true);
       try {
         this.paymentCountState.set(await this.salesRepository.paymentCount());
       } catch (error) {
         this.toast.error(this.errors.message(error));
         throw error;
+      } finally {
+        this.paymentSummaryInitializedState.set(true);
+        this.paymentSummaryLoadingState.set(false);
       }
     }, force).catch(() => undefined);
   }

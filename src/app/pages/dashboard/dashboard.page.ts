@@ -3,10 +3,12 @@ import { RouterLink } from '@angular/router';
 import { DashboardStore } from '../../features/dashboard/dashboard.store';
 import { formatCurrency } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
+import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
+import { BfSkeleton } from '../../shared/ui/skeleton/skeleton';
 
 @Component({
   selector: 'bf-dashboard-page',
-  imports: [RouterLink, BfIcon],
+  imports: [RouterLink, BfIcon, BfPageRefresh, BfSkeleton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './dashboard.page.html',
   styleUrl: './dashboard.page.scss',
@@ -15,6 +17,10 @@ export class DashboardPage {
   readonly store = inject(DashboardStore);
   private readonly destroyRef = inject(DestroyRef);
   readonly currency = formatCurrency;
+  readonly skeletonFour = [1, 2, 3, 4];
+  readonly skeletonFive = [1, 2, 3, 4, 5];
+  readonly skeletonThree = [1, 2, 3];
+  readonly skeletonMonths = Array.from({ length: 12 }, (_, index) => index);
 
   readonly chartCeiling = computed(() => {
     const max = Math.max(0, ...this.store.monthlyRevenue().map((item) => item.valueCents));

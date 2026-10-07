@@ -9,10 +9,12 @@ import { formatCurrency } from '../../core/utils/money';
 import { BfDialog } from '../../shared/ui/dialog/dialog';
 import { BfIcon } from '../../shared/ui/icon/icon';
 import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
+import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
+import { BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
 
 @Component({
   selector: 'bf-sales-page',
-  imports: [BfIcon, BfDialog, SaleEditor, BfEmptyState],
+  imports: [BfIcon, BfDialog, SaleEditor, BfEmptyState, BfPageRefresh, BfTableSkeleton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sales.page.html',
   styleUrl: './sales.page.scss',

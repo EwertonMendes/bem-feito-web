@@ -6,10 +6,11 @@ import { CatalogEditor } from '../../features/catalog/components/catalog-editor/
 import { CatalogImage } from '../../shared/media/catalog-image/catalog-image';
 import { BfIcon } from '../../shared/ui/icon/icon';
 import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
+import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
 
 @Component({
   selector: 'bf-catalog-page',
-  imports: [BfIcon, CatalogImage, CatalogEditor, BfEmptyState],
+  imports: [BfIcon, CatalogImage, CatalogEditor, BfEmptyState, BfPageRefresh],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './catalog.page.html',
   styleUrl: './catalog.page.scss',

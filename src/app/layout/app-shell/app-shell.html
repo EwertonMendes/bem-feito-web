@@ -52,6 +52,9 @@
   </aside>
 
   <main class="content">
+    @if (navigation.routeLoading()) {
+      <div class="route-progress" role="status" aria-label="Carregando tela"><span></span></div>
+    }
     <bf-drive-connection-banner />
     <router-outlet />
   </main>

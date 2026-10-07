@@ -4,6 +4,11 @@
     <button class="bf-button" type="button" (click)="open()"><bf-icon name="plus" /> Registrar produção</button>
   </header>
 
+  @if (store.initialized() && store.loading()) { <bf-page-refresh /> }
+
+  @if (!store.initialized()) {
+    <bf-table-skeleton [columns]="6" [rows]="7" />
+  } @else {
   <div class="bf-table-wrap">
     <table class="bf-table">
       <thead><tr><th>ID</th><th>Data</th><th>Produto</th><th>Quantidade</th><th>Custo unit.</th><th>Status de custo</th></tr></thead>
@@ -14,6 +19,7 @@
       </tbody>
     </table>
   </div>
+  }
   @if (store.hasMore()) {
     <div class="bf-actions"><button class="bf-button secondary" type="button" (click)="store.loadMore()">Carregar mais</button></div>
   }

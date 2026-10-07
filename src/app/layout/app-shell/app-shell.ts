@@ -76,6 +76,8 @@ export class AppShell {
   ];
 
   readonly mobilePrimaryNav = this.nav.filter((item) => item.mobilePlacement === 'primary');
+  readonly mobilePrimaryStart = this.mobilePrimaryNav.slice(0, 2);
+  readonly mobilePrimaryEnd = this.mobilePrimaryNav.slice(2);
   readonly mobileMoreNav = this.nav.filter((item) => item.mobilePlacement === 'more');
 
   readonly mobileMoreActive = computed(() => {

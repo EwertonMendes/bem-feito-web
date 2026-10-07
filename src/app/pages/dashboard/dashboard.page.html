@@ -63,7 +63,7 @@
 
       <section class="dashboard-panel alerts">
         <div class="section-head"><bf-skeleton width="118px" height="22px" /></div>
-        @for (item of skeletonFive; track item) {
+        @for (item of skeletonFour; track item) {
           <div class="alert-row">
             <bf-skeleton shape="circle" width="24px" height="24px" />
             <bf-skeleton width="24px" height="14px" />
@@ -207,12 +207,6 @@
         </div>
       </div>
 
-      <a routerLink="/estoque" class="alert-row danger-row">
-        <span class="alert-icon"><bf-icon name="negative-stock" /></span>
-        <span class="alert-count">{{ store.negativeProducts() }}</span>
-        <span class="alert-label">produtos negativos</span>
-        <span class="alert-action">Corrigir <bf-icon name="arrow-right" /></span>
-      </a>
       <a routerLink="/estoque" class="alert-row">
         <span class="alert-icon"><bf-icon name="low-stock-product" /></span>
         <span class="alert-count">{{ store.lowStockProducts() }}</span>

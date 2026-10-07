@@ -10,6 +10,8 @@ import { BfIcon } from '../../shared/ui/icon/icon';
 import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
 import { BfDialog } from '../../shared/ui/dialog/dialog';
 import { CatalogImage } from '../../shared/media/catalog-image/catalog-image';
+import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
+import { BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
 
 interface ProductionFormModel {
   productId: string;
@@ -20,7 +22,7 @@ interface ProductionFormModel {
 
 @Component({
   selector: 'bf-production-page',
-  imports: [FormField, BfIcon, CatalogImage, BfDialog, BfEmptyState],
+  imports: [FormField, BfIcon, CatalogImage, BfDialog, BfEmptyState, BfPageRefresh, BfTableSkeleton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './production.page.html',
   styleUrl: './production.page.scss',

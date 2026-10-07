@@ -120,6 +120,25 @@ describe('DriveAuthService', () => {
     expect(service.connected()).toBe(true);
   });
 
+  it('resumes a remembered grant in a new tab even before the Drive auth listener fires', async () => {
+    localStorage.setItem('bem-feito:google-drive-grant:development', JSON.stringify({
+      firebaseUid: 'user-1',
+      accountEmail: 'user@example.com',
+      grantedAt: Date.now() - 60_000,
+    }));
+    auth.currentUser = { uid: 'user-1', email: 'user@example.com' };
+
+    const service = createService();
+
+    expect(service.linked()).toBe(false);
+    expect(await service.connect()).toBe('token-1');
+
+    expect(prompts).toEqual(['']);
+    expect(service.linked()).toBe(true);
+    expect(service.connected()).toBe(true);
+    expect(service.currentToken()).toBe('token-1');
+  });
+
   it('expires the access token on logout but can resume the remembered grant for the same Firebase user', async () => {
     const service = createService();
     signIn(service);

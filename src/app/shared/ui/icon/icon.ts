@@ -43,7 +43,7 @@ import {
 export type BfIconName =
   | 'dashboard' | 'sales' | 'production' | 'inventory' | 'finance' | 'catalog' | 'settings'
   | 'plus' | 'minus' | 'search' | 'sun' | 'moon' | 'logout' | 'close' | 'trash' | 'image'
-  | 'calendar' | 'chart' | 'wallet' | 'clock' | 'tag' | 'box' | 'heart' | 'alert' | 'leaf'
+  | 'calendar' | 'chart' | 'wallet' | 'clock' | 'tag' | 'box' | 'heart' | 'alert' | 'leaf' | 'product'
   | 'receipt' | 'bag' | 'chevron-right' | 'arrow-right' | 'arrow-down-right' | 'eye' | 'card' | 'check'
   | 'tick' | 'qr-code' | 'banknote' | 'upload';
 
@@ -73,6 +73,7 @@ const ICONS = {
   heart: LucideHeart,
   alert: LucideTriangleAlert,
   leaf: LucideLeaf,
+  product: LucidePackage,
   receipt: LucideReceiptText,
   'qr-code': LucideQrCode,
   banknote: LucideBanknote,

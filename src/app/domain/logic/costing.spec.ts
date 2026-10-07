@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { productCostComponents, standardCostForProduct, trackingModeForInput } from './costing';
+import { productCostBreakdown, productCostComponents, standardCostForProduct, trackingModeForInput } from './costing';
 import { InputItem, Product } from '../models/catalog.model';
 
 const product: Product = {
@@ -41,6 +41,15 @@ describe('standard costing', () => {
       { inputId: 'base', unitId: 'g', quantity: 90 },
       { inputId: 'extra', unitId: 'ml', quantity: 6 },
     ]);
+  });
+
+  it('keeps the origin of reusable and product-specific cost contributions', () => {
+    const breakdown = productCostBreakdown(product, {
+      format: { id: 'fmt', name: 'Barra', active: true, costComponents: [{ inputId: 'extra', unitId: 'ml', quantity: 2 }] },
+      fragrance: { id: 'f', name: 'Lavanda', collectionId: 'c', active: true, costComponents: [{ inputId: 'extra', unitId: 'ml', quantity: 3 }] },
+    });
+    expect(breakdown[0]?.quantity).toBe(6);
+    expect(breakdown[0]?.sources.map((item) => item.source)).toEqual(['format', 'fragrance', 'product']);
   });
 
   it('calculates standard unit cost without depending on physical stock', () => {

@@ -25,10 +25,6 @@ export class BfImageUpload {
 
   readonly hasCurrent = input(false);
   readonly label = input('Imagem');
-  readonly hint = input('PNG, JPEG, WebP, GIF ou AVIF.');
-  readonly emptyTitle = input('Adicione uma imagem');
-  readonly emptyDescription = input('Clique para escolher ou arraste uma imagem até aqui.');
-  readonly currentTitle = input('Imagem atual');
   readonly disabled = input(false);
   readonly accept = input('image/webp,image/png,image/jpeg,image/gif,image/avif');
 
@@ -84,30 +80,25 @@ export class BfImageUpload {
     this.useFile(event.dataTransfer?.files?.[0] ?? null);
   }
 
-  clearSelection(): void {
+  clearSelection(event: Event): void {
+    event.stopPropagation();
     this.file.set(null);
     this.validationMessage.set('');
   }
 
-  removeExisting(): void {
+  removeExisting(event: Event): void {
+    event.stopPropagation();
     if (!this.hasCurrent()) return;
     this.file.set(null);
     this.removeCurrent.set(true);
     this.validationMessage.set('');
   }
 
-  restoreExisting(): void {
+  restoreExisting(event: Event): void {
+    event.stopPropagation();
     if (!this.hasCurrent()) return;
     this.removeCurrent.set(false);
     this.validationMessage.set('');
-  }
-
-  fileSize(): string {
-    const size = this.file()?.size ?? 0;
-    if (!size) return '';
-    if (size < 1024) return `${size} B`;
-    if (size < 1024 * 1024) return `${(size / 1024).toFixed(size < 10 * 1024 ? 1 : 0)} KB`;
-    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
   }
 
   private useFile(file: File | null): void {

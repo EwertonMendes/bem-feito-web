@@ -124,9 +124,9 @@ describe('Actual repositories against restrictive emulator rules', () => {
   it('uses estimated inputs for cost without consuming or blocking their physical balance', async () => {
     const created = await production.create('p-est', 2, day);
     expect(created.production).toMatchObject({ unitCostCents: 2000, totalCostCents: 4000, costPending: false });
-    expect(await data('inputs', 'i-est')).toMatchObject({ stock: 1 });
+    expect(await data('inputs', 'i-est')).toMatchObject({ stock: 0 });
     expect(await data('products', 'p-est')).toMatchObject({ stock: 2, averageUnitCostCents: 2000 });
-    expect(await count('stockMovements')).toBe(1);
+    expect(await count('stockMovements')).toBe(2);
   });
 
   it('updates cost for an untracked input without creating fake physical inventory', async () => {

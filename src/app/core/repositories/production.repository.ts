@@ -106,8 +106,17 @@ export class ProductionRepository {
       for (const consumption of consumptions) {
         const snapshot = inputSnapshots.get(consumption.inputId);
         const input = inputs.get(consumption.inputId);
-        if (!snapshot?.exists() || !input || trackingModeForInput(input) !== 'exact') continue;
-        const stock = input.stock - consumption.quantity;
+        if (!snapshot?.exists() || !input) continue;
+
+        const mode = trackingModeForInput(input);
+        if (mode === 'untracked') continue;
+
+        const appliedQuantity = mode === 'exact'
+          ? consumption.quantity
+          : Math.min(Math.max(0, input.stock), consumption.quantity);
+        if (appliedQuantity <= 0) continue;
+
+        const stock = input.stock - appliedQuantity;
         transaction.update(snapshot.ref, {
           stock,
           stockStatus: stockStatusForInput({ ...input, stock }),
@@ -115,13 +124,14 @@ export class ProductionRepository {
           updatedBy: userId,
         });
         stockChanges.push({ itemType: 'input', itemId: input.id, stock });
+
         const movementRef = doc(collection(this.firestore, 'stockMovements'));
         transaction.set(movementRef, {
           itemType: 'input',
           itemId: input.id,
-          quantityDelta: -consumption.quantity,
+          quantityDelta: -appliedQuantity,
           unitCostCents: consumption.unitCostCents,
-          totalCostCents: consumption.totalCostCents,
+          totalCostCents: Math.round(appliedQuantity * consumption.unitCostCents),
           sourceType: 'production',
           sourceId: productionRef.id,
           businessDate,

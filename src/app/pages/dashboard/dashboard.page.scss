@@ -760,6 +760,12 @@
     min-height: 55px;
   }
 
+  .alert-icon {
+    grid-row: 1 / span 2;
+    align-self: center;
+    justify-self: center;
+  }
+
   .alert-action {
     grid-column: 3;
     justify-self: start;

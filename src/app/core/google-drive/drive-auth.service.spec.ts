@@ -104,7 +104,7 @@ describe('DriveAuthService', () => {
     expect(service.connected()).toBe(true);
     expect(service.linked()).toBe(true);
     expect(prompts).toEqual(['consent']);
-    expect(sessionStorage.getItem('bem-feito:google-drive:development')).toContain('token-1');
+    expect(localStorage.getItem('bem-feito:google-drive:development')).toContain('token-1');
     expect(localStorage.getItem('bem-feito:google-drive-grant:development')).toContain('user-1');
 
     service.expireAccessToken();
@@ -112,12 +112,31 @@ describe('DriveAuthService', () => {
     expect(service.connected()).toBe(false);
     expect(service.linked()).toBe(true);
     expect(service.accountEmail()).toBe('user@example.com');
-    expect(sessionStorage.getItem('bem-feito:google-drive:development')).toBeNull();
+    expect(localStorage.getItem('bem-feito:google-drive:development')).toBeNull();
     expect(localStorage.getItem('bem-feito:google-drive-grant:development')).not.toBeNull();
 
     expect(await service.connect()).toBe('token-2');
     expect(prompts).toEqual(['consent', '']);
     expect(service.connected()).toBe(true);
+  });
+
+  it('restores a still-valid access token after closing and reopening the tab', async () => {
+    const service = createService();
+    signIn(service);
+    await service.connect();
+    service.setAccountEmail('user@example.com');
+
+    const persistentStorage = localStorage;
+    vi.stubGlobal('sessionStorage', new MemoryStorage());
+    auth.currentUser = { uid: 'user-1', email: 'user@example.com' };
+
+    const reopened = createService();
+
+    expect(localStorage).toBe(persistentStorage);
+    expect(reopened.currentToken()).toBe('token-1');
+    expect(reopened.connected()).toBe(true);
+    expect(reopened.linked()).toBe(true);
+    expect(prompts).toEqual(['consent']);
   });
 
   it('resumes a remembered grant in a new tab even before the Drive auth listener fires', async () => {
@@ -150,7 +169,7 @@ describe('DriveAuthService', () => {
 
     expect(service.connected()).toBe(false);
     expect(service.linked()).toBe(false);
-    expect(sessionStorage.getItem('bem-feito:google-drive:development')).toBeNull();
+    expect(localStorage.getItem('bem-feito:google-drive:development')).toBeNull();
     expect(localStorage.getItem('bem-feito:google-drive-grant:development')).toContain('user-1');
 
     auth.currentUser = { uid: 'user-1', email: 'user@example.com' };

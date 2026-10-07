@@ -250,7 +250,7 @@
       <div><span>Saídas de caixa</span><strong>{{ currency(store.cashOutCents()) }}</strong></div>
     </article>
     <article class="financial-card tint-sage">
-      <span class="financial-icon"><bf-icon name="chart" /></span>
+      <span class="financial-icon"><bf-icon name="cash-flow" /></span>
       <div><span>Fluxo de caixa</span><strong [class.negative]="store.cashFlowCents() < 0">{{ currency(store.cashFlowCents()) }}</strong></div>
     </article>
   </div>

@@ -46,6 +46,7 @@
   @for (option of options(); track option.value; let i = $index) {
     <button
       class="option"
+      [class.has-media]="!!(option.imageSrc || option.icon)"
       type="button"
       role="option"
       tabindex="-1"

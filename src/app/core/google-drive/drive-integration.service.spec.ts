@@ -1,6 +1,11 @@
 import '@angular/compiler';
 import { Injector, runInInjectionContext, signal } from '@angular/core';
 import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('@angular/core', async () => {
+  const actual = await vi.importActual<typeof import('@angular/core')>('@angular/core');
+  return { ...actual, effect: vi.fn() };
+});
 import { AuthService } from '../auth/auth.service';
 import { DriveIntegrationRepository } from '../repositories/drive-integration.repository';
 import { DriveApiService } from './drive-api.service';

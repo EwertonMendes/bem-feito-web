@@ -10,6 +10,8 @@ import { BfIcon } from '../../shared/ui/icon/icon';
 import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
 import { BfDialog } from '../../shared/ui/dialog/dialog';
 import { CatalogImage } from '../../shared/media/catalog-image/catalog-image';
+import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
+import { BfListSkeleton, BfSkeleton } from '../../shared/ui/skeleton/skeleton';
 
 interface AdjustmentModel {
   quantity: number;
@@ -19,7 +21,7 @@ interface AdjustmentModel {
 
 @Component({
   selector: 'bf-inventory-page',
-  imports: [FormField, BfIcon, CatalogImage, BfDialog, BfEmptyState],
+  imports: [FormField, BfIcon, CatalogImage, BfDialog, BfEmptyState, BfPageRefresh, BfListSkeleton, BfSkeleton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './inventory.page.html',
   styleUrl: './inventory.page.scss',
@@ -52,6 +54,8 @@ export class InventoryPage {
     const term = this.search().toLocaleLowerCase('pt-BR').trim();
     return this.catalog.inputs().filter((item) => !term || (item.name + item.code).toLocaleLowerCase('pt-BR').includes(term));
   });
+  readonly initialized = computed(() => this.catalog.initialized() && this.references.initialized());
+  readonly refreshing = computed(() => this.initialized() && (this.catalog.loading() || this.references.loading()));
   readonly selectedName = computed(() => {
     if (this.selectedType() === 'product') return this.catalog.products().find((item) => item.id === this.selectedId())?.displayName ?? '';
     return this.catalog.inputs().find((item) => item.id === this.selectedId())?.name ?? '';
@@ -77,12 +81,12 @@ export class InventoryPage {
     this.selectedType.set(type);
     this.selectedId.set(id);
     this.store.activateHistory();
+    this.historyDialog().open();
     const loaded = await this.store.loadMovements(id);
     if (!loaded) {
+      this.historyDialog().close();
       this.store.deactivateHistory();
-      return;
     }
-    this.historyDialog().open();
   }
 
   closeHistory(): void {

@@ -12,6 +12,8 @@ import { BfDialog } from '../../../../shared/ui/dialog/dialog';
 import { BfIcon } from '../../../../shared/ui/icon/icon';
 import { BfSelect, BfSelectOption } from '../../../../shared/ui/select/select';
 import { BfCheckbox } from '../../../../shared/ui/checkbox/checkbox';
+import { BfImageUpload } from '../../../../shared/ui/image-upload/image-upload';
+import { CatalogImage } from '../../../../shared/media/catalog-image/catalog-image';
 
 interface ProductFormModel { code: string; collectionId: string; fragranceId: string; formatId: string; salePrice: number; additionalCost: number; minimumStock: number; active: boolean; }
 interface InputFormModel { code: string; name: string; unitId: string; minimumStock: number | null; active: boolean; }
@@ -20,7 +22,7 @@ interface AdditionFormModel { name: string; category: string; price: number; not
 
 @Component({
   selector: 'bf-catalog-editor',
-  imports: [FormField, BfDialog, BfIcon, BfSelect, BfCheckbox],
+  imports: [FormField, BfDialog, BfIcon, BfSelect, BfCheckbox, BfImageUpload, CatalogImage],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './catalog-editor.html',
   styleUrl: './catalog-editor.scss',
@@ -215,18 +217,6 @@ export class CatalogEditor {
 
   removeAdditionComponent(index: number): void {
     this.additionComponents.update((items) => items.filter((_, i) => i !== index).map((item, i) => ({ ...item, order: i + 1 })));
-  }
-
-  onImage(event: Event): void {
-    if (!this.imagesEnabled) return;
-    const files = (event.target as HTMLInputElement).files;
-    this.imageFile.set(files?.[0] ?? null);
-    if (files?.length) this.removeImage.set(false);
-  }
-
-  markImageForRemoval(): void {
-    this.imageFile.set(null);
-    this.removeImage.set(true);
   }
 
   async save(): Promise<void> {

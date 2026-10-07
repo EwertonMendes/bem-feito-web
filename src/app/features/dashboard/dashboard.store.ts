@@ -50,7 +50,8 @@ export class DashboardStore {
   private lastCatalogRevision = 0;
   private lastInventoryRevision = 0;
   private active = false;
-  private initialized = false;
+  private readonly initializedState = signal(false);
+  private pendingLoads = 0;
   private periodStale = true;
   private yearStale = true;
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
@@ -60,7 +61,9 @@ export class DashboardStore {
 
   readonly startDate = signal(this.initialPeriod.startDate);
   readonly endDate = signal(this.initialPeriod.endDate);
-  readonly loading = signal(false);
+  private readonly loadingState = signal(false);
+  readonly loading = this.loadingState.asReadonly();
+  readonly initialized = this.initializedState.asReadonly();
   private readonly metricsState = signal<DashboardMetrics>(EMPTY_METRICS);
   private readonly monthlyRevenueState = signal<MonthlyRevenuePoint[]>(
     Array.from({ length: 12 }, (_, index) => ({
@@ -139,19 +142,19 @@ export class DashboardStore {
 
   async load(): Promise<void> {
     this.active = true;
-    this.loading.set(true);
+    this.beginLoad();
     try {
       // Compatibility backfill is opportunistic; dashboard reads have a safe legacy fallback.
       void this.backfill.ensure().catch(() => undefined);
       const tasks: Promise<void>[] = [];
-      if (!this.initialized || this.periodStale) tasks.push(this.refreshPeriod());
-      if (!this.initialized || this.yearStale) tasks.push(this.refreshYear());
+      if (!this.initializedState() || this.periodStale) tasks.push(this.refreshPeriod());
+      if (!this.initializedState() || this.yearStale) tasks.push(this.refreshYear());
       await Promise.all(tasks);
-      this.initialized = true;
     } catch (error) {
       this.toast.error(this.errors.message(error));
     } finally {
-      this.loading.set(false);
+      this.initializedState.set(true);
+      this.endLoad();
     }
   }
 
@@ -187,7 +190,7 @@ export class DashboardStore {
   }
 
   private scheduleRefresh(): void {
-    if (!this.active || !this.initialized || this.refreshTimer !== null) return;
+    if (!this.active || !this.initializedState() || this.refreshTimer !== null) return;
     this.refreshTimer = setTimeout(() => {
       this.refreshTimer = null;
       if (!this.active) return;
@@ -199,19 +202,35 @@ export class DashboardStore {
   }
 
   private async safeRefreshPeriod(): Promise<void> {
+    this.beginLoad();
     try {
       await this.refreshPeriod();
     } catch (error) {
       this.toast.error(this.errors.message(error));
+    } finally {
+      this.endLoad();
     }
   }
 
   private async safeRefreshYear(): Promise<void> {
+    this.beginLoad();
     try {
       await this.refreshYear();
     } catch (error) {
       this.toast.error(this.errors.message(error));
+    } finally {
+      this.endLoad();
     }
+  }
+
+  private beginLoad(): void {
+    this.pendingLoads += 1;
+    this.loadingState.set(true);
+  }
+
+  private endLoad(): void {
+    this.pendingLoads = Math.max(0, this.pendingLoads - 1);
+    if (this.pendingLoads === 0) this.loadingState.set(false);
   }
 
   private async refreshPeriod(): Promise<void> {

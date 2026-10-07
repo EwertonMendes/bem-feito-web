@@ -35,6 +35,7 @@ import {
   LucideTags,
   LucideTrash2,
   LucideTriangleAlert,
+  LucideUpload,
   LucideWallet,
   LucideX,
 } from '@lucide/angular';
@@ -44,7 +45,7 @@ export type BfIconName =
   | 'plus' | 'minus' | 'search' | 'sun' | 'moon' | 'logout' | 'close' | 'trash' | 'image'
   | 'calendar' | 'chart' | 'wallet' | 'clock' | 'tag' | 'box' | 'heart' | 'alert' | 'leaf'
   | 'receipt' | 'bag' | 'chevron-right' | 'arrow-right' | 'arrow-down-right' | 'eye' | 'card' | 'check'
-  | 'tick' | 'qr-code' | 'banknote';
+  | 'tick' | 'qr-code' | 'banknote' | 'upload';
 
 const ICONS = {
   dashboard: LucideLayoutDashboard,
@@ -75,6 +76,7 @@ const ICONS = {
   receipt: LucideReceiptText,
   'qr-code': LucideQrCode,
   banknote: LucideBanknote,
+  upload: LucideUpload,
   tick: LucideCheck,
   bag: LucideShoppingBag,
   'chevron-right': LucideChevronRight,

@@ -36,15 +36,25 @@ export class SalesStore {
   private readonly receivablesState = signal<Sale[]>([]);
   private readonly receivableTotalState = signal(0);
   private readonly loadingState = signal(false);
+  private readonly initializedState = signal(false);
   private readonly loadingMoreState = signal(false);
   private readonly hasMoreState = signal(false);
+  private readonly receivablesLoadingState = signal(false);
+  private readonly receivablesInitializedState = signal(false);
+  private readonly receivableSummaryLoadingState = signal(false);
+  private readonly receivableSummaryInitializedState = signal(false);
   private readonly receivableHasMoreState = signal(false);
 
   readonly sales = this.salesState.asReadonly();
   readonly loading = this.loadingState.asReadonly();
+  readonly initialized = this.initializedState.asReadonly();
   readonly loadingMore = this.loadingMoreState.asReadonly();
   readonly hasMore = this.hasMoreState.asReadonly();
   readonly openSales = computed(() => this.receivablesState());
+  readonly receivablesLoading = this.receivablesLoadingState.asReadonly();
+  readonly receivablesInitialized = this.receivablesInitializedState.asReadonly();
+  readonly receivableSummaryLoading = this.receivableSummaryLoadingState.asReadonly();
+  readonly receivableSummaryInitialized = this.receivableSummaryInitializedState.asReadonly();
   readonly receivableHasMore = this.receivableHasMoreState.asReadonly();
   readonly receivableTotalCents = this.receivableTotalState.asReadonly();
 
@@ -87,6 +97,7 @@ export class SalesStore {
         this.toast.error(this.errors.message(error));
         throw error;
       } finally {
+        this.initializedState.set(true);
         this.loadingState.set(false);
       }
     }, force).catch(() => undefined);
@@ -110,6 +121,7 @@ export class SalesStore {
 
   loadReceivables(force = false): Promise<void> {
     return this.receivablesGate.run(async () => {
+      this.receivablesLoadingState.set(true);
       try {
         const page = await this.repository.receivablePage(RECEIVABLE_PAGE_SIZE);
         this.receivablesState.set(page.items);
@@ -118,17 +130,24 @@ export class SalesStore {
       } catch (error) {
         this.toast.error(this.errors.message(error));
         throw error;
+      } finally {
+        this.receivablesInitializedState.set(true);
+        this.receivablesLoadingState.set(false);
       }
     }, force).catch(() => undefined);
   }
 
   loadReceivableSummary(force = false): Promise<void> {
     return this.receivableSummaryGate.run(async () => {
+      this.receivableSummaryLoadingState.set(true);
       try {
         this.receivableTotalState.set(await this.repository.receivableTotalCents());
       } catch (error) {
         this.toast.error(this.errors.message(error));
         throw error;
+      } finally {
+        this.receivableSummaryInitializedState.set(true);
+        this.receivableSummaryLoadingState.set(false);
       }
     }, force).catch(() => undefined);
   }

@@ -95,15 +95,15 @@ export class CatalogEditor {
     ...this.references.units().map((item) => ({ value: item.id, label: item.name })),
   ]);
   readonly inputTrackingOptions: readonly BfSelectOption[] = [
-    { value: 'exact', label: 'Controlado', description: 'Contagem exata. Pode bloquear uma operação quando não houver saldo.' },
-    { value: 'estimated', label: 'Estimado', description: 'Saldo aproximado. Compras e consumo previsto atualizam automaticamente, sem bloquear por falta.' },
-    { value: 'untracked', label: 'Não controlar', description: 'Usado somente para calcular custos, sem saldo ou alertas.' },
+    { value: 'exact', label: 'Controlado', description: 'Contagem exata. Entradas e consumos alteram o saldo e a falta pode bloquear a operação.' },
+    { value: 'estimated', label: 'Estimado', description: 'Saldo aproximado. Compras e consumo previsto atualizam o saldo, mas a falta nunca bloqueia.' },
+    { value: 'untracked', label: 'Não controlar saldo', description: 'O custo continua sendo acompanhado, mas o sistema não mantém saldo físico nem alerta de estoque.' },
   ];
   readonly inputTrackingHint = computed(() => {
     const mode = this.inputModel().trackingMode;
-    if (mode === 'exact') return 'Ideal para embalagens e itens contáveis. O saldo deve representar a quantidade real disponível.';
-    if (mode === 'untracked') return 'O sistema acompanha o custo médio deste insumo, sem exigir controle de quantidade.';
-    return 'Ideal para glicerina, essência, lauril e outros materiais variáveis. O saldo é apenas uma referência para inventário.';
+    if (mode === 'exact') return 'Ideal para embalagens, frascos, caixas e outros itens contáveis. O saldo deve representar a quantidade real disponível.';
+    if (mode === 'untracked') return 'Ideal para materiais que vocês preferem não inventariar, como álcool de borrifação, fitas e pequenos consumíveis. O custo continua sendo considerado nas compras e composições.';
+    return 'Ideal para glicerina, essência, lauril, corantes e outros materiais de consumo variável. O saldo serve como referência e pode ser conferido periodicamente.';
   });
   readonly unitOptions = computed<BfSelectOption[]>(() =>
     this.references.units().map((item) => ({ value: item.id, label: item.name })),

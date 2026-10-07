@@ -16,7 +16,7 @@ import { CatalogStore } from '../../features/catalog/catalog.store';
 import { SettingsStore } from '../../features/settings/settings.store';
 import { ToastService } from '../../core/services/toast.service';
 import { ErrorService } from '../../core/services/error.service';
-import { fromCents, toCents } from '../../core/utils/money';
+import { formatCurrency, fromCents, toCents } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
 import { BfDialog } from '../../shared/ui/dialog/dialog';
 import { GoogleDriveSettingsCard } from '../../features/google-drive/components/google-drive-settings-card';
@@ -24,6 +24,7 @@ import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
 import { BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
 import { BfSelect, BfSelectOption } from '../../shared/ui/select/select';
 import { BfCheckbox } from '../../shared/ui/checkbox/checkbox';
+import { BfNumberInput } from '../../shared/ui/number-input/number-input';
 
 type SettingTab = 'collections' | 'fragrances' | 'formats' | 'prices' | 'units' | 'payments' | 'expenseCategories' | 'expenseTypes';
 type SimpleSetting = UnitDefinition | PaymentMethod | ExpenseCategory;
@@ -36,7 +37,7 @@ interface ExpenseTypeModel extends SimpleModel { kind: ExpenseType['kind']; }
 
 @Component({
   selector: 'bf-settings-page',
-  imports: [FormField, BfIcon, GoogleDriveSettingsCard, BfDialog, BfPageRefresh, BfTableSkeleton, BfSelect, BfCheckbox],
+  imports: [FormField, BfIcon, GoogleDriveSettingsCard, BfDialog, BfPageRefresh, BfTableSkeleton, BfSelect, BfCheckbox, BfNumberInput],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './settings.page.html',
   styleUrl: './settings.page.scss',
@@ -50,6 +51,7 @@ export class SettingsPage {
   private readonly errors = inject(ErrorService);
   private readonly dialog = viewChild.required<BfDialog>('editor');
 
+  readonly currency = formatCurrency;
   readonly tab = signal<SettingTab>('collections');
   readonly initialized = computed(() => this.references.initialized() && this.catalog.initialized() && this.settings.initialized());
   readonly refreshing = computed(() => this.initialized() && (this.references.loading() || this.catalog.loading() || this.settings.loading()));
@@ -168,9 +170,40 @@ export class SettingsPage {
     return this.references.units().find((item) => item.id === unitId)?.name ?? '—';
   }
 
-  componentCount(item: { costComponents?: RecipeComponent[] }): string {
-    const count = item.costComponents?.length ?? 0;
-    return count ? `${count} componente${count === 1 ? '' : 's'}` : 'Sem padrão';
+  componentUnitCostLabel(component: RecipeComponent): string {
+    const input = this.catalog.inputs().find((item) => item.id === component.inputId);
+    if (!input || input.averageUnitCostCents <= 0) return 'Custo pendente';
+    return `${this.currency(input.averageUnitCostCents)}/${this.unitName(component.unitId)}`;
+  }
+
+  componentTotalCostLabel(component: RecipeComponent): string {
+    const input = this.catalog.inputs().find((item) => item.id === component.inputId);
+    if (!input || input.averageUnitCostCents <= 0) return 'Pendente';
+    return this.currency(Math.round(component.quantity * input.averageUnitCostCents));
+  }
+
+  costSummary(components: readonly RecipeComponent[] | undefined): string {
+    const items = (components ?? []).filter((item) => item.inputId && item.quantity > 0 && item.unitId);
+    if (!items.length) return 'Sem padrão';
+
+    let totalCents = 0;
+    let pending = 0;
+    for (const component of items) {
+      const input = this.catalog.inputs().find((item) => item.id === component.inputId);
+      if (!input || input.averageUnitCostCents <= 0) {
+        pending += 1;
+        continue;
+      }
+      totalCents += Math.round(component.quantity * input.averageUnitCostCents);
+    }
+
+    const count = `${items.length} componente${items.length === 1 ? '' : 's'}`;
+    if (pending) return `${count} · ${this.currency(totalCents)} + ${pending} pendente${pending === 1 ? '' : 's'}`;
+    return `${count} · ${this.currency(totalCents)}`;
+  }
+
+  currentCostSummary(): string {
+    return this.costSummary(this.costComponents());
   }
 
   costScopeHint(): string {

@@ -207,6 +207,7 @@
   }
 
   .mobile-nav-item {
+    position: relative;
     min-width: 0;
     min-height: 48px;
     border: 0;
@@ -234,7 +235,21 @@
 
   .mobile-nav-item.active:not(.quick) {
     color: var(--brand-strong);
-    background: color-mix(in srgb, var(--brand-soft) 56%, transparent);
+    background: transparent;
+    font-weight: 760;
+  }
+
+  .mobile-nav-item.active:not(.quick)::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: 1px;
+    width: 18px;
+    height: 3px;
+    border-radius: 999px;
+    background: var(--brand);
+    transform: translateX(-50%);
+    box-shadow: 0 1px 5px color-mix(in srgb, var(--brand) 22%, transparent);
   }
 
   .mobile-nav-item:active {
@@ -394,7 +409,6 @@
   .quick-actions .sheet-row:nth-child(1) { --stagger: 1; }
   .quick-actions .sheet-row:nth-child(2) { --stagger: 2; }
   .quick-actions .sheet-row:nth-child(3) { --stagger: 3; }
-  .quick-actions .sheet-row:nth-child(4) { --stagger: 4; }
 
   .more-links .sheet-row:nth-child(1) { --stagger: 1; }
   .more-links .sheet-row:nth-child(2) { --stagger: 2; }
@@ -425,10 +439,24 @@
       opacity 130ms ease;
   }
 
-  .sheet-row:hover,
-  .sheet-row.active {
+  .sheet-row:hover {
     border-color: color-mix(in srgb, var(--brand) 26%, var(--line));
     background: color-mix(in srgb, var(--brand-soft) 72%, var(--surface-2));
+  }
+
+  .sheet-row.active {
+    border-color: color-mix(in srgb, var(--brand) 34%, var(--line));
+    background: var(--surface-2);
+    box-shadow: inset 3px 0 0 var(--brand);
+  }
+
+  .sheet-row.active .sheet-row-icon {
+    background: var(--brand-soft);
+    color: var(--brand-strong);
+  }
+
+  .sheet-row.active .sheet-chevron {
+    color: var(--brand-strong);
   }
 
   .sheet-row:active {

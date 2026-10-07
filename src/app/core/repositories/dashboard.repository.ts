@@ -28,7 +28,6 @@ export interface DashboardMetrics {
   saleCount: number;
   itemsSold: number;
   overdueCount: number;
-  negativeProducts: number;
   lowStockProducts: number;
   lowStockInputs: number;
 }
@@ -196,7 +195,7 @@ export class DashboardRepository {
 
   private async stockAlerts(): Promise<Pick<
     DashboardMetrics,
-    'negativeProducts' | 'lowStockProducts' | 'lowStockInputs'
+    'lowStockProducts' | 'lowStockInputs'
   >> {
     const products = collection(this.firestore, 'products');
     const inputs = collection(this.firestore, 'inputs');
@@ -206,7 +205,6 @@ export class DashboardRepository {
       productOptimized,
       inputTotal,
       inputOptimized,
-      negativeProducts,
       lowStockProducts,
       lowStockInputs,
     ] = await Promise.all([
@@ -220,9 +218,8 @@ export class DashboardRepository {
         query(inputs, where('stockStatus', 'in', ['negative', 'low', 'ok', 'untracked'])),
         { value: count() },
       ),
-      getAggregateFromServer(query(products, where('stockStatus', '==', 'negative')), { value: count() }),
-      getAggregateFromServer(query(products, where('active', '==', true), where('stockStatus', 'in', ['negative', 'low'])), { value: count() }),
-      getAggregateFromServer(query(inputs, where('active', '==', true), where('stockStatus', 'in', ['negative', 'low'])), { value: count() }),
+      getAggregateFromServer(query(products, where('active', '==', true), where('stockStatus', '==', 'low')), { value: count() }),
+      getAggregateFromServer(query(inputs, where('active', '==', true), where('stockStatus', '==', 'low')), { value: count() }),
     ]);
 
     const productsComplete = Number(productOptimized.data().value ?? 0) === Number(productTotal.data().value ?? 0);
@@ -230,7 +227,6 @@ export class DashboardRepository {
 
     if (productsComplete && inputsComplete) {
       return {
-        negativeProducts: Number(negativeProducts.data().value ?? 0),
         lowStockProducts: Number(lowStockProducts.data().value ?? 0),
         lowStockInputs: Number(lowStockInputs.data().value ?? 0),
       };
@@ -240,24 +236,21 @@ export class DashboardRepository {
       getDocs(products),
       getDocs(inputs),
     ]);
-    let negative = 0;
     let lowProducts = 0;
     let lowInputs = 0;
 
     for (const snapshot of productSnapshot.docs) {
       const product = { id: snapshot.id, ...snapshot.data() } as Product;
       const status = stockStatusForProduct(product);
-      if (status === 'negative') negative += 1;
-      if (product.active && ['negative', 'low'].includes(status)) lowProducts += 1;
+      if (product.active && status === 'low') lowProducts += 1;
     }
 
     for (const snapshot of inputSnapshot.docs) {
       const input = { id: snapshot.id, ...snapshot.data() } as InputItem;
-      if (input.active && ['negative', 'low'].includes(stockStatusForInput(input))) lowInputs += 1;
+      if (input.active && stockStatusForInput(input) === 'low') lowInputs += 1;
     }
 
     return {
-      negativeProducts: negative,
       lowStockProducts: lowProducts,
       lowStockInputs: lowInputs,
     };

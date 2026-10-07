@@ -28,14 +28,17 @@ export class DriveIntegrationService {
   private readonly statusState = signal<DriveIntegrationStatus>(environment.googleDrive.enabled ? 'loading' : 'disabled');
   private readonly errorState = signal<string | null>(null);
   private readonly authorizationNeededState = signal(false);
+  private readonly connectingState = signal(false);
   private readonly configRevision = signal(0);
   private loaded = false;
+  private connectPending?: Promise<void>;
 
   readonly enabled = environment.googleDrive.enabled;
   readonly config = this.configState.asReadonly();
   readonly status = this.statusState.asReadonly();
   readonly error = this.errorState.asReadonly();
   readonly authorizationNeeded = this.authorizationNeededState.asReadonly();
+  readonly connecting = this.connectingState.asReadonly();
   readonly driveEmail = this.driveAuth.accountEmail;
   readonly revision = computed(() => this.driveAuth.revision() + this.configRevision());
   readonly linked = computed(() => Boolean(this.configState()?.enabled && this.driveAuth.linked()));
@@ -140,7 +143,19 @@ export class DriveIntegrationService {
     }
   }
 
-  async connect(): Promise<void> {
+  connect(): Promise<void> {
+    if (this.connectPending) return this.connectPending;
+
+    this.connectingState.set(true);
+    const pending = this.connectInternal().finally(() => {
+      this.connectingState.set(false);
+      this.connectPending = undefined;
+    });
+    this.connectPending = pending;
+    return pending;
+  }
+
+  private async connectInternal(): Promise<void> {
     if (!this.enabled) throw new Error('A integração com Google Drive ainda não foi configurada no ambiente.');
     if (!this.loaded) await this.load();
 
@@ -166,10 +181,9 @@ export class DriveIntegrationService {
       this.errorState.set(null);
       this.authorizationNeededState.set(false);
     } catch (error) {
-      if (
-        error instanceof DriveAuthorizationRequiredError ||
-        (error instanceof DriveApiError && error.status === 401)
-      ) {
+      if (error instanceof DriveAuthorizationRequiredError) {
+        this.markAuthorizationNeeded();
+      } else if (error instanceof DriveApiError && error.status === 401) {
         this.markAccessExpired(true);
       } else {
         this.fail(error);
@@ -183,7 +197,12 @@ export class DriveIntegrationService {
     await this.connect();
   }
 
-  noteAuthorizationRequired(): void {
+  requestAuthorization(): void {
+    if (!this.configState()?.enabled || this.connectingState()) return;
+    this.markAuthorizationNeeded();
+  }
+
+  handleUnauthorized(): void {
     if (!this.configState()?.enabled) return;
     this.markAccessExpired(true);
   }
@@ -214,6 +233,13 @@ export class DriveIntegrationService {
       throw new Error('A pasta configurada não está disponível.');
     }
     await Promise.all(Object.values(config.folders).map((folderId) => this.driveApi.getFile(folderId)));
+  }
+
+  private markAuthorizationNeeded(): void {
+    const linked = this.driveAuth.linked();
+    this.statusState.set(linked ? 'ready' : 'disconnected');
+    this.errorState.set(null);
+    this.authorizationNeededState.set(linked);
   }
 
   private markAccessExpired(notify: boolean): void {

@@ -767,3 +767,23 @@
     font-size: 0.7rem;
   }
 }
+
+
+.dashboard-skeleton-chart {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 8px;
+  align-items: end;
+  padding: 8px 4px 28px;
+}
+
+.dashboard-skeleton-chart > span {
+  display: block;
+  min-height: 12%;
+}
+
+@media (max-width: 760px) {
+  .dashboard-skeleton-chart { gap: 4px; }
+}

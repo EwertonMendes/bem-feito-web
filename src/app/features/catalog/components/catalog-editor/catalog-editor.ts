@@ -1,12 +1,12 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
 import { Addition, AdditionComponent, InputItem, InputTrackingMode, Kit, KitComponent, Product, RecipeComponent } from '../../../../domain/models/catalog.model';
-import { trackingModeForInput } from '../../../../domain/logic/costing';
+import { standardCostForProduct, trackingModeForInput } from '../../../../domain/logic/costing';
 import { CatalogImageEntityKind, CatalogImageRef } from '../../../../domain/models/image.model';
 import { ErrorService } from '../../../../core/services/error.service';
 import { ImageService } from '../../../../core/services/image.service';
 import { ToastService } from '../../../../core/services/toast.service';
-import { fromCents, toCents } from '../../../../core/utils/money';
+import { formatCurrency, fromCents, toCents } from '../../../../core/utils/money';
 import { CatalogReferenceStore } from '../../catalog-reference.store';
 import { CatalogStore } from '../../catalog.store';
 import { BfDialog } from '../../../../shared/ui/dialog/dialog';
@@ -15,6 +15,7 @@ import { BfSelect, BfSelectOption } from '../../../../shared/ui/select/select';
 import { BfCheckbox } from '../../../../shared/ui/checkbox/checkbox';
 import { BfImageUpload } from '../../../../shared/ui/image-upload/image-upload';
 import { CatalogImage } from '../../../../shared/media/catalog-image/catalog-image';
+import { BfNumberInput } from '../../../../shared/ui/number-input/number-input';
 
 interface ProductFormModel { collectionId: string; fragranceId: string; formatId: string; salePrice: number; additionalCost: number; minimumStock: number; active: boolean; }
 interface InputFormModel { name: string; unitId: string; trackingMode: InputTrackingMode; minimumStock: number | null; active: boolean; }
@@ -23,7 +24,7 @@ interface AdditionFormModel { name: string; category: string; price: number; not
 
 @Component({
   selector: 'bf-catalog-editor',
-  imports: [FormField, BfDialog, BfIcon, BfSelect, BfCheckbox, BfImageUpload, CatalogImage],
+  imports: [FormField, BfDialog, BfIcon, BfSelect, BfCheckbox, BfImageUpload, CatalogImage, BfNumberInput],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './catalog-editor.html',
   styleUrl: './catalog-editor.scss',
@@ -37,6 +38,7 @@ export class CatalogEditor {
   private readonly errors = inject(ErrorService);
   private readonly dialog = viewChild.required<BfDialog>('dialog');
 
+  readonly currency = formatCurrency;
   readonly imagesEnabled = this.images.enabled;
   readonly kind = signal<CatalogImageEntityKind>('products');
   readonly editingId = signal('');
@@ -115,6 +117,34 @@ export class CatalogEditor {
   readonly inputOptions = computed<BfSelectOption[]>(() =>
     this.store.inputs().map((item) => ({ value: item.id, label: item.name })),
   );
+  readonly productCostPreview = computed(() => {
+    if (this.kind() !== 'products') return null;
+    const model = this.productModel();
+    const existing = this.store.products().find((item) => item.id === this.editingId());
+    try {
+      return standardCostForProduct({
+        recipe: this.recipe(),
+        additionalCostCents: toCents(model.additionalCost),
+        averageUnitCostCents: existing?.averageUnitCostCents ?? 0,
+      }, {
+        collection: this.references.collections().find((item) => item.id === model.collectionId),
+        fragrance: this.references.fragrances().find((item) => item.id === model.fragranceId),
+        format: this.references.formats().find((item) => item.id === model.formatId),
+      }, new Map(this.store.inputs().map((item) => [item.id, item])));
+    } catch {
+      return null;
+    }
+  });
+
+  readonly productCostSummary = computed(() => {
+    const preview = this.productCostPreview();
+    if (!preview) return 'Custo ainda indisponível';
+    const pending = preview.components.filter((item) => item.unitCostCents <= 0).length;
+    return pending
+      ? `${this.currency(preview.unitCostCents)} · ${pending} custo${pending === 1 ? '' : 's'} pendente${pending === 1 ? '' : 's'}`
+      : this.currency(preview.unitCostCents);
+  });
+
   readonly kitCollectionOptions = computed<BfSelectOption[]>(() => [
     { value: '', label: 'Qualquer coleção' },
     ...this.references.collections().map((item) => ({ value: item.id, label: item.name })),

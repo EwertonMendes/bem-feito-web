@@ -49,7 +49,7 @@ export class GoogleDriveImageStorageService extends ImageStoragePort {
 
     const token = this.auth.currentToken();
     if (!token || !this.integration.connected()) {
-      if (this.auth.linked()) this.integration.noteAuthorizationRequired();
+      if (this.auth.linked()) this.integration.requestAuthorization();
       return null;
     }
 
@@ -67,11 +67,11 @@ export class GoogleDriveImageStorageService extends ImageStoragePort {
       return url;
     }).catch((error) => {
       if (error instanceof DriveAuthorizationRequiredError) {
-        this.integration.noteAuthorizationRequired();
+        this.integration.requestAuthorization();
         return null;
       }
       if (error instanceof DriveApiError && error.status === 401) {
-        this.integration.noteAuthorizationRequired();
+        this.integration.handleUnauthorized();
         return null;
       }
       throw error;

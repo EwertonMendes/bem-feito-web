@@ -44,12 +44,16 @@ export abstract class FirestoreRepository<T extends { id: string }> {
     return snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as T) : null;
   }
 
-  async create(value: Omit<T, 'id'>, id?: string): Promise<string> {
+  async create(
+    value: Omit<T, 'id'> | ((id: string) => Omit<T, 'id'>),
+    id?: string,
+  ): Promise<string> {
     const target = id ? this.documentRef(id) : doc(this.collectionRef());
+    const resolved = typeof value === 'function' ? value(target.id) : value;
     const userId = this.actor();
     const batch = writeBatch(this.firestore);
     batch.set(target, {
-      ...value,
+      ...resolved,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       createdBy: userId,

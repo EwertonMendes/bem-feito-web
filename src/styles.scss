@@ -434,13 +434,19 @@ a { color: inherit; }
 
 .bf-dialog {
   width: min(760px, calc(100vw - 32px));
-  max-height: min(88vh, 880px);
+  max-height: min(88dvh, 880px);
   border: 1px solid var(--line);
   border-radius: 22px;
   padding: 0;
+  overflow: hidden;
   background: var(--surface);
   color: var(--text);
   box-shadow: var(--shadow-dialog);
+}
+
+.bf-dialog[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 .bf-dialog::backdrop {
@@ -469,9 +475,11 @@ a { color: inherit; }
 }
 
 .bf-dialog-body {
+  min-height: 0;
   padding: 22px;
   overflow: auto;
-  max-height: calc(88vh - 150px);
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .bf-dialog h2 {
@@ -546,8 +554,18 @@ a { color: inherit; }
     border-radius: 22px 22px 0 0;
   }
 
+  .bf-dialog-header,
+  .bf-dialog-footer {
+    padding: 16px;
+  }
+
   .bf-dialog-body {
-    max-height: calc(96dvh - 150px);
+    padding: 16px;
+  }
+
+  .bf-dialog-footer .bf-button {
+    flex: 1;
+    min-width: 0;
   }
 }
 

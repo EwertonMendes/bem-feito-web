@@ -129,6 +129,7 @@ a { color: inherit; }
 ::selection { background: var(--accent-soft); }
 
 .bf-page {
+  position: relative;
   width: min(100%, var(--content-max));
   margin: 0 auto;
   padding: 28px 34px 110px;

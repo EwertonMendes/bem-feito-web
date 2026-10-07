@@ -18,7 +18,7 @@ import { CatalogImage } from '../../../../shared/media/catalog-image/catalog-ima
 import { BfNumberInput } from '../../../../shared/ui/number-input/number-input';
 
 interface ProductFormModel { collectionId: string; fragranceId: string; formatId: string; salePrice: number; additionalCost: number; minimumStock: number; active: boolean; }
-interface InputFormModel { name: string; unitId: string; trackingMode: InputTrackingMode; minimumStock: number | null; active: boolean; }
+interface InputFormModel { name: string; unitId: string; trackingMode: InputTrackingMode; minimumStock: number; active: boolean; }
 interface KitFormModel { name: string; price: number; notes: string; active: boolean; }
 interface AdditionFormModel { name: string; category: string; price: number; notes: string; active: boolean; }
 
@@ -201,7 +201,7 @@ export class CatalogEditor {
       name: item.name,
       unitId: item.unitId,
       trackingMode,
-      minimumStock: trackingMode === 'untracked' ? null : item.minimumStock,
+      minimumStock: trackingMode === 'untracked' ? 0 : item.minimumStock,
       active: item.active,
     });
     this.dialog().open();
@@ -323,7 +323,7 @@ export class CatalogEditor {
       unitId: model.unitId,
       trackingMode: model.trackingMode,
       stock: existing?.stock ?? 0,
-      minimumStock: tracked ? (model.minimumStock ?? 0) : 0,
+      minimumStock: tracked ? model.minimumStock : 0,
       minimumStockConfigured: tracked,
       averageUnitCostCents: existing?.averageUnitCostCents ?? 0,
       costBasisQuantity: existing?.costBasisQuantity,

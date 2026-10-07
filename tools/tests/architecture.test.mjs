@@ -157,3 +157,23 @@ test('shared controls own select and checkbox rendering', () => {
     `Native form controls outside shared UI:\n${violations.join('\n')}`,
   );
 });
+
+
+test('shared image upload owns native file input rendering', () => {
+  const violations = [];
+  for (const file of walkUiSources(appRoot)) {
+    const relativeFile = relative(appRoot, file).split(sep).join('/');
+    if (relativeFile === 'shared/ui/image-upload/image-upload.html') continue;
+
+    const source = readFileSync(file, 'utf8');
+    if (/type\s*=\s*['"]file['"]/i.test(source)) {
+      violations.push(relativeFile);
+    }
+  }
+
+  assert.deepEqual(
+    violations,
+    [],
+    `Native file inputs outside shared image upload:\n${violations.join('\n')}`,
+  );
+});

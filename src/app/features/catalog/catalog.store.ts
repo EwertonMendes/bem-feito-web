@@ -8,6 +8,7 @@ import { ErrorService } from '../../core/services/error.service';
 import { ToastService } from '../../core/services/toast.service';
 import { DataRevisionService } from '../../core/firebase/data-revision.service';
 import { AsyncLoadGate } from '../../core/state/async-load-gate';
+import { catalogEntityCode } from '../../core/utils/ids';
 
 @Injectable({ providedIn: 'root' })
 export class CatalogStore {
@@ -90,8 +91,8 @@ export class CatalogStore {
           this.additionRepository.all(),
         ]);
         if (request !== this.catalogRequest) return;
-        this.productsState.set(products);
-        this.inputsState.set(inputs);
+        this.productsState.set(products.map((item) => this.normalizeProduct(item)));
+        this.inputsState.set(inputs.map((item) => this.normalizeInput(item)));
         this.kitsState.set(kits);
         this.additionsState.set(additions);
       } catch (error) {
@@ -114,8 +115,8 @@ export class CatalogStore {
           this.inputRepository.all(),
         ]);
         if (request !== this.inventoryRequest || catalogRequest !== this.catalogRequest) return;
-        this.productsState.set(products);
-        this.inputsState.set(inputs);
+        this.productsState.set(products.map((item) => this.normalizeProduct(item)));
+        this.inputsState.set(inputs.map((item) => this.normalizeInput(item)));
       } catch (error) {
         this.toast.error(this.errors.message(error));
         throw error;
@@ -124,18 +125,34 @@ export class CatalogStore {
   }
 
   async saveProduct(product: Product): Promise<string> {
-    const normalized = { ...product, stockStatus: stockStatusForProduct(product) };
-    const id = normalized.id || await this.productRepository.create(this.withoutId(normalized));
-    if (normalized.id) await this.productRepository.replace(normalized);
-    this.upsertProduct({ ...normalized, id });
+    const base = { ...product, stockStatus: stockStatusForProduct(product) };
+    if (base.id) {
+      const normalized = this.normalizeProduct(base);
+      await this.productRepository.replace(normalized);
+      this.upsertProduct(normalized);
+      return normalized.id;
+    }
+
+    const id = await this.productRepository.create((allocatedId) =>
+      this.withoutId(this.normalizeProduct({ ...base, id: allocatedId }))
+    );
+    this.upsertProduct(this.normalizeProduct({ ...base, id }));
     return id;
   }
 
   async saveInput(input: InputItem): Promise<string> {
-    const normalized = { ...input, stockStatus: stockStatusForInput(input) };
-    const id = normalized.id || await this.inputRepository.create(this.withoutId(normalized));
-    if (normalized.id) await this.inputRepository.replace(normalized);
-    this.upsertInput({ ...normalized, id });
+    const base = { ...input, stockStatus: stockStatusForInput(input) };
+    if (base.id) {
+      const normalized = this.normalizeInput(base);
+      await this.inputRepository.replace(normalized);
+      this.upsertInput(normalized);
+      return normalized.id;
+    }
+
+    const id = await this.inputRepository.create((allocatedId) =>
+      this.withoutId(this.normalizeInput({ ...base, id: allocatedId }))
+    );
+    this.upsertInput(this.normalizeInput({ ...base, id }));
     return id;
   }
 
@@ -216,6 +233,14 @@ export class CatalogStore {
         return { ...updated, stockStatus: stockStatusForInput(updated) };
       }));
     }
+  }
+
+  private normalizeProduct(product: Product): Product {
+    return { ...product, code: catalogEntityCode('PROD', product.id) };
+  }
+
+  private normalizeInput(input: InputItem): InputItem {
+    return { ...input, code: catalogEntityCode('INS', input.id) };
   }
 
   private upsertProduct(product: Product): void {

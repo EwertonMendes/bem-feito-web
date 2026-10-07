@@ -22,10 +22,14 @@ export class SettingsStore {
   private readonly paymentMethodsState = signal<PaymentMethod[]>([]);
   private readonly expenseCategoriesState = signal<ExpenseCategory[]>([]);
   private readonly expenseTypesState = signal<ExpenseType[]>([]);
+  private readonly loadingState = signal(false);
+  private readonly initializedState = signal(false);
 
   readonly paymentMethods = this.paymentMethodsState.asReadonly();
   readonly expenseCategories = this.expenseCategoriesState.asReadonly();
   readonly expenseTypes = this.expenseTypesState.asReadonly();
+  readonly loading = this.loadingState.asReadonly();
+  readonly initialized = this.initializedState.asReadonly();
 
   constructor() {
     effect(() => {
@@ -45,6 +49,7 @@ export class SettingsStore {
 
   load(force = false): Promise<void> {
     return this.gate.run(async () => {
+      this.loadingState.set(true);
       try {
         const [paymentMethods, expenseCategories, expenseTypes] = await Promise.all([
           this.paymentMethodRepository.list(),
@@ -57,6 +62,9 @@ export class SettingsStore {
       } catch (error) {
         this.toast.error(this.errors.message(error));
         throw error;
+      } finally {
+        this.initializedState.set(true);
+        this.loadingState.set(false);
       }
     }, force).catch(() => undefined);
   }

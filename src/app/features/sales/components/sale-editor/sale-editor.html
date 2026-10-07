@@ -462,7 +462,7 @@
 
               <label class="bf-field">
                 <span>Desconto</span>
-                <bf-number-input kind="currency" [min]="0" [formField]="saleForm.discount" ariaLabel="Desconto" />
+                <bf-number-input kind="currency" [formField]="saleForm.discount" ariaLabel="Desconto" />
               </label>
 
               @if (remainingCents()>0) {

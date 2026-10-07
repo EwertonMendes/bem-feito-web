@@ -14,6 +14,7 @@ import { BfDialog } from '../../shared/ui/dialog/dialog';
 import { CatalogImage } from '../../shared/media/catalog-image/catalog-image';
 import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
 import { BfListSkeleton, BfSkeleton } from '../../shared/ui/skeleton/skeleton';
+import { BfNumberInput } from '../../shared/ui/number-input/number-input';
 
 interface AdjustmentModel {
   quantity: number;
@@ -23,7 +24,7 @@ interface AdjustmentModel {
 
 @Component({
   selector: 'bf-inventory-page',
-  imports: [FormField, BfIcon, CatalogImage, BfDialog, BfEmptyState, BfPageRefresh, BfListSkeleton, BfSkeleton],
+  imports: [FormField, BfIcon, CatalogImage, BfDialog, BfEmptyState, BfPageRefresh, BfListSkeleton, BfSkeleton, BfNumberInput],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './inventory.page.html',
   styleUrl: './inventory.page.scss',
@@ -66,6 +67,11 @@ export class InventoryPage {
     if (this.selectedType() !== 'input') return null;
     const input = this.catalog.inputs().find((item) => item.id === this.selectedId());
     return input ? trackingModeForInput(input) : null;
+  });
+  readonly selectedUnitName = computed(() => {
+    if (this.selectedType() === 'product') return 'un';
+    const input = this.catalog.inputs().find((item) => item.id === this.selectedId());
+    return input ? this.unitName(input.unitId) : '';
   });
 
   constructor() {

@@ -20,6 +20,8 @@ import { BfDialog } from '../../shared/ui/dialog/dialog';
 import { GoogleDriveSettingsCard } from '../../features/google-drive/components/google-drive-settings-card';
 import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
 import { BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
+import { BfSelect, BfSelectOption } from '../../shared/ui/select/select';
+import { BfCheckbox } from '../../shared/ui/checkbox/checkbox';
 
 type SettingTab = 'collections' | 'fragrances' | 'formats' | 'prices' | 'units' | 'payments' | 'expenseCategories' | 'expenseTypes';
 type SimpleSetting = CollectionDefinition | UnitDefinition | PaymentMethod | ExpenseCategory;
@@ -32,7 +34,7 @@ interface ExpenseTypeModel extends SimpleModel { kind: ExpenseType['kind']; }
 
 @Component({
   selector: 'bf-settings-page',
-  imports: [FormField, BfIcon, GoogleDriveSettingsCard, BfDialog, BfPageRefresh, BfTableSkeleton],
+  imports: [FormField, BfIcon, GoogleDriveSettingsCard, BfDialog, BfPageRefresh, BfTableSkeleton, BfSelect, BfCheckbox],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './settings.page.html',
   styleUrl: './settings.page.scss',
@@ -59,6 +61,20 @@ export class SettingsPage {
   readonly priceForm = form(this.priceModel, (p) => { required(p.collectionId); required(p.formatId); min(p.price, 0); });
   readonly expenseTypeModel = signal<ExpenseTypeModel>({ name: '', kind: 'operating-expense', active: true });
   readonly expenseTypeForm = form(this.expenseTypeModel, (p) => { required(p.name); required(p.kind); });
+  readonly collectionOptions = computed<BfSelectOption[]>(() => [
+    { value: '', label: 'Selecione' },
+    ...this.references.collections().map((item) => ({ value: item.id, label: item.name })),
+  ]);
+  readonly formatOptions = computed<BfSelectOption[]>(() => [
+    { value: '', label: 'Selecione' },
+    ...this.references.formats().map((item) => ({ value: item.id, label: item.name })),
+  ]);
+  readonly expenseTypeOptions: readonly BfSelectOption[] = [
+    { value: 'input-purchase', label: 'Compra de insumo', icon: 'box' },
+    { value: 'operating-expense', label: 'Despesa operacional', icon: 'receipt' },
+    { value: 'equipment', label: 'Equipamento / investimento', icon: 'settings' },
+    { value: 'other', label: 'Outro', icon: 'tag' },
+  ];
 
   constructor() {
     this.destroyRef.onDestroy(this.references.activate());

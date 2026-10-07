@@ -4,6 +4,8 @@
     <div class="bf-actions"><button class="bf-button" type="button" (click)="editor.openNew(tab())"><bf-icon name="plus" /> Novo</button></div>
   </header>
 
+  @if (store.initialized() && store.loading()) { <bf-page-refresh /> }
+
   <div class="toolbar">
     <div class="bf-segments">
       <button type="button" [class.active]="tab() === 'products'" (click)="tab.set('products')">Produtos</button>

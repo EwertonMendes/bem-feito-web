@@ -27,25 +27,40 @@
   <dialog bfDialog #productionDialog="bfDialog" class="bf-dialog">
     <div class="bf-dialog-header"><h2>Registrar produção</h2><button class="bf-icon-button" type="button" (click)="productionDialog.close()"><bf-icon name="close" /></button></div>
     <div class="bf-dialog-body">
+      @if(formError()){<div class="bf-form-error" role="alert">{{formError()}}</div>}
       <div class="bf-grid two">
-        <label class="bf-field full"><span>Produto</span><bf-select [formField]="productionForm.productId" [options]="productOptions()" ariaLabel="Produto" /></label>
-        <label class="bf-field"><span>Quantidade produzida</span><input class="bf-input" type="number" step="1" [formField]="productionForm.quantity" /></label>
-        <label class="bf-field"><span>Data</span><input class="bf-input" type="date" [formField]="productionForm.businessDate" /></label>
+        <label class="bf-field full"><span>Produto</span><bf-select [formField]="productionForm.productId" [options]="productOptions()" [invalid]="submitted() && !!formErrors().productId" ariaLabel="Produto" />@if(submitted() && formErrors().productId){<small class="bf-field-error">{{formErrors().productId}}</small>}</label>
+        <label class="bf-field"><span>Quantidade produzida</span><bf-number-input kind="integer" [min]="1" [invalid]="submitted() && !!formErrors().quantity" [formField]="productionForm.quantity" ariaLabel="Quantidade produzida" />@if(submitted() && formErrors().quantity){<small class="bf-field-error">{{formErrors().quantity}}</small>}</label>
+        <label class="bf-field"><span>Data</span><input class="bf-input" type="date" [class.invalid]="submitted() && !!formErrors().businessDate" [formField]="productionForm.businessDate" />@if(submitted() && formErrors().businessDate){<small class="bf-field-error">{{formErrors().businessDate}}</small>}</label>
         <label class="bf-field full"><span>Observações</span><textarea class="bf-textarea" [formField]="productionForm.notes"></textarea></label>
       </div>
 
       @if (selectedProduct()) {
         <section class="preview">
           <div class="product"><bf-catalog-image [image]="selectedProduct()?.image" [alt]="selectedProduct()?.displayName || ''" [compact]="true" /><div><strong>{{ selectedProduct()?.displayName }}</strong><small>Estoque atual: {{ selectedProduct()?.stock }}</small></div></div>
-          <div class="cost-summary"><span>Custo padrão estimado desta produção</span><strong>{{currency(estimatedTotalCostCents())}}</strong></div>
+          <div class="cost-summary" [class.pending]="costPreview()?.costPending">
+            <span>{{costPreview()?.costPending ? 'Custo padrão parcial desta produção' : 'Custo padrão estimado desta produção'}}</span>
+            <strong>{{currency(estimatedTotalCostCents())}}</strong>
+            @if(costPreview()?.costPending){<small>{{pendingCostItems().length}} material(is) ainda sem custo médio conhecido</small>}
+          </div>
           <div class="consumption-head"><strong>Materiais de referência</strong><span>{{ estimatedConsumptions().length ? estimatedConsumptions().length + ' itens' : 'Sem composição cadastrada' }}</span></div>
           @for (item of estimatedConsumptions(); track item.name) {
-            <div class="consumption" [class.not-enough]="!item.enough"><span>{{ item.name }} <small>{{trackingLabel(item.mode)}}</small></span><strong>{{ item.quantity }} {{ item.unit }}</strong></div>
+            <div class="consumption" [class.not-enough]="!item.enough" [class.cost-pending]="item.unitCostCents<=0">
+              <span class="consumption-copy">
+                <strong>{{ item.name }}</strong>
+                <small>{{trackingLabel(item.mode)}} · {{sourceLabel(item.sources)}}</small>
+                @if(item.unitCostCents<=0){<small class="pending-copy">custo médio ainda não definido</small>}
+              </span>
+              <span class="consumption-values">
+                <strong>Necessário {{ item.quantity }} {{ item.unit }}</strong>
+                <small>{{stockLabel(item)}}</small>
+              </span>
+            </div>
           } @empty { <p class="warning-text">Cadastre componentes de custo em Configurações para calcular o custo padrão automaticamente.</p> }
-          <p class="preview-hint">Materiais estimados têm baixa aproximada até zero e nunca bloqueiam a produção. Itens “Só custo” não mexem em saldo. Apenas os “Controlados” exigem quantidade suficiente.</p>
+          <p class="preview-hint">Controlado exige saldo real suficiente. Estimado baixa aproximadamente até zero sem bloquear. Sem controle de saldo participa do custo, mas não mantém inventário físico.</p>
         </section>
       }
     </div>
-    <div class="bf-dialog-footer"><button class="bf-button secondary" (click)="productionDialog.close()">Cancelar</button><button class="bf-button" (click)="save()">Confirmar produção</button></div>
+    <div class="bf-dialog-footer"><button class="bf-button secondary" (click)="productionDialog.close()">Cancelar</button><button class="bf-button" [disabled]="saving()" (click)="save()">{{saving()?'Registrando...':'Confirmar produção'}}</button></div>
   </dialog>
 </section>

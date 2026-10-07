@@ -42,7 +42,7 @@
   } @else if (tab() === 'inputs') {
     <div class="list-grid">
       @for (item of filteredInputs(); track item.id) {
-        <article class="list-card"><div class="input-main"><bf-catalog-image [image]="item.image" [alt]="item.name" [compact]="true" /><div><span class="code">{{ item.code }}</span><h2>{{ item.name }}</h2><p>Estoque {{ item.stock }} · mínimo {{ item.minimumStockConfigured === false ? 'não definido' : item.minimumStock }}</p></div></div><div class="row-actions"><span class="bf-badge" [class.muted]="!item.active">{{ item.active ? 'Ativo' : 'Inativo' }}</span><button class="bf-button secondary" (click)="editor.editInput(item)">Editar</button></div></article>
+        <article class="list-card"><div class="input-main"><bf-catalog-image [image]="item.image" [alt]="item.name" [compact]="true" /><div><span class="code">{{ item.code }}</span><h2>{{ item.name }}</h2><p>@if(item.trackingMode==='untracked' || item.minimumStockConfigured===false){Sem controle de saldo}@else if(item.trackingMode==='estimated' || !item.trackingMode){Saldo aprox. {{item.stock}} · mín. {{item.minimumStock}}}@else{Estoque {{item.stock}} · mín. {{item.minimumStock}}}</p></div></div><div class="row-actions"><span class="bf-badge" [class.muted]="!item.active">{{ item.active ? 'Ativo' : 'Inativo' }}</span><button class="bf-button secondary" (click)="editor.editInput(item)">Editar</button></div></article>
       } @empty { <bf-empty-state title="Nenhum insumo" description="Cadastre matérias-primas e embalagens." /> }
     </div>
   } @else if (tab() === 'kits') {

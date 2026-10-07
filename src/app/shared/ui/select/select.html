@@ -6,6 +6,7 @@
   aria-haspopup="listbox"
   [class.open]="open()"
   [class.compact]="compact()"
+  [class.descriptive]="descriptive()"
   [class.placeholder]="!selectedOption() || selectedOption()?.value === ''"
   [class.invalid]="invalid()"
   [attr.aria-label]="ariaLabel()"
@@ -45,6 +46,7 @@
   [id]="listboxId"
   [attr.aria-label]="ariaLabel()"
   [class.compact]="compact()"
+  [class.descriptive]="descriptive()"
 >
   @for (option of options(); track option.value; let i = $index) {
     <button

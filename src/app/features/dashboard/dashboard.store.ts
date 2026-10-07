@@ -27,7 +27,6 @@ const EMPTY_METRICS: DashboardMetrics = {
   saleCount: 0,
   itemsSold: 0,
   overdueCount: 0,
-  negativeProducts: 0,
   lowStockProducts: 0,
   lowStockInputs: 0,
 };
@@ -100,7 +99,6 @@ export class DashboardStore {
   readonly saleCount = computed(() => this.metricsState().saleCount);
   readonly itemsSold = computed(() => this.metricsState().itemsSold);
   readonly overdueCount = computed(() => this.metricsState().overdueCount);
-  readonly negativeProducts = computed(() => this.metricsState().negativeProducts);
   readonly lowStockProducts = computed(() => this.metricsState().lowStockProducts);
   readonly lowStockInputs = computed(() => this.metricsState().lowStockInputs);
   readonly averageTicketCents = computed(() =>

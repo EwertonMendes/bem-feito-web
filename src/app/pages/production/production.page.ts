@@ -50,7 +50,7 @@ export class ProductionPage {
       value: product.id,
       label: product.displayName,
       description: `Estoque atual: ${product.stock}`,
-      icon: 'box' as const,
+      icon: 'product' as const,
     })),
   ]);
   readonly selectedProduct = computed(() => this.catalog.products().find((item) => item.id === this.model().productId));

@@ -382,6 +382,10 @@
   color: var(--brand);
 }
 
+.attention-title .section-icon {
+  color: var(--warning);
+}
+
 .section-icon bf-icon {
   width: 19px;
   height: 19px;
@@ -435,11 +439,6 @@
 .alert-action bf-icon {
   width: 14px;
   height: 14px;
-}
-
-.danger-row .alert-icon,
-.danger-row .alert-action {
-  color: var(--danger);
 }
 
 .warning-row .alert-icon,
@@ -556,7 +555,7 @@
   }
 
   .alerts {
-    grid-template-rows: auto repeat(5, minmax(0, 1fr));
+    grid-template-rows: auto repeat(4, minmax(0, 1fr));
     align-content: stretch;
   }
 
@@ -757,13 +756,37 @@
 
   .alert-row {
     grid-template-columns: 24px 29px minmax(0, 1fr);
-    min-height: 55px;
+    grid-template-rows: auto auto;
+    grid-template-areas:
+      "icon count label"
+      "icon count action";
+    row-gap: 4px;
+    min-height: 62px;
+    padding: 8px 0;
+  }
+
+  .alert-icon {
+    grid-area: icon;
+    align-self: center;
+    justify-self: center;
+  }
+
+  .alert-count {
+    grid-area: count;
+    align-self: center;
+    justify-self: start;
+  }
+
+  .alert-label {
+    grid-area: label;
+    align-self: end;
   }
 
   .alert-action {
-    grid-column: 3;
+    grid-area: action;
+    align-self: start;
     justify-self: start;
-    margin-top: -7px;
+    margin: 0;
     font-size: 0.7rem;
   }
 }

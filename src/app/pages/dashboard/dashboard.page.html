@@ -63,7 +63,7 @@
 
       <section class="dashboard-panel alerts">
         <div class="section-head"><bf-skeleton width="118px" height="22px" /></div>
-        @for (item of skeletonFive; track item) {
+        @for (item of skeletonFour; track item) {
           <div class="alert-row">
             <bf-skeleton shape="circle" width="24px" height="24px" />
             <bf-skeleton width="24px" height="14px" />
@@ -89,7 +89,7 @@
   } @else {
   <div class="metric-grid">
     <article class="metric-card tint-sage">
-      <span class="metric-icon sage"><bf-icon name="chart" /></span>
+      <span class="metric-icon sage"><bf-icon name="revenue" /></span>
       <div class="metric-copy">
         <span>Faturamento</span>
         <strong>{{ currency(store.revenueCents()) }}</strong>
@@ -97,7 +97,7 @@
     </article>
 
     <article class="metric-card">
-      <span class="metric-icon sage"><bf-icon name="wallet" /></span>
+      <span class="metric-icon sage"><bf-icon name="received" /></span>
       <div class="metric-copy">
         <span>Recebido</span>
         <strong>{{ currency(store.receivedCents()) }}</strong>
@@ -105,7 +105,7 @@
     </article>
 
     <article class="metric-card">
-      <span class="metric-icon sand"><bf-icon name="clock" /></span>
+      <span class="metric-icon sand"><bf-icon name="receivable" /></span>
       <div class="metric-copy">
         <span>Saldo a receber</span>
         <strong>{{ currency(store.receivableCents()) }}</strong>
@@ -118,7 +118,7 @@
       routerLink="/catalogo"
     >
       <span class="metric-icon attention-icon">
-        <bf-icon [name]="store.missingCostItems() ? 'alert' : 'check'" />
+        <bf-icon [name]="store.missingCostItems() ? 'missing-cost' : 'check'" />
       </span>
       <div class="metric-copy">
         <span>Custos pendentes</span>
@@ -136,17 +136,17 @@
       <strong>{{ store.saleCount() }}</strong>
     </article>
     <article class="compact-card">
-      <span class="compact-icon"><bf-icon name="tag" /></span>
+      <span class="compact-icon"><bf-icon name="average-ticket" /></span>
       <span>Ticket médio</span>
       <strong>{{ currency(store.averageTicketCents()) }}</strong>
     </article>
     <article class="compact-card">
-      <span class="compact-icon"><bf-icon name="box" /></span>
+      <span class="compact-icon"><bf-icon name="sold-items" /></span>
       <span>Itens vendidos</span>
       <strong>{{ store.itemsSold() }}</strong>
     </article>
     <article class="compact-card">
-      <span class="compact-icon blush"><bf-icon name="heart" /></span>
+      <span class="compact-icon blush"><bf-icon name="tips" /></span>
       <span>Gorjetas</span>
       <strong>{{ currency(store.tipsCents()) }}</strong>
     </article>
@@ -202,37 +202,31 @@
     <section class="dashboard-panel alerts">
       <div class="section-head">
         <div class="attention-title">
-          <span class="section-icon"><bf-icon name="leaf" /></span>
+          <span class="section-icon"><bf-icon name="alert" /></span>
           <div><h2>Atenção</h2><p>Itens que merecem ação.</p></div>
         </div>
       </div>
 
-      <a routerLink="/estoque" class="alert-row danger-row">
-        <span class="alert-icon"><bf-icon name="arrow-down-right" /></span>
-        <span class="alert-count">{{ store.negativeProducts() }}</span>
-        <span class="alert-label">produtos negativos</span>
-        <span class="alert-action">Corrigir <bf-icon name="arrow-right" /></span>
-      </a>
       <a routerLink="/estoque" class="alert-row">
-        <span class="alert-icon"><bf-icon name="box" /></span>
+        <span class="alert-icon"><bf-icon name="low-stock-product" /></span>
         <span class="alert-count">{{ store.lowStockProducts() }}</span>
         <span class="alert-label">produtos em estoque baixo</span>
         <span class="alert-action">Ver <bf-icon name="arrow-right" /></span>
       </a>
       <a routerLink="/estoque" class="alert-row">
-        <span class="alert-icon sage"><bf-icon name="leaf" /></span>
+        <span class="alert-icon sage"><bf-icon name="low-stock-input" /></span>
         <span class="alert-count">{{ store.lowStockInputs() }}</span>
         <span class="alert-label">insumos em estoque baixo</span>
         <span class="alert-action">Ver <bf-icon name="arrow-right" /></span>
       </a>
       <a routerLink="/financeiro" class="alert-row warning-row">
-        <span class="alert-icon"><bf-icon name="receipt" /></span>
+        <span class="alert-icon"><bf-icon name="overdue" /></span>
         <span class="alert-count">{{ store.overdueCount() }}</span>
         <span class="alert-label">contas vencidas</span>
         <span class="alert-action">Cobrar <bf-icon name="arrow-right" /></span>
       </a>
       <a routerLink="/catalogo" class="alert-row">
-        <span class="alert-icon"><bf-icon name="settings" /></span>
+        <span class="alert-icon"><bf-icon name="missing-cost" /></span>
         <span class="alert-count">{{ store.missingCostItems() }}</span>
         <span class="alert-label">itens vendidos sem custo</span>
         <span class="alert-action">Completar <bf-icon name="arrow-right" /></span>
@@ -242,15 +236,15 @@
 
   <div class="financial-strip">
     <article class="financial-card tint-sage">
-      <span class="financial-icon"><bf-icon name="chart" /></span>
+      <span class="financial-icon"><bf-icon name="cogs" /></span>
       <div><span>CMV conhecido</span><strong>{{ currency(store.cogsCents()) }}</strong></div>
     </article>
     <article class="financial-card tint-sand">
-      <span class="financial-icon sand"><bf-icon name="wallet" /></span>
+      <span class="financial-icon sand"><bf-icon name="cash-out" /></span>
       <div><span>Saídas de caixa</span><strong>{{ currency(store.cashOutCents()) }}</strong></div>
     </article>
     <article class="financial-card tint-sage">
-      <span class="financial-icon"><bf-icon name="chart" /></span>
+      <span class="financial-icon"><bf-icon name="cash-flow" /></span>
       <div><span>Fluxo de caixa</span><strong [class.negative]="store.cashFlowCents() < 0">{{ currency(store.cashFlowCents()) }}</strong></div>
     </article>
   </div>

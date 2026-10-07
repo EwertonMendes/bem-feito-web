@@ -18,7 +18,6 @@ export class DashboardPage {
   private readonly destroyRef = inject(DestroyRef);
   readonly currency = formatCurrency;
   readonly skeletonFour = [1, 2, 3, 4];
-  readonly skeletonFive = [1, 2, 3, 4, 5];
   readonly skeletonThree = [1, 2, 3];
   readonly skeletonMonths = Array.from({ length: 12 }, (_, index) => index);
 

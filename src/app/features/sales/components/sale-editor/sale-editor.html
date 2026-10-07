@@ -6,7 +6,7 @@
 >
   <header class="sale-header">
     <div class="sale-title-group">
-      <span class="sale-header-icon" aria-hidden="true"><bf-icon name="bag" /></span>
+      <span class="sale-header-icon" aria-hidden="true"><bf-icon name="order" /></span>
       <div class="sale-title">
         <h2>Nova venda</h2>
         <span>{{ cartItemLabel() }} · <strong>{{ currency(totalCents()) }}</strong></span>
@@ -35,7 +35,7 @@
         [attr.aria-pressed]="mobileView()==='catalog'"
         (click)="mobileView.set('catalog')"
       >
-        <bf-icon name="leaf" />
+        <bf-icon name="catalog-browse" />
         <span>Catálogo</span>
       </button>
       <button
@@ -44,7 +44,7 @@
         [attr.aria-pressed]="mobileView()==='order'"
         (click)="mobileView.set('order')"
       >
-        <bf-icon name="bag" />
+        <bf-icon name="order" />
         <span>Pedido ({{ cartItemCount() }})</span>
       </button>
     </nav>
@@ -57,11 +57,11 @@
             <span>Produtos</span>
           </button>
           <button [class.active]="catalogTab()==='kits'" (click)="selectCatalogTab('kits')">
-            <bf-icon name="box" />
+            <bf-icon name="kit" />
             <span>Kits</span>
           </button>
           <button [class.active]="catalogTab()==='additions'" (click)="selectCatalogTab('additions')">
-            <bf-icon name="plus" />
+            <bf-icon name="addition" />
             <span>Adicionais</span>
           </button>
         </div>
@@ -262,7 +262,7 @@
       </div>
 
       <button class="mobile-catalog-cta" type="button" (click)="mobileView.set('order')">
-        <bf-icon name="bag" />
+        <bf-icon name="order" />
         <span>Ver pedido · {{ cartItemLabel() }} — {{ currency(totalCents()) }}</span>
         <bf-icon name="chevron-right" />
       </button>
@@ -273,7 +273,7 @@
         <section class="order-section">
           <div class="section-heading cart-heading">
             <div>
-              <bf-icon name="bag" />
+              <bf-icon name="order" />
               <h3>Pedido</h3>
             </div>
 
@@ -337,11 +337,11 @@
               </article>
             } @empty {
               <div class="cart-empty">
-                <span class="empty-icon"><bf-icon name="bag" /></span>
+                <span class="empty-icon"><bf-icon name="order" /></span>
                 <strong>Pedido vazio</strong>
                 <span>Escolha produtos, kits ou adicionais.</span>
                 <button class="back-to-catalog" type="button" (click)="mobileView.set('catalog')">
-                  <bf-icon name="leaf" />
+                  <bf-icon name="catalog-browse" />
                   Ver catálogo
                 </button>
               </div>
@@ -352,7 +352,7 @@
         <section class="payments panel-section">
           <div class="section-heading payments-head">
             <div>
-              <span class="section-icon"><bf-icon name="card" /></span>
+              <span class="section-icon"><bf-icon name="payment" /></span>
               <div>
                 <h3>Pagamento</h3>
                 <small>Você pode dividir em várias formas.</small>
@@ -413,7 +413,7 @@
         <section class="customer-section panel-section">
           <div class="section-heading compact-heading">
             <div>
-              <span class="section-icon"><bf-icon name="tag" /></span>
+              <span class="section-icon"><bf-icon name="customer" /></span>
               <div>
                 <h3>Cliente</h3>
                 @if (remainingCents()>0) {
@@ -449,7 +449,7 @@
         >
           <summary>
             <span class="summary-title">
-              <span class="section-icon"><bf-icon name="receipt" /></span>
+              <span class="section-icon"><bf-icon name="details" /></span>
               <span>Mais detalhes</span>
             </span>
             <bf-icon class="details-chevron" name="chevron-right" />
@@ -505,7 +505,7 @@
           @if (submitting()) {
             <span>Registrando venda…</span>
           } @else {
-            <bf-icon name="tag" />
+            <bf-icon name="confirm-sale" />
             <span>Confirmar venda · {{ currency(totalCents()) }}</span>
           }
         </button>

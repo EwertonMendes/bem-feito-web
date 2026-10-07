@@ -70,10 +70,10 @@ export class SettingsPage {
     ...this.references.formats().map((item) => ({ value: item.id, label: item.name })),
   ]);
   readonly expenseTypeOptions: readonly BfSelectOption[] = [
-    { value: 'input-purchase', label: 'Compra de insumo', icon: 'box' },
-    { value: 'operating-expense', label: 'Despesa operacional', icon: 'receipt' },
-    { value: 'equipment', label: 'Equipamento / investimento', icon: 'settings' },
-    { value: 'other', label: 'Outro', icon: 'tag' },
+    { value: 'input-purchase', label: 'Compra de insumo', icon: 'purchase' },
+    { value: 'operating-expense', label: 'Despesa operacional', icon: 'expense' },
+    { value: 'equipment', label: 'Equipamento / investimento', icon: 'equipment' },
+    { value: 'other', label: 'Outro', icon: 'other-expense' },
   ];
 
   constructor() {

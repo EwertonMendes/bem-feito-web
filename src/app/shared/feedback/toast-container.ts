@@ -51,6 +51,6 @@ export class ToastContainer {
   icon(kind: ToastMessage['kind']): BfIconName {
     if (kind === 'success') return 'check';
     if (kind === 'error') return 'alert';
-    return 'leaf';
+    return 'info';
   }
 }

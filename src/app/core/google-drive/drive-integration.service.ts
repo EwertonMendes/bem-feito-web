@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { environment } from '../../../environments/environment';
 import { CatalogImageEntityKind } from '../../domain/models/image.model';
 import { GoogleDriveIntegration } from '../../domain/models/integration.model';
@@ -40,6 +40,22 @@ export class DriveIntegrationService {
   readonly revision = computed(() => this.driveAuth.revision() + this.configRevision());
   readonly linked = computed(() => Boolean(this.configState()?.enabled && this.driveAuth.linked()));
   readonly connected = computed(() => this.statusState() === 'connected' && this.driveAuth.connected());
+
+  constructor() {
+    effect(() => {
+      const linked = this.driveAuth.linked();
+      const tokenActive = this.driveAuth.connected();
+      const status = this.statusState();
+
+      if (!this.loaded || !this.configState()?.enabled) return;
+      if (status === 'loading' || status === 'unconfigured' || status === 'disabled' || status === 'error') return;
+      if (tokenActive) return;
+
+      const nextStatus: DriveIntegrationStatus = linked ? 'ready' : 'disconnected';
+      if (status !== nextStatus) this.statusState.set(nextStatus);
+      if (!linked) this.authorizationNeededState.set(false);
+    });
+  }
 
   async load(force = false): Promise<void> {
     if (!this.enabled || (this.loaded && !force)) return;

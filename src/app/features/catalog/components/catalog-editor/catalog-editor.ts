@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
-import { Addition, AdditionComponent, InputItem, Kit, KitComponent, Product, RecipeComponent } from '../../../../domain/models/catalog.model';
+import { Addition, AdditionComponent, InputItem, InputTrackingMode, Kit, KitComponent, Product, RecipeComponent } from '../../../../domain/models/catalog.model';
+import { trackingModeForInput } from '../../../../domain/logic/costing';
 import { CatalogImageEntityKind, CatalogImageRef } from '../../../../domain/models/image.model';
 import { ErrorService } from '../../../../core/services/error.service';
 import { ImageService } from '../../../../core/services/image.service';
@@ -16,7 +17,7 @@ import { BfImageUpload } from '../../../../shared/ui/image-upload/image-upload';
 import { CatalogImage } from '../../../../shared/media/catalog-image/catalog-image';
 
 interface ProductFormModel { code: string; collectionId: string; fragranceId: string; formatId: string; salePrice: number; additionalCost: number; minimumStock: number; active: boolean; }
-interface InputFormModel { code: string; name: string; unitId: string; minimumStock: number | null; active: boolean; }
+interface InputFormModel { code: string; name: string; unitId: string; trackingMode: InputTrackingMode; minimumStock: number | null; active: boolean; }
 interface KitFormModel { name: string; price: number; notes: string; active: boolean; }
 interface AdditionFormModel { name: string; category: string; price: number; notes: string; active: boolean; }
 
@@ -64,7 +65,7 @@ export class CatalogEditor {
     min(p.minimumStock, 0);
   });
 
-  readonly inputModel = signal<InputFormModel>({ code: '', name: '', unitId: '', minimumStock: 0, active: true });
+  readonly inputModel = signal<InputFormModel>({ code: '', name: '', unitId: '', trackingMode: 'estimated', minimumStock: 0, active: true });
   readonly inputForm = form(this.inputModel, (p) => {
     required(p.code);
     required(p.name);
@@ -93,6 +94,17 @@ export class CatalogEditor {
     { value: '', label: 'Selecione' },
     ...this.references.units().map((item) => ({ value: item.id, label: item.name })),
   ]);
+  readonly inputTrackingOptions: readonly BfSelectOption[] = [
+    { value: 'exact', label: 'Controlado', description: 'Contagem exata. Pode bloquear uma operação quando não houver saldo.' },
+    { value: 'estimated', label: 'Estimado', description: 'Saldo de referência. Compras entram, mas a produção não baixa nem bloqueia.' },
+    { value: 'untracked', label: 'Não controlar', description: 'Usado somente para calcular custos, sem saldo ou alertas.' },
+  ];
+  readonly inputTrackingHint = computed(() => {
+    const mode = this.inputModel().trackingMode;
+    if (mode === 'exact') return 'Ideal para embalagens e itens contáveis. O saldo deve representar a quantidade real disponível.';
+    if (mode === 'untracked') return 'O sistema acompanha o custo médio deste insumo, sem exigir controle de quantidade.';
+    return 'Ideal para glicerina, essência, lauril e outros materiais variáveis. O saldo é apenas uma referência para inventário.';
+  });
   readonly unitOptions = computed<BfSelectOption[]>(() =>
     this.references.units().map((item) => ({ value: item.id, label: item.name })),
   );
@@ -132,7 +144,7 @@ export class CatalogEditor {
       this.productModel.set({ code: '', collectionId: '', fragranceId: '', formatId: '', salePrice: 0, additionalCost: 0, minimumStock: 0, active: true });
       this.recipe.set([]);
     } else if (kind === 'inputs') {
-      this.inputModel.set({ code: '', name: '', unitId: '', minimumStock: 0, active: true });
+      this.inputModel.set({ code: '', name: '', unitId: '', trackingMode: 'estimated', minimumStock: 0, active: true });
     } else if (kind === 'kits') {
       this.kitModel.set({ name: '', price: 0, notes: '', active: true });
       this.kitComponents.set([]);
@@ -156,7 +168,15 @@ export class CatalogEditor {
     this.kind.set('inputs');
     this.editingId.set(item.id);
     this.resetImageChange();
-    this.inputModel.set({ code: item.code, name: item.name, unitId: item.unitId, minimumStock: item.minimumStockConfigured === false ? null : item.minimumStock, active: item.active });
+    const trackingMode = trackingModeForInput(item);
+    this.inputModel.set({
+      code: item.code,
+      name: item.name,
+      unitId: item.unitId,
+      trackingMode,
+      minimumStock: trackingMode === 'untracked' ? null : item.minimumStock,
+      active: item.active,
+    });
     this.dialog().open();
   }
 
@@ -180,12 +200,16 @@ export class CatalogEditor {
 
   addRecipeComponent(): void {
     const input = this.store.activeInputs()[0];
-    const unit = this.references.units()[0];
-    if (input && unit) this.recipe.update((items) => [...items, { inputId: input.id, quantity: 0, unitId: unit.id }]);
+    if (input) this.recipe.update((items) => [...items, { inputId: input.id, quantity: 0, unitId: input.unitId }]);
   }
 
   patchRecipe(index: number, patch: Partial<RecipeComponent>): void {
     this.recipe.update((items) => items.map((item, i) => i === index ? { ...item, ...patch } : item));
+  }
+
+  patchRecipeInput(index: number, inputId: string): void {
+    const input = this.store.inputs().find((item) => item.id === inputId);
+    this.patchRecipe(index, { inputId, unitId: input?.unitId ?? '' });
   }
 
   removeRecipe(index: number): void {
@@ -207,12 +231,20 @@ export class CatalogEditor {
 
   addAdditionComponent(): void {
     const input = this.store.activeInputs()[0];
-    const unit = this.references.units()[0];
-    if (input && unit) this.additionComponents.update((items) => [...items, { id: crypto.randomUUID(), inputId: input.id, quantity: 1, unitId: unit.id, order: items.length + 1 }]);
+    if (input) this.additionComponents.update((items) => [...items, { id: crypto.randomUUID(), inputId: input.id, quantity: 1, unitId: input.unitId, order: items.length + 1 }]);
   }
 
   patchAdditionComponent(index: number, patch: Partial<AdditionComponent>): void {
     this.additionComponents.update((items) => items.map((item, i) => i === index ? { ...item, ...patch } : item));
+  }
+
+  patchAdditionInput(index: number, inputId: string): void {
+    const input = this.store.inputs().find((item) => item.id === inputId);
+    this.patchAdditionComponent(index, { inputId, unitId: input?.unitId ?? '' });
+  }
+
+  unitName(unitId: string): string {
+    return this.references.units().find((item) => item.id === unitId)?.name ?? '—';
   }
 
   removeAdditionComponent(index: number): void {
@@ -255,10 +287,21 @@ export class CatalogEditor {
     if (this.inputForm().invalid()) throw new Error('Revise os campos obrigatórios.');
     const model = this.inputModel();
     const existing = this.store.inputs().find((item) => item.id === this.editingId());
+    const tracked = model.trackingMode !== 'untracked';
     const input: InputItem = {
-      id: existing?.id ?? '', code: model.code.trim(), active: model.active, name: model.name.trim(), unitId: model.unitId,
-      stock: existing?.stock ?? 0, minimumStock: model.minimumStock ?? 0, minimumStockConfigured: model.minimumStock !== null,
-      averageUnitCostCents: existing?.averageUnitCostCents ?? 0, image: existing?.image,
+      id: existing?.id ?? '',
+      code: model.code.trim(),
+      active: model.active,
+      name: model.name.trim(),
+      unitId: model.unitId,
+      trackingMode: model.trackingMode,
+      stock: existing?.stock ?? 0,
+      minimumStock: tracked ? (model.minimumStock ?? 0) : 0,
+      minimumStockConfigured: tracked,
+      averageUnitCostCents: existing?.averageUnitCostCents ?? 0,
+      costBasisQuantity: existing?.costBasisQuantity,
+      costBasisValueCents: existing?.costBasisValueCents,
+      image: existing?.image,
     };
     const id = await this.store.saveInput(input);
     await this.applyImageChange('inputs', id, existing?.image, (image) => this.store.setInputImage(id, image));

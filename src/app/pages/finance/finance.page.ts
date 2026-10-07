@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormField, form, min, required } from '@angular/forms/signals';
@@ -17,6 +17,7 @@ import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
 import { BfListSkeleton, BfSkeleton, BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
 import { BfSelect, BfSelectOption } from '../../shared/ui/select/select';
 import { paymentMethodIcon } from '../../shared/ui/select/payment-method-icon';
+import { BfNumberInput } from '../../shared/ui/number-input/number-input';
 
 interface ReceiptFormModel {
   saleId: string;
@@ -39,7 +40,7 @@ interface ExpenseFormModel {
 
 @Component({
   selector: 'bf-finance-page',
-  imports: [FormField, BfIcon, BfDialog, BfEmptyState, BfPageRefresh, BfListSkeleton, BfSkeleton, BfTableSkeleton, BfSelect],
+  imports: [FormField, BfIcon, BfDialog, BfEmptyState, BfPageRefresh, BfListSkeleton, BfSkeleton, BfTableSkeleton, BfSelect, BfNumberInput],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './finance.page.html',
   styleUrl: './finance.page.scss',
@@ -53,10 +54,17 @@ export class FinancePage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly dialog = viewChild.required<BfDialog>('expenseDialog');
   private readonly receiptDialog = viewChild.required<BfDialog>('receiptDialog');
 
   readonly tab = signal<'expenses' | 'receivables' | 'payments'>('expenses');
+  readonly expenseSubmitted = signal(false);
+  readonly receiptSubmitted = signal(false);
+  readonly expenseSaving = signal(false);
+  readonly receiptSaving = signal(false);
+  readonly expenseFormError = signal('');
+  readonly receiptFormError = signal('');
   readonly currency = formatCurrency;
   readonly date = formatBusinessDate;
   readonly model = signal<ExpenseFormModel>({
@@ -74,6 +82,26 @@ export class FinancePage {
     required(p.businessDate);
     required(p.kind);
     min(p.amount, 0.01);
+  });
+  readonly expenseErrors = computed(() => {
+    const value = this.model();
+    return {
+      businessDate: value.businessDate ? '' : 'Informe a data.',
+      amount: Number.isFinite(value.amount) && value.amount > 0 ? '' : 'Informe um valor maior que zero.',
+      inputId: value.kind === 'input-purchase' && !value.inputId ? 'Selecione o insumo comprado.' : '',
+      quantity: value.kind === 'input-purchase' && (!Number.isFinite(value.quantity) || value.quantity <= 0)
+        ? 'Informe uma quantidade maior que zero.'
+        : '',
+    };
+  });
+  readonly receiptErrors = computed(() => {
+    const value = this.receiptModel();
+    return {
+      saleId: value.saleId ? '' : 'Selecione a venda.',
+      businessDate: value.businessDate ? '' : 'Informe a data.',
+      methodId: value.methodId ? '' : 'Selecione a forma de pagamento.',
+      amount: Number.isFinite(value.amount) && value.amount > 0 ? '' : 'Informe um valor maior que zero.',
+    };
   });
   readonly totalReceivable = this.sales.receivableTotalCents;
   readonly totalOut = this.store.totalOutCents;
@@ -185,6 +213,9 @@ export class FinancePage {
   }
 
   openExpense(kind: ExpenseKind = 'operating-expense'): void {
+    this.expenseSubmitted.set(false);
+    this.expenseFormError.set('');
+    this.store.clearOperationError();
     this.model.set({
       businessDate: todayBusinessDate(),
       kind,
@@ -200,6 +231,8 @@ export class FinancePage {
   }
 
   openReceipt(saleId: string): void {
+    this.receiptSubmitted.set(false);
+    this.receiptFormError.set('');
     const sale = this.sales.openSales().find((item) => item.id === saleId);
     if (!sale) return;
     this.receiptModel.set({
@@ -212,12 +245,27 @@ export class FinancePage {
   }
 
   async saveReceipt(): Promise<void> {
-    if (this.receiptForm().invalid()) return;
+    if (this.receiptSaving()) return;
+    this.receiptSubmitted.set(true);
+    this.receiptFormError.set('');
+    const errors = this.receiptErrors();
+    if (this.receiptForm().invalid() || Object.values(errors).some(Boolean)) {
+      this.focusFirstInvalid('receipt');
+      return;
+    }
+
     const value = this.receiptModel();
-    const result = await this.sales.addPayment(value.saleId, value.businessDate, value.methodId, toCents(value.amount));
-    if (result) {
-      this.store.applyPayment(result.payment);
-      this.receiptDialog().close();
+    this.receiptSaving.set(true);
+    try {
+      const result = await this.sales.addPayment(value.saleId, value.businessDate, value.methodId, toCents(value.amount));
+      if (result) {
+        this.store.applyPayment(result.payment);
+        this.receiptDialog().close();
+      } else {
+        this.receiptFormError.set('Não foi possível registrar o recebimento. Revise os dados e tente novamente.');
+      }
+    } finally {
+      this.receiptSaving.set(false);
     }
   }
 
@@ -228,7 +276,16 @@ export class FinancePage {
   }
 
   async save(): Promise<void> {
-    if (this.expenseForm().invalid()) return;
+    if (this.expenseSaving()) return;
+    this.expenseSubmitted.set(true);
+    this.expenseFormError.set('');
+    this.store.clearOperationError();
+    const errors = this.expenseErrors();
+    if (this.expenseForm().invalid() || Object.values(errors).some(Boolean)) {
+      this.focusFirstInvalid('expense');
+      return;
+    }
+
     const value = this.model();
     const draft: ExpenseDraft = {
       businessDate: value.businessDate,
@@ -242,11 +299,25 @@ export class FinancePage {
       notes: value.notes.trim() || undefined,
       link: value.link.trim() || undefined,
     };
-    const result = await this.store.createExpense(draft);
-    if (result) {
-      if (result.stockChange) this.catalog.applyStockChanges([result.stockChange]);
-      this.dialog().close();
+    this.expenseSaving.set(true);
+    try {
+      const result = await this.store.createExpense(draft);
+      if (result) {
+        if (result.stockChange) this.catalog.applyStockChanges([result.stockChange]);
+        this.dialog().close();
+      } else {
+        this.expenseFormError.set(this.store.operationError() || 'Não foi possível registrar a saída.');
+      }
+    } finally {
+      this.expenseSaving.set(false);
     }
+  }
+
+  private focusFirstInvalid(scope: 'expense' | 'receipt'): void {
+    queueMicrotask(() => {
+      const root = this.host.nativeElement.querySelector<HTMLElement>(`[data-form="${scope}"]`);
+      root?.querySelector<HTMLElement>('[data-invalid="true"] input, [data-invalid="true"] button')?.focus();
+    });
   }
 
   paymentName(id: string): string {

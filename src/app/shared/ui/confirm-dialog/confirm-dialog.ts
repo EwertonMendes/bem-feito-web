@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, signal, viewChild } from '@angular/core';
 import { BfDialog } from '../dialog/dialog';
-import { BfIcon, BfIconName } from '../icon/icon';
+import { BfIcon } from '../icon/icon';
+import type { BfIconName } from '../icon/icon';
 
 export interface BfConfirmDialogOptions {
   title: string;

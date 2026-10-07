@@ -345,6 +345,30 @@ a { color: inherit; }
   background: var(--surface-elevated);
 }
 
+.bf-input.invalid,
+.bf-textarea.invalid {
+  border-color: color-mix(in srgb, var(--danger) 58%, var(--line));
+}
+
+.bf-field-error {
+  color: var(--danger);
+  font-size: .72rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.bf-form-error {
+  margin-bottom: 14px;
+  padding: 11px 13px;
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--line));
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: .8rem;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
 .bf-grid {
   display: grid;
   gap: 16px;

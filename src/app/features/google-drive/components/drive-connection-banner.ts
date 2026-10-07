@@ -33,12 +33,8 @@ import { BfIcon } from '../../../shared/ui/icon/icon';
         />
 
         <div class="copy">
-          <strong>{{ integration.status() === 'error' ? 'Google Drive indisponível' : 'Google Drive desconectado' }}</strong>
-          <span>
-            {{ integration.status() === 'error'
-              ? 'Não foi possível validar o acesso às imagens privadas.'
-              : 'Conecte sua conta para carregar e alterar as imagens privadas.' }}
-          </span>
+          <strong>{{ title() }}</strong>
+          <span>{{ message() }}</span>
         </div>
 
         <button
@@ -47,7 +43,7 @@ import { BfIcon } from '../../../shared/ui/icon/icon';
           [disabled]="connecting()"
           (click)="connect()"
         >
-          {{ connecting() ? 'Conectando...' : 'Conectar Drive' }}
+          {{ connecting() ? 'Conectando...' : actionLabel() }}
         </button>
       </aside>
     }
@@ -80,9 +76,30 @@ export class DriveConnectionBanner {
     if (!this.integration.enabled || !this.integration.config()?.enabled) return false;
 
     const status = this.integration.status();
-    if (status === 'loading' || status === 'unconfigured' || status === 'disabled') return false;
-    return status === 'error' || !this.integration.connected();
+    if (status === 'loading' || status === 'unconfigured' || status === 'disabled' || status === 'connected') {
+      return false;
+    }
+    if (status === 'ready') return this.integration.authorizationNeeded();
+    return status === 'error' || status === 'disconnected';
   });
+
+  readonly title = computed(() => {
+    const status = this.integration.status();
+    if (status === 'ready') return 'Continuar com Google Drive';
+    if (status === 'error') return 'Google Drive indisponível';
+    return 'Google Drive desconectado';
+  });
+
+  readonly message = computed(() => {
+    const status = this.integration.status();
+    if (status === 'ready') {
+      return 'Sua conta continua vinculada. Confirme para renovar o acesso temporário às imagens.';
+    }
+    if (status === 'error') return 'Não foi possível validar o acesso às imagens privadas.';
+    return 'Conecte sua conta para carregar e alterar as imagens privadas.';
+  });
+
+  readonly actionLabel = computed(() => this.integration.status() === 'ready' ? 'Continuar' : 'Conectar Drive');
 
   constructor() {
     this.router.events
@@ -98,8 +115,10 @@ export class DriveConnectionBanner {
   async connect(): Promise<void> {
     if (this.connecting()) return;
     this.connecting.set(true);
+
     try {
       await this.integration.connect();
+      this.dismissed.set(false);
       this.toast.success('Google Drive conectado.');
     } catch (error) {
       this.toast.error(this.errors.message(error));

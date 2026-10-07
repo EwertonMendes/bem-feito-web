@@ -3,7 +3,7 @@ import { environment } from '../../../environments/environment';
 import { CatalogImageEntityKind, CatalogImageRef } from '../../domain/models/image.model';
 import { ImageStorageAvailability, ImageStoragePort } from '../images/image-storage.port';
 import { ImageProcessorService } from '../images/image-processor.service';
-import { DriveApiService, DriveFileMetadata } from './drive-api.service';
+import { DriveApiError, DriveApiService, DriveFileMetadata } from './drive-api.service';
 import { DriveAuthService, DriveAuthorizationRequiredError } from './drive-auth.service';
 import { DriveIntegrationService } from './drive-integration.service';
 
@@ -25,7 +25,7 @@ export class GoogleDriveImageStorageService extends ImageStoragePort {
     if (!this.enabled) return 'unavailable';
     const status = this.integration.status();
     if (status === 'loading') return 'loading';
-    return status === 'connected' ? 'available' : 'unavailable';
+    return status === 'connected' || status === 'ready' ? 'available' : 'unavailable';
   });
 
   constructor() {
@@ -37,7 +37,7 @@ export class GoogleDriveImageStorageService extends ImageStoragePort {
   }
 
   async resolve(image?: CatalogImageRef): Promise<string | null> {
-    if (!this.enabled || !image || image.provider !== 'google-drive' || !this.integration.connected() || !this.auth.currentToken()) return null;
+    if (!this.enabled || !image || image.provider !== 'google-drive') return null;
 
     const key = this.cacheKey(image);
     const cached = this.urlCache.get(key);
@@ -46,6 +46,13 @@ export class GoogleDriveImageStorageService extends ImageStoragePort {
       this.urlCache.set(key, cached);
       return cached;
     }
+
+    const token = this.auth.currentToken();
+    if (!token || !this.integration.connected()) {
+      if (this.auth.linked()) this.integration.requestAuthorization();
+      return null;
+    }
+
     const pending = this.pendingDownloads.get(key);
     if (pending) return pending;
 
@@ -59,7 +66,14 @@ export class GoogleDriveImageStorageService extends ImageStoragePort {
       this.cacheUrl(key, url);
       return url;
     }).catch((error) => {
-      if (error instanceof DriveAuthorizationRequiredError) return null;
+      if (error instanceof DriveAuthorizationRequiredError) {
+        this.integration.requestAuthorization();
+        return null;
+      }
+      if (error instanceof DriveApiError && error.status === 401) {
+        this.integration.handleUnauthorized();
+        return null;
+      }
       throw error;
     }).finally(() => this.pendingDownloads.delete(key));
 
@@ -69,6 +83,7 @@ export class GoogleDriveImageStorageService extends ImageStoragePort {
 
   async save(kind: CatalogImageEntityKind, entityId: string, file: File, existing?: CatalogImageRef): Promise<CatalogImageRef> {
     if (!this.enabled) throw new Error('O envio de imagens está indisponível neste ambiente.');
+
     await this.integration.ensureConnected();
     const processed = await this.processor.process(file);
     let metadata: DriveFileMetadata;
@@ -99,6 +114,7 @@ export class GoogleDriveImageStorageService extends ImageStoragePort {
 
   async remove(kind: CatalogImageEntityKind, entityId: string, image?: CatalogImageRef): Promise<void> {
     if (!this.enabled || !image) return;
+
     await this.integration.ensureConnected();
     await this.assertManagedFile(kind, entityId, image);
     await this.api.trash(image.fileId);

@@ -25,13 +25,17 @@ export class DriveApiService {
   private readonly uploadApi = 'https://www.googleapis.com/upload/drive/v3';
 
   async currentUser(): Promise<{ emailAddress: string; displayName?: string }> {
-    const data = await this.json<{ user: { emailAddress: string; displayName?: string } }>(`${this.api}/about?fields=user(emailAddress,displayName)`);
+    const data = await this.json<{ user: { emailAddress: string; displayName?: string } }>(
+      `${this.api}/about?fields=user(emailAddress,displayName)`,
+    );
     return data.user;
   }
 
   getFile(fileId: string): Promise<DriveFileMetadata> {
     const fields = 'id,name,mimeType,modifiedTime,size,trashed,parents,appProperties';
-    return this.json<DriveFileMetadata>(`${this.api}/files/${encodeURIComponent(fileId)}?fields=${encodeURIComponent(fields)}&supportsAllDrives=true`);
+    return this.json<DriveFileMetadata>(
+      `${this.api}/files/${encodeURIComponent(fileId)}?fields=${encodeURIComponent(fields)}&supportsAllDrives=true`,
+    );
   }
 
   async findFolder(parentId: string, name: string): Promise<DriveFileMetadata | null> {
@@ -86,16 +90,21 @@ export class DriveApiService {
   }
 
   async download(fileId: string): Promise<Blob> {
-    const response = await this.request(`${this.api}/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`);
+    const response = await this.request(
+      `${this.api}/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`,
+    );
     return response.blob();
   }
 
   async trash(fileId: string): Promise<void> {
-    await this.json<DriveFileMetadata>(`${this.api}/files/${encodeURIComponent(fileId)}?fields=id,trashed&supportsAllDrives=true`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ trashed: true }),
-    });
+    await this.json<DriveFileMetadata>(
+      `${this.api}/files/${encodeURIComponent(fileId)}?fields=id,trashed&supportsAllDrives=true`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trashed: true }),
+      },
+    );
   }
 
   private async json<T>(url: string, init: RequestInit = {}): Promise<T> {
@@ -108,10 +117,15 @@ export class DriveApiService {
     const headers = new Headers(init.headers);
     headers.set('Authorization', `Bearer ${token}`);
     const response = await fetch(url, { ...init, headers });
-    if (response.status === 401) this.auth.invalidate();
+
+    if (response.status === 401) this.auth.expireAccessToken();
+
     if (!response.ok) {
       const body = await response.text().catch(() => '');
-      throw new DriveApiError(response.status, `Google Drive respondeu ${response.status}.${body ? ` ${body.slice(0, 300)}` : ''}`);
+      throw new DriveApiError(
+        response.status,
+        `Google Drive respondeu ${response.status}.${body ? ` ${body.slice(0, 300)}` : ''}`,
+      );
     }
     return response;
   }

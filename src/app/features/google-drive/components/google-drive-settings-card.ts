@@ -29,7 +29,12 @@ import { ToastService } from '../../../core/services/toast.service';
             <p class="muted">A integração está desativada neste ambiente.</p>
           } @else if (integration.config(); as config) {
             <div class="status">
-              <span class="bf-badge" [class.warning]="!integration.connected()">{{ statusLabel() }}</span>
+              <span
+                class="bf-badge"
+                [class.warning]="integration.status() === 'error' || integration.status() === 'disconnected'"
+              >
+                {{ statusLabel() }}
+              </span>
               <span>{{ config.rootFolderName }}</span>
               @if (integration.driveEmail()) { <small>{{ integration.driveEmail() }}</small> }
             </div>
@@ -49,7 +54,7 @@ import { ToastService } from '../../../core/services/toast.service';
               [disabled]="busy()"
               (click)="connect()"
             >
-              {{ busy() === 'connect' ? 'Conectando...' : 'Conectar Drive' }}
+              {{ connectLabel() }}
             </button>
           }
           @if (auth.canAdminister()) {
@@ -89,14 +94,21 @@ export class GoogleDriveSettingsCard {
   statusLabel(): string {
     const status = this.integration.status();
     if (this.integration.connected()) return 'Conectado';
+    if (status === 'ready') return 'Vinculado';
     if (status === 'loading') return 'Carregando';
     if (status === 'error') return 'Atenção';
     return 'Desconectado';
   }
 
+  connectLabel(): string {
+    if (this.busy() === 'connect') return 'Conectando...';
+    return this.integration.status() === 'ready' ? 'Renovar acesso' : 'Conectar Drive';
+  }
+
   async connect(): Promise<void> {
     if (this.busy()) return;
     this.busy.set('connect');
+
     try {
       await this.integration.connect();
       this.toast.success('Google Drive conectado.');
@@ -110,6 +122,7 @@ export class GoogleDriveSettingsCard {
   async configure(): Promise<void> {
     if (this.busy()) return;
     this.busy.set('configure');
+
     try {
       await this.integration.configure();
       this.toast.success('Pasta de imagens configurada.');

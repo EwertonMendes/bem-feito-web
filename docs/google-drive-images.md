@@ -119,11 +119,20 @@ A leitura usa blob privado, cache em memória e carregamento próximo ao viewpor
 
 O consentimento `drive.file` não deve aparecer a cada uso enquanto a concessão continuar válida.
 
-Para evitar que um simples F5 derrube as imagens, o access token atual é mantido em `sessionStorage` até a expiração. No reload da mesma aba, o app restaura o token, valida novamente a conta Google e a pasta configurada e só então libera a leitura das imagens.
+A SPA continua usando o **Google Identity Services token model**. O access token é curto e sua duração é definida pelo Google; o Angular não tenta ampliar essa validade e não armazena refresh token.
 
-O token não é mantido após logout, troca de conta, expiração, resposta `401` do Drive ou encerramento da sessão da aba. O modelo de token do Google Identity Services usado por esta SPA emite access tokens curtos e exige um novo gesto do usuário para obter outro token depois da expiração. A duração do access token é definida pelo Google e não pode ser aumentada pelo Angular para dias ou meses.
+O estado local é dividido em duas partes:
 
-Uma conexão realmente durável por dias ou meses exige migrar a autorização do Drive para o **authorization code model** com um backend seguro, que recebe e armazena um refresh token fora do navegador. Não armazene refresh token no frontend para contornar essa limitação. Enquanto o app continuar client-only, o botão **Conectar Drive** reutiliza a concessão existente sempre que possível e usa o e-mail Firebase como `login_hint`, evitando novo consentimento quando o Google não exigir.
+- **access token temporário**: fica em memória e em `localStorage` somente até o `expiresAt` real informado pelo Google, vinculado à UID Firebase. Isso permite fechar/reabrir a aba sem nova autorização enquanto o token ainda for válido; no logout ele é removido;
+- **marcador de vínculo**: fica em `localStorage` e contém somente o UID Firebase, o e-mail da conta Drive validada e a data do vínculo. Esse marcador não é uma credencial e não concede acesso ao Drive.
+
+Quando o access token expira ou o Drive responde `401`, somente o token temporário é descartado. A concessão conhecida continua marcada e a próxima **ação interativa** que precisar do Drive solicita um novo token com `prompt: ''` e `login_hint`, evitando novo consentimento quando o Google permitir.
+
+Para leituras passivas, como uma imagem ainda não carregada, o navegador não pode renovar o token sozinho sem gesto do usuário. Nessa situação o app mostra **Continuar com Google Drive** somente quando o acesso for realmente necessário. Imagens já carregadas permanecem no cache em memória até logout, troca de usuário, mudança de configuração ou invalidação explícita do cache.
+
+No logout do Firebase, o access token persistido e o cache da sessão são descartados. O marcador não sensível pode permanecer para permitir retomada com a mesma UID no próximo login. Se outra UID entrar, o marcador anterior é removido.
+
+Nunca grave refresh token, client secret, access token, cookies ou credenciais de service account em `localStorage`, IndexedDB, Firestore, Git ou logs. Uma conexão realmente silenciosa por dias ou meses continuaria exigindo o authorization code model com backend seguro; isso não é simulado no frontend.
 
 ## Testes recomendados
 

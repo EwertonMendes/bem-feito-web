@@ -22,7 +22,7 @@
           <label class="bf-field"><span>Código</span><input class="bf-input" [formField]="inputForm.code" /></label>
           <label class="bf-field"><span>Nome</span><input class="bf-input" [formField]="inputForm.name" /></label>
           <label class="bf-field"><span>Unidade base</span><bf-select [formField]="inputForm.unitId" [options]="inputUnitOptions()" ariaLabel="Unidade base" /></label>
-          <label class="bf-field"><span>Controle de estoque</span><bf-select [formField]="inputForm.trackingMode" [options]="inputTrackingOptions" ariaLabel="Controle de estoque" /></label>
+          <label class="bf-field"><span>Controle de estoque</span><bf-select [formField]="inputForm.trackingMode" [options]="inputTrackingOptions" [descriptive]="true" ariaLabel="Controle de estoque" /></label>
           @if (inputModel().trackingMode !== 'untracked') {
             <label class="bf-field"><span>Estoque mínimo</span><input class="bf-input" type="number" [formField]="inputForm.minimumStock" /></label>
           }

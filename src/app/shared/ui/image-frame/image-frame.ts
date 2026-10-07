@@ -17,8 +17,8 @@ import { BfIcon } from '../icon/icon';
     </div>
   `,
   styles: [`
-    :host{display:block}.frame{position:relative;aspect-ratio:4/3;border-radius:14px;display:grid;place-items:center;overflow:hidden;background:linear-gradient(145deg,var(--surface-2),var(--brand-soft));color:var(--muted)}
-    .frame.compact{width:48px;height:48px;aspect-ratio:1;border-radius:12px}.frame img{width:100%;height:100%;object-fit:cover}.frame.contain img{object-fit:contain;padding:5px}.frame bf-icon{width:28px;height:28px}
+    :host{display:block;min-width:0;min-height:0}.frame{position:relative;aspect-ratio:4/3;border-radius:14px;display:grid;place-items:center;overflow:hidden;background:linear-gradient(145deg,var(--surface-2),var(--brand-soft));color:var(--muted)}
+    .frame.compact{width:48px;height:48px;aspect-ratio:1;border-radius:12px}.frame img{width:100%;height:100%;object-fit:cover}.frame.contain{width:100%;height:100%;aspect-ratio:auto;padding:5px}.frame.contain img{width:auto;height:auto;max-width:100%;max-height:100%;object-fit:contain;object-position:center}.frame bf-icon{width:28px;height:28px}
     .skeleton{position:absolute;inset:0;background:linear-gradient(100deg,var(--surface-2) 20%,color-mix(in srgb,var(--surface-2) 70%,white) 38%,var(--surface-2) 56%);background-size:220% 100%;animation:image-loading 1.15s ease-in-out infinite}
     @keyframes image-loading{from{background-position:120% 0}to{background-position:-100% 0}}@media(prefers-reduced-motion:reduce){.skeleton{animation:none}}
   `],

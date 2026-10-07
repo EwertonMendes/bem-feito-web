@@ -22,6 +22,8 @@ const EMPTY_METRICS: DashboardMetrics = {
   operationalExpenseCents: 0,
   cashOutCents: 0,
   tipsCents: 0,
+  discountsCents: 0,
+  overdueCents: 0,
   cogsCents: 0,
   missingCostItems: 0,
   saleCount: 0,
@@ -94,6 +96,8 @@ export class DashboardStore {
   readonly operationalExpenseCents = computed(() => this.metricsState().operationalExpenseCents);
   readonly cashOutCents = computed(() => this.metricsState().cashOutCents);
   readonly tipsCents = computed(() => this.metricsState().tipsCents);
+  readonly discountsCents = computed(() => this.metricsState().discountsCents);
+  readonly overdueCents = computed(() => this.metricsState().overdueCents);
   readonly cogsCents = computed(() => this.metricsState().cogsCents);
   readonly missingCostItems = computed(() => this.metricsState().missingCostItems);
   readonly saleCount = computed(() => this.metricsState().saleCount);
@@ -105,6 +109,11 @@ export class DashboardStore {
     this.saleCount() ? Math.round(this.revenueCents() / this.saleCount()) : 0
   );
   readonly cashFlowCents = computed(() => this.cashReceivedCents() - this.cashOutCents());
+  readonly grossProfitCents = computed(() => this.revenueCents() - this.cogsCents());
+  readonly grossMarginPercent = computed(() => this.revenueCents()
+    ? Math.round((this.grossProfitCents() / this.revenueCents()) * 1000) / 10
+    : 0
+  );
   readonly resultCents = computed(() =>
     this.revenueCents() + this.tipsCents() - this.cogsCents() - this.operationalExpenseCents()
   );

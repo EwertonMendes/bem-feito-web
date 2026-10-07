@@ -12,7 +12,8 @@ import {
   startAfter,
   where,
 } from 'firebase/firestore';
-import { inputStockStatus, productStockStatus } from '../../domain/logic/stock-status';
+import { trackingModeForInput } from '../../domain/logic/costing';
+import { productStockStatus, stockStatusForInput } from '../../domain/logic/stock-status';
 import { InputItem, Product } from '../../domain/models/catalog.model';
 import { StockAdjustment, StockMovement } from '../../domain/models/inventory.model';
 import { AuthService } from '../auth/auth.service';
@@ -78,17 +79,16 @@ export class InventoryRepository {
       const stock = currentStock + quantityDelta;
       const unitCostCents = Number(itemSnapshot.data()['averageUnitCostCents'] ?? 0);
       const item = { id: itemSnapshot.id, ...itemSnapshot.data() } as Product | InputItem;
+      if (itemType === 'input' && trackingModeForInput(item as InputItem) === 'untracked') {
+        throw new Error('Este insumo não controla saldo. Altere o modo de estoque no Catálogo para ajustar quantidades.');
+      }
       if (stock < 0) {
         const itemName = itemType === 'product' ? (item as Product).displayName : (item as InputItem).name;
         throw new Error(`Estoque insuficiente de ${itemName}. Ajuste o saldo disponível antes de registrar a saída.`);
       }
       const stockStatus = itemType === 'product'
         ? productStockStatus(stock, (item as Product).minimumStock)
-        : inputStockStatus(
-            stock,
-            (item as InputItem).minimumStock,
-            (item as InputItem).minimumStockConfigured !== false,
-          );
+        : stockStatusForInput({ ...(item as InputItem), stock });
 
       transaction.set(counterRef, { value: sequence, updatedAt: serverTimestamp() }, { merge: true });
       transaction.update(itemRef, {

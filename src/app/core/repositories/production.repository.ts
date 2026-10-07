@@ -3,6 +3,7 @@ import {
   collection,
   doc,
   documentId,
+  DocumentSnapshot,
   getDocs,
   limit,
   orderBy,
@@ -11,15 +12,15 @@ import {
   serverTimestamp,
   startAfter,
 } from 'firebase/firestore';
-import { inputStockStatus, productStockStatus } from '../../domain/logic/stock-status';
-import { InputItem, Product } from '../../domain/models/catalog.model';
+import { productCostComponents, standardCostForProduct, trackingModeForInput } from '../../domain/logic/costing';
+import { productStockStatus, stockStatusForInput } from '../../domain/logic/stock-status';
+import { CollectionDefinition, FormatDefinition, FragranceDefinition, InputItem, Product } from '../../domain/models/catalog.model';
 import { StockMovement } from '../../domain/models/inventory.model';
 import { Production, ProductionConsumption } from '../../domain/models/production.model';
 import { AuthService } from '../auth/auth.service';
 import { DataRevisionService } from '../firebase/data-revision.service';
 import { FIRESTORE } from '../firebase/firebase.providers';
 import { entityCode } from '../utils/ids';
-import { aggregateRecipe } from '../utils/recipe';
 import { ProductionCreateResult } from './mutation-results';
 import { BusinessDateCursor, PageResult } from './pagination';
 
@@ -41,19 +42,10 @@ export class ProductionRepository {
     const docs = snapshot.docs.slice(0, pageSize);
     const items = docs.map((item) => ({ id: item.id, ...item.data() }) as Production);
     const last = items.at(-1);
-    return {
-      items,
-      hasMore,
-      nextCursor: hasMore && last ? { businessDate: last.businessDate, id: last.id } : null,
-    };
+    return { items, hasMore, nextCursor: hasMore && last ? { businessDate: last.businessDate, id: last.id } : null };
   }
 
-  async create(
-    productId: string,
-    quantity: number,
-    businessDate: string,
-    notes?: string,
-  ): Promise<ProductionCreateResult> {
+  async create(productId: string, quantity: number, businessDate: string, notes?: string): Promise<ProductionCreateResult> {
     const userId = this.auth.user()?.uid;
     if (!userId) throw new Error('Sessão inválida.');
     if (!productId) throw new Error('Selecione o produto.');
@@ -65,66 +57,64 @@ export class ProductionRepository {
       const productSnapshot = await transaction.get(productRef);
       const counterSnapshot = await transaction.get(counterRef);
       if (!productSnapshot.exists()) throw new Error('Produto não encontrado.');
-
       const product = { id: productSnapshot.id, ...productSnapshot.data() } as Product;
       if (!product.active) throw new Error('O produto está inativo.');
 
-      const recipe = aggregateRecipe(product.recipe);
-      const inputSnapshots = [];
-      for (const component of recipe) {
-        inputSnapshots.push(await transaction.get(doc(this.firestore, 'inputs', component.inputId)));
+      const [collectionSnapshot, fragranceSnapshot, formatSnapshot] = await Promise.all([
+        transaction.get(doc(this.firestore, 'collections', product.collectionId)),
+        transaction.get(doc(this.firestore, 'fragrances', product.fragranceId)),
+        transaction.get(doc(this.firestore, 'formats', product.formatId)),
+      ]);
+      const references = {
+        collection: collectionSnapshot.exists() ? ({ id: collectionSnapshot.id, ...collectionSnapshot.data() } as CollectionDefinition) : undefined,
+        fragrance: fragranceSnapshot.exists() ? ({ id: fragranceSnapshot.id, ...fragranceSnapshot.data() } as FragranceDefinition) : undefined,
+        format: formatSnapshot.exists() ? ({ id: formatSnapshot.id, ...formatSnapshot.data() } as FormatDefinition) : undefined,
+      };
+
+      const definitions = productCostComponents(product, references);
+      const inputSnapshots = new Map<string, DocumentSnapshot>();
+      for (const inputId of new Set(definitions.map((component) => component.inputId))) {
+        inputSnapshots.set(inputId, await transaction.get(doc(this.firestore, 'inputs', inputId)));
+      }
+      const inputs = new Map<string, InputItem>();
+      for (const [inputId, snapshot] of inputSnapshots) {
+        if (!snapshot.exists()) throw new Error('A composição de custo contém um insumo inválido.');
+        inputs.set(inputId, { id: snapshot.id, ...snapshot.data() } as InputItem);
       }
 
-      const consumptions: ProductionConsumption[] = [];
-      let totalCostCents = product.additionalCostCents * quantity;
-
-      for (let index = 0; index < recipe.length; index++) {
-        const component = recipe[index];
-        const snapshot = inputSnapshots[index];
-        if (!component || !snapshot?.exists()) throw new Error('A receita contém um insumo inválido.');
-        const input = { id: snapshot.id, ...snapshot.data() } as InputItem;
-        if (component.unitId !== input.unitId) throw new Error(`Unidade incompatível para ${input.name}.`);
-        const consumedQuantity = component.quantity * quantity;
-        if (input.stock < consumedQuantity) throw new Error(`Estoque insuficiente de ${input.name}.`);
-        const componentCost = Math.round(consumedQuantity * input.averageUnitCostCents);
-        totalCostCents += componentCost;
-        consumptions.push({
-          inputId: input.id,
-          quantity: consumedQuantity,
-          unitId: component.unitId,
-          unitCostCents: input.averageUnitCostCents,
-          totalCostCents: componentCost,
-        });
+      const standardCost = standardCostForProduct(product, references, inputs);
+      const consumptions: ProductionConsumption[] = standardCost.components.map((component) => ({
+        inputId: component.inputId,
+        quantity: component.quantity * quantity,
+        unitId: component.unitId,
+        unitCostCents: component.unitCostCents,
+        totalCostCents: component.totalCostCents * quantity,
+      }));
+      for (const consumption of consumptions) {
+        const input = inputs.get(consumption.inputId);
+        if (!input || trackingModeForInput(input) !== 'exact') continue;
+        if (input.stock < consumption.quantity) throw new Error(`Estoque insuficiente de ${input.name}.`);
       }
 
-      totalCostCents = Math.round(totalCostCents);
       const sequence = Number(counterSnapshot.data()?.['value'] ?? 0) + 1;
       const productionRef = doc(collection(this.firestore, 'productions'));
-      const unitCostCents = Math.round(totalCostCents / quantity);
-      const currentPositiveStock = Math.max(0, product.stock);
-      const denominator = currentPositiveStock + quantity;
-      const newAverage = denominator > 0
-        ? Math.round((currentPositiveStock * product.averageUnitCostCents + totalCostCents) / denominator)
-        : unitCostCents;
-
+      const unitCostCents = standardCost.unitCostCents;
+      const totalCostCents = Math.round(unitCostCents * quantity);
       transaction.set(counterRef, { value: sequence, updatedAt: serverTimestamp() }, { merge: true });
 
       const stockChanges: ProductionCreateResult['stockChanges'] = [];
-      for (let index = 0; index < consumptions.length; index++) {
-        const consumption = consumptions[index];
-        const snapshot = inputSnapshots[index];
-        if (!consumption || !snapshot?.exists()) continue;
-        const input = { id: snapshot.id, ...snapshot.data() } as InputItem;
+      for (const consumption of consumptions) {
+        const snapshot = inputSnapshots.get(consumption.inputId);
+        const input = inputs.get(consumption.inputId);
+        if (!snapshot?.exists() || !input || trackingModeForInput(input) !== 'exact') continue;
         const stock = input.stock - consumption.quantity;
-
         transaction.update(snapshot.ref, {
           stock,
-          stockStatus: inputStockStatus(stock, input.minimumStock, input.minimumStockConfigured !== false),
+          stockStatus: stockStatusForInput({ ...input, stock }),
           updatedAt: serverTimestamp(),
           updatedBy: userId,
         });
         stockChanges.push({ itemType: 'input', itemId: input.id, stock });
-
         const movementRef = doc(collection(this.firestore, 'stockMovements'));
         transaction.set(movementRef, {
           itemType: 'input',
@@ -146,16 +136,11 @@ export class ProductionRepository {
       transaction.update(productRef, {
         stock: productStock,
         stockStatus: productStockStatus(productStock, product.minimumStock),
-        averageUnitCostCents: newAverage,
+        averageUnitCostCents: unitCostCents,
         updatedAt: serverTimestamp(),
         updatedBy: userId,
       });
-      stockChanges.push({
-        itemType: 'product',
-        itemId: product.id,
-        stock: productStock,
-        averageUnitCostCents: newAverage,
-      });
+      stockChanges.push({ itemType: 'product', itemId: product.id, stock: productStock, averageUnitCostCents: unitCostCents });
 
       const productMovementRef = doc(collection(this.firestore, 'stockMovements'));
       transaction.set(productMovementRef, {
@@ -182,11 +167,10 @@ export class ProductionRepository {
         quantity,
         unitCostCents,
         totalCostCents,
-        costPending: product.recipe.length === 0 || consumptions.some((item) => item.unitCostCents <= 0),
+        costPending: standardCost.costPending,
         consumptions,
         notes: notes?.trim() || undefined,
       };
-
       transaction.set(productionRef, {
         code: production.code,
         businessDate,

@@ -2,6 +2,7 @@ import { AuditFields } from './common.model';
 import { CatalogImageRef } from './image.model';
 
 export type StockStatus = 'negative' | 'low' | 'ok' | 'untracked';
+export type InputTrackingMode = 'exact' | 'estimated' | 'untracked';
 
 export interface RecipeComponent {
   inputId: string;
@@ -36,8 +37,11 @@ export interface InputItem extends AuditFields {
   stock: number;
   minimumStock: number;
   minimumStockConfigured?: boolean;
+  trackingMode?: InputTrackingMode;
   stockStatus?: StockStatus;
   averageUnitCostCents: number;
+  costBasisQuantity?: number;
+  costBasisValueCents?: number;
   image?: CatalogImageRef;
 }
 
@@ -83,6 +87,7 @@ export interface CollectionDefinition extends AuditFields {
   id: string;
   name: string;
   active: boolean;
+  costComponents?: RecipeComponent[];
 }
 
 export interface FragranceDefinition extends AuditFields {
@@ -90,6 +95,7 @@ export interface FragranceDefinition extends AuditFields {
   name: string;
   collectionId: string;
   active: boolean;
+  costComponents?: RecipeComponent[];
 }
 
 export interface FormatDefinition extends AuditFields {
@@ -97,6 +103,7 @@ export interface FormatDefinition extends AuditFields {
   name: string;
   active: boolean;
   approximateWeightGrams?: number;
+  costComponents?: RecipeComponent[];
 }
 
 export interface FormatPrice extends AuditFields {

@@ -1,3 +1,4 @@
+import { trackingModeForInput } from './costing';
 import { Addition, InputItem, Kit, Product } from '../models/catalog.model';
 import { SaleDraft, SaleLineSnapshot, StockEffect } from '../models/sales.model';
 
@@ -6,6 +7,7 @@ export interface SaleResolutionCatalog {
   kits: ReadonlyMap<string, Kit>;
   additions: ReadonlyMap<string, Addition>;
   inputs: ReadonlyMap<string, InputItem>;
+  productUnitCosts: ReadonlyMap<string, number>;
 }
 
 export interface ResolvedSaleDraft {
@@ -37,6 +39,7 @@ export function resolveSaleDraft(
       const product = catalog.products.get(line.sourceId);
       if (!product) throw new Error('Produto inválido.');
       const unitPriceCents = line.manualUnitPriceCents ?? product.salePriceCents;
+      const unitCostCents = catalog.productUnitCosts.get(product.id) ?? product.averageUnitCostCents;
       lines.push({
         id: createId(),
         kind: 'product',
@@ -45,15 +48,15 @@ export function resolveSaleDraft(
         image: product.image,
         quantity: line.quantity,
         unitPriceCents,
-        unitCostCents: product.averageUnitCostCents,
+        unitCostCents,
         totalCents: Math.round(unitPriceCents * line.quantity),
-        totalCostCents: Math.round(product.averageUnitCostCents * line.quantity),
+        totalCostCents: Math.round(unitCostCents * line.quantity),
       });
       addEffect({
         itemType: 'product',
         itemId: product.id,
         quantityDelta: -line.quantity,
-        unitCostCents: product.averageUnitCostCents,
+        unitCostCents,
       });
       continue;
     }
@@ -77,18 +80,19 @@ export function resolveSaleDraft(
           if (component.collectionId && product.collectionId !== component.collectionId) throw new Error(`Coleção inválida no kit ${kit.name}.`);
           if (component.fragranceId && product.fragranceId !== component.fragranceId) throw new Error(`Fragrância inválida no kit ${kit.name}.`);
 
-          kitCostCents += product.averageUnitCostCents;
+          const componentUnitCostCents = catalog.productUnitCosts.get(product.id) ?? product.averageUnitCostCents;
+          kitCostCents += componentUnitCostCents;
           components.push({
             productId: product.id,
             name: product.displayName,
             quantity: 1,
-            unitCostCents: product.averageUnitCostCents,
+            unitCostCents: componentUnitCostCents,
           });
           addEffect({
             itemType: 'product',
             itemId: product.id,
             quantityDelta: -1,
-            unitCostCents: product.averageUnitCostCents,
+            unitCostCents: componentUnitCostCents,
           });
         }
       }
@@ -117,12 +121,14 @@ export function resolveSaleDraft(
       const input = catalog.inputs.get(component.inputId);
       if (!input) throw new Error(`Insumo inválido no adicional ${addition.name}.`);
       unitCostCents += Math.round(component.quantity * input.averageUnitCostCents);
-      addEffect({
-        itemType: 'input',
-        itemId: input.id,
-        quantityDelta: -(component.quantity * line.quantity),
-        unitCostCents: input.averageUnitCostCents,
-      });
+      if (trackingModeForInput(input) === 'exact') {
+        addEffect({
+          itemType: 'input',
+          itemId: input.id,
+          quantityDelta: -(component.quantity * line.quantity),
+          unitCostCents: input.averageUnitCostCents,
+        });
+      }
     }
 
     lines.push({

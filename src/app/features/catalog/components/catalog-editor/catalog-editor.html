@@ -3,7 +3,6 @@
     <div class="bf-dialog-body">
       @if (kind() === 'products') {
         <div class="bf-grid two">
-          <label class="bf-field"><span>Código</span><input class="bf-input" [formField]="productForm.code" /></label>
           <label class="bf-field"><span>Preço</span><input class="bf-input" type="number" step="0.01" [formField]="productForm.salePrice" /></label>
           <label class="bf-field"><span>Coleção</span><bf-select [formField]="productForm.collectionId" [options]="productCollectionOptions()" ariaLabel="Coleção" /></label>
           <label class="bf-field"><span>Fragrância</span><bf-select [formField]="productForm.fragranceId" [options]="productFragranceOptions()" ariaLabel="Fragrância" /></label>
@@ -19,7 +18,6 @@
         </section>
       } @else if (kind() === 'inputs') {
         <div class="bf-grid two">
-          <label class="bf-field"><span>Código</span><input class="bf-input" [formField]="inputForm.code" /></label>
           <label class="bf-field"><span>Nome</span><input class="bf-input" [formField]="inputForm.name" /></label>
           <label class="bf-field"><span>Unidade base</span><bf-select [formField]="inputForm.unitId" [options]="inputUnitOptions()" ariaLabel="Unidade base" /></label>
           <label class="bf-field"><span>Controle de estoque</span><bf-select [formField]="inputForm.trackingMode" [options]="inputTrackingOptions" [descriptive]="true" ariaLabel="Controle de estoque" /></label>

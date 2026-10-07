@@ -1,4 +1,4 @@
-<label class="checkbox" [class.disabled]="disabled()">
+<label class="checkbox" [class.disabled]="disabled()" [class.invalid]="invalid()">
   <input
     #native
     type="checkbox"
@@ -6,6 +6,7 @@
     [disabled]="disabled()"
     [required]="required()"
     [attr.aria-label]="label() ? null : ariaLabel()"
+    [attr.aria-invalid]="invalid()"
     (change)="checked.set($any($event.target).checked)"
     (blur)="touch.emit()"
   />

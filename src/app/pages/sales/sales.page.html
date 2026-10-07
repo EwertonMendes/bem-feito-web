@@ -9,6 +9,8 @@
     </button>
   </header>
 
+  @if (store.initialized() && store.loading()) { <bf-page-refresh /> }
+
   <div class="filters">
     <label class="search">
       <bf-icon name="search" />
@@ -23,7 +25,9 @@
     </div>
   </div>
 
-  @if (filteredSales().length) {
+  @if (!store.initialized()) {
+    <bf-table-skeleton [columns]="8" [rows]="7" />
+  } @else if (filteredSales().length) {
     <div class="sales-table-wrap">
       <table class="bf-table sales-table">
         <thead>

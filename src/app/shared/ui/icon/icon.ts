@@ -35,7 +35,6 @@ import {
   LucidePackageCheck,
   LucidePackageMinus,
   LucidePackagePlus,
-  LucidePackageX,
   LucidePlus,
   LucideQrCode,
   LucideReceiptText,
@@ -72,7 +71,7 @@ export type BfIconName =
   | 'payment' | 'details' | 'confirm-sale'
   // Dashboard and financial concepts
   | 'revenue' | 'received' | 'receivable' | 'average-ticket' | 'sold-items' | 'tips'
-  | 'negative-stock' | 'low-stock-product' | 'low-stock-input' | 'overdue' | 'missing-cost'
+  | 'low-stock-product' | 'low-stock-input' | 'overdue' | 'missing-cost'
   | 'cogs' | 'cash-out' | 'cash-flow'
   // Expense concepts
   | 'purchase' | 'expense' | 'equipment' | 'other-expense'
@@ -108,7 +107,6 @@ const ICONS = {
   'average-ticket': LucideTicket,
   'sold-items': LucidePackageCheck,
   tips: LucideHandCoins,
-  'negative-stock': LucidePackageX,
   'low-stock-product': LucidePackageMinus,
   'low-stock-input': LucideFlaskConical,
   overdue: LucideAlarmClock,

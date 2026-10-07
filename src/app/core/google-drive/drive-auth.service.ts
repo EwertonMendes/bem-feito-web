@@ -341,7 +341,9 @@ export class DriveAuthService {
 
   private restoreTokenSession(): void {
     try {
-      const raw = sessionStorage.getItem(this.tokenStorageKey);
+      const persistentRaw = localStorage.getItem(this.tokenStorageKey);
+      const legacyRaw = sessionStorage.getItem(this.tokenStorageKey);
+      const raw = persistentRaw ?? legacyRaw;
       if (!raw) return;
       const stored = JSON.parse(raw) as Partial<StoredDriveTokenSession>;
 
@@ -373,6 +375,13 @@ export class DriveAuthService {
         firebaseUid: stored.firebaseUid,
       });
       if (typeof stored.accountEmail === 'string') this.accountState.set(stored.accountEmail);
+
+      if (!persistentRaw && legacyRaw) this.persistTokenSession();
+      try {
+        sessionStorage.removeItem(this.tokenStorageKey);
+      } catch {
+        // Legacy session cleanup is best-effort only.
+      }
     } catch {
       this.removeStoredToken();
     }
@@ -389,7 +398,7 @@ export class DriveAuthService {
         firebaseUid: token.firebaseUid,
         accountEmail: this.accountState() ?? undefined,
       };
-      sessionStorage.setItem(this.tokenStorageKey, JSON.stringify(stored));
+      localStorage.setItem(this.tokenStorageKey, JSON.stringify(stored));
     } catch {
       return;
     }
@@ -424,6 +433,11 @@ export class DriveAuthService {
   }
 
   private removeStoredToken(): void {
+    try {
+      localStorage.removeItem(this.tokenStorageKey);
+    } catch {
+      // Continue and also clear the legacy per-tab copy when possible.
+    }
     try {
       sessionStorage.removeItem(this.tokenStorageKey);
     } catch {

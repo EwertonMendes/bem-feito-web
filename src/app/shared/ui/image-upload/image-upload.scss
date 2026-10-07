@@ -96,25 +96,27 @@
 }
 
 .preview {
+  position: relative;
   width: min(100%, 300px);
   height: 132px;
   min-width: 0;
   min-height: 0;
-  display: grid;
-  place-items: center;
-  padding: 8px;
   overflow: hidden;
   border-radius: 13px;
   background: color-mix(in srgb, var(--surface-2) 76%, var(--surface));
 }
 
 .preview-image {
+  position: absolute;
+  inset: 8px;
   display: block;
-  width: auto;
-  height: auto;
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
+  width: calc(100% - 16px);
+  height: calc(100% - 16px);
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  max-height: none;
+  object-fit: contain !important;
   object-position: center;
 }
 

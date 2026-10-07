@@ -56,7 +56,7 @@
           <div class="stock-actions">
             @if(inputMode(item)!=='untracked'){
               <button class="bf-button secondary" (click)="openHistory('input',item.id)">Histórico</button>
-              <button class="bf-button" (click)="openAdjustment('input',item.id)">Ajustar</button>
+              <button class="bf-button" (click)="openAdjustment('input',item.id)">{{inputMode(item)==='estimated'?'Conferir':'Ajustar'}}</button>
             } @else {
               <span class="no-stock-action">Sem inventário</span>
             }
@@ -76,7 +76,7 @@
           Use número positivo para entrada e negativo para saída. O saldo não pode ficar negativo e o ajuste fica registrado no histórico.
         }
       </div>
-      <div class="bf-grid two"><label class="bf-field"><span>Quantidade (+/-)</span><input class="bf-input" type="number" step="0.001" [formField]="adjustmentForm.quantity" /></label><label class="bf-field"><span>Data</span><input class="bf-input" type="date" [formField]="adjustmentForm.businessDate" /></label><label class="bf-field full"><span>Motivo</span><textarea class="bf-textarea" [formField]="adjustmentForm.reason" placeholder="Inventário, perda, amostra, correção..."></textarea></label></div>
+      <div class="bf-grid two"><label class="bf-field"><span>{{selectedInputMode()==='estimated'?'Saldo conferido':'Quantidade (+/-)'}}</span><input class="bf-input" type="number" [attr.min]="selectedInputMode()==='estimated'?0:null" step="0.001" [formField]="adjustmentForm.quantity" /></label><label class="bf-field"><span>Data</span><input class="bf-input" type="date" [formField]="adjustmentForm.businessDate" /></label><label class="bf-field full"><span>Motivo</span><textarea class="bf-textarea" [formField]="adjustmentForm.reason" placeholder="Inventário, perda, amostra, correção..."></textarea></label></div>
     </div>
     <div class="bf-dialog-footer"><button class="bf-button secondary" (click)="adjustmentDialog.close()">Cancelar</button><button class="bf-button" (click)="saveAdjustment()">Registrar ajuste</button></div>
   </dialog>

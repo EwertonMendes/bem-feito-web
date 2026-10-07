@@ -89,13 +89,17 @@ export class InventoryPage {
   }
 
   openAdjustment(type: 'product' | 'input', id: string): void {
-    if (type === 'input') {
-      const input = this.catalog.inputs().find((item) => item.id === id);
-      if (input && this.inputMode(input) === 'untracked') return;
-    }
+    const input = type === 'input' ? this.catalog.inputs().find((item) => item.id === id) : undefined;
+    if (input && this.inputMode(input) === 'untracked') return;
+
     this.selectedType.set(type);
     this.selectedId.set(id);
-    this.model.set({ quantity: 0, reason: '', businessDate: todayBusinessDate() });
+    const estimated = input && this.inputMode(input) === 'estimated';
+    this.model.set({
+      quantity: estimated ? input.stock : 0,
+      reason: estimated ? 'Conferência de inventário' : '',
+      businessDate: todayBusinessDate(),
+    });
     this.adjustmentDialog().open();
   }
 
@@ -116,9 +120,23 @@ export class InventoryPage {
   }
 
   async saveAdjustment(): Promise<void> {
-    if (this.adjustmentForm().invalid() || !this.model().quantity) return;
+    if (this.adjustmentForm().invalid()) return;
     const value = this.model();
-    const result = await this.store.adjust(this.selectedType(), this.selectedId(), value.quantity, value.reason, value.businessDate);
+    let quantityDelta = value.quantity;
+
+    if (this.selectedInputMode() === 'estimated') {
+      const input = this.catalog.inputs().find((item) => item.id === this.selectedId());
+      if (!input || value.quantity < 0) return;
+      quantityDelta = value.quantity - input.stock;
+      if (quantityDelta === 0) {
+        this.adjustmentDialog().close();
+        return;
+      }
+    } else if (!quantityDelta) {
+      return;
+    }
+
+    const result = await this.store.adjust(this.selectedType(), this.selectedId(), quantityDelta, value.reason, value.businessDate);
     if (result) {
       this.catalog.applyStockChanges([result.stockChange]);
       this.adjustmentDialog().close();

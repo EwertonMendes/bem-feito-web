@@ -28,7 +28,7 @@
     <div class="bf-dialog-header"><h2>Registrar produção</h2><button class="bf-icon-button" type="button" (click)="productionDialog.close()"><bf-icon name="close" /></button></div>
     <div class="bf-dialog-body">
       <div class="bf-grid two">
-        <label class="bf-field full"><span>Produto</span><select class="bf-select" [formField]="productionForm.productId"><option value="">Selecione</option>@for (product of catalog.activeProducts(); track product.id) { <option [value]="product.id">{{ product.displayName }} · estoque {{ product.stock }}</option> }</select></label>
+        <label class="bf-field full"><span>Produto</span><bf-select [formField]="productionForm.productId" [options]="productOptions()" ariaLabel="Produto" /></label>
         <label class="bf-field"><span>Quantidade</span><input class="bf-input" type="number" step="1" [formField]="productionForm.quantity" /></label>
         <label class="bf-field"><span>Data</span><input class="bf-input" type="date" [formField]="productionForm.businessDate" /></label>
         <label class="bf-field full"><span>Observações</span><textarea class="bf-textarea" [formField]="productionForm.notes"></textarea></label>

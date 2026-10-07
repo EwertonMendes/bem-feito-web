@@ -15,5 +15,5 @@ export function paymentMethodIcon(name: string): BfIconName {
     normalized.includes('card')
   ) return 'card';
   if (normalized.includes('boleto') || normalized.includes('fatura')) return 'receipt';
-  return 'wallet';
+  return 'payment-other';
 }

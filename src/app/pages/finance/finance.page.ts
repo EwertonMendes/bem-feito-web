@@ -14,6 +14,8 @@ import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
 import { BfDialog } from '../../shared/ui/dialog/dialog';
 import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
 import { BfListSkeleton, BfSkeleton, BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
+import { BfSelect, BfSelectOption } from '../../shared/ui/select/select';
+import { paymentMethodIcon } from '../../shared/ui/select/payment-method-icon';
 
 interface ReceiptFormModel {
   saleId: string;
@@ -37,7 +39,7 @@ interface ExpenseFormModel {
 
 @Component({
   selector: 'bf-finance-page',
-  imports: [FormField, BfIcon, BfDialog, BfEmptyState, BfPageRefresh, BfListSkeleton, BfSkeleton, BfTableSkeleton],
+  imports: [FormField, BfIcon, BfDialog, BfEmptyState, BfPageRefresh, BfListSkeleton, BfSkeleton, BfTableSkeleton, BfSelect],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './finance.page.html',
   styleUrl: './finance.page.scss',
@@ -82,6 +84,37 @@ export class FinancePage {
     required(p.methodId);
     min(p.amount, 0.01);
   });
+  readonly inputOptions = computed<BfSelectOption[]>(() => [
+    { value: '', label: 'Selecione' },
+    ...this.catalog.activeInputs().map((item) => ({ value: item.id, label: item.name })),
+  ]);
+  readonly unitOptions = computed<BfSelectOption[]>(() => [
+    { value: '', label: 'Selecione' },
+    ...this.references.units().map((item) => ({ value: item.id, label: item.name })),
+  ]);
+  readonly expenseCategoryOptions = computed<BfSelectOption[]>(() => [
+    { value: '', label: 'Sem categoria' },
+    ...this.settings.expenseCategories()
+      .filter((category) => category.active)
+      .map((category) => ({ value: category.id, label: category.name })),
+  ]);
+  readonly paymentMethodOptions = computed<BfSelectOption[]>(() =>
+    this.settings.paymentMethods()
+      .filter((method) => method.active)
+      .map((method) => ({
+        value: method.id,
+        label: method.name,
+        icon: paymentMethodIcon(method.name),
+      })),
+  );
+  readonly optionalPaymentMethodOptions = computed<BfSelectOption[]>(() => [
+    { value: '', label: 'Não informado' },
+    ...this.paymentMethodOptions(),
+  ]);
+  readonly requiredPaymentMethodOptions = computed<BfSelectOption[]>(() => [
+    { value: '', label: 'Selecione' },
+    ...this.paymentMethodOptions(),
+  ]);
   readonly selectedReceivable = computed(() => this.sales.openSales().find((sale) => sale.id === this.receiptModel().saleId));
   readonly summaryInitialized = computed(() => this.store.summaryInitialized() && this.sales.receivableSummaryInitialized());
   readonly refreshing = computed(() =>

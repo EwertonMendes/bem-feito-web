@@ -106,18 +106,13 @@ export class DriveAuthService {
     if (this.enabled) void this.prepare().catch(() => undefined);
 
     onAuthStateChanged(this.firebaseAuth, (user) => {
-      this.firebaseUidState.set(user?.uid ?? null);
-
       if (!user) {
+        this.firebaseUidState.set(null);
         this.endSession();
         return;
       }
 
-      const token = this.tokenState();
-      if (token && token.firebaseUid !== user.uid) this.clearAccessToken();
-
-      const grant = this.grantState();
-      if (grant && grant.firebaseUid !== user.uid) this.clearGrant();
+      this.synchronizeFirebaseUser(user.uid);
 
       const restoredToken = this.tokenState();
       if (restoredToken?.firebaseUid === user.uid && !this.grantState()) {
@@ -141,14 +136,16 @@ export class DriveAuthService {
   }
 
   currentToken(): string | null {
+    const firebaseUser = this.firebaseAuth.currentUser;
+    if (!firebaseUser) return null;
+
+    this.synchronizeFirebaseUser(firebaseUser.uid);
+
     const token = this.tokenState();
     if (!token) return null;
 
-    const firebaseUid = this.firebaseUidState();
-    if (!firebaseUid) return null;
-
-    if (token.firebaseUid !== firebaseUid) {
-      this.disconnect();
+    if (token.firebaseUid !== firebaseUser.uid) {
+      this.clearAccessToken();
       return null;
     }
 
@@ -168,6 +165,11 @@ export class DriveAuthService {
 
   connect(): Promise<string> {
     if (!this.enabled) return Promise.reject(new Error('A integração com Google Drive ainda não foi configurada.'));
+
+    const firebaseUser = this.firebaseAuth.currentUser;
+    if (!firebaseUser) return Promise.reject(new Error('Entre no Bem Feito antes de conectar o Google Drive.'));
+
+    this.synchronizeFirebaseUser(firebaseUser.uid);
 
     const current = this.currentToken();
     if (current) return Promise.resolve(current);
@@ -235,6 +237,8 @@ export class DriveAuthService {
     const firebaseUser = this.firebaseAuth.currentUser;
     if (!firebaseUser) return Promise.reject(new Error('Entre no Bem Feito antes de conectar o Google Drive.'));
 
+    this.synchronizeFirebaseUser(firebaseUser.uid);
+
     return new Promise<string>((resolve, reject) => {
       const client = oauth.initTokenClient({
         client_id: environment.googleDrive.clientId,
@@ -269,6 +273,18 @@ export class DriveAuthService {
 
   private oauth(): GoogleOAuth | undefined {
     return (window as unknown as GoogleIdentityWindow).google?.accounts?.oauth2;
+  }
+
+  private synchronizeFirebaseUser(firebaseUid: string): void {
+    if (this.firebaseUidState() === firebaseUid) return;
+
+    this.firebaseUidState.set(firebaseUid);
+
+    const token = this.tokenState();
+    if (token && token.firebaseUid !== firebaseUid) this.clearAccessToken();
+
+    const grant = this.grantState();
+    if (grant && grant.firebaseUid !== firebaseUid) this.clearGrant();
   }
 
   private rememberGrant(firebaseUid: string, accountEmail?: string): void {

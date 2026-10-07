@@ -14,9 +14,16 @@ export interface ProductCostReferences {
   format?: FormatDefinition;
 }
 
+export type CostComponentSource = 'format' | 'collection' | 'fragrance' | 'product';
+
+export interface CostComponentContribution extends RecipeComponent {
+  source: CostComponentSource;
+}
+
 export interface CostedComponent extends RecipeComponent {
   unitCostCents: number;
   totalCostCents: number;
+  sources: CostComponentContribution[];
 }
 
 export interface StandardProductCost {
@@ -32,16 +39,16 @@ export function trackingModeForInput(
   return input.minimumStockConfigured === false ? 'untracked' : 'estimated';
 }
 
-export function productCostComponents(
+export function productCostBreakdown(
   product: Pick<Product, 'recipe'>,
   references: ProductCostReferences,
-): RecipeComponent[] {
-  const aggregated = new Map<string, RecipeComponent>();
-  const source = [
-    ...(references.format?.costComponents ?? []),
-    ...(references.collection?.costComponents ?? []),
-    ...(references.fragrance?.costComponents ?? []),
-    ...product.recipe,
+): Array<RecipeComponent & { sources: CostComponentContribution[] }> {
+  const aggregated = new Map<string, RecipeComponent & { sources: CostComponentContribution[] }>();
+  const source: CostComponentContribution[] = [
+    ...(references.format?.costComponents ?? []).map((component) => ({ ...component, source: 'format' as const })),
+    ...(references.collection?.costComponents ?? []).map((component) => ({ ...component, source: 'collection' as const })),
+    ...(references.fragrance?.costComponents ?? []).map((component) => ({ ...component, source: 'fragrance' as const })),
+    ...product.recipe.map((component) => ({ ...component, source: 'product' as const })),
   ];
 
   for (const component of source) {
@@ -52,9 +59,17 @@ export function productCostComponents(
       inputId: component.inputId,
       unitId: component.unitId,
       quantity: (previous?.quantity ?? 0) + component.quantity,
+      sources: [...(previous?.sources ?? []), component],
     });
   }
   return [...aggregated.values()];
+}
+
+export function productCostComponents(
+  product: Pick<Product, 'recipe'>,
+  references: ProductCostReferences,
+): RecipeComponent[] {
+  return productCostBreakdown(product, references).map(({ sources: _sources, ...component }) => component);
 }
 
 export function standardCostForProduct(
@@ -62,7 +77,7 @@ export function standardCostForProduct(
   references: ProductCostReferences,
   inputs: ReadonlyMap<string, InputItem>,
 ): StandardProductCost {
-  const definitions = productCostComponents(product, references);
+  const definitions = productCostBreakdown(product, references);
   if (!definitions.length) {
     const fallback = Math.max(0, Math.round(product.additionalCostCents || product.averageUnitCostCents || 0));
     return { unitCostCents: fallback, costPending: fallback <= 0, components: [] };

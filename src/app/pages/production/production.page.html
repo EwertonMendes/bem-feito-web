@@ -29,8 +29,8 @@
     <div class="bf-dialog-body">
       @if(formError()){<div class="bf-form-error" role="alert">{{formError()}}</div>}
       <div class="bf-grid two">
-        <label class="bf-field full"><span>Produto</span><bf-select [formField]="productionForm.productId" [options]="productOptions()" [invalid]="submitted() && !!formErrors().productId" ariaLabel="Produto" />@if(submitted() && formErrors().productId){<small class="bf-field-error">{{formErrors().productId}}</small>}</label>
-        <label class="bf-field"><span>Quantidade produzida</span><bf-number-input kind="integer" [min]="1" [invalid]="submitted() && !!formErrors().quantity" [formField]="productionForm.quantity" ariaLabel="Quantidade produzida" />@if(submitted() && formErrors().quantity){<small class="bf-field-error">{{formErrors().quantity}}</small>}</label>
+        <label class="bf-field full"><span>Produto</span><bf-select [formField]="productionForm.productId" [options]="productOptions()" ariaLabel="Produto" />@if(submitted() && formErrors().productId){<small class="bf-field-error">{{formErrors().productId}}</small>}</label>
+        <label class="bf-field"><span>Quantidade produzida</span><bf-number-input kind="integer" [formField]="productionForm.quantity" ariaLabel="Quantidade produzida" />@if(submitted() && formErrors().quantity){<small class="bf-field-error">{{formErrors().quantity}}</small>}</label>
         <label class="bf-field"><span>Data</span><input class="bf-input" type="date" [class.invalid]="submitted() && !!formErrors().businessDate" [formField]="productionForm.businessDate" />@if(submitted() && formErrors().businessDate){<small class="bf-field-error">{{formErrors().businessDate}}</small>}</label>
         <label class="bf-field full"><span>Observações</span><textarea class="bf-textarea" [formField]="productionForm.notes"></textarea></label>
       </div>

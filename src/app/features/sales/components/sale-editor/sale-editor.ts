@@ -13,6 +13,8 @@ import { SalesStore } from '../../sales.store';
 import { CatalogImage } from '../../../../shared/media/catalog-image/catalog-image';
 import { BfDialog } from '../../../../shared/ui/dialog/dialog';
 import { BfIcon } from '../../../../shared/ui/icon/icon';
+import { BfSelect, BfSelectOption } from '../../../../shared/ui/select/select';
+import { paymentMethodIcon } from '../../../../shared/ui/select/payment-method-icon';
 
 interface SaleFormModel { businessDate: string; customerName: string; dueDate: string; discount: number; notes: string; }
 interface ProductCartLine { key: string; kind: 'product'; sourceId: string; quantity: number; }
@@ -21,11 +23,10 @@ interface AdditionCartLine { key: string; kind: 'addition'; sourceId: string; qu
 type CartLine = ProductCartLine | KitCartLine | AdditionCartLine;
 interface PaymentUi { id: string; methodId: string; amount: number; }
 interface KitSlot { index: number; label: string; candidates: Product[]; }
-interface CatalogFilterOption { value: string; label: string; }
 
 @Component({
   selector: 'bf-sale-editor',
-  imports: [FormField, BfDialog, BfIcon, CatalogImage],
+  imports: [FormField, BfDialog, BfIcon, CatalogImage, BfSelect],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sale-editor.html',
   styleUrl: './sale-editor.scss',
@@ -71,21 +72,38 @@ export class SaleEditor {
     );
   });
 
-  readonly categoryOptions = computed<CatalogFilterOption[]>(() => {
+  readonly categoryOptions = computed<BfSelectOption[]>(() => {
+    const all = { value: '', label: 'Todas as categorias' };
     if (this.catalogTab() === 'products') {
-      return this.references.collections()
-        .filter((item) => item.active)
-        .map((item) => ({ value: item.id, label: item.name }));
+      return [
+        all,
+        ...this.references.collections()
+          .filter((item) => item.active)
+          .map((item) => ({ value: item.id, label: item.name })),
+      ];
     }
 
     if (this.catalogTab() === 'additions') {
-      return [...new Set(this.catalog.activeAdditions().map((item) => item.category).filter(Boolean))]
-        .sort((a, b) => a.localeCompare(b, 'pt-BR'))
-        .map((category) => ({ value: category, label: category }));
+      return [
+        all,
+        ...[...new Set(this.catalog.activeAdditions().map((item) => item.category).filter(Boolean))]
+          .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+          .map((category) => ({ value: category, label: category })),
+      ];
     }
 
-    return [];
+    return [all];
   });
+
+  readonly paymentMethodOptions = computed<BfSelectOption[]>(() =>
+    this.settings.paymentMethods()
+      .filter((method) => method.active)
+      .map((method) => ({
+        value: method.id,
+        label: method.name,
+        icon: paymentMethodIcon(method.name),
+      })),
+  );
 
   readonly subtotalCents = computed(() => this.cart().reduce((sum, line) => sum + this.lineTotal(line), 0));
   readonly totalCents = computed(() => Math.max(0, this.subtotalCents() - toCents(this.model().discount)));
@@ -183,6 +201,14 @@ export class SaleEditor {
       const ids = [...item.componentProductIds];
       ids[index] = productId;
       return { ...item, componentProductIds: ids };
+    }));
+  }
+
+  productSelectOptions(products: Product[]): BfSelectOption[] {
+    return products.map((product) => ({
+      value: product.id,
+      label: product.displayName,
+      description: `Estoque ${product.stock}`,
     }));
   }
 

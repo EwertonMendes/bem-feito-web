@@ -1,0 +1,20 @@
+<label class="checkbox" [class.disabled]="disabled()" [class.invalid]="invalid()">
+  <input
+    #native
+    type="checkbox"
+    [checked]="checked()"
+    [disabled]="disabled()"
+    [required]="required()"
+    [attr.aria-label]="label() ? null : ariaLabel()"
+    [attr.aria-invalid]="invalid()"
+    (change)="checked.set($any($event.target).checked)"
+    (blur)="touch.emit()"
+  />
+  <span class="box" aria-hidden="true"><bf-icon name="tick" /></span>
+  @if (label() || description()) {
+    <span class="copy">
+      @if (label()) { <strong>{{ label() }}</strong> }
+      @if (description()) { <small>{{ description() }}</small> }
+    </span>
+  }
+</label>

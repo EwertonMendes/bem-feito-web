@@ -12,6 +12,14 @@ function walk(directory) {
   });
 }
 
+function walkUiSources(directory) {
+  return readdirSync(directory).flatMap((entry) => {
+    const path = resolve(directory, entry);
+    if (statSync(path).isDirectory()) return walkUiSources(path);
+    return path.endsWith('.ts') || path.endsWith('.html') ? [path] : [];
+  });
+}
+
 function appTarget(file, specifier) {
   if (!specifier.startsWith('.')) return null;
   const absolute = normalize(resolve(dirname(file), specifier));
@@ -125,4 +133,27 @@ test('dashboard stays decoupled from bulk feature stores', () => {
     /features\/(sales|finance|catalog)/.test(normalize(resolve(dirname(file), specifier)).split(sep).join('/'))
   );
   assert.deepEqual(forbidden, []);
+});
+
+
+test('shared controls own select and checkbox rendering', () => {
+  const violations = [];
+  for (const file of walkUiSources(appRoot)) {
+    const relativeFile = relative(appRoot, file).split(sep).join('/');
+    const source = readFileSync(file, 'utf8');
+
+    if (/<select\b/i.test(source)) {
+      violations.push(`${relativeFile}: native select`);
+    }
+
+    if (/type\s*=\s*['"]checkbox['"]/i.test(source) && relativeFile !== 'shared/ui/checkbox/checkbox.html') {
+      violations.push(`${relativeFile}: native checkbox`);
+    }
+  }
+
+  assert.deepEqual(
+    violations,
+    [],
+    `Native form controls outside shared UI:\n${violations.join('\n')}`,
+  );
 });

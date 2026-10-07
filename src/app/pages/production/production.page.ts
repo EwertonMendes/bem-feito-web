@@ -12,6 +12,7 @@ import { BfDialog } from '../../shared/ui/dialog/dialog';
 import { CatalogImage } from '../../shared/media/catalog-image/catalog-image';
 import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
 import { BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
+import { BfSelect, BfSelectOption } from '../../shared/ui/select/select';
 
 interface ProductionFormModel {
   productId: string;
@@ -22,7 +23,7 @@ interface ProductionFormModel {
 
 @Component({
   selector: 'bf-production-page',
-  imports: [FormField, BfIcon, CatalogImage, BfDialog, BfEmptyState, BfPageRefresh, BfTableSkeleton],
+  imports: [FormField, BfIcon, CatalogImage, BfDialog, BfEmptyState, BfPageRefresh, BfTableSkeleton, BfSelect],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './production.page.html',
   styleUrl: './production.page.scss',
@@ -43,6 +44,15 @@ export class ProductionPage {
     required(p.businessDate);
     min(p.quantity, 1);
   });
+  readonly productOptions = computed<BfSelectOption[]>(() => [
+    { value: '', label: 'Selecione' },
+    ...this.catalog.activeProducts().map((product) => ({
+      value: product.id,
+      label: product.displayName,
+      description: `Estoque atual: ${product.stock}`,
+      icon: 'box' as const,
+    })),
+  ]);
   readonly selectedProduct = computed(() => this.catalog.products().find((item) => item.id === this.model().productId));
   readonly estimatedConsumptions = computed(() => {
     const product = this.selectedProduct();

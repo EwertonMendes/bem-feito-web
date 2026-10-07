@@ -10,6 +10,8 @@ import { CatalogReferenceStore } from '../../catalog-reference.store';
 import { CatalogStore } from '../../catalog.store';
 import { BfDialog } from '../../../../shared/ui/dialog/dialog';
 import { BfIcon } from '../../../../shared/ui/icon/icon';
+import { BfSelect, BfSelectOption } from '../../../../shared/ui/select/select';
+import { BfCheckbox } from '../../../../shared/ui/checkbox/checkbox';
 
 interface ProductFormModel { code: string; collectionId: string; fragranceId: string; formatId: string; salePrice: number; additionalCost: number; minimumStock: number; active: boolean; }
 interface InputFormModel { code: string; name: string; unitId: string; minimumStock: number | null; active: boolean; }
@@ -18,7 +20,7 @@ interface AdditionFormModel { name: string; category: string; price: number; not
 
 @Component({
   selector: 'bf-catalog-editor',
-  imports: [FormField, BfDialog, BfIcon],
+  imports: [FormField, BfDialog, BfIcon, BfSelect, BfCheckbox],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './catalog-editor.html',
   styleUrl: './catalog-editor.scss',
@@ -73,6 +75,47 @@ export class CatalogEditor {
   readonly additionModel = signal<AdditionFormModel>({ name: '', category: 'Embalagem', price: 0, notes: '', active: true });
   readonly additionForm = form(this.additionModel, (p) => { required(p.name); required(p.category); min(p.price, 0); });
   readonly availableFragrances = computed(() => this.references.fragrances().filter((item) => item.active && (!this.productModel().collectionId || item.collectionId === this.productModel().collectionId)));
+  readonly productCollectionOptions = computed<BfSelectOption[]>(() => [
+    { value: '', label: 'Selecione' },
+    ...this.references.collections().filter((item) => item.active).map((item) => ({ value: item.id, label: item.name })),
+  ]);
+  readonly productFragranceOptions = computed<BfSelectOption[]>(() => [
+    { value: '', label: 'Selecione' },
+    ...this.availableFragrances().map((item) => ({ value: item.id, label: item.name })),
+  ]);
+  readonly productFormatOptions = computed<BfSelectOption[]>(() => [
+    { value: '', label: 'Selecione' },
+    ...this.references.formats().filter((item) => item.active).map((item) => ({ value: item.id, label: item.name })),
+  ]);
+  readonly inputUnitOptions = computed<BfSelectOption[]>(() => [
+    { value: '', label: 'Selecione' },
+    ...this.references.units().map((item) => ({ value: item.id, label: item.name })),
+  ]);
+  readonly unitOptions = computed<BfSelectOption[]>(() =>
+    this.references.units().map((item) => ({ value: item.id, label: item.name })),
+  );
+  readonly formatOptions = computed<BfSelectOption[]>(() =>
+    this.references.formats().map((item) => ({ value: item.id, label: item.name })),
+  );
+  readonly activeInputOptions = computed<BfSelectOption[]>(() =>
+    this.store.inputs().filter((item) => item.active).map((item) => ({ value: item.id, label: item.name })),
+  );
+  readonly inputOptions = computed<BfSelectOption[]>(() =>
+    this.store.inputs().map((item) => ({ value: item.id, label: item.name })),
+  );
+  readonly kitCollectionOptions = computed<BfSelectOption[]>(() => [
+    { value: '', label: 'Qualquer coleção' },
+    ...this.references.collections().map((item) => ({ value: item.id, label: item.name })),
+  ]);
+
+  kitFragranceOptions(collectionId?: string): BfSelectOption[] {
+    return [
+      { value: '', label: 'Cliente escolhe' },
+      ...this.references.fragrances()
+        .filter((fragrance) => !collectionId || fragrance.collectionId === collectionId)
+        .map((fragrance) => ({ value: fragrance.id, label: fragrance.name })),
+    ];
+  }
 
   constructor() {
     this.destroyRef.onDestroy(this.references.activate());

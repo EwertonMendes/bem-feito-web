@@ -264,7 +264,6 @@ a { color: inherit; }
 }
 
 .bf-input,
-.bf-select,
 .bf-textarea {
   width: 100%;
   min-height: 44px;
@@ -289,13 +288,11 @@ a { color: inherit; }
 }
 
 .bf-input:hover,
-.bf-select:hover,
 .bf-textarea:hover {
   border-color: color-mix(in srgb, var(--brand) 24%, var(--line));
 }
 
 .bf-input:focus,
-.bf-select:focus,
 .bf-textarea:focus {
   border-color: color-mix(in srgb, var(--brand) 55%, var(--line));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 13%, transparent);

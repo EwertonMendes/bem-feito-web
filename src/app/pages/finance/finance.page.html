@@ -60,13 +60,13 @@
         <label class="bf-field"><span>Data</span><input class="bf-input" type="date" [formField]="expenseForm.businessDate" /></label>
         <label class="bf-field"><span>Valor total</span><input class="bf-input" type="number" step="0.01" [formField]="expenseForm.amount" /></label>
         @if(model().kind==='input-purchase'){
-          <label class="bf-field full"><span>Insumo</span><select class="bf-select" [formField]="expenseForm.inputId"><option value="">Selecione</option>@for(input of catalog.activeInputs();track input.id){<option [value]="input.id">{{input.name}}</option>}</select></label>
+          <label class="bf-field full"><span>Insumo</span><bf-select [formField]="expenseForm.inputId" [options]="inputOptions()" ariaLabel="Insumo" /></label>
           <label class="bf-field"><span>Quantidade comprada</span><input class="bf-input" type="number" step="0.001" [formField]="expenseForm.quantity" /></label>
-          <label class="bf-field"><span>Unidade</span><select class="bf-select" [formField]="expenseForm.unitId"><option value="">Selecione</option>@for(unit of references.units();track unit.id){<option [value]="unit.id">{{unit.name}}</option>}</select></label>
+          <label class="bf-field"><span>Unidade</span><bf-select [formField]="expenseForm.unitId" [options]="unitOptions()" ariaLabel="Unidade" /></label>
         } @else {
-          <label class="bf-field full"><span>Categoria</span><select class="bf-select" [formField]="expenseForm.categoryId"><option value="">Sem categoria</option>@for(category of settings.expenseCategories();track category.id){@if(category.active){<option [value]="category.id">{{category.name}}</option>}}</select></label>
+          <label class="bf-field full"><span>Categoria</span><bf-select [formField]="expenseForm.categoryId" [options]="expenseCategoryOptions()" ariaLabel="Categoria" /></label>
         }
-        <label class="bf-field"><span>Forma de pagamento</span><select class="bf-select" [formField]="expenseForm.paymentMethodId"><option value="">Não informado</option>@for(method of settings.paymentMethods();track method.id){@if(method.active){<option [value]="method.id">{{method.name}}</option>}}</select></label>
+        <label class="bf-field"><span>Forma de pagamento</span><bf-select [formField]="expenseForm.paymentMethodId" [options]="optionalPaymentMethodOptions()" ariaLabel="Forma de pagamento" /></label>
         <label class="bf-field"><span>Link / comprovante</span><input class="bf-input" type="url" [formField]="expenseForm.link" /></label>
         <label class="bf-field full"><span>Observações</span><textarea class="bf-textarea" [formField]="expenseForm.notes"></textarea></label>
       </div>
@@ -80,7 +80,7 @@
       <div class="receipt-balance"><span>Saldo atual</span><strong>{{currency(selectedReceivable()?.balanceCents || 0)}}</strong></div>
       <div class="bf-grid two">
         <label class="bf-field"><span>Data</span><input class="bf-input" type="date" [formField]="receiptForm.businessDate" /></label>
-        <label class="bf-field"><span>Forma</span><select class="bf-select" [formField]="receiptForm.methodId"><option value="">Selecione</option>@for(method of settings.paymentMethods();track method.id){@if(method.active){<option [value]="method.id">{{method.name}}</option>}}</select></label>
+        <label class="bf-field"><span>Forma</span><bf-select [formField]="receiptForm.methodId" [options]="requiredPaymentMethodOptions()" ariaLabel="Forma de pagamento" /></label>
         <label class="bf-field full"><span>Valor recebido</span><input class="bf-input" type="number" step="0.01" [formField]="receiptForm.amount" /></label>
       </div>
       <p class="receipt-hint">Se o valor ultrapassar o saldo, o excedente será registrado como gorjeta.</p>

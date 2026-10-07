@@ -4,8 +4,10 @@ import {
   LucideArrowRight,
   LucideBox,
   LucideBoxes,
+  LucideBanknote,
   LucideCalendarDays,
   LucideChartNoAxesColumnIncreasing,
+  LucideCheck,
   LucideChevronRight,
   LucideCircleCheck,
   LucideCircleDollarSign,
@@ -22,6 +24,7 @@ import {
   LucideMoon,
   LucidePackage,
   LucidePlus,
+  LucideQrCode,
   LucideReceiptText,
   LucideSearch,
   LucideSettings,
@@ -40,7 +43,8 @@ export type BfIconName =
   | 'dashboard' | 'sales' | 'production' | 'inventory' | 'finance' | 'catalog' | 'settings'
   | 'plus' | 'minus' | 'search' | 'sun' | 'moon' | 'logout' | 'close' | 'trash' | 'image'
   | 'calendar' | 'chart' | 'wallet' | 'clock' | 'tag' | 'box' | 'heart' | 'alert' | 'leaf'
-  | 'receipt' | 'bag' | 'chevron-right' | 'arrow-right' | 'arrow-down-right' | 'eye' | 'card' | 'check';
+  | 'receipt' | 'bag' | 'chevron-right' | 'arrow-right' | 'arrow-down-right' | 'eye' | 'card' | 'check'
+  | 'tick' | 'qr-code' | 'banknote';
 
 const ICONS = {
   dashboard: LucideLayoutDashboard,
@@ -69,6 +73,9 @@ const ICONS = {
   alert: LucideTriangleAlert,
   leaf: LucideLeaf,
   receipt: LucideReceiptText,
+  'qr-code': LucideQrCode,
+  banknote: LucideBanknote,
+  tick: LucideCheck,
   bag: LucideShoppingBag,
   'chevron-right': LucideChevronRight,
   'arrow-right': LucideArrowRight,

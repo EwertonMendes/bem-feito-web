@@ -26,6 +26,7 @@ const checks = [
     .where('businessDate', '<=', endDate)
     .aggregate({
       revenueCents: AggregateField.sum('totalCents'),
+      discountsCents: AggregateField.sum('discountCents'),
       saleCount: AggregateField.count(),
     }).get()],
   ['dashboard:optimized-sales-period', () => db.collection('sales')
@@ -59,11 +60,14 @@ const checks = [
     .aggregate({ operationalExpenseCents: AggregateField.sum('amountCents') }).get()],
   ['dashboard:receivable-total', () => db.collection('sales')
     .aggregate({ receivableCents: AggregateField.sum('balanceCents') }).get()],
-  ['dashboard:overdue-count', () => db.collection('sales')
+  ['dashboard:overdue', () => db.collection('sales')
     .where('status', '==', 'active')
     .where('paymentStatus', 'in', ['pending', 'partial'])
     .where('dueDate', '<', todayDate)
-    .aggregate({ overdueCount: AggregateField.count() }).get()],
+    .aggregate({
+      overdueCount: AggregateField.count(),
+      overdueCents: AggregateField.sum('balanceCents'),
+    }).get()],
   ['dashboard:products-status-completeness', () => db.collection('products')
     .where('stockStatus', 'in', ['negative', 'low', 'ok'])
     .aggregate({ value: AggregateField.count() }).get()],

@@ -142,12 +142,24 @@ test('Dashboard aggregation indexes cover every filtered sum query', () => {
   ));
 
   for (const expected of [
-    'sales|status:ASCENDING|businessDate:ASCENDING|totalCents:ASCENDING',
+    'sales|status:ASCENDING|businessDate:ASCENDING|totalCents:ASCENDING|discountCents:ASCENDING',
     'sales|status:ASCENDING|analyticsVersion:ASCENDING|businessDate:ASCENDING|cogsCents:ASCENDING|itemsSold:ASCENDING|missingCostItems:ASCENDING',
     'payments|status:ASCENDING|businessDate:ASCENDING|amountReceivedCents:ASCENDING|appliedCents:ASCENDING|tipCents:ASCENDING',
     'expenses|businessDate:ASCENDING|amountCents:ASCENDING',
     'expenses|kind:ASCENDING|businessDate:ASCENDING|amountCents:ASCENDING',
+    'sales|status:ASCENDING|paymentStatus:ASCENDING|dueDate:ASCENDING|balanceCents:ASCENDING',
   ]) {
     assert.ok(keys.has(expected), `Missing Dashboard aggregation index: ${expected}`);
+  }
+});
+
+
+test('Firestore DEV verifier mirrors Dashboard aggregate payloads that need composite indexes', () => {
+  const verifier = readFileSync('tools/deploy/verify-firestore-queries.mjs', 'utf8');
+  for (const expected of [
+    "discountsCents: AggregateField.sum('discountCents')",
+    "overdueCents: AggregateField.sum('balanceCents')",
+  ]) {
+    assert.ok(verifier.includes(expected), `DEV Firestore verifier is missing Dashboard aggregate: ${expected}`);
   }
 });

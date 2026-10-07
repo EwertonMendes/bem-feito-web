@@ -27,15 +27,13 @@
             />
           </label>
 
-          <label class="category-filter">
-            <span class="sr-only">Categoria</span>
-            <select [value]="catalogCategory()" (change)="catalogCategory.set($any($event.target).value)">
-              <option value="">Todas as categorias</option>
-              @for (option of categoryOptions(); track option.value) {
-                <option [value]="option.value">{{ option.label }}</option>
-              }
-            </select>
-          </label>
+          <bf-select
+            class="category-filter"
+            ariaLabel="Categoria"
+            [value]="catalogCategory()"
+            (valueChange)="catalogCategory.set($event)"
+            [options]="categoryOptions()"
+          />
         </div>
       </div>
 
@@ -109,9 +107,13 @@
                     @for (slot of kitSlots(line); track slot.index) {
                       <label>
                         <span>{{ slot.label }}</span>
-                        <select [value]="line.componentProductIds[slot.index]" (change)="changeKitSelection(line,slot.index,$any($event.target).value)">
-                          @for (product of slot.candidates; track product.id) { <option [value]="product.id">{{ product.displayName }}</option> }
-                        </select>
+                        <bf-select
+                          [compact]="true"
+                          [ariaLabel]="slot.label"
+                          [value]="line.componentProductIds[slot.index]"
+                          (valueChange)="changeKitSelection(line, slot.index, $event)"
+                          [options]="productSelectOptions(slot.candidates)"
+                        />
                       </label>
                     }
                   </div>
@@ -174,11 +176,12 @@
 
           @for (payment of payments(); track payment.id; let i=$index) {
             <div class="payment-row">
-              <select class="bf-select" [value]="payment.methodId" (change)="patchPayment(i,{methodId:$any($event.target).value})">
-                @for (method of settings.paymentMethods(); track method.id) {
-                  @if (method.active) { <option [value]="method.id">{{ method.name }}</option> }
-                }
-              </select>
+              <bf-select
+                ariaLabel="Forma de pagamento"
+                [value]="payment.methodId"
+                (valueChange)="patchPayment(i, { methodId: $event })"
+                [options]="paymentMethodOptions()"
+              />
               <input class="bf-input" type="number" min="0" step="0.01" [value]="payment.amount" (input)="patchPayment(i,{amount:+$any($event.target).value})" />
               <button class="fill" type="button" (click)="fillRemaining(i)">Restante</button>
               <button class="bf-icon-button" type="button" aria-label="Remover forma de pagamento" (click)="removePayment(i)"><bf-icon name="trash" /></button>

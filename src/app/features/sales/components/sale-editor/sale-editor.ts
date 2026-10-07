@@ -20,6 +20,7 @@ import { CatalogStore } from '../../../catalog/catalog.store';
 import { SettingsStore } from '../../../settings/settings.store';
 import { SalesStore } from '../../sales.store';
 import { CatalogImage } from '../../../../shared/media/catalog-image/catalog-image';
+import { BfConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-dialog';
 import { BfDialog } from '../../../../shared/ui/dialog/dialog';
 import { BfIcon } from '../../../../shared/ui/icon/icon';
 import { BfSelect, BfSelectOption } from '../../../../shared/ui/select/select';
@@ -71,9 +72,22 @@ interface KitSlot {
   candidates: Product[];
 }
 
+interface KitAvailability {
+  available: boolean;
+  message: string;
+  details: string[];
+  productIds: string[];
+}
+
+interface KitRequirement {
+  index: number;
+  label: string;
+  candidates: Product[];
+}
+
 @Component({
   selector: 'bf-sale-editor',
-  imports: [FormField, BfDialog, BfIcon, CatalogImage, BfSelect],
+  imports: [FormField, BfConfirmDialog, BfDialog, BfIcon, CatalogImage, BfSelect],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sale-editor.html',
   styleUrl: './sale-editor.scss',
@@ -88,6 +102,7 @@ export class SaleEditor {
   private readonly toast = inject(ToastService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly dialog = viewChild.required<BfDialog>('saleDialog');
+  private readonly confirmDialog = viewChild.required<BfConfirmDialog>('confirmDialog');
 
   readonly currency = formatCurrency;
   readonly catalogTab = signal<'products' | 'kits' | 'additions'>('products');
@@ -128,6 +143,12 @@ export class SaleEditor {
       (!category || addition.category === category)
     );
   });
+
+  readonly kitAvailabilityById = computed(() =>
+    new Map(
+      this.catalog.activeKits().map((kit) => [kit.id, this.planKit(kit)] as const)
+    )
+  );
 
   readonly categoryOptions = computed<BfSelectOption[]>(() => {
     const all = { value: '', label: 'Todas as categorias' };
@@ -244,9 +265,13 @@ export class SaleEditor {
     if (line) this.changeQuantity(line, -1);
   }
 
+  canAddProduct(product: Product): boolean {
+    return this.availableProductStock(product.id) > 0;
+  }
+
   addProduct(product: Product): void {
-    if (product.stock <= 0) {
-      this.toast.error(product.displayName + ' está sem estoque.');
+    if (!this.canAddProduct(product)) {
+      this.toast.error('Todo o estoque disponível de ' + product.displayName + ' já está comprometido neste pedido.');
       return;
     }
 
@@ -254,11 +279,6 @@ export class SaleEditor {
       const existing = items.find(
         (item) => item.kind === 'product' && item.sourceId === product.id
       ) as ProductCartLine | undefined;
-
-      if (existing && existing.quantity >= product.stock) {
-        this.toast.error('Todo o estoque disponível de ' + product.displayName + ' já está no pedido.');
-        return items;
-      }
 
       if (existing) {
         return items.map((item) =>
@@ -306,11 +326,15 @@ export class SaleEditor {
     });
   }
 
-  addKit(kit: Kit): void {
-    const slots = this.buildKitSlots(kit);
+  kitAvailability(kit: Kit): KitAvailability {
+    return this.kitAvailabilityById().get(kit.id) ?? this.planKit(kit);
+  }
 
-    if (slots.some((slot) => !slot.candidates.length)) {
-      this.toast.error('Não há estoque disponível para completar o kit ' + kit.name + '.');
+  addKit(kit: Kit): void {
+    const availability = this.kitAvailability(kit);
+
+    if (!availability.available) {
+      this.toast.error(availability.message + '.');
       return;
     }
 
@@ -321,7 +345,7 @@ export class SaleEditor {
         kind: 'kit',
         sourceId: kit.id,
         quantity: 1,
-        componentProductIds: slots.map((slot) => slot.candidates[0]?.id ?? ''),
+        componentProductIds: availability.productIds,
       },
     ]);
   }
@@ -344,10 +368,10 @@ export class SaleEditor {
       return;
     }
 
-    if (line.kind === 'product') {
+    if (line.kind === 'product' && delta > 0) {
       const product = this.catalog.products().find((item) => item.id === line.sourceId);
-      if (product && next > product.stock) {
-        this.toast.error('Todo o estoque disponível de ' + product.displayName + ' já está no pedido.');
+      if (product && this.availableProductStock(product.id) < delta) {
+        this.toast.error('Todo o estoque disponível de ' + product.displayName + ' já está comprometido neste pedido.');
         return;
       }
     }
@@ -364,25 +388,16 @@ export class SaleEditor {
   }
 
   clearOrder(): void {
-    if (
-      this.hasDraftChanges() &&
-      !window.confirm('Limpar esta venda? Itens, pagamentos e dados preenchidos serão descartados.')
-    ) {
-      return;
-    }
-
-    this.resetDraft();
+    void this.confirmClearOrder();
   }
 
   requestClose(): void {
-    if (!this.confirmDiscardIfNeeded()) return;
-    this.dialog().close();
+    void this.confirmClose();
   }
 
   onDialogCancel(event: Event): void {
-    if (!this.confirmDiscardIfNeeded()) {
-      event.preventDefault();
-    }
+    event.preventDefault();
+    void this.confirmClose();
   }
 
   syncDetailsOpen(event: Event): void {
@@ -394,17 +409,24 @@ export class SaleEditor {
 
   kitSlots(line: KitCartLine): KitSlot[] {
     const kit = this.catalog.kits().find((item) => item.id === line.sourceId);
-    return kit ? this.buildKitSlots(kit) : [];
+    return kit ? this.buildKitSlots(kit, line.key) : [];
   }
 
   changeKitSelection(line: KitCartLine, index: number, productId: string): void {
+    const ids = [...line.componentProductIds];
+    ids[index] = productId;
+
+    if (!this.selectionFitsStock(ids, line.key)) {
+      this.toast.error('Não há estoque suficiente para usar essa combinação no kit.');
+      return;
+    }
+
     this.cart.update((items) =>
-      items.map((item) => {
-        if (item.key !== line.key || item.kind !== 'kit') return item;
-        const ids = [...item.componentProductIds];
-        ids[index] = productId;
-        return { ...item, componentProductIds: ids };
-      })
+      items.map((item) =>
+        item.key === line.key && item.kind === 'kit'
+          ? { ...item, componentProductIds: ids }
+          : item
+      )
     );
   }
 
@@ -576,11 +598,40 @@ export class SaleEditor {
     this.submitting.set(false);
   }
 
-  private confirmDiscardIfNeeded(): boolean {
-    return (
-      !this.hasDraftChanges() ||
-      window.confirm('Descartar esta venda? As alterações ainda não foram salvas.')
-    );
+  private async confirmClearOrder(): Promise<void> {
+    if (!this.hasDraftChanges()) {
+      this.resetDraft();
+      return;
+    }
+
+    const confirmed = await this.confirmDialog().open({
+      title: 'Limpar pedido?',
+      message: 'Os itens, pagamentos e dados preenchidos nesta venda serão descartados.',
+      confirmLabel: 'Limpar pedido',
+      cancelLabel: 'Continuar venda',
+      tone: 'danger',
+      icon: 'trash',
+    });
+
+    if (confirmed) this.resetDraft();
+  }
+
+  private async confirmClose(): Promise<void> {
+    if (!this.hasDraftChanges()) {
+      this.dialog().close();
+      return;
+    }
+
+    const confirmed = await this.confirmDialog().open({
+      title: 'Descartar esta venda?',
+      message: 'As alterações desta venda ainda não foram salvas. Se sair agora, elas serão perdidas.',
+      confirmLabel: 'Descartar venda',
+      cancelLabel: 'Continuar venda',
+      tone: 'danger',
+      icon: 'alert',
+    });
+
+    if (confirmed) this.dialog().close();
   }
 
   private focusFirstInvalidField(): void {
@@ -601,33 +652,177 @@ export class SaleEditor {
     return this.lineUnitPrice(line) * line.quantity;
   }
 
-  private buildKitSlots(kit: Kit): KitSlot[] {
+  private buildKitSlots(kit: Kit, excludeLineKey?: string): KitSlot[] {
     const slots: KitSlot[] = [];
+    const reserved = this.reservedProductQuantities(excludeLineKey);
     let index = 0;
 
     for (const component of [...kit.components].sort((a, b) => a.order - b.order)) {
+      const candidates = this.matchingProducts(component).filter(
+        (product) => product.stock - (reserved.get(product.id) ?? 0) > 0
+      );
+
+      const formatName = this.references.formats()
+        .find((item) => item.id === component.formatId)?.name ?? 'Item';
+
       for (let slot = 0; slot < component.quantity; slot++) {
-        const candidates = this.catalog.activeProducts().filter((product) =>
-          product.stock > 0 &&
-          product.formatId === component.formatId &&
-          (!component.collectionId || product.collectionId === component.collectionId) &&
-          (!component.fragranceId || product.fragranceId === component.fragranceId)
-        );
-
-        const formatName = this.references.formats()
-          .find((item) => item.id === component.formatId)?.name ?? 'Item';
-
         slots.push({
           index,
           label: formatName + ' ' + (slot + 1),
           candidates,
         });
-
         index++;
       }
     }
 
     return slots;
+  }
+
+  private planKit(kit: Kit): KitAvailability {
+    const reserved = this.reservedProductQuantities();
+    const remaining = new Map(
+      this.catalog.activeProducts().map((product) => [
+        product.id,
+        Math.max(0, product.stock - (reserved.get(product.id) ?? 0)),
+      ])
+    );
+
+    const requirements: KitRequirement[] = [];
+    let index = 0;
+
+    for (const component of [...kit.components].sort((a, b) => a.order - b.order)) {
+      const candidates = this.matchingProducts(component);
+      const label = this.kitRequirementLabel(component);
+
+      for (let slot = 0; slot < component.quantity; slot++) {
+        requirements.push({ index, label, candidates });
+        index++;
+      }
+    }
+
+    const productIds = Array<string>(requirements.length).fill('');
+    const ordered = [...requirements].sort(
+      (a, b) => a.candidates.length - b.candidates.length || a.index - b.index
+    );
+
+    const allocate = (position: number): boolean => {
+      if (position >= ordered.length) return true;
+
+      const requirement = ordered[position];
+      const candidates = [...requirement.candidates].sort(
+        (a, b) => (remaining.get(b.id) ?? 0) - (remaining.get(a.id) ?? 0)
+      );
+
+      for (const product of candidates) {
+        const stock = remaining.get(product.id) ?? 0;
+        if (stock <= 0) continue;
+
+        remaining.set(product.id, stock - 1);
+        productIds[requirement.index] = product.id;
+
+        if (allocate(position + 1)) return true;
+
+        productIds[requirement.index] = '';
+        remaining.set(product.id, stock);
+      }
+
+      return false;
+    };
+
+    if (allocate(0)) {
+      return {
+        available: true,
+        message: 'Disponível',
+        details: [],
+        productIds,
+      };
+    }
+
+    const shortages = [...kit.components]
+      .sort((a, b) => a.order - b.order)
+      .map((component) => {
+        const available = this.matchingProducts(component).reduce(
+          (sum, product) => sum + Math.max(0, product.stock - (reserved.get(product.id) ?? 0)),
+          0
+        );
+        const missing = Math.max(0, component.quantity - available);
+        return missing > 0 ? missing + '× ' + this.kitRequirementLabel(component) : '';
+      })
+      .filter(Boolean);
+
+    const details = shortages.length
+      ? shortages
+      : ['Estoque insuficiente para combinar os itens exigidos por este kit.'];
+
+    return {
+      available: false,
+      message: shortages.length
+        ? 'Em falta: ' + shortages.slice(0, 2).join(' · ') + (shortages.length > 2 ? ' +' + (shortages.length - 2) : '')
+        : details[0],
+      details,
+      productIds: [],
+    };
+  }
+
+  private matchingProducts(component: Kit['components'][number]): Product[] {
+    return this.catalog.activeProducts().filter((product) =>
+      product.formatId === component.formatId &&
+      (!component.collectionId || product.collectionId === component.collectionId) &&
+      (!component.fragranceId || product.fragranceId === component.fragranceId)
+    );
+  }
+
+  private kitRequirementLabel(component: Kit['components'][number]): string {
+    const format = this.references.formats().find((item) => item.id === component.formatId)?.name ?? 'Item';
+    const fragrance = component.fragranceId
+      ? this.references.fragrances().find((item) => item.id === component.fragranceId)?.name
+      : undefined;
+    const collection = component.collectionId
+      ? this.references.collections().find((item) => item.id === component.collectionId)?.name
+      : undefined;
+
+    return [format, fragrance ?? collection].filter(Boolean).join(' · ');
+  }
+
+  private reservedProductQuantities(excludeLineKey?: string): Map<string, number> {
+    const reserved = new Map<string, number>();
+
+    const reserve = (productId: string, quantity: number): void => {
+      reserved.set(productId, (reserved.get(productId) ?? 0) + quantity);
+    };
+
+    for (const line of this.cart()) {
+      if (line.key === excludeLineKey) continue;
+
+      if (line.kind === 'product') {
+        reserve(line.sourceId, line.quantity);
+      } else if (line.kind === 'kit') {
+        line.componentProductIds.forEach((productId) => reserve(productId, 1));
+      }
+    }
+
+    return reserved;
+  }
+
+  private availableProductStock(productId: string): number {
+    const product = this.catalog.products().find((item) => item.id === productId);
+    if (!product) return 0;
+    return Math.max(0, product.stock - (this.reservedProductQuantities().get(productId) ?? 0));
+  }
+
+  private selectionFitsStock(productIds: string[], excludeLineKey: string): boolean {
+    const reserved = this.reservedProductQuantities(excludeLineKey);
+    const selected = new Map<string, number>();
+
+    for (const productId of productIds) {
+      selected.set(productId, (selected.get(productId) ?? 0) + 1);
+    }
+
+    return [...selected].every(([productId, quantity]) => {
+      const product = this.catalog.products().find((item) => item.id === productId);
+      if (!product) return false;
+      return quantity <= Math.max(0, product.stock - (reserved.get(productId) ?? 0));
+    });
   }
 
   private toDraftLine(line: CartLine): SaleDraftLine {

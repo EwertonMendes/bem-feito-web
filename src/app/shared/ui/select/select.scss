@@ -262,3 +262,27 @@
     box-shadow: 0 18px 48px color-mix(in srgb, #160f0b 28%, transparent);
   }
 }
+
+
+/* Opt-in: long explanatory options may wrap without changing compact selectors. */
+.trigger.descriptive {
+  min-height: 52px;
+  align-items: flex-start;
+}
+
+.trigger.descriptive .selection-copy small,
+.menu.descriptive .option-copy small {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  line-height: 1.4;
+}
+
+.menu.descriptive .option {
+  min-height: 54px;
+  align-items: flex-start;
+}
+
+.menu.descriptive .selected-mark {
+  margin-top: 2px;
+}

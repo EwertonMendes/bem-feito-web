@@ -103,7 +103,7 @@ export class ProductionPage {
 
   trackingLabel(mode: 'exact' | 'estimated' | 'untracked'): string {
     if (mode === 'exact') return 'baixa estoque';
-    if (mode === 'estimated') return 'referência';
+    if (mode === 'estimated') return 'baixa estimada';
     return 'só custo';
   }
 

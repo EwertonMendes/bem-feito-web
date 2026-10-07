@@ -1,6 +1,6 @@
 <section class="bf-page">
   <header class="bf-page-header">
-    <div><h1>Produção</h1><p>Registre o que entrou no estoque. O custo é estimado pelo padrão e só insumos controlados têm baixa automática.</p></div>
+    <div><h1>Produção</h1><p>Registre o que entrou no estoque. Custo e consumo são estimados automaticamente; só itens controlados bloqueiam quando faltam.</p></div>
     <button class="bf-button" type="button" (click)="open()"><bf-icon name="plus" /> Registrar produção</button>
   </header>
 
@@ -42,7 +42,7 @@
           @for (item of estimatedConsumptions(); track item.name) {
             <div class="consumption" [class.not-enough]="!item.enough"><span>{{ item.name }} <small>{{trackingLabel(item.mode)}}</small></span><strong>{{ item.quantity }} {{ item.unit }}</strong></div>
           } @empty { <p class="warning-text">Cadastre componentes de custo em Configurações para calcular o custo padrão automaticamente.</p> }
-          <p class="preview-hint">Materiais estimados e sem controle nunca bloqueiam a produção. Apenas itens marcados como “Controlado” exigem saldo suficiente.</p>
+          <p class="preview-hint">Materiais estimados têm baixa aproximada até zero e nunca bloqueiam a produção. Itens “Só custo” não mexem em saldo. Apenas os “Controlados” exigem quantidade suficiente.</p>
         </section>
       }
     </div>

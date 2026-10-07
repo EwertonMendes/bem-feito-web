@@ -96,7 +96,7 @@ export class CatalogEditor {
   ]);
   readonly inputTrackingOptions: readonly BfSelectOption[] = [
     { value: 'exact', label: 'Controlado', description: 'Contagem exata. Pode bloquear uma operação quando não houver saldo.' },
-    { value: 'estimated', label: 'Estimado', description: 'Saldo de referência. Compras entram, mas a produção não baixa nem bloqueia.' },
+    { value: 'estimated', label: 'Estimado', description: 'Saldo aproximado. Compras e consumo previsto atualizam automaticamente, sem bloquear por falta.' },
     { value: 'untracked', label: 'Não controlar', description: 'Usado somente para calcular custos, sem saldo ou alertas.' },
   ];
   readonly inputTrackingHint = computed(() => {

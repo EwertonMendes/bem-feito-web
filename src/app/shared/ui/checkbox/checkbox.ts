@@ -18,6 +18,7 @@ export class BfCheckbox implements FormCheckboxControl {
   readonly ariaLabel = input('Opção');
   readonly disabled = input(false);
   readonly required = input(false);
+  readonly invalid = input(false);
   readonly touch = output<void>();
 
   focus(options?: FocusOptions): void {

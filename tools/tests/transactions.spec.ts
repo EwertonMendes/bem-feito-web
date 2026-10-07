@@ -38,8 +38,11 @@ beforeEach(async () => {
     const seed = context.firestore();
     await Promise.all([
       setDoc(doc(seed, 'users', 'operator'), { email: 'test@example.test', displayName: 'Test', role: 'operator', active: true }),
-      setDoc(doc(seed, 'inputs', 'i'), { code: 'TEST-I', name: 'TEST INPUT', active: true, unitId: 'u', stock: 20, minimumStock: 0, averageUnitCostCents: 100, ...audit() }),
+      setDoc(doc(seed, 'inputs', 'i'), { code: 'TEST-I', name: 'TEST INPUT', active: true, unitId: 'u', trackingMode: 'exact', stock: 20, minimumStock: 0, minimumStockConfigured: true, averageUnitCostCents: 100, ...audit() }),
+      setDoc(doc(seed, 'inputs', 'i-est'), { code: 'TEST-I-EST', name: 'TEST ESTIMATED INPUT', active: true, unitId: 'u', trackingMode: 'estimated', stock: 1, minimumStock: 0, minimumStockConfigured: true, averageUnitCostCents: 200, ...audit() }),
+      setDoc(doc(seed, 'inputs', 'i-un'), { code: 'TEST-I-UN', name: 'TEST UNTRACKED INPUT', active: true, unitId: 'u', trackingMode: 'untracked', stock: 0, minimumStock: 0, minimumStockConfigured: false, averageUnitCostCents: 0, ...audit() }),
       setDoc(doc(seed, 'products', 'p'), { code: 'TEST-P', displayName: 'TEST PRODUCT', active: true, collectionId: 'c', fragranceId: 'f', formatId: 'fmt', salePriceCents: 1000, additionalCostCents: 0, averageUnitCostCents: 100, stock: 10, minimumStock: 0, recipe: [{ inputId: 'i', unitId: 'u', quantity: 2 }, { inputId: 'i', unitId: 'u', quantity: 3 }], ...audit() }),
+      setDoc(doc(seed, 'products', 'p-est'), { code: 'TEST-P-EST', displayName: 'TEST ESTIMATED PRODUCT', active: true, collectionId: 'c', fragranceId: 'f', formatId: 'fmt', salePriceCents: 3000, additionalCostCents: 0, averageUnitCostCents: 0, stock: 0, minimumStock: 0, recipe: [{ inputId: 'i-est', unitId: 'u', quantity: 10 }], ...audit() }),
       setDoc(doc(seed, 'kits', 'k'), { active: true, name: 'TEST KIT', priceCents: 1800, components: [{ id: 'slot', formatId: 'fmt', quantity: 2, order: 1 }], ...audit() }),
       setDoc(doc(seed, 'additions', 'a'), { active: true, name: 'TEST ADDITION', category: 'TEST', priceCents: 200, components: [{ id: 'part', inputId: 'i', unitId: 'u', quantity: 1, order: 1 }], ...audit() }),
     ]);
@@ -85,7 +88,7 @@ describe('Actual repositories against restrictive emulator rules', () => {
       { kind: 'addition', sourceId: 'a', quantity: 2 },
     ], payments: [{ methodId: 'cash', amountReceivedCents: 1000 }, { methodId: 'pix', amountReceivedCents: 2300 }] });
     const id = created.sale.id;
-    expect(created.sale).toMatchObject({ cogsCents: 500, itemsSold: 3, missingCostItems: 0, analyticsVersion: 1 });
+    expect(created.sale).toMatchObject({ cogsCents: 1700, itemsSold: 3, missingCostItems: 0, analyticsVersion: 1 });
     expect(created.stockChanges).toHaveLength(2);
     expect(await data('products', 'p')).toMatchObject({ stock: 7 });
     expect(await data('inputs', 'i')).toMatchObject({ stock: 18 });
@@ -118,6 +121,27 @@ describe('Actual repositories against restrictive emulator rules', () => {
     expect(await data('productions', id)).toMatchObject({ totalCostCents: 1000, unitCostCents: 500, consumptions: [{ inputId: 'i', quantity: 10 }] });
     expect(await count('stockMovements')).toBe(2);
   });
+  it('uses estimated inputs for cost without consuming or blocking their physical balance', async () => {
+    const created = await production.create('p-est', 2, day);
+    expect(created.production).toMatchObject({ unitCostCents: 2000, totalCostCents: 4000, costPending: false });
+    expect(await data('inputs', 'i-est')).toMatchObject({ stock: 1 });
+    expect(await data('products', 'p-est')).toMatchObject({ stock: 2, averageUnitCostCents: 2000 });
+    expect(await count('stockMovements')).toBe(1);
+  });
+
+  it('updates cost for an untracked input without creating fake physical inventory', async () => {
+    await finance.createExpense({ businessDate: day, kind: 'input-purchase', inputId: 'i-un', unitId: 'u', quantity: 5, amountCents: 500 });
+    expect(await data('inputs', 'i-un')).toMatchObject({
+      stock: 0,
+      averageUnitCostCents: 100,
+      costBasisQuantity: 5,
+      costBasisValueCents: 500,
+    });
+    expect(await count('stockMovements')).toBe(0);
+    await expect(inventory.adjust('input', 'i-un', 1, 'TEST ONLY', day)).rejects.toThrow('não controla saldo');
+    expect(await count('stockAdjustments')).toBe(0);
+  });
+
   it('records purchases, expenses and positive/negative inventory adjustments', async () => {
     await finance.createExpense(purchase());
     expect(await data('inputs', 'i')).toMatchObject({ stock: 25, averageUnitCostCents: 100 });

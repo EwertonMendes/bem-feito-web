@@ -1,10 +1,8 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   ElementRef,
   effect,
-  inject,
   input,
   model,
   signal,
@@ -20,7 +18,6 @@ import { BfIcon } from '../icon/icon';
   styleUrl: './image-upload.scss',
 })
 export class BfImageUpload {
-  private readonly destroyRef = inject(DestroyRef);
   private readonly nativeInput = viewChild.required<ElementRef<HTMLInputElement>>('nativeInput');
 
   readonly file = model<File | null>(null);
@@ -50,11 +47,6 @@ export class BfImageUpload {
       const url = URL.createObjectURL(file);
       this.previewUrl.set(url);
       onCleanup(() => URL.revokeObjectURL(url));
-    });
-
-    this.destroyRef.onDestroy(() => {
-      const input = this.nativeInput()?.nativeElement;
-      if (input) input.value = '';
     });
   }
 

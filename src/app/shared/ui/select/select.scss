@@ -30,6 +30,10 @@
   background: var(--surface-elevated);
 }
 
+.trigger.invalid {
+  border-color: color-mix(in srgb, var(--danger) 58%, var(--line));
+}
+
 .trigger:focus-visible,
 .trigger.open {
   border-color: color-mix(in srgb, var(--brand) 58%, var(--line));

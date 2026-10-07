@@ -19,7 +19,7 @@ import {
 import { summarizeSaleItems } from '../../domain/logic/sale-analytics';
 import { productCostComponents, standardCostForProduct } from '../../domain/logic/costing';
 import { productStockStatus, stockStatusForInput } from '../../domain/logic/stock-status';
-import { Addition, CollectionDefinition, FormatDefinition, FragranceDefinition, InputItem, Kit, Product, RecipeComponent } from '../../domain/models/catalog.model';
+import { Addition, CollectionDefinition, FormatDefinition, FragranceDefinition, InputItem, Kit, Product } from '../../domain/models/catalog.model';
 import { StockMovement } from '../../domain/models/inventory.model';
 import { Payment, Sale, SaleDraft } from '../../domain/models/sales.model';
 import { resolveSaleDraft } from '../../domain/logic/sale-resolution';
@@ -191,7 +191,6 @@ export class SalesRepository {
         if (snapshot.exists()) formats.set(id, { id, ...snapshot.data() } as FormatDefinition);
       }
 
-      const costComponents = new Map<string, RecipeComponent[]>();
       const requiredInputIds = new Set<string>(additionInputIds);
       for (const [id, product] of products) {
         const components = productCostComponents(product, {
@@ -199,7 +198,6 @@ export class SalesRepository {
           fragrance: fragrances.get(product.fragranceId),
           format: formats.get(product.formatId),
         });
-        costComponents.set(id, components);
         components.forEach((component) => requiredInputIds.add(component.inputId));
       }
 

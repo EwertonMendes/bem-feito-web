@@ -1,6 +1,8 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { FormField, form, required } from '@angular/forms/signals';
+import { trackingModeForInput } from '../../domain/logic/costing';
+import { InputItem } from '../../domain/models/catalog.model';
 import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
 import { CatalogStore } from '../../features/catalog/catalog.store';
 import { InventoryStore } from '../../features/inventory/inventory.store';
@@ -60,6 +62,11 @@ export class InventoryPage {
     if (this.selectedType() === 'product') return this.catalog.products().find((item) => item.id === this.selectedId())?.displayName ?? '';
     return this.catalog.inputs().find((item) => item.id === this.selectedId())?.name ?? '';
   });
+  readonly selectedInputMode = computed(() => {
+    if (this.selectedType() !== 'input') return null;
+    const input = this.catalog.inputs().find((item) => item.id === this.selectedId());
+    return input ? trackingModeForInput(input) : null;
+  });
 
   constructor() {
     this.destroyRef.onDestroy(() => this.store.deactivateHistory());
@@ -70,7 +77,22 @@ export class InventoryPage {
     });
   }
 
+  inputMode(item: InputItem): 'exact' | 'estimated' | 'untracked' {
+    return trackingModeForInput(item);
+  }
+
+  inputModeLabel(item: InputItem): string {
+    const mode = this.inputMode(item);
+    if (mode === 'exact') return 'Controlado';
+    if (mode === 'untracked') return 'Só custo';
+    return 'Estimado';
+  }
+
   openAdjustment(type: 'product' | 'input', id: string): void {
+    if (type === 'input') {
+      const input = this.catalog.inputs().find((item) => item.id === id);
+      if (input && this.inputMode(input) === 'untracked') return;
+    }
     this.selectedType.set(type);
     this.selectedId.set(id);
     this.model.set({ quantity: 0, reason: '', businessDate: todayBusinessDate() });

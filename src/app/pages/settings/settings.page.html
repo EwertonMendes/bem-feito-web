@@ -1,5 +1,5 @@
 <section class="bf-page">
-  <header class="bf-page-header"><div><h1>Configurações</h1><p>Listas administrativas que alimentam os formulários sem espalhar valores fixos pelo código.</p></div><button class="bf-button" type="button" (click)="openNew()"><bf-icon name="plus" /> Novo</button></header>
+  <header class="bf-page-header"><div><h1>Configurações</h1><p>Cadastros reutilizáveis de preços, custos e opções do sistema.</p></div><button class="bf-button" type="button" (click)="openNew()"><bf-icon name="plus" /> Novo</button></header>
 
   @if (refreshing()) { <bf-page-refresh /> }
 
@@ -21,11 +21,11 @@
   } @else {
   <div class="bf-table-wrap">
     <table class="bf-table">
-      <thead><tr><th>Nome</th>@if(tab()==='fragrances'){<th>Coleção</th>}@if(tab()==='formats'){<th>Peso aprox.</th>}@if(tab()==='prices'){<th>Formato</th><th>Preço</th>}@if(tab()==='expenseTypes'){<th>Comportamento</th>}<th>Status</th><th></th></tr></thead>
+      <thead><tr><th>Nome</th>@if(tab()==='fragrances'){<th>Coleção</th>}@if(tab()==='formats'){<th>Peso aprox.</th>}@if(tab()==='prices'){<th>Formato</th><th>Preço</th>}@if(tab()==='expenseTypes'){<th>Comportamento</th>}@if(tab()==='collections'||tab()==='fragrances'||tab()==='formats'){<th>Custo padrão</th>}<th>Status</th><th></th></tr></thead>
       <tbody>
-        @if (tab()==='collections') { @for(item of references.collections();track item.id){<tr><td>{{item.name}}</td><td><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></td><td><button class="bf-button secondary" (click)="editSimple(item)">Editar</button></td></tr>} }
-        @else if (tab()==='fragrances') { @for(item of references.fragrances();track item.id){<tr><td>{{item.name}}</td><td>{{collectionName(item.collectionId)}}</td><td><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></td><td><button class="bf-button secondary" (click)="editFragrance(item)">Editar</button></td></tr>} }
-        @else if (tab()==='formats') { @for(item of references.formats();track item.id){<tr><td>{{item.name}}</td><td>{{item.approximateWeightGrams || '—'}} g</td><td><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></td><td><button class="bf-button secondary" (click)="editFormat(item)">Editar</button></td></tr>} }
+        @if (tab()==='collections') { @for(item of references.collections();track item.id){<tr><td>{{item.name}}</td><td>{{componentCount(item)}}</td><td><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></td><td><button class="bf-button secondary" (click)="editCollection(item)">Editar</button></td></tr>} }
+        @else if (tab()==='fragrances') { @for(item of references.fragrances();track item.id){<tr><td>{{item.name}}</td><td>{{collectionName(item.collectionId)}}</td><td>{{componentCount(item)}}</td><td><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></td><td><button class="bf-button secondary" (click)="editFragrance(item)">Editar</button></td></tr>} }
+        @else if (tab()==='formats') { @for(item of references.formats();track item.id){<tr><td>{{item.name}}</td><td>{{item.approximateWeightGrams || '—'}} g</td><td>{{componentCount(item)}}</td><td><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></td><td><button class="bf-button secondary" (click)="editFormat(item)">Editar</button></td></tr>} }
         @else if (tab()==='prices') { @for(item of references.formatPrices();track item.id){<tr><td>{{collectionName(item.collectionId)}}</td><td>{{formatName(item.formatId)}}</td><td>R$ {{(item.priceCents/100).toFixed(2).replace('.',',')}}</td><td><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></td><td><button class="bf-button secondary" (click)="editPrice(item)">Editar</button></td></tr>} }
         @else if (tab()==='units') { @for(item of references.units();track item.id){<tr><td>{{item.name}}</td><td><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></td><td><button class="bf-button secondary" (click)="editSimple(item)">Editar</button></td></tr>} }
         @else if (tab()==='payments') { @for(item of settings.paymentMethods();track item.id){<tr><td>{{item.name}}</td><td><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></td><td><button class="bf-button secondary" (click)="editSimple(item)">Editar</button></td></tr>} }
@@ -49,6 +49,15 @@
         <div class="bf-grid two"><label class="bf-field"><span>Nome</span><input class="bf-input" [formField]="expenseTypeForm.name" /></label><label class="bf-field"><span>Comportamento</span><bf-select [formField]="expenseTypeForm.kind" [options]="expenseTypeOptions" ariaLabel="Comportamento" /></label><bf-checkbox class="toggle" [formField]="expenseTypeForm.active" label="Ativo" /></div>
       } @else {
         <div class="bf-grid two"><label class="bf-field"><span>Nome</span><input class="bf-input" [formField]="simpleForm.name" /></label><bf-checkbox class="toggle" [formField]="simpleForm.active" label="Ativo" /></div>
+      }
+
+      @if(tab()==='collections'||tab()==='fragrances'||tab()==='formats'){
+        <section class="cost-composition">
+          <div class="cost-head"><div><strong>Componentes de custo padrão</strong><small>{{costScopeHint()}}</small></div><button class="bf-button secondary" type="button" (click)="addCostComponent()">+ Insumo</button></div>
+          @for(component of costComponents();track $index;let i=$index){
+            <div class="cost-row"><bf-select [value]="component.inputId" (valueChange)="selectCostInput(i,$event)" [options]="costInputOptions()" ariaLabel="Insumo" /><input class="bf-input" type="number" min="0" step="0.001" [value]="component.quantity" (input)="patchCostComponent(i,{quantity:+$any($event.target).value})" /><span class="cost-unit">{{unitName(component.unitId)}}</span><button class="bf-icon-button" type="button" (click)="removeCostComponent(i)"><bf-icon name="trash" /></button></div>
+          } @empty { <p class="cost-empty">Sem componentes. Adicione apenas o que realmente se repete neste nível.</p> }
+        </section>
       }
     </div>
     <div class="bf-dialog-footer"><button class="bf-button secondary" (click)="editor.close()">Cancelar</button><button class="bf-button" (click)="save()">Salvar</button></div>

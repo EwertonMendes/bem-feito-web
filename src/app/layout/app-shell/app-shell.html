@@ -99,7 +99,8 @@
     <button
       type="button"
       class="mobile-nav-item mobile-more"
-      [class.active]="mobileMoreActive() || mobilePanel()==='more'"
+      [class.active]="mobileMoreActive()"
+      [class.panel-open]="mobilePanel()==='more'"
       [attr.aria-expanded]="mobilePanel()==='more'"
       aria-controls="mobile-more-sheet"
       aria-label="Mais opções"
@@ -146,14 +147,9 @@
         <span class="sheet-row-copy"><strong>Produção</strong><small>Registrar uma produção</small></span>
         <bf-icon class="sheet-chevron" name="chevron-right" />
       </button>
-      <button class="sheet-row sheet-animate" type="button" (click)="mobileNavigate('/financeiro?novo=1')">
+      <button class="sheet-row sheet-animate" type="button" (click)="mobileNavigate('/financeiro?novo=compra')">
         <span class="sheet-row-icon"><bf-icon name="finance" /></span>
-        <span class="sheet-row-copy"><strong>Compra ou despesa</strong><small>Lançar uma saída financeira</small></span>
-        <bf-icon class="sheet-chevron" name="chevron-right" />
-      </button>
-      <button class="sheet-row sheet-animate" type="button" (click)="mobileNavigate('/estoque?ajuste=1')">
-        <span class="sheet-row-icon"><bf-icon name="inventory" /></span>
-        <span class="sheet-row-copy"><strong>Ajuste de estoque</strong><small>Corrigir saldo de produto ou insumo</small></span>
+        <span class="sheet-row-copy"><strong>Compra ou despesa</strong><small>Abrir em compra de insumo</small></span>
         <bf-icon class="sheet-chevron" name="chevron-right" />
       </button>
     </div>

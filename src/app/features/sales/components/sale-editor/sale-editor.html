@@ -110,7 +110,7 @@
                         <bf-select
                           [compact]="true"
                           [ariaLabel]="slot.label"
-                          [value]="line.componentProductIds[slot.index]"
+                          [value]="line.componentProductIds[slot.index] ?? ''"
                           (valueChange)="changeKitSelection(line, slot.index, $event)"
                           [options]="productSelectOptions(slot.candidates)"
                         />

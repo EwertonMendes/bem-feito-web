@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { ThemeService } from '../../core/services/theme.service';
+import { NavigationLoadingService } from '../../core/state/navigation-loading.service';
 import { DriveConnectionBanner } from '../../features/google-drive/components/drive-connection-banner';
 import { BfIcon, BfIconName } from '../../shared/ui/icon/icon';
 
@@ -17,6 +18,7 @@ interface NavItem { label: string; path: string; icon: BfIconName; }
 export class AppShell {
   readonly auth = inject(AuthService);
   readonly theme = inject(ThemeService);
+  readonly navigation = inject(NavigationLoadingService);
   private readonly router = inject(Router);
 
   readonly mobileMenuOpen = signal(false);

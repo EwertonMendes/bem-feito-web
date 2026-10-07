@@ -123,14 +123,14 @@ A SPA continua usando o **Google Identity Services token model**. O access token
 
 O estado local é dividido em duas partes:
 
-- **access token temporário**: fica em memória e em `sessionStorage` apenas enquanto é válido;
+- **access token temporário**: fica em memória e em `localStorage` somente até o `expiresAt` real informado pelo Google, vinculado à UID Firebase. Isso permite fechar/reabrir a aba sem nova autorização enquanto o token ainda for válido; no logout ele é removido;
 - **marcador de vínculo**: fica em `localStorage` e contém somente o UID Firebase, o e-mail da conta Drive validada e a data do vínculo. Esse marcador não é uma credencial e não concede acesso ao Drive.
 
 Quando o access token expira ou o Drive responde `401`, somente o token temporário é descartado. A concessão conhecida continua marcada e a próxima **ação interativa** que precisar do Drive solicita um novo token com `prompt: ''` e `login_hint`, evitando novo consentimento quando o Google permitir.
 
 Para leituras passivas, como uma imagem ainda não carregada, o navegador não pode renovar o token sozinho sem gesto do usuário. Nessa situação o app mostra **Continuar com Google Drive** somente quando o acesso for realmente necessário. Imagens já carregadas permanecem no cache em memória até logout, troca de usuário, mudança de configuração ou invalidação explícita do cache.
 
-No logout do Firebase, o access token e o cache da sessão são descartados. O marcador não sensível pode permanecer para permitir retomada com a mesma UID no próximo login. Se outra UID entrar, o marcador anterior é removido.
+No logout do Firebase, o access token persistido e o cache da sessão são descartados. O marcador não sensível pode permanecer para permitir retomada com a mesma UID no próximo login. Se outra UID entrar, o marcador anterior é removido.
 
 Nunca grave refresh token, client secret, access token, cookies ou credenciais de service account em `localStorage`, IndexedDB, Firestore, Git ou logs. Uma conexão realmente silenciosa por dias ou meses continuaria exigindo o authorization code model com backend seguro; isso não é simulado no frontend.
 

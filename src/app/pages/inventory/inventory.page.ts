@@ -84,7 +84,7 @@ export class InventoryPage {
   inputModeLabel(item: InputItem): string {
     const mode = this.inputMode(item);
     if (mode === 'exact') return 'Controlado';
-    if (mode === 'untracked') return 'Só custo';
+    if (mode === 'untracked') return 'Sem controle de saldo';
     return 'Estimado';
   }
 

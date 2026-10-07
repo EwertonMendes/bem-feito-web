@@ -15,8 +15,8 @@ export class BfNumberInput implements FormValueControl<number> {
   readonly value = model(0);
   readonly kind = input<BfNumberInputKind>('decimal');
   readonly decimals = input<number | null>(null);
-  readonly min = input<number | null>(null);
-  readonly max = input<number | null>(null);
+  readonly min = input<number | undefined>(undefined);
+  readonly max = input<number | undefined>(undefined);
   readonly suffix = input('');
   readonly placeholder = input('');
   readonly ariaLabel = input('Valor');
@@ -124,8 +124,8 @@ export class BfNumberInput implements FormValueControl<number> {
     if (clamp) {
       const min = this.min();
       const max = this.max();
-      if (min !== null && Number.isFinite(min)) next = Math.max(min, next);
-      if (max !== null && Number.isFinite(max)) next = Math.min(max, next);
+      if (min !== undefined && Number.isFinite(min)) next = Math.max(min, next);
+      if (max !== undefined && Number.isFinite(max)) next = Math.min(max, next);
     }
     return next;
   }

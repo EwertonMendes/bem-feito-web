@@ -13,6 +13,12 @@
   box-shadow: var(--shadow-dialog);
 }
 
+.sale-dialog[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overscroll-behavior: contain;
+}
+
 .sale-dialog::backdrop {
   background: rgba(43, 34, 28, 0.42);
   backdrop-filter: blur(6px);
@@ -86,7 +92,7 @@
 }
 
 .sale-layout {
-  height: calc(100% - 76px);
+  height: auto;
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(470px, 0.85fr);
@@ -193,7 +199,9 @@
   min-height: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: max-content;
   align-content: start;
+  align-items: stretch;
   gap: 12px;
   overflow-y: auto;
   overflow-x: hidden;
@@ -204,8 +212,10 @@
 
 .pick-card {
   min-width: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -228,6 +238,7 @@
 .product-media {
   position: relative;
   min-width: 0;
+  flex: 0 0 auto;
   padding: 8px 8px 0;
 }
 
@@ -297,9 +308,10 @@
 
 .product-body {
   min-width: 0;
-  display: grid;
-  grid-template-rows: auto minmax(2.55em, auto) auto auto;
-  align-content: start;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   gap: 7px;
   padding: 11px 11px 12px;
 }
@@ -320,6 +332,7 @@
 
 .product-body > strong {
   min-width: 0;
+  min-height: 2.55em;
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
@@ -1042,7 +1055,7 @@
   }
 
   .sale-layout {
-    height: calc(100dvh - 68px);
+    height: auto;
     display: grid;
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(0, 1fr);
@@ -1201,7 +1214,7 @@
   }
 
   .catalog-tools {
-    grid-template-columns: minmax(0, 1fr) minmax(112px, 34%);
+    grid-template-columns: minmax(0, 1fr) minmax(132px, 40%);
     gap: 8px;
   }
 
@@ -1244,7 +1257,6 @@
   }
 
   .product-body {
-    grid-template-rows: auto minmax(2.55em, auto) auto auto;
     gap: 6px;
     padding: 9px 8px 10px;
   }
@@ -1367,7 +1379,7 @@
   }
 
   .catalog-tools {
-    grid-template-columns: minmax(0, 1fr) 108px;
+    grid-template-columns: minmax(0, 1fr) 124px;
   }
 
   .catalog-tabs button {

@@ -16,8 +16,8 @@ import { BfCheckbox } from '../../../../shared/ui/checkbox/checkbox';
 import { BfImageUpload } from '../../../../shared/ui/image-upload/image-upload';
 import { CatalogImage } from '../../../../shared/media/catalog-image/catalog-image';
 
-interface ProductFormModel { code: string; collectionId: string; fragranceId: string; formatId: string; salePrice: number; additionalCost: number; minimumStock: number; active: boolean; }
-interface InputFormModel { code: string; name: string; unitId: string; trackingMode: InputTrackingMode; minimumStock: number | null; active: boolean; }
+interface ProductFormModel { collectionId: string; fragranceId: string; formatId: string; salePrice: number; additionalCost: number; minimumStock: number; active: boolean; }
+interface InputFormModel { name: string; unitId: string; trackingMode: InputTrackingMode; minimumStock: number | null; active: boolean; }
 interface KitFormModel { name: string; price: number; notes: string; active: boolean; }
 interface AdditionFormModel { name: string; category: string; price: number; notes: string; active: boolean; }
 
@@ -55,9 +55,8 @@ export class CatalogEditor {
     return this.store.additions().find((item) => item.id === id)?.image;
   });
 
-  readonly productModel = signal<ProductFormModel>({ code: '', collectionId: '', fragranceId: '', formatId: '', salePrice: 0, additionalCost: 0, minimumStock: 0, active: true });
+  readonly productModel = signal<ProductFormModel>({ collectionId: '', fragranceId: '', formatId: '', salePrice: 0, additionalCost: 0, minimumStock: 0, active: true });
   readonly productForm = form(this.productModel, (p) => {
-    required(p.code, { message: 'Informe o código.' });
     required(p.collectionId, { message: 'Selecione a coleção.' });
     required(p.fragranceId, { message: 'Selecione a fragrância.' });
     required(p.formatId, { message: 'Selecione o formato.' });
@@ -65,9 +64,8 @@ export class CatalogEditor {
     min(p.minimumStock, 0);
   });
 
-  readonly inputModel = signal<InputFormModel>({ code: '', name: '', unitId: '', trackingMode: 'estimated', minimumStock: 0, active: true });
+  readonly inputModel = signal<InputFormModel>({ name: '', unitId: '', trackingMode: 'estimated', minimumStock: 0, active: true });
   readonly inputForm = form(this.inputModel, (p) => {
-    required(p.code);
     required(p.name);
     required(p.unitId);
     min(p.minimumStock, 0);
@@ -141,10 +139,10 @@ export class CatalogEditor {
     this.editingId.set('');
     this.resetImageChange();
     if (kind === 'products') {
-      this.productModel.set({ code: '', collectionId: '', fragranceId: '', formatId: '', salePrice: 0, additionalCost: 0, minimumStock: 0, active: true });
+      this.productModel.set({ collectionId: '', fragranceId: '', formatId: '', salePrice: 0, additionalCost: 0, minimumStock: 0, active: true });
       this.recipe.set([]);
     } else if (kind === 'inputs') {
-      this.inputModel.set({ code: '', name: '', unitId: '', trackingMode: 'estimated', minimumStock: 0, active: true });
+      this.inputModel.set({ name: '', unitId: '', trackingMode: 'estimated', minimumStock: 0, active: true });
     } else if (kind === 'kits') {
       this.kitModel.set({ name: '', price: 0, notes: '', active: true });
       this.kitComponents.set([]);
@@ -159,7 +157,7 @@ export class CatalogEditor {
     this.kind.set('products');
     this.editingId.set(item.id);
     this.resetImageChange();
-    this.productModel.set({ code: item.code, collectionId: item.collectionId, fragranceId: item.fragranceId, formatId: item.formatId, salePrice: fromCents(item.salePriceCents), additionalCost: fromCents(item.additionalCostCents), minimumStock: item.minimumStock, active: item.active });
+    this.productModel.set({ collectionId: item.collectionId, fragranceId: item.fragranceId, formatId: item.formatId, salePrice: fromCents(item.salePriceCents), additionalCost: fromCents(item.additionalCostCents), minimumStock: item.minimumStock, active: item.active });
     this.recipe.set(item.recipe.map((component) => ({ ...component })));
     this.dialog().open();
   }
@@ -170,7 +168,6 @@ export class CatalogEditor {
     this.resetImageChange();
     const trackingMode = trackingModeForInput(item);
     this.inputModel.set({
-      code: item.code,
       name: item.name,
       unitId: item.unitId,
       trackingMode,
@@ -273,7 +270,7 @@ export class CatalogEditor {
     if (!collection || !fragrance || !format) throw new Error('Coleção, fragrância ou formato inválido.');
     const existing = this.store.products().find((item) => item.id === this.editingId());
     const product: Product = {
-      id: existing?.id ?? '', code: model.code.trim(), active: model.active, collectionId: model.collectionId,
+      id: existing?.id ?? '', code: existing?.code ?? '', active: model.active, collectionId: model.collectionId,
       fragranceId: model.fragranceId, formatId: model.formatId, displayName: `${collection.name} · ${fragrance.name} · ${format.name}`,
       salePriceCents: toCents(model.salePrice), additionalCostCents: toCents(model.additionalCost), averageUnitCostCents: existing?.averageUnitCostCents ?? 0,
       stock: existing?.stock ?? 0, minimumStock: model.minimumStock, image: existing?.image,
@@ -290,7 +287,7 @@ export class CatalogEditor {
     const tracked = model.trackingMode !== 'untracked';
     const input: InputItem = {
       id: existing?.id ?? '',
-      code: model.code.trim(),
+      code: existing?.code ?? '',
       active: model.active,
       name: model.name.trim(),
       unitId: model.unitId,

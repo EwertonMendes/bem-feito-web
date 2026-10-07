@@ -1,6 +1,8 @@
 <section class="bf-page">
   <header class="bf-page-header"><div><h1>Configurações</h1><p>Listas administrativas que alimentam os formulários sem espalhar valores fixos pelo código.</p></div><button class="bf-button" type="button" (click)="openNew()"><bf-icon name="plus" /> Novo</button></header>
 
+  @if (refreshing()) { <bf-page-refresh /> }
+
   <bf-google-drive-settings-card />
 
   <div class="bf-segments tabs">
@@ -14,6 +16,9 @@
     <button [class.active]="tab()==='expenseTypes'" (click)="tab.set('expenseTypes')">Tipos de saída</button>
   </div>
 
+  @if (!initialized()) {
+    <bf-table-skeleton [columns]="5" [rows]="7" />
+  } @else {
   <div class="bf-table-wrap">
     <table class="bf-table">
       <thead><tr><th>Nome</th>@if(tab()==='fragrances'){<th>Coleção</th>}@if(tab()==='formats'){<th>Peso aprox.</th>}@if(tab()==='prices'){<th>Formato</th><th>Preço</th>}@if(tab()==='expenseTypes'){<th>Comportamento</th>}<th>Status</th><th></th></tr></thead>
@@ -29,6 +34,7 @@
       </tbody>
     </table>
   </div>
+  }
 
   <dialog bfDialog #editor="bfDialog" class="bf-dialog">
     <div class="bf-dialog-header"><h2>{{editingId()?'Editar':'Novo cadastro'}}</h2><button class="bf-icon-button" (click)="editor.close()"><bf-icon name="close" /></button></div>

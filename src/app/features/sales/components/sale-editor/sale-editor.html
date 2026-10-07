@@ -99,7 +99,7 @@
                 <button
                   class="media-add"
                   type="button"
-                  [disabled]="product.stock<=quantity"
+                  [disabled]="!canAddProduct(product)"
                   [attr.aria-label]="'Adicionar ' + product.displayName"
                   (click)="addProduct(product)"
                 >
@@ -124,7 +124,7 @@
                     <span>{{ quantity }} no pedido</span>
                     <button
                       type="button"
-                      [disabled]="product.stock<=quantity"
+                      [disabled]="!canAddProduct(product)"
                       [attr.aria-label]="'Adicionar uma unidade de ' + product.displayName"
                       (click)="addProduct(product)"
                     >
@@ -135,11 +135,11 @@
                   <button
                     class="add-to-order"
                     type="button"
-                    [disabled]="product.stock<=0"
+                    [disabled]="!canAddProduct(product)"
                     (click)="addProduct(product)"
                   >
                     <bf-icon name="plus" />
-                    <span>{{ product.stock<=0 ? 'Sem estoque' : 'Adicionar' }}</span>
+                    <span>{{ canAddProduct(product) ? 'Adicionar' : 'Sem estoque disponível' }}</span>
                   </button>
                 }
               </div>
@@ -150,10 +150,18 @@
         } @else if (catalogTab()==='kits') {
           @for (kit of filteredKits(); track kit.id) {
             @let quantity = quantityInCart('kit', kit.id);
-            <article class="pick-card">
+            @let availability = kitAvailability(kit);
+            <article class="pick-card" [class.kit-unavailable]="!availability.available">
               <div class="product-media">
                 <bf-catalog-image [image]="kit.image" [alt]="kit.name" />
-                <button class="media-add" type="button" [attr.aria-label]="'Adicionar ' + kit.name" (click)="addKit(kit)">
+                <button
+                  class="media-add"
+                  type="button"
+                  [disabled]="!availability.available"
+                  [attr.aria-label]="'Adicionar ' + kit.name"
+                  [attr.title]="!availability.available ? availability.details.join(' • ') : null"
+                  (click)="addKit(kit)"
+                >
                   <bf-icon name="plus" />
                 </button>
               </div>
@@ -163,20 +171,36 @@
                 <strong>{{ kit.name }}</strong>
                 <span class="product-price">{{ currency(kit.priceCents) }}</span>
 
+                @if (!availability.available) {
+                  <div
+                    class="kit-stock-warning"
+                    [attr.title]="availability.details.join(' • ')"
+                    role="status"
+                  >
+                    <bf-icon name="alert" />
+                    <span>{{ availability.message }}</span>
+                  </div>
+                }
+
                 @if (quantity > 0) {
                   <div class="catalog-quantity" aria-label="Quantidade no pedido">
                     <button type="button" [attr.aria-label]="'Remover um ' + kit.name" (click)="decrementCatalogItem('kit', kit.id)">
                       <bf-icon name="minus" />
                     </button>
                     <span>{{ quantity }} no pedido</span>
-                    <button type="button" [attr.aria-label]="'Adicionar um ' + kit.name" (click)="addKit(kit)">
+                    <button
+                      type="button"
+                      [disabled]="!availability.available"
+                      [attr.aria-label]="'Adicionar um ' + kit.name"
+                      (click)="addKit(kit)"
+                    >
                       <bf-icon name="plus" />
                     </button>
                   </div>
                 } @else {
-                  <button class="add-to-order" type="button" (click)="addKit(kit)">
-                    <bf-icon name="plus" />
-                    <span>Adicionar</span>
+                  <button class="add-to-order" type="button" [disabled]="!availability.available" (click)="addKit(kit)">
+                    <bf-icon [name]="availability.available ? 'plus' : 'alert'" />
+                    <span>{{ availability.available ? 'Adicionar' : 'Kit indisponível' }}</span>
                   </button>
                 }
               </div>
@@ -470,13 +494,6 @@
             }
             <span class="total-line">Total <strong>{{ currency(totalCents()) }}</strong></span>
           </div>
-
-          @if (remainingCents()>0 && totalCents()>0) {
-            <div class="remaining-card">
-              <span>Falta receber</span>
-              <strong>{{ currency(remainingCents()) }}</strong>
-            </div>
-          }
         </div>
 
         <button
@@ -496,3 +513,5 @@
     </aside>
   </div>
 </dialog>
+
+<bf-confirm-dialog #confirmDialog />

@@ -120,7 +120,7 @@ describe('DriveAuthService', () => {
     expect(service.connected()).toBe(true);
   });
 
-  it('clears both token and remembered grant when Firebase logs out', async () => {
+  it('expires the access token on logout but can resume the remembered grant for the same Firebase user', async () => {
     const service = createService();
     signIn(service);
     await service.connect();
@@ -131,8 +131,14 @@ describe('DriveAuthService', () => {
 
     expect(service.connected()).toBe(false);
     expect(service.linked()).toBe(false);
-    expect(service.accountEmail()).toBeNull();
     expect(sessionStorage.getItem('bem-feito:google-drive:development')).toBeNull();
-    expect(localStorage.getItem('bem-feito:google-drive-grant:development')).toBeNull();
+    expect(localStorage.getItem('bem-feito:google-drive-grant:development')).toContain('user-1');
+
+    auth.currentUser = { uid: 'user-1', email: 'user@example.com' };
+    mocks.authCallbacks.at(-1)?.(auth.currentUser);
+
+    expect(service.linked()).toBe(true);
+    expect(await service.connect()).toBe('token-2');
+    expect(prompts).toEqual(['consent', '']);
   });
 });

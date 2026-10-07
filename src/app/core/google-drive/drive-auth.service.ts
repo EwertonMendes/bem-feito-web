@@ -109,7 +109,7 @@ export class DriveAuthService {
       this.firebaseUidState.set(user?.uid ?? null);
 
       if (!user) {
-        this.disconnect();
+        this.endSession();
         return;
       }
 
@@ -205,6 +205,12 @@ export class DriveAuthService {
 
   expireAccessToken(): void {
     this.clearAccessToken();
+  }
+
+  private endSession(): void {
+    const hadSessionData = Boolean(this.tokenState() || this.grantState() || this.accountState());
+    this.clearAccessToken();
+    if (hadSessionData) this.revisionState.update((value) => value + 1);
   }
 
   disconnect(): void {
@@ -334,7 +340,12 @@ export class DriveAuthService {
 
       if (stored.expiresAt <= Date.now() + TOKEN_EXPIRY_SKEW_MS) {
         this.removeStoredToken();
-        if (typeof stored.accountEmail === 'string' && !this.accountState()) {
+        if (!this.grantState()) {
+          this.rememberGrant(
+            stored.firebaseUid,
+            typeof stored.accountEmail === 'string' ? stored.accountEmail : undefined,
+          );
+        } else if (typeof stored.accountEmail === 'string' && !this.accountState()) {
           this.accountState.set(stored.accountEmail);
         }
         return;

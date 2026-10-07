@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
 import {
   CollectionDefinition,
@@ -18,6 +18,8 @@ import { fromCents, toCents } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
 import { BfDialog } from '../../shared/ui/dialog/dialog';
 import { GoogleDriveSettingsCard } from '../../features/google-drive/components/google-drive-settings-card';
+import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
+import { BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
 
 type SettingTab = 'collections' | 'fragrances' | 'formats' | 'prices' | 'units' | 'payments' | 'expenseCategories' | 'expenseTypes';
 type SimpleSetting = CollectionDefinition | UnitDefinition | PaymentMethod | ExpenseCategory;
@@ -30,7 +32,7 @@ interface ExpenseTypeModel extends SimpleModel { kind: ExpenseType['kind']; }
 
 @Component({
   selector: 'bf-settings-page',
-  imports: [FormField, BfIcon, GoogleDriveSettingsCard, BfDialog],
+  imports: [FormField, BfIcon, GoogleDriveSettingsCard, BfDialog, BfPageRefresh, BfTableSkeleton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './settings.page.html',
   styleUrl: './settings.page.scss',
@@ -44,6 +46,8 @@ export class SettingsPage {
   private readonly dialog = viewChild.required<BfDialog>('editor');
 
   readonly tab = signal<SettingTab>('collections');
+  readonly initialized = computed(() => this.references.initialized() && this.settings.initialized());
+  readonly refreshing = computed(() => this.initialized() && (this.references.loading() || this.settings.loading()));
   readonly editingId = signal('');
   readonly simpleModel = signal<SimpleModel>({ name: '', active: true });
   readonly simpleForm = form(this.simpleModel, (p) => required(p.name));

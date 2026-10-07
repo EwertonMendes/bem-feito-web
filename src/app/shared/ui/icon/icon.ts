@@ -14,6 +14,7 @@ import {
   LucideClock3,
   LucideCreditCard,
   LucideDynamicIcon,
+  LucideEllipsis,
   LucideEye,
   LucideHeart,
   LucideImage,
@@ -45,7 +46,7 @@ export type BfIconName =
   | 'plus' | 'minus' | 'search' | 'sun' | 'moon' | 'logout' | 'close' | 'trash' | 'image'
   | 'calendar' | 'chart' | 'wallet' | 'clock' | 'tag' | 'box' | 'heart' | 'alert' | 'leaf' | 'product'
   | 'receipt' | 'bag' | 'chevron-right' | 'arrow-right' | 'arrow-down-right' | 'eye' | 'card' | 'check'
-  | 'tick' | 'qr-code' | 'banknote' | 'upload';
+  | 'tick' | 'qr-code' | 'banknote' | 'upload' | 'more';
 
 const ICONS = {
   dashboard: LucideLayoutDashboard,
@@ -86,6 +87,7 @@ const ICONS = {
   eye: LucideEye,
   card: LucideCreditCard,
   check: LucideCircleCheck,
+  more: LucideEllipsis,
 } as const;
 
 @Component({

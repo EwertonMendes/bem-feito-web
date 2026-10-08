@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Sale } from '../../domain/models/sales.model';
 import { CatalogStore } from '../../features/catalog/catalog.store';
 import { SaleEditor } from '../../features/sales/components/sale-editor/sale-editor';
@@ -24,6 +24,7 @@ export class SalesPage {
   readonly catalog = inject(CatalogStore);
   private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly detailDialog = viewChild.required<BfDialog>('detailDialog');
   private readonly saleEditor = viewChild.required<SaleEditor>('saleEditor');
 
@@ -47,9 +48,13 @@ export class SalesPage {
     this.destroyRef.onDestroy(this.store.activateSales());
     this.destroyRef.onDestroy(this.catalog.activate());
     void Promise.all([this.store.load(), this.catalog.load()]);
-    const openRequested = this.route.snapshot.queryParamMap.get('novo') === '1';
+    const initialProductId = this.route.snapshot.queryParamMap.get('produto') ?? undefined;
+    const openRequested = this.route.snapshot.queryParamMap.get('novo') === '1' || !!initialProductId;
     afterNextRender(() => {
-      if (openRequested) void this.saleEditor().open();
+      if (openRequested) {
+        void this.saleEditor().open(initialProductId);
+        void this.router.navigate([], { relativeTo: this.route, queryParams: { novo: null, produto: null }, queryParamsHandling: 'merge', replaceUrl: true });
+      }
     });
   }
 

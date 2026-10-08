@@ -295,18 +295,31 @@
                   <small>{{ currency(lineUnitPrice(line)) }} cada</small>
 
                   @if (line.kind==='kit') {
-                    <div class="kit-config">
-                      @for (slot of kitSlots(line); track slot.index) {
-                        <label>
-                          <span>{{ slot.label }}</span>
-                          <bf-select
-                            [compact]="true"
-                            [ariaLabel]="slot.label"
-                            [value]="line.componentProductIds[slot.index] ?? ''"
-                            (valueChange)="changeKitSelection(line, slot.index, $event)"
-                            [options]="productSelectOptions(slot.candidates)"
-                          />
-                        </label>
+                    <div class="kit-config kit-config-groups">
+                      @for (group of kitAllocationGroups(line); track group.index) {
+                        <section class="kit-allocation">
+                          <div class="kit-allocation-head">
+                            <strong>{{group.label}}</strong>
+                            <span [class.kit-missing]="group.allocated!==group.target">{{group.allocated}} / {{group.target}} un.</span>
+                          </div>
+                          @for (allocation of group.allocations; track allocation.productId) {
+                            <div class="kit-allocation-row">
+                              <span>{{allocation.name}}</span>
+                              <bf-number-input kind="integer" [min]="0" [value]="allocation.quantity"
+                                [ariaLabel]="'Quantidade de ' + allocation.name"
+                                (valueChange)="changeKitGroupQuantity(line,group.index,allocation.productId,$event)" />
+                            </div>
+                          }
+                          @if(group.allocated<group.target && group.candidates.length) {
+                            <bf-select [compact]="true" value=""
+                              [ariaLabel]="'Adicionar fragrância em ' + group.label"
+                              [options]="[{value:'',label:'Adicionar outro produto'},...productSelectOptions(group.candidates)]"
+                              (valueChange)="addKitGroupProduct(line,group.index,$event)" />
+                          }
+                          @if(group.allocated<group.target) {
+                            <small class="kit-missing">Faltam {{group.target-group.allocated}} unidades</small>
+                          }
+                        </section>
                       }
                     </div>
                   }

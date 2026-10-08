@@ -53,7 +53,7 @@ export class ProductionRepository {
   async createBatch(lines: readonly ProductionDraftItem[], businessDate: string, notes?: string): Promise<ProductionCreateResult> {
     const userId = this.auth.user()?.uid;
     if (!userId) throw new Error('Sessão inválida.');
-    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(businessDate)) throw new Error('Data de produção inválida.');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) throw new Error('Data de produção inválida.');
     if (!lines.length || lines.length > 60) throw new Error('Informe de 1 a 60 produtos por lançamento.');
     const quantities = new Map<string, number>();
     for (const line of lines) {

@@ -218,10 +218,14 @@ service cloud.firestore {
           && money(data.appliedCents) && money(data.tipCents)
           && data.amountReceivedCents == data.appliedCents + data.tipCents && data.status in ['active', 'reversed'])
         || (name == 'expenses'
-          && fields(data, ['code', 'businessDate', 'kind', 'amountCents'], ['categoryId', 'inputId', 'quantity', 'unitId', 'paymentMethodId', 'notes', 'link'])
+          && fields(data, ['code', 'businessDate', 'kind', 'amountCents'], ['categoryId', 'inputId', 'quantity', 'unitId', 'paymentMethodId', 'notes', 'link', 'items'])
           && text(data.code) && businessDate(data) && money(data.amountCents) && data.amountCents > 0
           && data.kind in ['input-purchase', 'operating-expense', 'equipment', 'other']
-          && (data.kind != 'input-purchase' || (text(data.inputId) && quantity(data.quantity) && data.quantity > 0)))
+          && (data.kind != 'input-purchase'
+            || (text(data.inputId) && quantity(data.quantity) && data.quantity > 0)
+            || ('items' in data && data.items is list && data.items.size() > 0 && data.items.size() <= 40
+              && data.items[0].inputId is string && data.items[0].quantity is number
+              && data.items[0].amountCents is int)))
         || (name == 'productions'
           && fields(data, ['code', 'businessDate', 'productId', 'productName', 'quantity', 'unitCostCents', 'totalCostCents', 'costPending', 'consumptions'], ['notes', 'items'])
           && text(data.code) && businessDate(data) && text(data.productName)

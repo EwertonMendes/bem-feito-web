@@ -38,6 +38,7 @@ export interface SaleCancellationResult {
 export interface ExpenseCreateResult {
   expense: Expense;
   stockChange?: StockChange;
+  stockChanges?: StockChange[];
 }
 
 export interface ProductionCreateResult {

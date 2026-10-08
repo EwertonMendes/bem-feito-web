@@ -7,7 +7,7 @@ import { CatalogStore } from '../../features/catalog/catalog.store';
 import { FinanceStore } from '../../features/finance/finance.store';
 import { SalesStore } from '../../features/sales/sales.store';
 import { SettingsStore } from '../../features/settings/settings.store';
-import { ExpenseDraft, ExpenseKind } from '../../domain/models/finance.model';
+import { Expense, ExpenseDraft, ExpenseKind, PurchaseBatchDraft } from '../../domain/models/finance.model';
 import { formatBusinessDate, todayBusinessDate } from '../../core/utils/date';
 import { formatCurrency, fromCents, toCents } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
@@ -18,6 +18,8 @@ import { BfListSkeleton, BfSkeleton, BfTableSkeleton } from '../../shared/ui/ske
 import { BfSelect, BfSelectOption } from '../../shared/ui/select/select';
 import { paymentMethodIcon } from '../../shared/ui/select/payment-method-icon';
 import { BfNumberInput } from '../../shared/ui/number-input/number-input';
+
+interface PurchaseFormLine { id: string; inputId: string; quantity: number; amount: number; }
 
 interface ReceiptFormModel {
   saleId: string;
@@ -57,6 +59,39 @@ export class FinancePage {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly dialog = viewChild.required<BfDialog>('expenseDialog');
   private readonly receiptDialog = viewChild.required<BfDialog>('receiptDialog');
+  private readonly expenseDetailDialog = viewChild.required<BfDialog>('expenseDetailDialog');
+  readonly selectedExpense = signal<Expense | null>(null);
+  readonly purchaseLines = signal<PurchaseFormLine[]>([]);
+  readonly purchaseTotalCents = computed(() => this.purchaseLines().reduce((sum, item) => sum + toCents(item.amount), 0));
+  readonly overdueOnly = signal(false);
+  readonly visibleReceivables = computed(() => this.sales.openSales().filter(sale =>
+    !this.overdueOnly() || (!!sale.dueDate && sale.dueDate < todayBusinessDate())));
+  newPurchaseLine(): void {
+    if (this.purchaseLines().length >= 40) return;
+    this.purchaseLines.update(items => [...items, { id: crypto.randomUUID(), inputId: '', quantity: 1, amount: 0 }]);
+  }
+  patchPurchaseLine(id: string, patch: Partial<Omit<PurchaseFormLine, 'id'>>): void {
+    this.purchaseLines.update(items => items.map(item => item.id === id ? { ...item, ...patch } : item));
+    this.model.update(value => ({ ...value, amount: fromCents(this.purchaseTotalCents()) }));
+  }
+  removePurchaseLine(id: string): void {
+    this.purchaseLines.update(items => items.filter(item => item.id !== id));
+    this.model.update(value => ({ ...value, amount: fromCents(this.purchaseTotalCents()) }));
+  }
+  purchaseUnit(inputId: string): string {
+    const input = this.catalog.inputs().find(item => item.id === inputId);
+    return input ? this.references.units().find(unit => unit.id === input.unitId)?.name ?? '' : '';
+  }
+  openExpenseDetails(expense: Expense): void {
+    this.selectedExpense.set(expense);
+    this.expenseDetailDialog().open();
+  }
+  purchaseDescription(expense: Expense): string {
+    return expense.items?.length
+      ? expense.items.length + ' insumo(s)'
+      : this.inputName(expense.inputId);
+  }
+
 
   readonly tab = signal<'expenses' | 'receivables' | 'payments'>('expenses');
   readonly expenseSubmitted = signal(false);
@@ -88,10 +123,8 @@ export class FinancePage {
     return {
       businessDate: value.businessDate ? '' : 'Informe a data.',
       amount: Number.isFinite(value.amount) && value.amount > 0 ? '' : 'Informe um valor maior que zero.',
-      inputId: value.kind === 'input-purchase' && !value.inputId ? 'Selecione o insumo comprado.' : '',
-      quantity: value.kind === 'input-purchase' && (!Number.isFinite(value.quantity) || value.quantity <= 0)
-        ? 'Informe uma quantidade maior que zero.'
-        : '',
+      inputId: '',
+      quantity: '',
     };
   });
   readonly receiptErrors = computed(() => {
@@ -157,6 +190,10 @@ export class FinancePage {
   );
 
   constructor() {
+    const params = this.route.snapshot.queryParamMap;
+    const tab = params.get('tab');
+    if (tab === 'receivables' || tab === 'payments') this.tab.set(tab);
+    this.overdueOnly.set(params.get('status') === 'overdue');
     this.destroyRef.onDestroy(this.catalog.activate());
     this.destroyRef.onDestroy(this.references.activate());
     this.destroyRef.onDestroy(this.store.activate());
@@ -170,6 +207,14 @@ export class FinancePage {
       this.sales.loadReceivableSummary(),
       this.settings.load(),
     ]);
+
+    if (this.tab() !== 'expenses') void ready.then(() => this.selectTab(this.tab()));
+    const requestedReceipt = params.get('receber');
+    if (requestedReceipt) void ready.then(async () => {
+      await this.selectTab('receivables');
+      this.openReceipt(requestedReceipt);
+      await this.router.navigate([], { relativeTo: this.route, queryParams: { receber: null }, queryParamsHandling: 'merge', replaceUrl: true });
+    });
 
     this.route.queryParamMap
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -213,6 +258,8 @@ export class FinancePage {
   }
 
   openExpense(kind: ExpenseKind = 'operating-expense'): void {
+    this.purchaseLines.set([]);
+    if (kind === 'input-purchase') this.newPurchaseLine();
     this.expenseSubmitted.set(false);
     this.expenseFormError.set('');
     this.store.clearOperationError();
@@ -287,6 +334,32 @@ export class FinancePage {
     }
 
     const value = this.model();
+    if (value.kind === 'input-purchase') {
+      const lines = this.purchaseLines();
+      if (!lines.length || lines.some(item => !item.inputId || !Number.isFinite(item.quantity) || item.quantity <= 0 ||
+          !Number.isFinite(item.amount) || toCents(item.amount) <= 0)) {
+        this.expenseFormError.set('Informe insumo, quantidade e valor de cada item da compra.');
+        return;
+      }
+      const items = lines.map(item => ({
+        inputId: item.inputId, quantity: item.quantity, amountCents: toCents(item.amount),
+        unitId: this.catalog.inputs().find(input => input.id === item.inputId)?.unitId ?? '',
+      }));
+      const draft: PurchaseBatchDraft = {
+        businessDate: value.businessDate, items,
+        paymentMethodId: value.paymentMethodId || undefined,
+        notes: value.notes.trim() || undefined, link: value.link.trim() || undefined,
+      };
+      this.expenseSaving.set(true);
+      try {
+        const result = await this.store.createPurchaseBatch(draft);
+        if (result) {
+          this.catalog.applyStockChanges(result.stockChanges ?? []);
+          this.dialog().close();
+        } else this.expenseFormError.set(this.store.operationError() || 'Não foi possível registrar a compra.');
+      } finally { this.expenseSaving.set(false); }
+      return;
+    }
     const draft: ExpenseDraft = {
       businessDate: value.businessDate,
       kind: value.kind,

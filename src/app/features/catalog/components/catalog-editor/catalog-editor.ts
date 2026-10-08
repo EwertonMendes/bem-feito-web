@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
-import { Addition, AdditionComponent, InputItem, InputTrackingMode, CollectionDefinition, FragranceDefinition, FormatDefinition, Kit, KitComponent, Product, RecipeComponent } from '../../../../domain/models/catalog.model';
+import { Addition, AdditionComponent, InputItem, InputTrackingMode, Kit, KitComponent, Product, RecipeComponent } from '../../../../domain/models/catalog.model';
 import { standardCostForProduct, trackingModeForInput } from '../../../../domain/logic/costing';
 import { CatalogImageEntityKind, CatalogImageRef } from '../../../../domain/models/image.model';
 import { ErrorService } from '../../../../core/services/error.service';
@@ -10,6 +10,7 @@ import { formatCurrency, fromCents, toCents } from '../../../../core/utils/money
 import { CatalogReferenceStore } from '../../catalog-reference.store';
 import { CatalogStore } from '../../catalog.store';
 import { BfDialog } from '../../../../shared/ui/dialog/dialog';
+import { BfSettingsEditor, ReferenceSaved } from '../../../../shared/ui/settings-editor/settings-editor';
 import { BfIcon } from '../../../../shared/ui/icon/icon';
 import { BfSelect, BfSelectOption } from '../../../../shared/ui/select/select';
 import { BfCheckbox } from '../../../../shared/ui/checkbox/checkbox';
@@ -24,7 +25,7 @@ interface AdditionFormModel { name: string; category: string; price: number; not
 
 @Component({
   selector: 'bf-catalog-editor',
-  imports: [FormField, BfDialog, BfIcon, BfSelect, BfCheckbox, BfImageUpload, CatalogImage, BfNumberInput],
+  imports: [FormField, BfDialog, BfIcon, BfSelect, BfCheckbox, BfImageUpload, CatalogImage, BfNumberInput, BfSettingsEditor],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './catalog-editor.html',
   styleUrl: './catalog-editor.scss',
@@ -37,7 +38,7 @@ export class CatalogEditor {
   private readonly toast = inject(ToastService);
   private readonly errors = inject(ErrorService);
   private readonly dialog = viewChild.required<BfDialog>('dialog');
-  private readonly quickDialog = viewChild.required<BfDialog>('quickReferenceDialog');
+  private readonly referenceEditor = viewChild.required<BfSettingsEditor>('referenceEditor');
 
   readonly currency = formatCurrency;
   readonly imagesEnabled = this.images.enabled;
@@ -70,9 +71,6 @@ export class CatalogEditor {
       });
   });
 
-  readonly quickReferenceKind = signal<'collection' | 'fragrance' | 'format'>('collection');
-  readonly quickName = signal('');
-  readonly quickSaving = signal(false);
   readonly suggestedPrice = computed(() => {
     const model = this.productModel();
     return this.references.formatPrices().find(item =>
@@ -87,37 +85,17 @@ export class CatalogEditor {
       this.toast.error('Selecione ou crie uma coleção antes da fragrância.');
       return;
     }
-    this.quickReferenceKind.set(kind);
-    this.quickName.set('');
-    this.quickDialog().open();
+    this.referenceEditor().openNew(
+      kind === 'collection' ? 'collections' : kind === 'fragrance' ? 'fragrances' : 'formats',
+      this.productModel().collectionId,
+    );
   }
-  async saveQuickReference(): Promise<void> {
-    if (this.quickSaving()) return;
-    const name = this.quickName().trim();
-    if (!name) { this.toast.error('Informe o nome.'); return; }
-    const kind = this.quickReferenceKind();
-    const matches = kind === 'collection' ? this.references.collections()
-      : kind === 'fragrance' ? this.references.fragrances() : this.references.formats();
-    if (matches.some(item => item.name.localeCompare(name, 'pt-BR', { sensitivity: 'base' }) === 0 &&
-      (kind !== 'fragrance' || (item as FragranceDefinition).collectionId === this.productModel().collectionId))) {
-      this.toast.error('Este cadastro já existe. Selecione-o na lista.'); return;
-    }
-    this.quickSaving.set(true);
-    try {
-      if (kind === 'collection') {
-        const id = await this.references.saveCollection({ id: '', name, active: true, costComponents: [] } as CollectionDefinition);
-        this.productModel.update(model => ({ ...model, collectionId: id, fragranceId: '' }));
-      } else if (kind === 'fragrance') {
-        const id = await this.references.saveFragrance({ id: '', name, collectionId: this.productModel().collectionId, active: true, costComponents: [] } as FragranceDefinition);
-        this.productModel.update(model => ({ ...model, fragranceId: id }));
-      } else {
-        const id = await this.references.saveFormat({ id: '', name, active: true, approximateWeightGrams: 0, costComponents: [] } as FormatDefinition);
-        this.productModel.update(model => ({ ...model, formatId: id }));
-      }
-      this.toast.success('Cadastro criado. O custo padrão pode ser configurado em Configurações.');
-      this.quickDialog().close();
-    } catch (error) { this.toast.error(this.errors.message(error)); }
-    finally { this.quickSaving.set(false); }
+
+  onReferenceSaved(event: ReferenceSaved): void {
+    if (!event.id) return;
+    if (event.kind === 'collections') this.productModel.update(model => ({ ...model, collectionId: event.id, fragranceId: '' }));
+    if (event.kind === 'fragrances') this.productModel.update(model => ({ ...model, fragranceId: event.id }));
+    if (event.kind === 'formats') this.productModel.update(model => ({ ...model, formatId: event.id }));
   }
 
   readonly editingId = signal('');

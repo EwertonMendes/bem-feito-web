@@ -98,11 +98,4 @@
     </div>
     <div class="bf-dialog-footer"><button class="bf-button secondary" type="button" (click)="dialog.close()">Cancelar</button><button class="bf-button" type="button" (click)="save()">{{kind()==='products' && bulkVariants() && !editingId() ? 'Criar ' + selectedVariantFragranceIds().length + ' variações' : 'Salvar'}}</button></div>
   </dialog>
-<dialog bfDialog #quickReferenceDialog="bfDialog" class="bf-dialog quick-reference-dialog">
-  <div class="bf-dialog-header"><h2>Nova referência</h2><button class="bf-icon-button" type="button" (click)="quickReferenceDialog.close()"><bf-icon name="close"/></button></div>
-  <div class="bf-dialog-body">
-    <label class="bf-field"><span>Nome da {{quickReferenceKind()==='collection'?'coleção':quickReferenceKind()==='fragrance'?'fragrância':'formato'}}</span><input class="bf-input" [value]="quickName()" (input)="quickName.set($any($event.target).value)" /></label>
-    <p class="hint">Depois, você pode editar a composição de custo padrão em Configurações.</p>
-  </div>
-  <div class="bf-dialog-footer"><button class="bf-button secondary" type="button" (click)="quickReferenceDialog.close()">Cancelar</button><button class="bf-button" type="button" [disabled]="quickSaving()" (click)="saveQuickReference()">Criar e selecionar</button></div>
-</dialog>
+<bf-settings-editor #referenceEditor (saved)="onReferenceSaved($event)" />

@@ -23,14 +23,3 @@
 .production-note{padding:10px 12px;border-radius:10px;background:var(--surface-2);font-size:.82rem}
 .detail-stats{margin:0 0 20px}.bf-dialog-body h3{font-size:.93rem;margin:20px 0 8px}
 @media(max-width:640px){.day-actions{flex-wrap:wrap}.production-line{grid-template-columns:minmax(0,1fr) 90px 30px;gap:6px;padding:8px}.production-line .bf-field{font-size:.8rem}.cost-summary{align-items:flex-start;flex-direction:column}.day-stats>div{padding:9px}.day-stats strong{font-size:.92rem}}
-
-.production-filters{display:grid;grid-template-columns:minmax(148px,.9fr) minmax(180px,1.4fr) minmax(120px,.8fr) auto;gap:12px;align-items:end;margin:0 0 20px}
-.production-filters .bf-field{min-width:0}
-.production-filters>button{min-height:42px}
-.day-card{min-width:0}
-.day-card-head{align-items:flex-start}
-.day-card-head>.bf-badge{white-space:nowrap;flex-shrink:0}
-.day-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
-.day-actions>.bf-button{width:100%;min-width:0;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 8px;font-size:.81rem}
-@media(max-width:880px){.production-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:480px){.production-filters{grid-template-columns:minmax(0,1fr)}.day-grid{grid-template-columns:minmax(0,1fr)}}

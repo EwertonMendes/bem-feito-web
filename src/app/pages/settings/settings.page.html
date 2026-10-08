@@ -46,37 +46,5 @@
   </div>
   }
 
-  <dialog bfDialog #editor="bfDialog" class="bf-dialog">
-    <div class="bf-dialog-header"><h2>{{editingId()?'Editar':'Novo cadastro'}}</h2><button class="bf-icon-button" (click)="editor.close()"><bf-icon name="close" /></button></div>
-    <div class="bf-dialog-body">
-      @if(tab()==='fragrances'){
-        <div class="bf-grid two"><label class="bf-field"><span>Nome</span><input class="bf-input" [formField]="fragranceForm.name" /></label><label class="bf-field"><span>Coleção</span><bf-select [formField]="fragranceForm.collectionId" [options]="collectionOptions()" ariaLabel="Coleção" /></label><bf-checkbox class="toggle" [formField]="fragranceForm.active" label="Ativo" /></div>
-      } @else if(tab()==='formats') {
-        <div class="bf-grid two"><label class="bf-field"><span>Nome</span><input class="bf-input" [formField]="formatForm.name" /></label><label class="bf-field"><span>Peso aproximado</span><bf-number-input kind="decimal" [decimals]="2" suffix="g" [formField]="formatForm.approximateWeightGrams" ariaLabel="Peso aproximado" /></label><bf-checkbox class="toggle" [formField]="formatForm.active" label="Ativo" /></div>
-      } @else if(tab()==='prices') {
-        <div class="bf-grid two"><label class="bf-field"><span>Coleção</span><bf-select [formField]="priceForm.collectionId" [options]="collectionOptions()" ariaLabel="Coleção" /></label><label class="bf-field"><span>Formato</span><bf-select [formField]="priceForm.formatId" [options]="formatOptions()" ariaLabel="Formato" /></label><label class="bf-field"><span>Preço</span><bf-number-input kind="currency" [formField]="priceForm.price" ariaLabel="Preço" /></label><bf-checkbox class="toggle" [formField]="priceForm.active" label="Ativo" /></div>
-      } @else if(tab()==='expenseTypes') {
-        <div class="bf-grid two"><label class="bf-field"><span>Nome</span><input class="bf-input" [formField]="expenseTypeForm.name" /></label><label class="bf-field"><span>Comportamento</span><bf-select [formField]="expenseTypeForm.kind" [options]="expenseTypeOptions" ariaLabel="Comportamento" /></label><bf-checkbox class="toggle" [formField]="expenseTypeForm.active" label="Ativo" /></div>
-      } @else {
-        <div class="bf-grid two"><label class="bf-field"><span>Nome</span><input class="bf-input" [formField]="simpleForm.name" /></label><bf-checkbox class="toggle" [formField]="simpleForm.active" label="Ativo" /></div>
-      }
-
-      @if(tab()==='collections'||tab()==='fragrances'||tab()==='formats'){
-        <section class="cost-composition">
-          <div class="cost-head"><div><strong>Componentes de custo padrão</strong><small>{{costScopeHint()}}</small></div><button class="bf-button secondary" type="button" (click)="addCostComponent()">+ Insumo</button></div>
-          @for(component of costComponents();track $index;let i=$index){
-            <div class="cost-row">
-              <bf-select [value]="component.inputId" (valueChange)="selectCostInput(i,$event)" [options]="costInputOptions()" ariaLabel="Insumo" />
-              <bf-number-input kind="decimal" [decimals]="3" [min]="0" [value]="component.quantity" (valueChange)="patchCostComponent(i,{quantity:$event})" ariaLabel="Quantidade do componente" />
-              <span class="cost-unit">{{unitName(component.unitId)}}</span>
-              <span class="cost-money"><small>{{componentUnitCostLabel(component)}}</small><strong>{{componentTotalCostLabel(component)}}</strong></span>
-              <button class="bf-icon-button" type="button" (click)="removeCostComponent(i)"><bf-icon name="trash" /></button>
-            </div>
-          } @empty { <p class="cost-empty">Sem componentes. Adicione apenas o que realmente se repete neste nível.</p> }
-          @if(costComponents().length){<div class="cost-total"><span>Custo padrão deste nível</span><strong>{{currentCostSummary()}}</strong></div>}
-        </section>
-      }
-    </div>
-    <div class="bf-dialog-footer"><button class="bf-button secondary" (click)="editor.close()">Cancelar</button><button class="bf-button" (click)="save()">Salvar</button></div>
-  </dialog>
+  <bf-settings-editor #editor />
 </section>

@@ -93,7 +93,7 @@ test('kit of 100 edits quantities by product, not one select for every unit',asy
   await d.getByPlaceholder(/Nome do cliente/).fill('Cliente QA');
   await d.getByRole('button',{name:/Confirmar venda/}).click();
   await expect(d).not.toBeVisible();
-  await expect(page.getByText('Cliente QA')).toBeVisible();
+  await expect(page.getByRole('table').getByText('Cliente QA')).toBeVisible();
 });
 
 test('catalog links open production with product preselected and contextual price can be applied',async({page})=>{

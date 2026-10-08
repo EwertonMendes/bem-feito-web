@@ -77,3 +77,5 @@ jobs:
 # Isolated rerun after tightening Playwright locator (no permanent CI changes).
 
 # Isolated QA rerun: fix select option locator and purchase-kind initialization.
+
+# Final isolated QA rerun: disambiguate desktop/mobile sale row assertion.

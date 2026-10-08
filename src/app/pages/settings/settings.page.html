@@ -5,16 +5,26 @@
 
   <bf-google-drive-settings-card />
 
-  <div class="bf-segments tabs">
-    <button [class.active]="tab()==='collections'" (click)="tab.set('collections')">Coleções</button>
-    <button [class.active]="tab()==='fragrances'" (click)="tab.set('fragrances')">Fragrâncias</button>
-    <button [class.active]="tab()==='formats'" (click)="tab.set('formats')">Formatos</button>
-    <button [class.active]="tab()==='prices'" (click)="tab.set('prices')">Preços</button>
-    <button [class.active]="tab()==='units'" (click)="tab.set('units')">Unidades</button>
-    <button [class.active]="tab()==='payments'" (click)="tab.set('payments')">Pagamentos</button>
-    <button [class.active]="tab()==='expenseCategories'" (click)="tab.set('expenseCategories')">Categorias</button>
-    <button [class.active]="tab()==='expenseTypes'" (click)="tab.set('expenseTypes')">Tipos de saída</button>
-  </div>
+  <nav class="settings-nav-groups" aria-label="Seções de configurações">
+    <section class="settings-nav-section">
+      <strong><bf-icon name="product" /> Produtos e custos</strong>
+      <div class="bf-segments tabs">
+        <button [class.active]="tab()==='collections'" (click)="tab.set('collections')">Coleções</button>
+        <button [class.active]="tab()==='fragrances'" (click)="tab.set('fragrances')">Fragrâncias</button>
+        <button [class.active]="tab()==='formats'" (click)="tab.set('formats')">Formatos</button>
+        <button [class.active]="tab()==='prices'" (click)="tab.set('prices')">Preços</button>
+        <button [class.active]="tab()==='units'" (click)="tab.set('units')">Unidades</button>
+      </div>
+    </section>
+    <section class="settings-nav-section">
+      <strong><bf-icon name="payment" /> Financeiro</strong>
+      <div class="bf-segments tabs">
+        <button [class.active]="tab()==='payments'" (click)="tab.set('payments')">Pagamentos</button>
+        <button [class.active]="tab()==='expenseCategories'" (click)="tab.set('expenseCategories')">Categorias</button>
+        <button [class.active]="tab()==='expenseTypes'" (click)="tab.set('expenseTypes')">Tipos de saída</button>
+      </div>
+    </section>
+  </nav>
 
   @if (!initialized()) {
     <bf-table-skeleton [columns]="5" [rows]="7" />

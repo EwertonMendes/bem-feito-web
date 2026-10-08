@@ -660,3 +660,9 @@ a { color: inherit; }
 .kit-allocation-row{display:grid;grid-template-columns:minmax(0,1fr) 90px;align-items:center;gap:10px}
 .kit-allocation-row span{font-size:.75rem;overflow-wrap:anywhere}
 .kit-allocation-row bf-number-input{min-width:0}
+
+/* Lightweight entrance motion for operational cards and editable rows. */
+@keyframes bf-enter {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}

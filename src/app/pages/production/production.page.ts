@@ -10,12 +10,13 @@ import { formatCurrency } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
 import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
 import { BfDialog } from '../../shared/ui/dialog/dialog';
+import { BfSelect, BfSelectOption } from '../../shared/ui/select/select';
 import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
 import { BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
 interface ProductionDay { date: string; entries: Production[]; quantity: number; totalCents: number; pending: boolean; products: number; }
 @Component({
  selector: 'bf-production-page',
- imports: [BfIcon, BfDialog, BfEmptyState, BfPageRefresh, BfTableSkeleton, BfProductionEditor],
+ imports: [BfIcon, BfDialog, BfEmptyState, BfPageRefresh, BfTableSkeleton, BfProductionEditor, BfSelect],
  changeDetection: ChangeDetectionStrategy.OnPush,
  templateUrl: './production.page.html',
  styleUrl: './production.page.scss',
@@ -35,6 +36,12 @@ export class ProductionPage {
  readonly filterDate = signal('');
  readonly filterProduct = signal('');
  readonly filterCost = signal<'all' | 'partial' | 'complete'>('all');
+ readonly costFilterOptions: readonly BfSelectOption[] = [
+   {value:'all',label:'Todos'}, {value:'complete',label:'Calculado'}, {value:'partial',label:'Parcial'},
+ ];
+ changeCostFilter(value: string): void {
+   if (value === 'all' || value === 'complete' || value === 'partial') this.filterCost.set(value);
+ }
   readonly days = computed<ProductionDay[]>(() => {
     const byDate = new Map<string, ProductionDay>();
     for (const entry of this.store.items()) {

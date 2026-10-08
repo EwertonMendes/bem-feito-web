@@ -7,7 +7,7 @@
   <div class="production-filters" role="search" aria-label="Filtrar produções">
     <label class="bf-field"><span>Data</span><input class="bf-input" type="date" [value]="filterDate()" (input)="filterDate.set($any($event.target).value)" /></label>
     <label class="bf-field"><span>Produto</span><input class="bf-input" type="search" placeholder="Buscar sabonete" [value]="filterProduct()" (input)="filterProduct.set($any($event.target).value)" /></label>
-    <label class="bf-field"><span>Custo</span><select class="bf-input" [value]="filterCost()" (change)="filterCost.set($any($event.target).value)"><option value="all">Todos</option><option value="complete">Calculado</option><option value="partial">Parcial</option></select></label>
+    <label class="bf-field"><span>Custo</span><bf-select [value]="filterCost()" (valueChange)="changeCostFilter($event)" [options]="costFilterOptions" ariaLabel="Filtrar por custo" /></label>
     <button class="bf-button secondary" type="button" (click)="filterDate.set('');filterProduct.set('');filterCost.set('all')">Limpar</button>
   </div>
   @if (!store.initialized()) {

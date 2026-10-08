@@ -10,7 +10,7 @@ import { formatCurrency, fromCents, toCents } from '../../../../core/utils/money
 import { CatalogReferenceStore } from '../../catalog-reference.store';
 import { CatalogStore } from '../../catalog.store';
 import { BfDialog } from '../../../../shared/ui/dialog/dialog';
-import { BfSettingsEditor, ReferenceSaved } from '../../../../shared/ui/settings-editor/settings-editor';
+import { BfSettingsEditor, ReferenceSaved } from '../../../settings/editor/settings-editor';
 import { BfIcon } from '../../../../shared/ui/icon/icon';
 import { BfSelect, BfSelectOption } from '../../../../shared/ui/select/select';
 import { BfCheckbox } from '../../../../shared/ui/checkbox/checkbox';

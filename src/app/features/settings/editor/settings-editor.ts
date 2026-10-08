@@ -7,11 +7,11 @@ import { SettingsStore } from '../../../features/settings/settings.store';
 import { ToastService } from '../../../core/services/toast.service';
 import { ErrorService } from '../../../core/services/error.service';
 import { formatCurrency, fromCents, toCents } from '../../../core/utils/money';
-import { BfIcon } from '../icon/icon';
-import { BfDialog } from '../dialog/dialog';
-import { BfSelect, BfSelectOption } from '../select/select';
-import { BfCheckbox } from '../checkbox/checkbox';
-import { BfNumberInput } from '../number-input/number-input';
+import { BfIcon } from '../../../shared/ui/icon/icon';
+import { BfDialog } from '../../../shared/ui/dialog/dialog';
+import { BfSelect, BfSelectOption } from '../../../shared/ui/select/select';
+import { BfCheckbox } from '../../../shared/ui/checkbox/checkbox';
+import { BfNumberInput } from '../../../shared/ui/number-input/number-input';
 
 export type SettingTab = 'collections' | 'fragrances' | 'formats' | 'prices' | 'units' | 'payments' | 'expenseCategories' | 'expenseTypes';
 export type ReferenceSaved = { kind: SettingTab; id: string };

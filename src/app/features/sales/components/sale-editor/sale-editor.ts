@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
 import { Addition, Kit, Product } from '../../../../domain/models/catalog.model';
+import { allocateKitStock } from '../../../../domain/logic/kit-stock';
 import { CatalogImageRef } from '../../../../domain/models/image.model';
 import { PaymentDraft, SaleDraft, SaleDraftLine } from '../../../../domain/models/sales.model';
 import { ToastService } from '../../../../core/services/toast.service';
@@ -78,12 +79,6 @@ interface KitAvailability {
   message: string;
   details: string[];
   productIds: string[];
-}
-
-interface KitRequirement {
-  index: number;
-  label: string;
-  candidates: Product[];
 }
 
 @Component({
@@ -235,7 +230,7 @@ export class SaleEditor {
     this.destroyRef.onDestroy(this.settings.activate());
   }
 
-  async open(initialProductId?: string): Promise<void> {
+  async open(initialProductId?: string, initialKitId?: string): Promise<void> {
     await Promise.all([
       this.catalog.load(),
       this.references.load(),
@@ -246,6 +241,10 @@ export class SaleEditor {
     if (initialProductId) {
       const product = this.catalog.activeProducts().find(item => item.id === initialProductId);
       if (product && this.canAddProduct(product)) this.addProduct(product);
+    }
+    if (initialKitId) {
+      const kit = this.catalog.activeKits().find(item => item.id === initialKitId);
+      if (kit) { this.catalogTab.set('kits'); this.addKit(kit); }
     }
     this.dialog().open();
   }
@@ -689,47 +688,11 @@ export class SaleEditor {
    */
   private planKit(kit: Kit): KitAvailability {
     const reserved = this.reservedProductQuantities();
-    const requirements: KitRequirement[] = [];
-    for (const component of [...kit.components].sort((a, b) => a.order - b.order)) {
-      const candidates = this.matchingProducts(component);
-      const label = this.kitRequirementLabel(component);
-      for (let n = 0; n < component.quantity; n++) {
-        requirements.push({ index: requirements.length, label, candidates });
-      }
-    }
     const capacities = new Map(this.catalog.activeProducts().map(product => [
       product.id, Math.max(0, product.stock - (reserved.get(product.id) ?? 0)),
     ]));
-    const assigned = new Map<string, number[]>();
-    const productIds = Array<string>(requirements.length).fill('');
-    const visit = (slotIndex: number, visited: Set<string>): boolean => {
-      const slot = requirements[slotIndex];
-      if (!slot) return false;
-      const candidates = [...slot.candidates].sort((a, b) =>
-        (capacities.get(b.id) ?? 0) - (capacities.get(a.id) ?? 0));
-      for (const product of candidates) {
-        if (visited.has(product.id)) continue;
-        visited.add(product.id);
-        const taken = assigned.get(product.id) ?? [];
-        if (taken.length < (capacities.get(product.id) ?? 0)) {
-          taken.push(slotIndex); assigned.set(product.id, taken); productIds[slotIndex] = product.id;
-          return true;
-        }
-        for (let index = 0; index < taken.length; index++) {
-          const displaced = taken[index]!;
-          if (visit(displaced, visited)) {
-            taken[index] = slotIndex;
-            productIds[slotIndex] = product.id;
-            return true;
-          }
-        }
-      }
-      return false;
-    };
-    const ordered = requirements.map((item, index) => ({ item, index }))
-      .sort((a, b) => a.item.candidates.length - b.item.candidates.length);
-    const available = ordered.every(({ index }) => visit(index, new Set()));
-    if (available) return { available: true, message: 'Disponível', details: [], productIds };
+    const productIds = allocateKitStock(kit, this.catalog.activeProducts(), 1, reserved);
+    if (productIds) return { available: true, message: 'Disponível', details: [], productIds };
     const shortages = [...kit.components].map(component => {
       const count = this.matchingProducts(component).reduce((sum, product) =>
         sum + (capacities.get(product.id) ?? 0), 0);

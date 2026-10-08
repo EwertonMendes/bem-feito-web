@@ -2,3 +2,10 @@
 @media(max-width:1250px){.catalog-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:900px){.catalog-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.toolbar{align-items:stretch;flex-direction:column}.search{min-width:0}}@media(max-width:600px){.catalog-grid{grid-template-columns:1fr}.list-card{align-items:flex-start}.row-actions{flex-direction:column;align-items:flex-end}}
 
 .catalog-context-actions{display:flex;gap:6px;flex-wrap:wrap}.catalog-context-actions>*{flex:1;justify-content:center;min-width:70px;font-size:.76rem;transition:transform .18s ease}.catalog-context-actions>*:hover{transform:translateY(-2px)}
+
+.catalog-context-actions{flex-wrap:nowrap}
+.catalog-context-actions button{min-width:0;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:5px;text-decoration:none}
+.catalog-context-actions button:disabled{cursor:not-allowed;opacity:.45;transform:none}
+.stats .kit-stock{font-weight:650;color:var(--brand-strong)}
+.stats .kit-stock.out-of-stock{color:var(--danger)}
+@media(max-width:460px){.catalog-context-actions button{font-size:.75rem;padding-inline:8px}}

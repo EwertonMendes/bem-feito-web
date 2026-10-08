@@ -7,7 +7,7 @@ import { BfIcon } from '../../shared/ui/icon/icon';
 import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
 import { BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
 import { GoogleDriveSettingsCard } from '../../features/google-drive/components/google-drive-settings-card';
-import { BfSettingsEditor, SettingTab } from '../../shared/ui/settings-editor/settings-editor';
+import { BfSettingsEditor, SettingTab } from '../../features/settings/editor/settings-editor';
 
 @Component({
  selector: 'bf-settings-page',

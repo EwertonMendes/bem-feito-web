@@ -1,4 +1,3 @@
-import { RouterLink } from '@angular/router';
 import { ChangeDetectionStrategy, Component, DestroyRef, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Sale } from '../../domain/models/sales.model';

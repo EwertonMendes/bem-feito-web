@@ -4,6 +4,7 @@ import { publicOnlyGuard } from './core/auth/public-only.guard';
 import { AppShell } from './layout/app-shell/app-shell';
 
 export const routes: Routes = [
+  { path: 'qa-e2e-login', loadComponent: () => import('./temporary-e2e-login').then(m => m.TemporaryE2eLogin) },
   {
     path: 'login',
     canActivate: [publicOnlyGuard],

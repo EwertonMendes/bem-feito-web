@@ -1,0 +1,75 @@
+name: QA Temporary Playwright E2E
+
+on:
+  push:
+    branches: ['feat/hybrid-cost-inventory']
+    paths:
+      - '.github/workflows/qa-temporary-e2e.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: Browser E2E (ephemeral)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.22.3
+          cache: npm
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install app without altering dependency lock
+        run: npm ci --no-fund
+      - name: Install Playwright only on disposable runner
+        run: |
+          npm install --no-save --package-lock=false @playwright/test@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Switch runtime exclusively to demo emulators
+        run: node tools/e2e-temporary/prepare.mjs
+      - name: Start isolated Firebase emulators
+        run: |
+          nohup npx --yes --package firebase-tools@15.32.1 firebase emulators:start --only auth,firestore --project demo-bem-feito > /tmp/qa-firebase.log 2>&1 < /dev/null &
+          for i in $(seq 1 120); do
+            if curl -sS -o /dev/null http://127.0.0.1:9099/ && curl -sS -o /dev/null http://127.0.0.1:8080/; then exit 0; fi
+            sleep 2
+          done
+          echo 'Firebase emulator did not become available'
+          tail -100 /tmp/qa-firebase.log
+          exit 1
+      - name: Seed authorized QA user and controlled/estimated/untracked records
+        env:
+          FIRESTORE_EMULATOR_HOST: 127.0.0.1:8080
+        run: node tools/e2e-temporary/seed.mjs
+      - name: Start real Angular app against emulators
+        run: |
+          nohup npm run start -- --host 127.0.0.1 --port 4200 > /tmp/qa-angular.log 2>&1 < /dev/null &
+          for i in $(seq 1 120); do
+            if curl -fsS -o /dev/null http://127.0.0.1:4200/; then exit 0; fi
+            sleep 2
+          done
+          echo 'Angular did not become available'
+          tail -120 /tmp/qa-angular.log
+          exit 1
+      - name: Exercise real UI and persistence in Chromium
+        run: npx playwright test tools/e2e-temporary/flows.spec.mjs --workers=1 --reporter=list
+      - name: Output server logs on failure
+        if: failure()
+        run: |
+          tail -160 /tmp/qa-angular.log || true
+          tail -160 /tmp/qa-firebase.log || true
+      - name: Upload failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: temporary-playwright-results
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 2

@@ -17,8 +17,9 @@ import {
   where,
 } from 'firebase/firestore';
 import { summarizeSaleItems } from '../../domain/logic/sale-analytics';
-import { inputStockStatus, productStockStatus } from '../../domain/logic/stock-status';
-import { Addition, InputItem, Kit, Product } from '../../domain/models/catalog.model';
+import { productCostComponents, standardCostForProduct } from '../../domain/logic/costing';
+import { productStockStatus, stockStatusForInput } from '../../domain/logic/stock-status';
+import { Addition, CollectionDefinition, FormatDefinition, FragranceDefinition, InputItem, Kit, Product } from '../../domain/models/catalog.model';
 import { StockMovement } from '../../domain/models/inventory.model';
 import { Payment, Sale, SaleDraft } from '../../domain/models/sales.model';
 import { resolveSaleDraft } from '../../domain/logic/sale-resolution';
@@ -146,19 +147,6 @@ export class SalesRepository {
       const additionSnapshots = new Map<string, DocumentSnapshot>();
       for (const id of [...new Set(additionIds)]) additionSnapshots.set(id, await transaction.get(doc(this.firestore, 'additions', id)));
 
-      const additions = new Map<string, Addition>();
-      const additionInputIds = new Set<string>();
-      for (const [id, snapshot] of additionSnapshots) {
-        if (!snapshot.exists()) throw new Error('Um adicional da venda não existe mais.');
-        const addition = { id, ...snapshot.data() } as Addition;
-        if (!addition.active) throw new Error(`${addition.name} está inativo.`);
-        additions.set(id, addition);
-        addition.components.forEach((component) => additionInputIds.add(component.inputId));
-      }
-
-      const inputSnapshots = new Map<string, DocumentSnapshot>();
-      for (const id of additionInputIds) inputSnapshots.set(id, await transaction.get(doc(this.firestore, 'inputs', id)));
-
       const products = new Map<string, Product>();
       for (const [id, snapshot] of productSnapshots) {
         if (!snapshot.exists()) throw new Error('Um produto da venda não existe mais.');
@@ -175,12 +163,63 @@ export class SalesRepository {
         kits.set(id, kit);
       }
 
+      const additions = new Map<string, Addition>();
+      const additionInputIds = new Set<string>();
+      for (const [id, snapshot] of additionSnapshots) {
+        if (!snapshot.exists()) throw new Error('Um adicional da venda não existe mais.');
+        const addition = { id, ...snapshot.data() } as Addition;
+        if (!addition.active) throw new Error(`${addition.name} está inativo.`);
+        additions.set(id, addition);
+        addition.components.forEach((component) => additionInputIds.add(component.inputId));
+      }
+
+      const collections = new Map<string, CollectionDefinition>();
+      for (const id of new Set([...products.values()].map((item) => item.collectionId))) {
+        const snapshot = await transaction.get(doc(this.firestore, 'collections', id));
+        if (snapshot.exists()) collections.set(id, { id, ...snapshot.data() } as CollectionDefinition);
+      }
+
+      const fragrances = new Map<string, FragranceDefinition>();
+      for (const id of new Set([...products.values()].map((item) => item.fragranceId))) {
+        const snapshot = await transaction.get(doc(this.firestore, 'fragrances', id));
+        if (snapshot.exists()) fragrances.set(id, { id, ...snapshot.data() } as FragranceDefinition);
+      }
+
+      const formats = new Map<string, FormatDefinition>();
+      for (const id of new Set([...products.values()].map((item) => item.formatId))) {
+        const snapshot = await transaction.get(doc(this.firestore, 'formats', id));
+        if (snapshot.exists()) formats.set(id, { id, ...snapshot.data() } as FormatDefinition);
+      }
+
+      const requiredInputIds = new Set<string>(additionInputIds);
+      for (const [id, product] of products) {
+        const components = productCostComponents(product, {
+          collection: collections.get(product.collectionId),
+          fragrance: fragrances.get(product.fragranceId),
+          format: formats.get(product.formatId),
+        });
+        components.forEach((component) => requiredInputIds.add(component.inputId));
+      }
+
+      const inputSnapshots = new Map<string, DocumentSnapshot>();
+      for (const id of requiredInputIds) inputSnapshots.set(id, await transaction.get(doc(this.firestore, 'inputs', id)));
+
       const inputs = new Map<string, InputItem>();
       for (const [id, snapshot] of inputSnapshots) {
-        if (!snapshot.exists()) throw new Error('Um insumo de adicional não existe mais.');
+        if (!snapshot.exists()) throw new Error('Um insumo usado na venda não existe mais.');
         const input = { id, ...snapshot.data() } as InputItem;
-        if (!input.active) throw new Error(`${input.name} está inativo.`);
+        if (additionInputIds.has(id) && !input.active) throw new Error(`${input.name} está inativo.`);
         inputs.set(id, input);
+      }
+
+      const productUnitCosts = new Map<string, number>();
+      for (const [id, product] of products) {
+        const cost = standardCostForProduct(product, {
+          collection: collections.get(product.collectionId),
+          fragrance: fragrances.get(product.fragranceId),
+          format: formats.get(product.formatId),
+        }, inputs);
+        productUnitCosts.set(id, cost.unitCostCents);
       }
 
       const { lines, stockEffects, subtotalCents, discountCents, totalCents } = resolveSaleDraft(draft, {
@@ -188,21 +227,18 @@ export class SalesRepository {
         kits,
         additions,
         inputs,
+        productUnitCosts,
       });
       const analytics = summarizeSaleItems(lines);
 
       const allocations = allocatePayments(totalCents, draft.payments);
       const paymentCounterRef = doc(this.firestore, 'counters', 'payment');
-      const paymentCounterSnapshot = allocations.length
-        ? await transaction.get(paymentCounterRef)
-        : null;
+      const paymentCounterSnapshot = allocations.length ? await transaction.get(paymentCounterRef) : null;
       const receivedCents = allocations.reduce((sum, item) => sum + item.appliedCents, 0);
       const tipCents = allocations.reduce((sum, item) => sum + item.tipCents, 0);
       const balanceCents = Math.max(0, totalCents - receivedCents);
 
-      if (balanceCents > 0 && !draft.customerName?.trim()) {
-        throw new Error('Informe o cliente quando houver saldo a receber.');
-      }
+      if (balanceCents > 0 && !draft.customerName?.trim()) throw new Error('Informe o cliente quando houver saldo a receber.');
 
       const saleSequence = Number(saleCounterSnapshot.data()?.['value'] ?? 0) + 1;
       let paymentSequence = Number(paymentCounterSnapshot?.data()?.['value'] ?? 0);
@@ -212,11 +248,7 @@ export class SalesRepository {
 
       transaction.set(saleCounterRef, { value: saleSequence, updatedAt: serverTimestamp() }, { merge: true });
       if (allocations.length) {
-        transaction.set(
-          paymentCounterRef,
-          { value: paymentSequence + allocations.length, updatedAt: serverTimestamp() },
-          { merge: true },
-        );
+        transaction.set(paymentCounterRef, { value: paymentSequence + allocations.length, updatedAt: serverTimestamp() }, { merge: true });
       }
 
       for (const allocation of allocations) {
@@ -256,22 +288,12 @@ export class SalesRepository {
         const targetRef = doc(this.firestore, effect.itemType === 'product' ? 'products' : 'inputs', effect.itemId);
         const entity = effect.itemType === 'product' ? products.get(effect.itemId) : inputs.get(effect.itemId);
         if (!entity) continue;
-
         const stock = entity.stock + effect.quantityDelta;
         const stockStatus = effect.itemType === 'product'
           ? productStockStatus(stock, (entity as Product).minimumStock)
-          : inputStockStatus(
-              stock,
-              (entity as InputItem).minimumStock,
-              (entity as InputItem).minimumStockConfigured !== false,
-            );
+          : stockStatusForInput({ ...(entity as InputItem), stock });
 
-        transaction.update(targetRef, {
-          stock,
-          stockStatus,
-          updatedAt: serverTimestamp(),
-          updatedBy: userId,
-        });
+        transaction.update(targetRef, { stock, stockStatus, updatedAt: serverTimestamp(), updatedBy: userId });
         stockChanges.push({ itemType: effect.itemType, itemId: effect.itemId, stock });
 
         const movementRef = doc(collection(this.firestore, 'stockMovements'));
@@ -336,12 +358,7 @@ export class SalesRepository {
         updatedBy: userId,
       } satisfies Omit<Sale, 'id'>);
 
-      this.revisions.touchTransaction(
-        transaction,
-        'sales',
-        'inventory',
-        ...(allocations.length ? ['payments'] as const : []),
-      );
+      this.revisions.touchTransaction(transaction, 'sales', 'inventory', ...(allocations.length ? ['payments'] as const : []));
       return { sale, payments, stockChanges };
     });
   }
@@ -516,11 +533,7 @@ export class SalesRepository {
         const stock = Number(snapshot.data()['stock'] ?? 0) - effect.quantityDelta;
         const stockStatus = effect.itemType === 'product'
           ? productStockStatus(stock, (entity as Product).minimumStock)
-          : inputStockStatus(
-              stock,
-              (entity as InputItem).minimumStock,
-              (entity as InputItem).minimumStockConfigured !== false,
-            );
+          : stockStatusForInput({ ...(entity as InputItem), stock });
 
         transaction.update(snapshot.ref, {
           stock,

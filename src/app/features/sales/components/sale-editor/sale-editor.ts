@@ -25,6 +25,7 @@ import { BfDialog } from '../../../../shared/ui/dialog/dialog';
 import { BfIcon } from '../../../../shared/ui/icon/icon';
 import { BfSelect, BfSelectOption } from '../../../../shared/ui/select/select';
 import { paymentMethodIcon } from '../../../../shared/ui/select/payment-method-icon';
+import { BfNumberInput } from '../../../../shared/ui/number-input/number-input';
 
 interface SaleFormModel {
   businessDate: string;
@@ -87,7 +88,7 @@ interface KitRequirement {
 
 @Component({
   selector: 'bf-sale-editor',
-  imports: [FormField, BfConfirmDialog, BfDialog, BfIcon, CatalogImage, BfSelect],
+  imports: [FormField, BfConfirmDialog, BfDialog, BfIcon, CatalogImage, BfSelect, BfNumberInput],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sale-editor.html',
   styleUrl: './sale-editor.scss',

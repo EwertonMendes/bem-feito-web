@@ -1,11 +1,12 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
-import { Addition, AdditionComponent, InputItem, Kit, KitComponent, Product, RecipeComponent } from '../../../../domain/models/catalog.model';
+import { Addition, AdditionComponent, InputItem, InputTrackingMode, Kit, KitComponent, Product, RecipeComponent } from '../../../../domain/models/catalog.model';
+import { standardCostForProduct, trackingModeForInput } from '../../../../domain/logic/costing';
 import { CatalogImageEntityKind, CatalogImageRef } from '../../../../domain/models/image.model';
 import { ErrorService } from '../../../../core/services/error.service';
 import { ImageService } from '../../../../core/services/image.service';
 import { ToastService } from '../../../../core/services/toast.service';
-import { fromCents, toCents } from '../../../../core/utils/money';
+import { formatCurrency, fromCents, toCents } from '../../../../core/utils/money';
 import { CatalogReferenceStore } from '../../catalog-reference.store';
 import { CatalogStore } from '../../catalog.store';
 import { BfDialog } from '../../../../shared/ui/dialog/dialog';
@@ -14,15 +15,16 @@ import { BfSelect, BfSelectOption } from '../../../../shared/ui/select/select';
 import { BfCheckbox } from '../../../../shared/ui/checkbox/checkbox';
 import { BfImageUpload } from '../../../../shared/ui/image-upload/image-upload';
 import { CatalogImage } from '../../../../shared/media/catalog-image/catalog-image';
+import { BfNumberInput } from '../../../../shared/ui/number-input/number-input';
 
-interface ProductFormModel { code: string; collectionId: string; fragranceId: string; formatId: string; salePrice: number; additionalCost: number; minimumStock: number; active: boolean; }
-interface InputFormModel { code: string; name: string; unitId: string; minimumStock: number | null; active: boolean; }
+interface ProductFormModel { collectionId: string; fragranceId: string; formatId: string; salePrice: number; additionalCost: number; minimumStock: number; active: boolean; }
+interface InputFormModel { name: string; unitId: string; trackingMode: InputTrackingMode; minimumStock: number; active: boolean; }
 interface KitFormModel { name: string; price: number; notes: string; active: boolean; }
 interface AdditionFormModel { name: string; category: string; price: number; notes: string; active: boolean; }
 
 @Component({
   selector: 'bf-catalog-editor',
-  imports: [FormField, BfDialog, BfIcon, BfSelect, BfCheckbox, BfImageUpload, CatalogImage],
+  imports: [FormField, BfDialog, BfIcon, BfSelect, BfCheckbox, BfImageUpload, CatalogImage, BfNumberInput],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './catalog-editor.html',
   styleUrl: './catalog-editor.scss',
@@ -36,6 +38,7 @@ export class CatalogEditor {
   private readonly errors = inject(ErrorService);
   private readonly dialog = viewChild.required<BfDialog>('dialog');
 
+  readonly currency = formatCurrency;
   readonly imagesEnabled = this.images.enabled;
   readonly kind = signal<CatalogImageEntityKind>('products');
   readonly editingId = signal('');
@@ -54,9 +57,8 @@ export class CatalogEditor {
     return this.store.additions().find((item) => item.id === id)?.image;
   });
 
-  readonly productModel = signal<ProductFormModel>({ code: '', collectionId: '', fragranceId: '', formatId: '', salePrice: 0, additionalCost: 0, minimumStock: 0, active: true });
+  readonly productModel = signal<ProductFormModel>({ collectionId: '', fragranceId: '', formatId: '', salePrice: 0, additionalCost: 0, minimumStock: 0, active: true });
   readonly productForm = form(this.productModel, (p) => {
-    required(p.code, { message: 'Informe o código.' });
     required(p.collectionId, { message: 'Selecione a coleção.' });
     required(p.fragranceId, { message: 'Selecione a fragrância.' });
     required(p.formatId, { message: 'Selecione o formato.' });
@@ -64,9 +66,8 @@ export class CatalogEditor {
     min(p.minimumStock, 0);
   });
 
-  readonly inputModel = signal<InputFormModel>({ code: '', name: '', unitId: '', minimumStock: 0, active: true });
+  readonly inputModel = signal<InputFormModel>({ name: '', unitId: '', trackingMode: 'estimated', minimumStock: 0, active: true });
   readonly inputForm = form(this.inputModel, (p) => {
-    required(p.code);
     required(p.name);
     required(p.unitId);
     min(p.minimumStock, 0);
@@ -93,6 +94,17 @@ export class CatalogEditor {
     { value: '', label: 'Selecione' },
     ...this.references.units().map((item) => ({ value: item.id, label: item.name })),
   ]);
+  readonly inputTrackingOptions: readonly BfSelectOption[] = [
+    { value: 'exact', icon: 'stock-exact', label: 'Controlado', description: 'Contagem exata. Entradas e consumos alteram o saldo e a falta pode bloquear a operação.' },
+    { value: 'estimated', icon: 'stock-estimated', label: 'Estimado', description: 'Saldo aproximado. Compras e consumo previsto atualizam o saldo, mas a falta nunca bloqueia.' },
+    { value: 'untracked', icon: 'stock-untracked', label: 'Não controlar saldo', description: 'O custo continua sendo acompanhado, mas o sistema não mantém saldo físico nem alerta de estoque.' },
+  ];
+  readonly inputTrackingHint = computed(() => {
+    const mode = this.inputModel().trackingMode;
+    if (mode === 'exact') return 'Ideal para embalagens, frascos, caixas e outros itens contáveis. O saldo deve representar a quantidade real disponível.';
+    if (mode === 'untracked') return 'Indicado para materiais cujo saldo físico não precisa ser acompanhado, como álcool de borrifação, fitas e pequenos consumíveis. Compras e composições continuam considerando o custo.';
+    return 'Ideal para glicerina, essência, lauril, corantes e outros materiais de consumo variável. O saldo serve como referência e pode ser conferido periodicamente.';
+  });
   readonly unitOptions = computed<BfSelectOption[]>(() =>
     this.references.units().map((item) => ({ value: item.id, label: item.name })),
   );
@@ -105,6 +117,34 @@ export class CatalogEditor {
   readonly inputOptions = computed<BfSelectOption[]>(() =>
     this.store.inputs().map((item) => ({ value: item.id, label: item.name })),
   );
+  readonly productCostPreview = computed(() => {
+    if (this.kind() !== 'products') return null;
+    const model = this.productModel();
+    const existing = this.store.products().find((item) => item.id === this.editingId());
+    try {
+      return standardCostForProduct({
+        recipe: this.recipe(),
+        additionalCostCents: toCents(model.additionalCost),
+        averageUnitCostCents: existing?.averageUnitCostCents ?? 0,
+      }, {
+        collection: this.references.collections().find((item) => item.id === model.collectionId),
+        fragrance: this.references.fragrances().find((item) => item.id === model.fragranceId),
+        format: this.references.formats().find((item) => item.id === model.formatId),
+      }, new Map(this.store.inputs().map((item) => [item.id, item])));
+    } catch {
+      return null;
+    }
+  });
+
+  readonly productCostSummary = computed(() => {
+    const preview = this.productCostPreview();
+    if (!preview) return 'Custo ainda indisponível';
+    const pending = preview.components.filter((item) => item.unitCostCents <= 0).length;
+    return pending
+      ? `${this.currency(preview.unitCostCents)} · ${pending} custo${pending === 1 ? '' : 's'} pendente${pending === 1 ? '' : 's'}`
+      : this.currency(preview.unitCostCents);
+  });
+
   readonly kitCollectionOptions = computed<BfSelectOption[]>(() => [
     { value: '', label: 'Qualquer coleção' },
     ...this.references.collections().map((item) => ({ value: item.id, label: item.name })),
@@ -129,10 +169,10 @@ export class CatalogEditor {
     this.editingId.set('');
     this.resetImageChange();
     if (kind === 'products') {
-      this.productModel.set({ code: '', collectionId: '', fragranceId: '', formatId: '', salePrice: 0, additionalCost: 0, minimumStock: 0, active: true });
+      this.productModel.set({ collectionId: '', fragranceId: '', formatId: '', salePrice: 0, additionalCost: 0, minimumStock: 0, active: true });
       this.recipe.set([]);
     } else if (kind === 'inputs') {
-      this.inputModel.set({ code: '', name: '', unitId: '', minimumStock: 0, active: true });
+      this.inputModel.set({ name: '', unitId: '', trackingMode: 'estimated', minimumStock: 0, active: true });
     } else if (kind === 'kits') {
       this.kitModel.set({ name: '', price: 0, notes: '', active: true });
       this.kitComponents.set([]);
@@ -147,7 +187,7 @@ export class CatalogEditor {
     this.kind.set('products');
     this.editingId.set(item.id);
     this.resetImageChange();
-    this.productModel.set({ code: item.code, collectionId: item.collectionId, fragranceId: item.fragranceId, formatId: item.formatId, salePrice: fromCents(item.salePriceCents), additionalCost: fromCents(item.additionalCostCents), minimumStock: item.minimumStock, active: item.active });
+    this.productModel.set({ collectionId: item.collectionId, fragranceId: item.fragranceId, formatId: item.formatId, salePrice: fromCents(item.salePriceCents), additionalCost: fromCents(item.additionalCostCents), minimumStock: item.minimumStock, active: item.active });
     this.recipe.set(item.recipe.map((component) => ({ ...component })));
     this.dialog().open();
   }
@@ -156,7 +196,14 @@ export class CatalogEditor {
     this.kind.set('inputs');
     this.editingId.set(item.id);
     this.resetImageChange();
-    this.inputModel.set({ code: item.code, name: item.name, unitId: item.unitId, minimumStock: item.minimumStockConfigured === false ? null : item.minimumStock, active: item.active });
+    const trackingMode = trackingModeForInput(item);
+    this.inputModel.set({
+      name: item.name,
+      unitId: item.unitId,
+      trackingMode,
+      minimumStock: trackingMode === 'untracked' ? 0 : item.minimumStock,
+      active: item.active,
+    });
     this.dialog().open();
   }
 
@@ -180,12 +227,16 @@ export class CatalogEditor {
 
   addRecipeComponent(): void {
     const input = this.store.activeInputs()[0];
-    const unit = this.references.units()[0];
-    if (input && unit) this.recipe.update((items) => [...items, { inputId: input.id, quantity: 0, unitId: unit.id }]);
+    if (input) this.recipe.update((items) => [...items, { inputId: input.id, quantity: 0, unitId: input.unitId }]);
   }
 
   patchRecipe(index: number, patch: Partial<RecipeComponent>): void {
     this.recipe.update((items) => items.map((item, i) => i === index ? { ...item, ...patch } : item));
+  }
+
+  patchRecipeInput(index: number, inputId: string): void {
+    const input = this.store.inputs().find((item) => item.id === inputId);
+    this.patchRecipe(index, { inputId, unitId: input?.unitId ?? '' });
   }
 
   removeRecipe(index: number): void {
@@ -207,12 +258,20 @@ export class CatalogEditor {
 
   addAdditionComponent(): void {
     const input = this.store.activeInputs()[0];
-    const unit = this.references.units()[0];
-    if (input && unit) this.additionComponents.update((items) => [...items, { id: crypto.randomUUID(), inputId: input.id, quantity: 1, unitId: unit.id, order: items.length + 1 }]);
+    if (input) this.additionComponents.update((items) => [...items, { id: crypto.randomUUID(), inputId: input.id, quantity: 1, unitId: input.unitId, order: items.length + 1 }]);
   }
 
   patchAdditionComponent(index: number, patch: Partial<AdditionComponent>): void {
     this.additionComponents.update((items) => items.map((item, i) => i === index ? { ...item, ...patch } : item));
+  }
+
+  patchAdditionInput(index: number, inputId: string): void {
+    const input = this.store.inputs().find((item) => item.id === inputId);
+    this.patchAdditionComponent(index, { inputId, unitId: input?.unitId ?? '' });
+  }
+
+  unitName(unitId: string): string {
+    return this.references.units().find((item) => item.id === unitId)?.name ?? '—';
   }
 
   removeAdditionComponent(index: number): void {
@@ -241,7 +300,7 @@ export class CatalogEditor {
     if (!collection || !fragrance || !format) throw new Error('Coleção, fragrância ou formato inválido.');
     const existing = this.store.products().find((item) => item.id === this.editingId());
     const product: Product = {
-      id: existing?.id ?? '', code: model.code.trim(), active: model.active, collectionId: model.collectionId,
+      id: existing?.id ?? '', code: existing?.code ?? '', active: model.active, collectionId: model.collectionId,
       fragranceId: model.fragranceId, formatId: model.formatId, displayName: `${collection.name} · ${fragrance.name} · ${format.name}`,
       salePriceCents: toCents(model.salePrice), additionalCostCents: toCents(model.additionalCost), averageUnitCostCents: existing?.averageUnitCostCents ?? 0,
       stock: existing?.stock ?? 0, minimumStock: model.minimumStock, image: existing?.image,
@@ -255,10 +314,21 @@ export class CatalogEditor {
     if (this.inputForm().invalid()) throw new Error('Revise os campos obrigatórios.');
     const model = this.inputModel();
     const existing = this.store.inputs().find((item) => item.id === this.editingId());
+    const tracked = model.trackingMode !== 'untracked';
     const input: InputItem = {
-      id: existing?.id ?? '', code: model.code.trim(), active: model.active, name: model.name.trim(), unitId: model.unitId,
-      stock: existing?.stock ?? 0, minimumStock: model.minimumStock ?? 0, minimumStockConfigured: model.minimumStock !== null,
-      averageUnitCostCents: existing?.averageUnitCostCents ?? 0, image: existing?.image,
+      id: existing?.id ?? '',
+      code: existing?.code ?? '',
+      active: model.active,
+      name: model.name.trim(),
+      unitId: model.unitId,
+      trackingMode: model.trackingMode,
+      stock: existing?.stock ?? 0,
+      minimumStock: tracked ? model.minimumStock : 0,
+      minimumStockConfigured: tracked,
+      averageUnitCostCents: existing?.averageUnitCostCents ?? 0,
+      costBasisQuantity: existing?.costBasisQuantity,
+      costBasisValueCents: existing?.costBasisValueCents,
+      image: existing?.image,
     };
     const id = await this.store.saveInput(input);
     await this.applyImageChange('inputs', id, existing?.image, (image) => this.store.setInputImage(id, image));

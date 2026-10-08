@@ -64,6 +64,11 @@ service cloud.firestore {
       return quantity(value);
     }
 
+    function validCostComponents(data) {
+      return !('costComponents' in data)
+        || (data.costComponents is list && data.costComponents.size() <= 50);
+    }
+
     function text(value) {
       return value is string && value.size() > 0 && value.size() <= 500;
     }
@@ -97,24 +102,31 @@ service cloud.firestore {
     }
 
     function validInputStockStatus(data) {
-      let tracked = !('minimumStockConfigured' in data) || data.minimumStockConfigured == true;
+      let legacyTracked = !('minimumStockConfigured' in data) || data.minimumStockConfigured == true;
+      let untracked = ('trackingMode' in data && data.trackingMode == 'untracked')
+        || (!('trackingMode' in data) && !legacyTracked);
       return !('stockStatus' in data)
-        || (!tracked && data.stockStatus == 'untracked')
-        || (tracked && data.stock < 0 && data.stockStatus == 'negative')
-        || (tracked && data.stock >= 0 && data.stock <= data.minimumStock && data.stockStatus == 'low')
-        || (tracked && data.stock > data.minimumStock && data.stockStatus == 'ok');
+        || (untracked && data.stockStatus == 'untracked')
+        || (!untracked && data.stock < 0 && data.stockStatus == 'negative')
+        || (!untracked && data.stock >= 0 && data.stock <= data.minimumStock && data.stockStatus == 'low')
+        || (!untracked && data.stock > data.minimumStock && data.stockStatus == 'ok');
     }
 
     function validCatalog(name, data) {
-      return (name in ['collections', 'units', 'paymentMethods', 'expenseCategories']
+      return (name == 'collections'
+          && fields(data, ['name', 'active'], ['costComponents'])
+          && text(data.name) && data.active is bool && validCostComponents(data))
+        || (name in ['units', 'paymentMethods', 'expenseCategories']
           && fields(data, ['name', 'active'], []) && text(data.name) && data.active is bool)
         || (name == 'fragrances'
-          && fields(data, ['name', 'active', 'collectionId'], [])
-          && text(data.name) && text(data.collectionId) && data.active is bool)
+          && fields(data, ['name', 'active', 'collectionId'], ['costComponents'])
+          && text(data.name) && text(data.collectionId) && data.active is bool
+          && validCostComponents(data))
         || (name == 'formats'
-          && fields(data, ['name', 'active'], ['approximateWeightGrams'])
+          && fields(data, ['name', 'active'], ['approximateWeightGrams', 'costComponents'])
           && text(data.name) && data.active is bool
-          && (!('approximateWeightGrams' in data) || quantity(data.approximateWeightGrams)))
+          && (!('approximateWeightGrams' in data) || quantity(data.approximateWeightGrams))
+          && validCostComponents(data))
         || (name == 'expenseTypes'
           && fields(data, ['name', 'active', 'kind'], []) && text(data.name) && data.active is bool
           && data.kind in ['input-purchase', 'operating-expense', 'equipment', 'other'])
@@ -130,10 +142,13 @@ service cloud.firestore {
           && validProductStockStatus(data)
           && (!('image' in data) || validImage(data.image)))
         || (name == 'inputs'
-          && fields(data, ['code', 'active', 'name', 'unitId', 'stock', 'minimumStock', 'averageUnitCostCents'], ['image', 'minimumStockConfigured', 'stockStatus'])
+          && fields(data, ['code', 'active', 'name', 'unitId', 'stock', 'minimumStock', 'averageUnitCostCents'], ['image', 'minimumStockConfigured', 'trackingMode', 'stockStatus', 'costBasisQuantity', 'costBasisValueCents'])
           && text(data.code) && text(data.name) && text(data.unitId) && data.active is bool
           && stock(data.stock) && quantity(data.minimumStock) && money(data.averageUnitCostCents)
           && (!('minimumStockConfigured' in data) || data.minimumStockConfigured is bool)
+          && (!('trackingMode' in data) || data.trackingMode in ['exact', 'estimated', 'untracked'])
+          && (!('costBasisQuantity' in data) || quantity(data.costBasisQuantity))
+          && (!('costBasisValueCents' in data) || money(data.costBasisValueCents))
           && validInputStockStatus(data)
           && (!('image' in data) || validImage(data.image)))
         || (name == 'kits'

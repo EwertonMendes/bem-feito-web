@@ -26,11 +26,13 @@ export class ProductionStore {
   private readonly loadingState = signal(false);
   private readonly initializedState = signal(false);
   private readonly hasMoreState = signal(false);
+  private readonly operationErrorState = signal('');
 
   readonly items = this.itemsState.asReadonly();
   readonly loading = this.loadingState.asReadonly();
   readonly initialized = this.initializedState.asReadonly();
   readonly hasMore = this.hasMoreState.asReadonly();
+  readonly operationError = this.operationErrorState.asReadonly();
 
   constructor() {
     effect(() => {
@@ -79,12 +81,17 @@ export class ProductionStore {
     }
   }
 
+  clearOperationError(): void {
+    this.operationErrorState.set('');
+  }
+
   async create(
     productId: string,
     quantity: number,
     businessDate: string,
     notes?: string,
   ): Promise<ProductionCreateResult | null> {
+    this.operationErrorState.set('');
     try {
       const result = await this.repository.create(productId, quantity, businessDate, notes);
       if (this.gate.isLoaded) {
@@ -93,7 +100,9 @@ export class ProductionStore {
       this.toast.success('Produção registrada com sucesso.');
       return result;
     } catch (error) {
-      this.toast.error(this.errors.message(error));
+      const message = this.errors.message(error);
+      this.operationErrorState.set(message);
+      this.toast.error(message);
       return null;
     }
   }

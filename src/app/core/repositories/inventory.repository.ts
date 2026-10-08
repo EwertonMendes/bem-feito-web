@@ -12,7 +12,9 @@ import {
   startAfter,
   where,
 } from 'firebase/firestore';
-import { inputStockStatus, productStockStatus } from '../../domain/logic/stock-status';
+import { trackingModeForInput } from '../../domain/logic/costing';
+import { planStockAdjustment, StockAdjustmentMode } from '../../domain/logic/stock-adjustment';
+import { productStockStatus, stockStatusForInput } from '../../domain/logic/stock-status';
 import { InputItem, Product } from '../../domain/models/catalog.model';
 import { StockAdjustment, StockMovement } from '../../domain/models/inventory.model';
 import { AuthService } from '../auth/auth.service';
@@ -52,6 +54,7 @@ export class InventoryRepository {
     };
   }
 
+  /** Strict delta adjustment kept for existing internal operations. */
   async adjust(
     itemType: 'product' | 'input',
     itemId: string,
@@ -59,9 +62,39 @@ export class InventoryRepository {
     reason: string,
     businessDate: string,
   ): Promise<StockAdjustmentResult> {
+    return this.applyAdjustment(itemType, itemId, 'delta', quantityDelta, reason, businessDate, false);
+  }
+
+  /**
+   * User-facing reconciliation resolves against the current balance inside the
+   * transaction, avoiding races with purchases, production and concurrent edits.
+   */
+  async reconcile(
+    itemType: 'product' | 'input',
+    itemId: string,
+    mode: StockAdjustmentMode,
+    quantity: number,
+    reason: string,
+    businessDate: string,
+  ): Promise<StockAdjustmentResult> {
+    return this.applyAdjustment(itemType, itemId, mode, quantity, reason, businessDate, true);
+  }
+
+  private async applyAdjustment(
+    itemType: 'product' | 'input',
+    itemId: string,
+    mode: StockAdjustmentMode,
+    quantity: number,
+    reason: string,
+    businessDate: string,
+    clampNegative: boolean,
+  ): Promise<StockAdjustmentResult> {
     const userId = this.auth.user()?.uid;
     if (!userId) throw new Error('Sessão inválida.');
-    if (!Number.isFinite(quantityDelta) || quantityDelta === 0) throw new Error('Informe uma quantidade diferente de zero.');
+    if (!Number.isFinite(quantity)) throw new Error('Informe uma quantidade válida.');
+    if (mode === 'delta' && quantity === 0) throw new Error('Informe uma quantidade diferente de zero.');
+    if (mode === 'set' && quantity < 0) throw new Error('O saldo total não pode ser negativo.');
+    if (itemType === 'product' && !Number.isInteger(quantity)) throw new Error('Produtos acabados exigem quantidade inteira.');
     if (!reason.trim()) throw new Error('Informe o motivo do ajuste.');
 
     return runTransaction(this.firestore, async (transaction) => {
@@ -75,20 +108,21 @@ export class InventoryRepository {
       const adjustmentRef = doc(collection(this.firestore, 'stockAdjustments'));
       const movementRef = doc(collection(this.firestore, 'stockMovements'));
       const currentStock = Number(itemSnapshot.data()['stock'] ?? 0);
-      const stock = currentStock + quantityDelta;
       const unitCostCents = Number(itemSnapshot.data()['averageUnitCostCents'] ?? 0);
       const item = { id: itemSnapshot.id, ...itemSnapshot.data() } as Product | InputItem;
-      if (stock < 0) {
+      if (itemType === 'input' && trackingModeForInput(item as InputItem) === 'untracked') {
+        throw new Error('Este insumo não controla saldo. Altere o modo de estoque no Catálogo para ajustar quantidades.');
+      }
+      if (!clampNegative && currentStock + quantity < 0) {
         const itemName = itemType === 'product' ? (item as Product).displayName : (item as InputItem).name;
         throw new Error(`Estoque insuficiente de ${itemName}. Ajuste o saldo disponível antes de registrar a saída.`);
       }
+      const plan = planStockAdjustment(currentStock, mode, quantity, clampNegative);
+      if (plan.quantityDelta === 0) throw new Error('O saldo informado já é o saldo atual. Nenhum ajuste necessário.');
+      const { quantityDelta, resultingStock: stock } = plan;
       const stockStatus = itemType === 'product'
         ? productStockStatus(stock, (item as Product).minimumStock)
-        : inputStockStatus(
-            stock,
-            (item as InputItem).minimumStock,
-            (item as InputItem).minimumStockConfigured !== false,
-          );
+        : stockStatusForInput({ ...(item as InputItem), stock });
 
       transaction.set(counterRef, { value: sequence, updatedAt: serverTimestamp() }, { merge: true });
       transaction.update(itemRef, {

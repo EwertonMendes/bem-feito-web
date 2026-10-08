@@ -75,6 +75,10 @@
         {
           "fieldPath": "dueDate",
           "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "balanceCents",
+          "order": "ASCENDING"
         }
       ]
     },
@@ -176,6 +180,10 @@
         },
         {
           "fieldPath": "businessDate",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "discountCents",
           "order": "ASCENDING"
         },
         {

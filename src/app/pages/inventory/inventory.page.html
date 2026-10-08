@@ -1,6 +1,6 @@
 <section class="bf-page">
   <header class="bf-page-header">
-    <div><h1>Estoque</h1><p>Saldo atual, mínimos e histórico completo de cada movimentação.</p></div>
+    <div><h1>Estoque</h1><p>Produtos acabados com saldo operacional e insumos no nível de controle que faz sentido para cada material.</p></div>
   </header>
 
   @if (refreshing()) { <bf-page-refresh /> }
@@ -27,19 +27,104 @@
       <bf-list-skeleton [rows]="8" />
     } @else if(tab()==='product'){
       @for(item of filteredProducts();track item.id){
-        <article class="stock-card product-card"><bf-catalog-image [image]="item.image" [alt]="item.displayName" [compact]="true" /><div class="identity"><strong>{{item.displayName}}</strong><span>{{item.code}}</span></div><div class="balance" [class.bad]="item.stock<0" [class.low]="item.stock>=0 && item.stock<=item.minimumStock"><strong>{{item.stock}}</strong><span>mín. {{item.minimumStock}}</span></div><div class="stock-actions"><button class="bf-button secondary" (click)="openHistory('product',item.id)">Histórico</button><button class="bf-button" (click)="openAdjustment('product',item.id)">Ajustar</button></div></article>
+        <article class="stock-card product-card">
+          <bf-catalog-image [image]="item.image" [alt]="item.displayName" [compact]="true" />
+          <div class="identity"><strong>{{item.displayName}}</strong><span>{{item.code}} · produto acabado</span></div>
+          <div class="balance" [class.low]="item.stock<=item.minimumStock"><strong>{{item.stock}}</strong><span>mín. {{item.minimumStock}}</span></div>
+          <div class="stock-actions"><button class="bf-button secondary" (click)="openHistory('product',item.id)">Histórico</button><button class="bf-button" (click)="openAdjustment('product',item.id)">Ajustar</button></div>
+        </article>
       } @empty {<bf-empty-state title="Nenhum produto" description="Cadastre produtos no Catálogo." />}
     } @else {
       @for(item of filteredInputs();track item.id){
-        <article class="stock-card input-card"><bf-catalog-image [image]="item.image" [alt]="item.name" [compact]="true" /><div class="identity"><strong>{{item.name}}</strong><span>{{item.code}} · {{unitName(item.unitId)}}</span></div><div class="balance" [class.bad]="item.stock<0" [class.low]="item.stock>=0 && item.stock<=item.minimumStock"><strong>{{item.stock}}</strong><span>mín. {{item.minimumStock}}</span></div><div class="cost"><strong>{{currency(item.averageUnitCostCents)}}</strong><span>custo médio</span></div><div class="stock-actions"><button class="bf-button secondary" (click)="openHistory('input',item.id)">Histórico</button><button class="bf-button" (click)="openAdjustment('input',item.id)">Ajustar</button></div></article>
+        <article class="stock-card input-card">
+          <bf-catalog-image [image]="item.image" [alt]="item.name" [compact]="true" />
+          <div class="identity">
+            <strong>{{item.name}}</strong>
+            <span>{{item.code}} · {{unitName(item.unitId)}}</span>
+            <em class="tracking-badge" [class.exact]="inputMode(item)==='exact'" [class.untracked]="inputMode(item)==='untracked'">{{inputModeLabel(item)}}</em>
+          </div>
+          <div class="balance" [class.low]="inputMode(item)!=='untracked' && item.stock<=item.minimumStock">
+            @if(inputMode(item)==='untracked'){
+              <strong>—</strong><span>sem controle de saldo</span>
+            } @else if(inputMode(item)==='estimated'){
+              <strong>{{item.stock}}</strong><span>aprox. · mín. {{item.minimumStock}}</span>
+            } @else {
+              <strong>{{item.stock}}</strong><span>mín. {{item.minimumStock}}</span>
+            }
+          </div>
+          <div class="cost"><strong>{{currency(item.averageUnitCostCents)}}</strong><span>custo médio</span></div>
+          <div class="stock-actions">
+            @if(inputMode(item)!=='untracked'){
+              <button class="bf-button secondary" (click)="openHistory('input',item.id)">Histórico</button>
+              <button class="bf-button" (click)="openAdjustment('input',item.id)">{{inputMode(item)==='estimated'?'Conferir':'Ajustar'}}</button>
+            } @else {
+              <span class="no-stock-action">Sem controle de saldo</span>
+            }
+          </div>
+        </article>
       } @empty {<bf-empty-state title="Nenhum insumo" description="Cadastre insumos no Catálogo." />}
     }
   </div>
 
   <dialog bfDialog #adjustmentDialog="bfDialog" class="bf-dialog">
-    <div class="bf-dialog-header"><div><h2>Ajustar estoque</h2><small>{{selectedName()}}</small></div><button class="bf-icon-button" (click)="adjustmentDialog.close()"><bf-icon name="close" /></button></div>
-    <div class="bf-dialog-body"><div class="callout">Use número positivo para entrada e negativo para saída. O saldo não pode ficar negativo e todos os ajustes ficam registrados no histórico.</div><div class="bf-grid two"><label class="bf-field"><span>Quantidade (+/-)</span><input class="bf-input" type="number" step="0.001" [formField]="adjustmentForm.quantity" /></label><label class="bf-field"><span>Data</span><input class="bf-input" type="date" [formField]="adjustmentForm.businessDate" /></label><label class="bf-field full"><span>Motivo</span><textarea class="bf-textarea" [formField]="adjustmentForm.reason" placeholder="Inventário, perda, amostra, correção..."></textarea></label></div></div>
-    <div class="bf-dialog-footer"><button class="bf-button secondary" (click)="adjustmentDialog.close()">Cancelar</button><button class="bf-button" (click)="saveAdjustment()">Registrar ajuste</button></div>
+    <div class="bf-dialog-header">
+      <div><h2>Ajustar estoque</h2><small>{{selectedName()}}</small></div>
+      <button class="bf-icon-button" type="button" aria-label="Fechar ajuste" (click)="adjustmentDialog.close()"><bf-icon name="close" /></button>
+    </div>
+    <div class="bf-dialog-body">
+      <fieldset class="adjustment-modes" [disabled]="saving()">
+        <legend>Como deseja ajustar?</legend>
+        <label class="adjustment-option" [class.active]="adjustmentMode()==='set'">
+          <input type="radio" name="adjustment-mode" value="set" [checked]="adjustmentMode()==='set'" (change)="setAdjustmentMode('set')" />
+          <span><strong>Definir saldo total</strong><small>Informar o total disponível após a conferência.</small></span>
+        </label>
+        <label class="adjustment-option" [class.active]="adjustmentMode()==='delta'">
+          <input type="radio" name="adjustment-mode" value="delta" [checked]="adjustmentMode()==='delta'" (change)="setAdjustmentMode('delta')" />
+          <span><strong>Somar ou subtrair</strong><small>Registrar uma entrada ou saída relativa ao saldo atual.</small></span>
+        </label>
+      </fieldset>
+
+      <div class="stock-preview" aria-live="polite">
+        <span class="stock-preview-current">Saldo atual <strong>{{formatQuantity(selectedStock())}} {{selectedUnitName()}}</strong></span>
+        <span class="stock-preview-arrow" aria-hidden="true">→</span>
+        <span class="stock-preview-result">Saldo após ajuste <strong>{{adjustmentPreview() ? formatQuantity(adjustmentPreview()!.resultingStock) : '—'}} {{selectedUnitName()}}</strong></span>
+      </div>
+      @if(adjustmentMode()==='delta' && adjustmentPreview()?.clampedToZero){
+        <p class="stock-preview-hint">A saída supera o saldo disponível. O resultado será limitado a zero, sem estoque negativo.</p>
+      }
+      @if(selectedInputMode()==='estimated'){
+        <p class="stock-preview-hint">Este insumo possui saldo estimado. O ajuste é uma conferência aproximada.</p>
+      }
+      @if(formError()){<p class="bf-form-error" role="alert">{{formError()}}</p>}
+
+      <div class="bf-grid two adjustment-fields">
+        <label class="bf-field">
+          <span>{{adjustmentMode()==='set'?'Novo saldo total':'Variação (+/-)'}}</span>
+          <bf-number-input
+            [kind]="selectedType()==='product'?'integer':'decimal'"
+            [decimals]="3"
+            [suffix]="selectedUnitName()"
+            [formField]="adjustmentForm.quantity"
+            ariaLabel="Quantidade do ajuste"
+          />
+          @if(submitted() && quantityError()){<small class="bf-field-error">{{quantityError()}}</small>}
+        </label>
+        <label class="bf-field">
+          <span>Data</span>
+          <input class="bf-input" type="date" [class.invalid]="submitted() && !!dateError()" [formField]="adjustmentForm.businessDate" />
+          @if(submitted() && dateError()){<small class="bf-field-error">{{dateError()}}</small>}
+        </label>
+        <label class="bf-field full">
+          <span>Motivo <em class="required-indicator">*</em></span>
+          <textarea class="bf-textarea" [class.invalid]="submitted() && !!reasonError()" [formField]="adjustmentForm.reason" placeholder="Inventário, perda, amostra, correção..."></textarea>
+          @if(submitted() && reasonError()){<small class="bf-field-error">{{reasonError()}}</small>}
+        </label>
+      </div>
+    </div>
+    <div class="bf-dialog-footer">
+      <button class="bf-button secondary" type="button" [disabled]="saving()" (click)="adjustmentDialog.close()">Cancelar</button>
+      <button class="bf-button" type="button" [disabled]="saving()" (click)="saveAdjustment()">{{saving()?'Registrando...':'Registrar ajuste'}}</button>
+    </div>
   </dialog>
 
   <dialog bfDialog #historyDialog="bfDialog" class="bf-dialog" (close)="closeHistory()">

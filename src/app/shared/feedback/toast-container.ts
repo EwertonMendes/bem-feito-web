@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, effect, inject, viewChild } from '@angular/core';
 import { ToastMessage, ToastService } from '../../core/services/toast.service';
 import { BfIcon, BfIconName } from '../ui/icon/icon';
 
@@ -7,7 +7,7 @@ import { BfIcon, BfIconName } from '../ui/icon/icon';
   imports: [BfIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="stack" aria-live="polite" aria-label="Notificações">
+    <div #stack class="stack" popover="manual" aria-live="polite" aria-label="Notificações">
       @for (toast of service.messages(); track toast.id) {
         <article
           class="toast"
@@ -27,7 +27,7 @@ import { BfIcon, BfIconName } from '../ui/icon/icon';
   `,
   styles: [`
     :host{position:relative;z-index:1200}
-    .stack{position:fixed;left:50%;bottom:max(20px,env(safe-area-inset-bottom));z-index:1200;width:min(560px,calc(100vw - 32px));display:grid;gap:10px;transform:translateX(-50%);pointer-events:none}
+    .stack{position:fixed;inset:auto auto max(20px,env(safe-area-inset-bottom)) 50%;margin:0;padding:0;border:0;background:transparent;overflow:visible;z-index:1200;width:min(560px,calc(100vw - 32px));display:grid;gap:10px;transform:translateX(-50%);pointer-events:none}
     .toast{pointer-events:auto;min-width:0;display:grid;grid-template-columns:36px minmax(0,1fr) 32px;gap:11px;align-items:center;padding:11px 11px 11px 13px;border:1px solid color-mix(in srgb,var(--line) 76%,var(--brand) 24%);border-radius:16px;background:color-mix(in srgb,var(--surface-elevated) 94%,transparent);color:var(--text);box-shadow:0 18px 52px rgba(20,15,12,.22);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);animation:toast-in 180ms ease-out}
     .toast.success{border-color:color-mix(in srgb,var(--success) 30%,var(--line))}
     .toast.error{border-color:color-mix(in srgb,var(--danger) 36%,var(--line))}
@@ -47,6 +47,18 @@ import { BfIcon, BfIconName } from '../ui/icon/icon';
 })
 export class ToastContainer {
   readonly service = inject(ToastService);
+  private readonly stack = viewChild<ElementRef<HTMLDivElement>>('stack');
+
+  constructor() {
+    effect(() => {
+      const hasMessages = this.service.messages().length > 0;
+      const stack = this.stack()?.nativeElement;
+      if (!stack) return;
+
+      if (hasMessages && !stack.matches(':popover-open')) stack.showPopover();
+      if (!hasMessages && stack.matches(':popover-open')) stack.hidePopover();
+    });
+  }
 
   icon(kind: ToastMessage['kind']): BfIconName {
     if (kind === 'success') return 'check';

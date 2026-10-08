@@ -23,6 +23,8 @@ export interface DashboardMetrics {
   operationalExpenseCents: number;
   cashOutCents: number;
   tipsCents: number;
+  discountsCents: number;
+  overdueCents: number;
   cogsCents: number;
   missingCostItems: number;
   saleCount: number;
@@ -94,6 +96,7 @@ export class DashboardRepository {
     ] = await Promise.all([
       getAggregateFromServer(salesInPeriod, {
         revenueCents: sum('totalCents'),
+        discountsCents: sum('discountCents'),
         saleCount: count(),
       }),
       getAggregateFromServer(optimizedSalesInPeriod, {
@@ -118,6 +121,7 @@ export class DashboardRepository {
       }),
       getAggregateFromServer(overdueSales, {
         overdueCount: count(),
+        overdueCents: sum('balanceCents'),
       }),
       this.stockAlerts(),
     ]);
@@ -163,6 +167,8 @@ export class DashboardRepository {
       operationalExpenseCents: Number(operatingExpensesData.operationalExpenseCents ?? 0),
       cashOutCents: Number(expensesData.cashOutCents ?? 0),
       tipsCents: Number(paymentsData.tipsCents ?? 0),
+      discountsCents: Number(salesData.discountsCents ?? 0),
+      overdueCents: Number(overdueAggregate.data().overdueCents ?? 0),
       cogsCents,
       missingCostItems,
       saleCount,

@@ -52,6 +52,7 @@ export class FinanceStore {
   private readonly paymentSummaryInitializedState = signal(false);
   private readonly expenseHasMoreState = signal(false);
   private readonly paymentHasMoreState = signal(false);
+  private readonly operationErrorState = signal('');
 
   readonly expenses = this.expensesState.asReadonly();
   readonly payments = this.paymentsState.asReadonly();
@@ -65,6 +66,7 @@ export class FinanceStore {
   readonly summaryInitialized = computed(() => this.expenseSummaryInitializedState() && this.paymentSummaryInitializedState());
   readonly expenseHasMore = this.expenseHasMoreState.asReadonly();
   readonly paymentHasMore = this.paymentHasMoreState.asReadonly();
+  readonly operationError = this.operationErrorState.asReadonly();
 
   constructor() {
     effect(() => {
@@ -178,7 +180,12 @@ export class FinanceStore {
     }
   }
 
+  clearOperationError(): void {
+    this.operationErrorState.set('');
+  }
+
   async createExpense(draft: ExpenseDraft): Promise<ExpenseCreateResult | null> {
+    this.operationErrorState.set('');
     try {
       const result = await this.financeRepository.createExpense(draft);
       if (this.expensesGate.isLoaded) {
@@ -195,7 +202,9 @@ export class FinanceStore {
         : 'Saída registrada com sucesso.');
       return result;
     } catch (error) {
-      this.toast.error(this.errors.message(error));
+      const message = this.errors.message(error);
+      this.operationErrorState.set(message);
+      this.toast.error(message);
       return null;
     }
   }

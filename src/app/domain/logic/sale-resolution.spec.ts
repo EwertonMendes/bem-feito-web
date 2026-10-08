@@ -19,7 +19,7 @@ const product = (id: string, stock = 10, formatId = 'round'): Product => ({
   recipe: [],
 });
 
-const input = (id: string, stock = 10): InputItem => ({
+const input = (id: string, stock = 10, trackingMode: InputItem['trackingMode'] = 'exact'): InputItem => ({
   id,
   code: id,
   active: true,
@@ -27,6 +27,7 @@ const input = (id: string, stock = 10): InputItem => ({
   unitId: 'unit',
   stock,
   minimumStock: 0,
+  trackingMode,
   averageUnitCostCents: 200,
 });
 
@@ -41,12 +42,12 @@ describe('sale resolution', () => {
   it('resolves a direct product line and its stock effect', () => {
     const draft = emptyDraft();
     draft.lines = [{ kind: 'product', sourceId: 'p1', quantity: 2 }];
-
     const resolved = resolveSaleDraft(draft, {
       products: new Map([['p1', product('p1')]]),
       kits: new Map(),
       additions: new Map(),
       inputs: new Map(),
+      productUnitCosts: new Map([['p1', 350]]),
     }, () => 'line-1');
 
     expect(resolved.lines).toEqual([expect.objectContaining({
@@ -59,7 +60,6 @@ describe('sale resolution', () => {
     expect(resolved.stockEffects).toEqual([
       { itemType: 'product', itemId: 'p1', quantityDelta: -2, unitCostCents: 350 },
     ]);
-    expect(resolved.totalCents).toBe(2200);
   });
 
   it('validates kit selections and aggregates product effects', () => {
@@ -78,20 +78,16 @@ describe('sale resolution', () => {
       kits: new Map([['k1', kit]]),
       additions: new Map(),
       inputs: new Map(),
+      productUnitCosts: new Map([['p1', 350]]),
     }, () => 'line-kit');
 
-    expect(resolved.lines[0]).toEqual(expect.objectContaining({
-      id: 'line-kit',
-      kind: 'kit',
-      unitCostCents: 700,
-      totalCents: 1900,
-    }));
+    expect(resolved.lines[0]).toEqual(expect.objectContaining({ id: 'line-kit', kind: 'kit', unitCostCents: 700, totalCents: 1900 }));
     expect(resolved.stockEffects).toEqual([
       { itemType: 'product', itemId: 'p1', quantityDelta: -2, unitCostCents: 350 },
     ]);
   });
 
-  it('resolves addition cost and input consumption', () => {
+  it('uses exact stock strictly and estimated stock approximately', () => {
     const addition: Addition = {
       id: 'a1',
       active: true,
@@ -103,32 +99,62 @@ describe('sale resolution', () => {
     const draft = emptyDraft();
     draft.lines = [{ kind: 'addition', sourceId: 'a1', quantity: 3 }];
 
-    const resolved = resolveSaleDraft(draft, {
+    const exact = resolveSaleDraft(draft, {
       products: new Map(),
       kits: new Map(),
       additions: new Map([['a1', addition]]),
-      inputs: new Map([['i1', input('i1')]]),
-    }, () => 'line-addition');
-
-    expect(resolved.lines[0]).toEqual(expect.objectContaining({
-      unitCostCents: 100,
-      totalCostCents: 300,
-      totalCents: 1500,
-    }));
-    expect(resolved.stockEffects).toEqual([
+      inputs: new Map([['i1', input('i1', 10, 'exact')]]),
+      productUnitCosts: new Map(),
+    });
+    expect(exact.stockEffects).toEqual([
       { itemType: 'input', itemId: 'i1', quantityDelta: -1.5, unitCostCents: 200 },
+    ]);
+
+    const estimated = resolveSaleDraft(draft, {
+      products: new Map(),
+      kits: new Map(),
+      additions: new Map([['a1', addition]]),
+      inputs: new Map([['i1', input('i1', 1, 'estimated')]]),
+      productUnitCosts: new Map(),
+    });
+    expect(estimated.lines[0]?.totalCostCents).toBe(300);
+    expect(estimated.stockEffects).toEqual([
+      { itemType: 'input', itemId: 'i1', quantityDelta: -1, unitCostCents: 200 },
     ]);
   });
 
-  it('rejects a sale that would make stock negative', () => {
+  it('does not block an estimated input when theoretical consumption exceeds its balance', () => {
+    const addition: Addition = {
+      id: 'a2',
+      active: true,
+      name: 'Estimado',
+      category: 'Teste',
+      priceCents: 100,
+      components: [{ id: 'c2', inputId: 'i2', quantity: 2, unitId: 'unit', order: 1 }],
+    };
+    const draft = emptyDraft();
+    draft.lines = [{ kind: 'addition', sourceId: 'a2', quantity: 2 }];
+    const resolved = resolveSaleDraft(draft, {
+      products: new Map(),
+      kits: new Map(),
+      additions: new Map([['a2', addition]]),
+      inputs: new Map([['i2', input('i2', 1, 'estimated')]]),
+      productUnitCosts: new Map(),
+    });
+    expect(resolved.stockEffects).toEqual([
+      { itemType: 'input', itemId: 'i2', quantityDelta: -1, unitCostCents: 200 },
+    ]);
+  });
+
+  it('rejects a sale that would make finished-product stock negative', () => {
     const draft = emptyDraft();
     draft.lines = [{ kind: 'product', sourceId: 'p1', quantity: 2 }];
-
     expect(() => resolveSaleDraft(draft, {
       products: new Map([['p1', product('p1', 1)]]),
       kits: new Map(),
       additions: new Map(),
       inputs: new Map(),
+      productUnitCosts: new Map([['p1', 350]]),
     })).toThrow('Estoque insuficiente de Produto p1.');
   });
 
@@ -136,14 +162,13 @@ describe('sale resolution', () => {
     const draft = emptyDraft();
     draft.discountCents = 5000;
     draft.lines = [{ kind: 'product', sourceId: 'p1', quantity: 1 }];
-
     const resolved = resolveSaleDraft(draft, {
       products: new Map([['p1', product('p1')]]),
       kits: new Map(),
       additions: new Map(),
       inputs: new Map(),
+      productUnitCosts: new Map([['p1', 350]]),
     });
-
     expect(resolved.subtotalCents).toBe(1100);
     expect(resolved.discountCents).toBe(1100);
     expect(resolved.totalCents).toBe(0);

@@ -17,6 +17,9 @@ import {
   LucideCircleDollarSign,
   LucideCirclePlus,
   LucideClipboardList,
+  LucideClipboardCheck,
+  LucideGauge,
+  LucideListX,
   LucideClock3,
   LucideCreditCard,
   LucideDynamicIcon,
@@ -72,6 +75,7 @@ export type BfIconName =
   // Dashboard and financial concepts
   | 'revenue' | 'received' | 'receivable' | 'average-ticket' | 'sold-items' | 'tips'
   | 'low-stock-product' | 'low-stock-input' | 'overdue' | 'missing-cost'
+  | 'stock-exact' | 'stock-estimated' | 'stock-untracked'
   | 'cogs' | 'cash-out' | 'cash-flow'
   // Expense concepts
   | 'purchase' | 'expense' | 'equipment' | 'other-expense'
@@ -109,6 +113,9 @@ const ICONS = {
   tips: LucideHandCoins,
   'low-stock-product': LucidePackageMinus,
   'low-stock-input': LucideFlaskConical,
+  'stock-exact': LucideClipboardCheck,
+  'stock-estimated': LucideGauge,
+  'stock-untracked': LucideListX,
   overdue: LucideAlarmClock,
   'missing-cost': LucideBadgeDollarSign,
   cogs: LucideCalculator,

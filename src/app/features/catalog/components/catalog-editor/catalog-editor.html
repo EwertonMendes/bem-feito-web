@@ -3,10 +3,10 @@
     <div class="bf-dialog-body">
       @if (kind() === 'products') {
         <div class="bf-grid two">
-          <label class="bf-field"><span>Preço</span><bf-number-input kind="currency" [formField]="productForm.salePrice" ariaLabel="Preço do produto" /></label>
-          <label class="bf-field"><span>Coleção</span><bf-select [formField]="productForm.collectionId" [options]="productCollectionOptions()" ariaLabel="Coleção" /></label>
-          <label class="bf-field"><span>Fragrância</span><bf-select [formField]="productForm.fragranceId" [options]="productFragranceOptions()" ariaLabel="Fragrância" /></label>
-          <label class="bf-field"><span>Formato</span><bf-select [formField]="productForm.formatId" [options]="productFormatOptions()" ariaLabel="Formato" /></label>
+          <label class="bf-field"><span>Preço</span><bf-number-input kind="currency" [formField]="productForm.salePrice" ariaLabel="Preço do produto" />@if(suggestedPrice()){<button class="bf-link-action" type="button" (click)="applySuggestedPrice()">Usar preço padrão: {{currency(suggestedPrice()!.priceCents)}}</button>}</label>
+          <label class="bf-field"><span>Coleção</span><bf-select [formField]="productForm.collectionId" [options]="productCollectionOptions()" ariaLabel="Coleção" /><button class="bf-link-action" type="button" (click)="openQuickReference('collection')"><bf-icon name="plus"/> Criar coleção</button></label>
+          <label class="bf-field"><span>Fragrância</span><bf-select [formField]="productForm.fragranceId" [options]="productFragranceOptions()" ariaLabel="Fragrância" /><button class="bf-link-action" type="button" (click)="openQuickReference('fragrance')"><bf-icon name="plus"/> Criar fragrância</button></label>
+          <label class="bf-field"><span>Formato</span><bf-select [formField]="productForm.formatId" [options]="productFormatOptions()" ariaLabel="Formato" /><button class="bf-link-action" type="button" (click)="openQuickReference('format')"><bf-icon name="plus"/> Criar formato</button></label>
           <label class="bf-field"><span>Estoque mínimo</span><bf-number-input kind="integer" [formField]="productForm.minimumStock" ariaLabel="Estoque mínimo" /></label>
           <label class="bf-field"><span>Custo adicional unitário</span><bf-number-input kind="currency" [formField]="productForm.additionalCost" ariaLabel="Custo adicional unitário" /></label>
           <bf-checkbox class="toggle" [formField]="productForm.active" label="Produto ativo" />
@@ -72,3 +72,11 @@
     </div>
     <div class="bf-dialog-footer"><button class="bf-button secondary" type="button" (click)="dialog.close()">Cancelar</button><button class="bf-button" type="button" (click)="save()">Salvar</button></div>
   </dialog>
+<dialog bfDialog #quickReferenceDialog="bfDialog" class="bf-dialog quick-reference-dialog">
+  <div class="bf-dialog-header"><h2>Nova referência</h2><button class="bf-icon-button" type="button" (click)="quickReferenceDialog.close()"><bf-icon name="close"/></button></div>
+  <div class="bf-dialog-body">
+    <label class="bf-field"><span>Nome da {{quickReferenceKind()==='collection'?'coleção':quickReferenceKind()==='fragrance'?'fragrância':'formato'}}</span><input class="bf-input" [value]="quickName()" (input)="quickName.set($any($event.target).value)" /></label>
+    <p class="hint">Depois, você pode editar a composição de custo padrão em Configurações.</p>
+  </div>
+  <div class="bf-dialog-footer"><button class="bf-button secondary" type="button" (click)="quickReferenceDialog.close()">Cancelar</button><button class="bf-button" type="button" [disabled]="quickSaving()" (click)="saveQuickReference()">Criar e selecionar</button></div>
+</dialog>

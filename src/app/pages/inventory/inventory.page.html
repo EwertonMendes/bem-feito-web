@@ -19,6 +19,7 @@
 
   <div class="toolbar">
     <div class="bf-segments"><button [class.active]="tab()==='product'" (click)="tab.set('product')">Produtos</button><button [class.active]="tab()==='input'" (click)="tab.set('input')">Insumos</button></div>
+    <button class="bf-button secondary" [class.active]="lowOnly()" type="button" (click)="lowOnly.set(!lowOnly())">{{lowOnly()?'Mostrar todos':'Somente baixos'}}</button>
     <label class="search"><bf-icon name="search" /><input type="search" placeholder="Buscar" [value]="search()" (input)="search.set($any($event.target).value)" /></label>
   </div>
 
@@ -31,7 +32,7 @@
           <bf-catalog-image [image]="item.image" [alt]="item.displayName" [compact]="true" />
           <div class="identity"><strong>{{item.displayName}}</strong><span>{{item.code}} · produto acabado</span></div>
           <div class="balance" [class.low]="item.stock<=item.minimumStock"><strong>{{item.stock}}</strong><span>mín. {{item.minimumStock}}</span></div>
-          <div class="stock-actions"><button class="bf-button secondary" (click)="openHistory('product',item.id)">Histórico</button><button class="bf-button" (click)="openAdjustment('product',item.id)">Ajustar</button></div>
+          <div class="stock-actions"><a class="bf-button secondary" routerLink="/producao" [queryParams]="{produto:item.id}"><bf-icon name="production" /> Produzir</a><button class="bf-button secondary" (click)="openHistory('product',item.id)">Histórico</button><button class="bf-button" (click)="openAdjustment('product',item.id)">Ajustar</button></div>
         </article>
       } @empty {<bf-empty-state title="Nenhum produto" description="Cadastre produtos no Catálogo." />}
     } @else {

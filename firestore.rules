@@ -223,10 +223,13 @@ service cloud.firestore {
           && data.kind in ['input-purchase', 'operating-expense', 'equipment', 'other']
           && (data.kind != 'input-purchase' || (text(data.inputId) && quantity(data.quantity) && data.quantity > 0)))
         || (name == 'productions'
-          && fields(data, ['code', 'businessDate', 'productId', 'productName', 'quantity', 'unitCostCents', 'totalCostCents', 'costPending', 'consumptions'], ['notes'])
-          && text(data.code) && businessDate(data) && text(data.productId) && text(data.productName)
+          && fields(data, ['code', 'businessDate', 'productId', 'productName', 'quantity', 'unitCostCents', 'totalCostCents', 'costPending', 'consumptions'], ['notes', 'items'])
+          && text(data.code) && businessDate(data) && text(data.productName)
+          && (text(data.productId) || ('items' in data && data.productId == ''))
           && quantity(data.quantity) && data.quantity > 0 && money(data.unitCostCents) && money(data.totalCostCents)
-          && data.costPending is bool && data.consumptions is list)
+          && data.costPending is bool && data.consumptions is list
+          && (!('items' in data) || (data.items is list && data.items.size() > 0 && data.items.size() <= 60
+            && data.items[0].productId is string && data.items[0].quantity is number)))
         || (name == 'stockAdjustments'
           && fields(data, ['code', 'businessDate', 'itemType', 'itemId', 'quantityDelta', 'reason'], [])
           && text(data.code) && businessDate(data) && text(data.itemId) && text(data.reason)

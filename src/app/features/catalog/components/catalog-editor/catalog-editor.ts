@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
-import { Addition, AdditionComponent, InputItem, InputTrackingMode, Kit, KitComponent, Product, RecipeComponent } from '../../../../domain/models/catalog.model';
+import { Addition, AdditionComponent, InputItem, InputTrackingMode, CollectionDefinition, FragranceDefinition, FormatDefinition, Kit, KitComponent, Product, RecipeComponent } from '../../../../domain/models/catalog.model';
 import { standardCostForProduct, trackingModeForInput } from '../../../../domain/logic/costing';
 import { CatalogImageEntityKind, CatalogImageRef } from '../../../../domain/models/image.model';
 import { ErrorService } from '../../../../core/services/error.service';
@@ -37,10 +37,61 @@ export class CatalogEditor {
   private readonly toast = inject(ToastService);
   private readonly errors = inject(ErrorService);
   private readonly dialog = viewChild.required<BfDialog>('dialog');
+  private readonly quickDialog = viewChild.required<BfDialog>('quickReferenceDialog');
 
   readonly currency = formatCurrency;
   readonly imagesEnabled = this.images.enabled;
   readonly kind = signal<CatalogImageEntityKind>('products');
+  readonly quickReferenceKind = signal<'collection' | 'fragrance' | 'format'>('collection');
+  readonly quickName = signal('');
+  readonly quickSaving = signal(false);
+  readonly suggestedPrice = computed(() => {
+    const model = this.productModel();
+    return this.references.formatPrices().find(item =>
+      item.active && item.collectionId === model.collectionId && item.formatId === model.formatId);
+  });
+  applySuggestedPrice(): void {
+    const price = this.suggestedPrice();
+    if (price) this.productModel.update(model => ({ ...model, salePrice: fromCents(price.priceCents) }));
+  }
+  openQuickReference(kind: 'collection' | 'fragrance' | 'format'): void {
+    if (kind === 'fragrance' && !this.productModel().collectionId) {
+      this.toast.error('Selecione ou crie uma coleção antes da fragrância.');
+      return;
+    }
+    this.quickReferenceKind.set(kind);
+    this.quickName.set('');
+    this.quickDialog().open();
+  }
+  async saveQuickReference(): Promise<void> {
+    if (this.quickSaving()) return;
+    const name = this.quickName().trim();
+    if (!name) { this.toast.error('Informe o nome.'); return; }
+    const kind = this.quickReferenceKind();
+    const matches = kind === 'collection' ? this.references.collections()
+      : kind === 'fragrance' ? this.references.fragrances() : this.references.formats();
+    if (matches.some(item => item.name.localeCompare(name, 'pt-BR', { sensitivity: 'base' }) === 0 &&
+      (kind !== 'fragrance' || (item as FragranceDefinition).collectionId === this.productModel().collectionId))) {
+      this.toast.error('Este cadastro já existe. Selecione-o na lista.'); return;
+    }
+    this.quickSaving.set(true);
+    try {
+      if (kind === 'collection') {
+        const id = await this.references.saveCollection({ id: '', name, active: true, costComponents: [] } as CollectionDefinition);
+        this.productModel.update(model => ({ ...model, collectionId: id, fragranceId: '' }));
+      } else if (kind === 'fragrance') {
+        const id = await this.references.saveFragrance({ id: '', name, collectionId: this.productModel().collectionId, active: true, costComponents: [] } as FragranceDefinition);
+        this.productModel.update(model => ({ ...model, fragranceId: id }));
+      } else {
+        const id = await this.references.saveFormat({ id: '', name, active: true, approximateWeightGrams: 0, costComponents: [] } as FormatDefinition);
+        this.productModel.update(model => ({ ...model, formatId: id }));
+      }
+      this.toast.success('Cadastro criado. O custo padrão pode ser configurado em Configurações.');
+      this.quickDialog().close();
+    } catch (error) { this.toast.error(this.errors.message(error)); }
+    finally { this.quickSaving.set(false); }
+  }
+
   readonly editingId = signal('');
   readonly imageFile = signal<File | null>(null);
   readonly removeImage = signal(false);

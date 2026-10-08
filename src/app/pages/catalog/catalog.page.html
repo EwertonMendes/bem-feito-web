@@ -35,7 +35,11 @@
       @for (item of filteredProducts(); track item.id) {
         <article class="catalog-card" [class.inactive]="!item.active">
           <bf-catalog-image [image]="item.image" [alt]="item.displayName" />
-          <div class="body"><div class="meta"><span>{{ item.code }}</span><span class="bf-badge" [class.muted]="!item.active">{{ item.active ? 'Ativo' : 'Inativo' }}</span></div><h2>{{ item.displayName }}</h2><div class="stats"><strong>{{ currency(item.salePriceCents) }}</strong><span [class.stock-danger]="item.stock < 0">{{ item.stock }} em estoque</span></div><button class="bf-button secondary" type="button" (click)="editor.editProduct(item)">Editar</button></div>
+          <div class="body"><div class="meta"><span>{{ item.code }}</span><span class="bf-badge" [class.muted]="!item.active">{{ item.active ? 'Ativo' : 'Inativo' }}</span></div><h2>{{ item.displayName }}</h2><div class="stats"><strong>{{ currency(item.salePriceCents) }}</strong><span [class.stock-danger]="item.stock < 0">{{ item.stock }} em estoque</span></div><div class="catalog-context-actions">
+  <button class="bf-button secondary" type="button" (click)="editor.editProduct(item)">Editar</button>
+  <a class="bf-button secondary" routerLink="/producao" [queryParams]="{produto:item.id}"><bf-icon name="production" /> Produzir</a>
+  <a class="bf-button" routerLink="/vendas" [queryParams]="{produto:item.id}"><bf-icon name="sales" /> Vender</a>
+</div></div>
         </article>
       } @empty { <bf-empty-state title="Nenhum produto ainda" description="Cadastre o primeiro sabonete para começar." /> }
     </div>

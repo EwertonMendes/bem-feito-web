@@ -49,3 +49,5 @@
 .product-cost-preview{margin-top:14px;padding:12px 14px;display:grid;gap:3px;border-radius:12px;background:var(--brand-soft);color:var(--brand-strong)}
 .product-cost-preview span{font-size:.72rem;font-weight:650}.product-cost-preview strong{font-size:.94rem}.product-cost-preview small{color:var(--muted);line-height:1.35}
 .product-cost-preview.pending{background:var(--warning-soft);color:var(--warning)}
+
+.bf-link-action{display:inline-flex;align-items:center;gap:5px;margin-top:6px;background:none;border:0;padding:3px 0;color:var(--brand-strong);font:inherit;font-size:.77rem;font-weight:700;cursor:pointer;transition:opacity .18s ease}.bf-link-action:hover{opacity:.7}.bf-link-action bf-icon{width:14px;height:14px}.quick-reference-dialog{width:min(430px,calc(100vw - 28px))}

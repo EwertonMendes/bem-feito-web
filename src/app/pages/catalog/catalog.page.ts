@@ -1,3 +1,4 @@
+import { RouterLink, ActivatedRoute } from '@angular/router';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { CatalogImageEntityKind } from '../../domain/models/image.model';
 import { CatalogStore } from '../../features/catalog/catalog.store';
@@ -10,7 +11,7 @@ import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
 
 @Component({
   selector: 'bf-catalog-page',
-  imports: [BfIcon, CatalogImage, CatalogEditor, BfEmptyState, BfPageRefresh],
+  imports: [RouterLink, BfIcon, CatalogImage, CatalogEditor, BfEmptyState, BfPageRefresh],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './catalog.page.html',
   styleUrl: './catalog.page.scss',
@@ -18,6 +19,7 @@ import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
 export class CatalogPage {
   readonly store = inject(CatalogStore);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly route = inject(ActivatedRoute);
   readonly currency = formatCurrency;
   readonly skeletonItems = [1, 2, 3, 4, 5, 6, 7, 8];
   readonly tab = signal<CatalogImageEntityKind>('products');
@@ -29,6 +31,8 @@ export class CatalogPage {
   readonly filteredAdditions = computed(() => this.filter(this.store.additions(), (item) => item.name + ' ' + item.category));
 
   constructor() {
+    const tab = this.route.snapshot.queryParamMap.get('tab');
+    if (tab === 'inputs' || tab === 'kits' || tab === 'additions' || tab === 'products') this.tab.set(tab);
     this.destroyRef.onDestroy(this.store.activate());
     void this.store.load();
   }

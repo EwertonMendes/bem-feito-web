@@ -12,7 +12,7 @@ async function login(page){
 }
 async function choose(page,combobox,option){
   await combobox.click();
-  await page.getByRole('option',{name:option,exact:true}).click();
+  await page.getByRole('option',{name:new RegExp('^'+option)}).click();
 }
 test.beforeEach(async ({page})=>{await login(page)});
 

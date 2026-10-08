@@ -75,3 +75,5 @@ jobs:
           retention-days: 2
 
 # Isolated rerun after tightening Playwright locator (no permanent CI changes).
+
+# Isolated QA rerun: fix select option locator and purchase-kind initialization.

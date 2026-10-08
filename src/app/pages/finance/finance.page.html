@@ -52,10 +52,10 @@
     <div class="bf-dialog-header"><h2>Registrar saída</h2><button class="bf-icon-button" (click)="expenseDialog.close()"><bf-icon name="close" /></button></div>
     <div class="bf-dialog-body">
       <div class="kind-grid">
-        <button type="button" [class.active]="model().kind==='input-purchase'" (click)="model.update(v=>({...v,kind:'input-purchase'}))">Compra de insumo</button>
-        <button type="button" [class.active]="model().kind==='operating-expense'" (click)="model.update(v=>({...v,kind:'operating-expense'}))">Despesa</button>
-        <button type="button" [class.active]="model().kind==='equipment'" (click)="model.update(v=>({...v,kind:'equipment'}))">Equipamento</button>
-        <button type="button" [class.active]="model().kind==='other'" (click)="model.update(v=>({...v,kind:'other'}))">Outro</button>
+        <button type="button" [class.active]="model().kind==='input-purchase'" (click)="changeExpenseKind('input-purchase')">Compra de insumo</button>
+        <button type="button" [class.active]="model().kind==='operating-expense'" (click)="changeExpenseKind('operating-expense')">Despesa</button>
+        <button type="button" [class.active]="model().kind==='equipment'" (click)="changeExpenseKind('equipment')">Equipamento</button>
+        <button type="button" [class.active]="model().kind==='other'" (click)="changeExpenseKind('other')">Outro</button>
       </div>
       @if(expenseFormError()){<div class="bf-form-error" role="alert">{{expenseFormError()}}</div>}
       <div class="bf-grid two" data-form="expense">

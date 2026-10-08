@@ -6,6 +6,7 @@ import {
   documentId,
   getAggregateFromServer,
   getDocs,
+  getDoc,
   limit,
   orderBy,
   query,
@@ -43,6 +44,11 @@ export class SalesRepository {
   private readonly firestore = inject(FIRESTORE);
   private readonly auth = inject(AuthService);
   private readonly revisions = inject(DataRevisionService);
+
+  async findById(id: string): Promise<Sale | null> {
+    const snapshot = await getDoc(doc(this.firestore, 'sales', id));
+    return snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as Sale) : null;
+  }
 
   async page(pageSize = 40, cursor?: BusinessDateCursor | null): Promise<PageResult<Sale>> {
     const constraints = [

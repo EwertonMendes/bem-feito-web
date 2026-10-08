@@ -7,6 +7,7 @@ import { CatalogStore } from '../../features/catalog/catalog.store';
 import { FinanceStore } from '../../features/finance/finance.store';
 import { SalesStore } from '../../features/sales/sales.store';
 import { SettingsStore } from '../../features/settings/settings.store';
+import { Sale } from '../../domain/models/sales.model';
 import { Expense, ExpenseDraft, ExpenseKind, PurchaseBatchDraft } from '../../domain/models/finance.model';
 import { formatBusinessDate, todayBusinessDate } from '../../core/utils/date';
 import { formatCurrency, fromCents, toCents } from '../../core/utils/money';
@@ -61,6 +62,7 @@ export class FinancePage {
   private readonly receiptDialog = viewChild.required<BfDialog>('receiptDialog');
   private readonly expenseDetailDialog = viewChild.required<BfDialog>('expenseDetailDialog');
   readonly selectedExpense = signal<Expense | null>(null);
+  readonly selectedReceiptSale = signal<Sale | null>(null);
   readonly purchaseLines = signal<PurchaseFormLine[]>([]);
   readonly purchaseTotalCents = computed(() => this.purchaseLines().reduce((sum, item) => sum + toCents(item.amount), 0));
   readonly overdueOnly = signal(false);
@@ -177,7 +179,7 @@ export class FinancePage {
     { value: '', label: 'Selecione' },
     ...this.paymentMethodOptions(),
   ]);
-  readonly selectedReceivable = computed(() => this.sales.openSales().find((sale) => sale.id === this.receiptModel().saleId));
+  readonly selectedReceivable = computed(() => this.selectedReceiptSale() ?? this.sales.openSales().find((sale) => sale.id === this.receiptModel().saleId));
   readonly summaryInitialized = computed(() => this.store.summaryInitialized() && this.sales.receivableSummaryInitialized());
   readonly refreshing = computed(() =>
     this.summaryInitialized() && (
@@ -257,6 +259,11 @@ export class FinancePage {
     }
   }
 
+  changeExpenseKind(kind: ExpenseKind): void {
+    this.model.update(value => ({ ...value, kind, amount: kind === 'input-purchase' ? fromCents(this.purchaseTotalCents()) : 0 }));
+    if (kind === 'input-purchase' && !this.purchaseLines().length) this.newPurchaseLine();
+  }
+
   openExpense(kind: ExpenseKind = 'operating-expense'): void {
     this.purchaseLines.set([]);
     if (kind === 'input-purchase') this.newPurchaseLine();
@@ -277,11 +284,14 @@ export class FinancePage {
     this.dialog().open();
   }
 
-  openReceipt(saleId: string): void {
+  async openReceipt(saleId: string): Promise<void> {
     this.receiptSubmitted.set(false);
     this.receiptFormError.set('');
-    const sale = this.sales.openSales().find((item) => item.id === saleId);
+    let sale: Sale | null = null;
+    try { sale = await this.sales.findReceivable(saleId); }
+    catch { this.receiptFormError.set('Não foi possível consultar essa venda.'); return; }
     if (!sale) return;
+    this.selectedReceiptSale.set(sale);
     this.receiptModel.set({
       saleId: sale.id,
       businessDate: todayBusinessDate(),

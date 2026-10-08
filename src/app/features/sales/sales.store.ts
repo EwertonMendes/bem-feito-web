@@ -178,6 +178,13 @@ export class SalesStore {
     }
   }
 
+  async findReceivable(id: string): Promise<Sale | null> {
+    const cached = this.receivablesState().find(sale => sale.id === id)
+      ?? this.salesState().find(sale => sale.id === id);
+    const sale = cached ?? await this.repository.findById(id);
+    return sale?.status === 'active' && sale.balanceCents > 0 ? sale : null;
+  }
+
   async addPayment(
     saleId: string,
     businessDate: string,

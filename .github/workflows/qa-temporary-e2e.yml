@@ -73,3 +73,5 @@ jobs:
             playwright-report/
           if-no-files-found: ignore
           retention-days: 2
+
+# Isolated rerun after tightening Playwright locator (no permanent CI changes).

@@ -133,9 +133,9 @@ test('bulk variations create distinct products for selected fragrances with one 
   const dialog=page.locator('dialog[open]');
   await choose(page,dialog.getByRole('combobox',{name:'Coleção'}),'Clássico QA');
   await choose(page,dialog.getByRole('combobox',{name:'Formato'}),'Florzinha QA');
-  await dialog.getByRole('checkbox',{name:/Criar várias fragrâncias/}).check();
-  await dialog.getByRole('checkbox',{name:'Pêssego QA'}).check();
-  await dialog.getByRole('checkbox',{name:'Jasmim QA'}).check();
+  await dialog.locator('bf-checkbox').filter({hasText:'Criar várias fragrâncias'}).locator('label').click();
+  await dialog.locator('bf-checkbox').filter({hasText:'Pêssego QA'}).locator('label').click();
+  await dialog.locator('bf-checkbox').filter({hasText:'Jasmim QA'}).locator('label').click();
   await expect(dialog.getByRole('button',{name:'Criar 2 variações'})).toBeVisible();
   await dialog.getByRole('button',{name:'Criar 2 variações'}).click();
   await expect(dialog).not.toBeVisible();

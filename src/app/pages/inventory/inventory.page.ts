@@ -1,6 +1,6 @@
 import { ModalActions } from '../../core/services/modal-actions.service';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { FormField, form, required } from '@angular/forms/signals';
 import { trackingModeForInput } from '../../domain/logic/costing';
 import { planStockAdjustment, StockAdjustmentMode } from '../../domain/logic/stock-adjustment';
@@ -26,7 +26,7 @@ interface AdjustmentModel {
 
 @Component({
   selector: 'bf-inventory-page',
-  imports: [RouterLink, FormField, BfIcon, CatalogImage, BfDialog, BfEmptyState, BfPageRefresh, BfListSkeleton, BfSkeleton, BfNumberInput],
+  imports: [FormField, BfIcon, CatalogImage, BfDialog, BfEmptyState, BfPageRefresh, BfListSkeleton, BfSkeleton, BfNumberInput],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './inventory.page.html',
   styleUrl: './inventory.page.scss',

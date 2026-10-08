@@ -9,15 +9,16 @@ import {
   inject,
   signal,
   viewChild,
+  ViewContainerRef,
 } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '../../core/auth/auth.service';
 import { ModalActions, ModalRequest } from '../../core/services/modal-actions.service';
-import { SaleEditor } from '../../features/sales/components/sale-editor/sale-editor';
-import { BfProductionEditor } from '../../features/production/components/production-editor';
-import { BfFinanceDialogs } from '../../features/finance/components/finance-dialogs';
+import type { SaleEditor } from '../../features/sales/components/sale-editor/sale-editor';
+import type { BfProductionEditor } from '../../features/production/components/production-editor';
+import type { BfFinanceDialogs } from '../../features/finance/components/finance-dialogs';
 import { ThemeService } from '../../core/services/theme.service';
 import { NavigationLoadingService } from '../../core/state/navigation-loading.service';
 import { DriveConnectionBanner } from '../../features/google-drive/components/drive-connection-banner';
@@ -45,9 +46,6 @@ interface NavItem {
     BfConfirmDialog,
     BfIcon,
     DriveConnectionBanner,
-    SaleEditor,
-    BfProductionEditor,
-    BfFinanceDialogs,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app-shell.html',
@@ -63,9 +61,37 @@ export class AppShell {
   private readonly document = inject(DOCUMENT);
   private readonly destroyRef = inject(DestroyRef);
   private readonly logoutConfirm = viewChild.required<BfConfirmDialog>('logoutConfirm');
-  private readonly saleEditor = viewChild.required<SaleEditor>('saleEditor');
-  private readonly productionEditor = viewChild.required<BfProductionEditor>('productionEditor');
-  private readonly financeDialogs = viewChild.required<BfFinanceDialogs>('financeDialogs');
+  private readonly modalOutlet = viewChild.required<ViewContainerRef>('modalOutlet', { read: ViewContainerRef });
+  private saleEditorPromise?: Promise<SaleEditor>;
+  private productionEditorPromise?: Promise<BfProductionEditor>;
+  private financeDialogsPromise?: Promise<BfFinanceDialogs>;
+
+  private getSaleEditor(): Promise<SaleEditor> {
+    return this.saleEditorPromise ??= import('../../features/sales/components/sale-editor/sale-editor')
+      .then(({ SaleEditor }) => {
+        const ref = this.modalOutlet().createComponent(SaleEditor);
+        ref.changeDetectorRef.detectChanges();
+        return ref.instance;
+      }).catch(error => { this.saleEditorPromise = undefined; throw error; });
+  }
+
+  private getProductionEditor(): Promise<BfProductionEditor> {
+    return this.productionEditorPromise ??= import('../../features/production/components/production-editor')
+      .then(({ BfProductionEditor }) => {
+        const ref = this.modalOutlet().createComponent(BfProductionEditor);
+        ref.changeDetectorRef.detectChanges();
+        return ref.instance;
+      }).catch(error => { this.productionEditorPromise = undefined; throw error; });
+  }
+
+  private getFinanceDialogs(): Promise<BfFinanceDialogs> {
+    return this.financeDialogsPromise ??= import('../../features/finance/components/finance-dialogs')
+      .then(({ BfFinanceDialogs }) => {
+        const ref = this.modalOutlet().createComponent(BfFinanceDialogs);
+        ref.changeDetectorRef.detectChanges();
+        return ref.instance;
+      }).catch(error => { this.financeDialogsPromise = undefined; throw error; });
+  }
 
   readonly mobilePanel = signal<MobilePanel>(null);
   readonly currentUrl = signal(this.router.url);
@@ -140,12 +166,12 @@ export class AppShell {
     this.mobilePanel.set(null);
   }
 
-  openModal(request: ModalRequest): void {
+  async openModal(request: ModalRequest): Promise<void> {
     this.closeMobilePanel();
-    if (request.kind === 'sale') void this.saleEditor().open(request.productId, request.kitId);
-    if (request.kind === 'production') void this.productionEditor().open(request.productId, request.date);
-    if (request.kind === 'expense') void this.financeDialogs().openExpense(request.expenseKind);
-    if (request.kind === 'receipt') void this.financeDialogs().openReceipt(request.saleId);
+    if (request.kind === 'sale') await (await this.getSaleEditor()).open(request.productId, request.kitId);
+    if (request.kind === 'production') await (await this.getProductionEditor()).open(request.productId, request.date);
+    if (request.kind === 'expense') await (await this.getFinanceDialogs()).openExpense(request.expenseKind);
+    if (request.kind === 'receipt') await (await this.getFinanceDialogs()).openReceipt(request.saleId);
   }
 
   async mobileNavigate(path: string): Promise<void> {

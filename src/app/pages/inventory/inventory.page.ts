@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signa
 import { ActivatedRoute } from '@angular/router';
 import { FormField, form, required } from '@angular/forms/signals';
 import { trackingModeForInput } from '../../domain/logic/costing';
+import { planStockAdjustment, StockAdjustmentMode } from '../../domain/logic/stock-adjustment';
 import { InputItem } from '../../domain/models/catalog.model';
 import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
 import { CatalogStore } from '../../features/catalog/catalog.store';
@@ -42,6 +43,10 @@ export class InventoryPage {
   readonly search = signal('');
   readonly selectedId = signal('');
   readonly selectedType = signal<'product' | 'input'>('product');
+  readonly adjustmentMode = signal<StockAdjustmentMode>('set');
+  readonly submitted = signal(false);
+  readonly saving = signal(false);
+  readonly formError = signal('');
   readonly model = signal<AdjustmentModel>({ quantity: 0, reason: '', businessDate: todayBusinessDate() });
   readonly adjustmentForm = form(this.model, (p) => {
     required(p.reason);
@@ -73,6 +78,30 @@ export class InventoryPage {
     const input = this.catalog.inputs().find((item) => item.id === this.selectedId());
     return input ? this.unitName(input.unitId) : '';
   });
+  readonly selectedStock = computed(() => {
+    const item = this.selectedType() === 'product'
+      ? this.catalog.products().find((entry) => entry.id === this.selectedId())
+      : this.catalog.inputs().find((entry) => entry.id === this.selectedId());
+    return item?.stock ?? 0;
+  });
+  readonly adjustmentPreview = computed(() => {
+    try {
+      return planStockAdjustment(this.selectedStock(), this.adjustmentMode(), this.model().quantity);
+    } catch {
+      return null;
+    }
+  });
+  readonly quantityError = computed(() => {
+    const quantity = this.model().quantity;
+    if (!Number.isFinite(quantity)) return 'Informe uma quantidade válida.';
+    if (this.adjustmentMode() === 'set' && quantity < 0) return 'O saldo total não pode ser negativo.';
+    if (this.adjustmentMode() === 'delta' && quantity === 0) return 'Informe uma quantidade diferente de zero.';
+    if (this.selectedType() === 'product' && !Number.isInteger(quantity)) return 'Produtos acabados exigem quantidade inteira.';
+    return '';
+  });
+  readonly reasonError = computed(() => this.model().reason.trim() ? '' : 'Informe o motivo do ajuste para o histórico.');
+  readonly dateError = computed(() => this.model().businessDate ? '' : 'Informe a data do ajuste.');
+  readonly formatQuantity = (value: number): string => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 }).format(value);
 
   constructor() {
     this.destroyRef.onDestroy(() => this.store.deactivateHistory());
@@ -100,13 +129,30 @@ export class InventoryPage {
 
     this.selectedType.set(type);
     this.selectedId.set(id);
-    const estimated = input && this.inputMode(input) === 'estimated';
+    this.adjustmentMode.set('set');
+    this.submitted.set(false);
+    this.saving.set(false);
+    this.formError.set('');
+    this.store.clearOperationError();
     this.model.set({
-      quantity: estimated ? input.stock : 0,
-      reason: estimated ? 'Conferência de inventário' : '',
+      quantity: this.selectedStock(),
+      reason: 'Conferência de inventário',
       businessDate: todayBusinessDate(),
     });
     this.adjustmentDialog().open();
+  }
+
+  setAdjustmentMode(mode: StockAdjustmentMode): void {
+    if (this.saving() || this.adjustmentMode() === mode) return;
+    this.adjustmentMode.set(mode);
+    this.submitted.set(false);
+    this.formError.set('');
+    this.store.clearOperationError();
+    this.model.update((current) => ({
+      ...current,
+      quantity: mode === 'set' ? this.selectedStock() : 0,
+      reason: mode === 'set' ? 'Conferência de inventário' : 'Movimentação manual de estoque',
+    }));
   }
 
   async openHistory(type: 'product' | 'input', id: string): Promise<void> {
@@ -126,26 +172,37 @@ export class InventoryPage {
   }
 
   async saveAdjustment(): Promise<void> {
-    if (this.adjustmentForm().invalid()) return;
-    const value = this.model();
-    let quantityDelta = value.quantity;
-
-    if (this.selectedInputMode() === 'estimated') {
-      const input = this.catalog.inputs().find((item) => item.id === this.selectedId());
-      if (!input || value.quantity < 0) return;
-      quantityDelta = value.quantity - input.stock;
-      if (quantityDelta === 0) {
-        this.adjustmentDialog().close();
-        return;
-      }
-    } else if (!quantityDelta) {
+    if (this.saving()) return;
+    this.submitted.set(true);
+    this.formError.set('');
+    this.store.clearOperationError();
+    const issue = this.quantityError() || this.reasonError() || this.dateError();
+    if (issue || this.adjustmentForm().invalid()) {
+      this.formError.set(issue || 'Revise os campos obrigatórios antes de registrar.');
       return;
     }
 
-    const result = await this.store.adjust(this.selectedType(), this.selectedId(), quantityDelta, value.reason, value.businessDate);
-    if (result) {
-      this.catalog.applyStockChanges([result.stockChange]);
-      this.adjustmentDialog().close();
+    const preview = this.adjustmentPreview();
+    if (!preview || preview.quantityDelta === 0) {
+      this.formError.set('O estoque resultante já é o saldo atual. Não há alteração para registrar.');
+      return;
+    }
+
+    const value = this.model();
+    this.saving.set(true);
+    try {
+      const result = await this.store.reconcile(
+        this.selectedType(), this.selectedId(), this.adjustmentMode(),
+        value.quantity, value.reason, value.businessDate,
+      );
+      if (result) {
+        this.catalog.applyStockChanges([result.stockChange]);
+        this.adjustmentDialog().close();
+      } else {
+        this.formError.set(this.store.operationError() || 'Não foi possível registrar o ajuste. Tente novamente.');
+      }
+    } finally {
+      this.saving.set(false);
     }
   }
 

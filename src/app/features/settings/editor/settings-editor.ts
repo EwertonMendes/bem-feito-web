@@ -79,10 +79,11 @@ export class BfSettingsEditor {
     this.destroyRef.onDestroy(this.references.activate());
     this.destroyRef.onDestroy(this.catalog.activate());
     this.destroyRef.onDestroy(this.settings.activate());
-    void Promise.all([this.references.load(), this.catalog.load(), this.settings.load()]);
+
   }
 
-  openNew(kind: SettingTab = this.tab(), collectionId = ''): void {
+  async openNew(kind: SettingTab = this.tab(), collectionId = ''): Promise<void> {
+    await Promise.all([this.references.load(), this.catalog.load(), ...(kind === 'collections' || kind === 'fragrances' || kind === 'formats' ? [] : [this.settings.load()])]);
     this.tab.set(kind);
     this.editingId.set('');
     this.costComponents.set([]);

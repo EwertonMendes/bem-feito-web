@@ -9,3 +9,7 @@
 .stats .kit-stock{font-weight:650;color:var(--brand-strong)}
 .stats .kit-stock.out-of-stock{color:var(--danger)}
 @media(max-width:460px){.catalog-context-actions button{font-size:.75rem;padding-inline:8px}}
+
+.kit-availability{display:flex;align-items:center;gap:7px;padding:9px 10px;background:var(--brand-soft);color:var(--brand-strong);border-radius:10px;font-size:.75rem;font-weight:750;line-height:1.3}
+.kit-availability bf-icon{flex-shrink:0;width:15px;height:15px}
+.kit-availability.empty{background:var(--warning-soft);color:var(--warning)}

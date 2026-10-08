@@ -1,3 +1,4 @@
+import { ModalActions } from '../../core/services/modal-actions.service';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormField, form, required } from '@angular/forms/signals';
@@ -31,6 +32,7 @@ interface AdjustmentModel {
   styleUrl: './inventory.page.scss',
 })
 export class InventoryPage {
+  readonly modals = inject(ModalActions);
   readonly catalog = inject(CatalogStore);
   readonly references = inject(CatalogReferenceStore);
   readonly store = inject(InventoryStore);

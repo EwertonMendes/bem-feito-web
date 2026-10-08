@@ -153,6 +153,56 @@ describe('Actual repositories against restrictive emulator rules', () => {
     expect(await count('expenses')).toBe(2);
     expect(await count('stockAdjustments')).toBe(2);
   });
+  it('reconciles absolute stock in an atomic transaction and records only the effective delta', async () => {
+    const first = await inventory.reconcile('input', 'i', 'set', 100, 'Conferência', day);
+    expect(first.stockChange.stock).toBe(100);
+    expect(first.movement.quantityDelta).toBe(80);
+    expect(await data('inputs', 'i')).toMatchObject({ stock: 100 });
+    expect(await data('stockAdjustments', first.adjustment.id)).toMatchObject({ quantityDelta: 80, reason: 'Conferência' });
+    const second = await inventory.reconcile('input', 'i', 'set', 12.5, 'Nova conferência', day);
+    expect(second.stockChange.stock).toBe(12.5);
+    expect(second.movement.quantityDelta).toBe(-87.5);
+    expect(await data('inputs', 'i')).toMatchObject({ stock: 12.5 });
+  });
+
+  it('reconciles relative changes and clamps an excessive decrease to zero without negative stock', async () => {
+    const plus = await inventory.reconcile('input', 'i', 'delta', 4.5, 'Entrada', day);
+    expect(plus.stockChange.stock).toBe(24.5);
+    const minus = await inventory.reconcile('input', 'i', 'delta', -100, 'Saída', day);
+    expect(minus.stockChange.stock).toBe(0);
+    expect(minus.movement.quantityDelta).toBe(-24.5);
+    expect(await data('inputs', 'i')).toMatchObject({ stock: 0 });
+    expect(await count('stockMovements')).toBe(2);
+  });
+
+  it('rejects no-op, invalid negative absolute amount and missing reason without creating history', async () => {
+    await expect(inventory.reconcile('input', 'i', 'set', 20, 'Sem mudança', day)).rejects.toThrow('saldo atual');
+    await expect(inventory.reconcile('input', 'i', 'set', -10, 'Inválido', day)).rejects.toThrow('negativo');
+    await expect(inventory.reconcile('input', 'i', 'set', 100, ' ', day)).rejects.toThrow('motivo');
+    expect(await count('stockAdjustments')).toBe(0);
+    expect(await count('stockMovements')).toBe(0);
+    expect(await data('inputs', 'i')).toMatchObject({ stock: 20 });
+  });
+
+  it('does not allow reconciliation for items without stock tracking', async () => {
+    await expect(inventory.reconcile('input', 'i-un', 'set', 10, 'Conferência', day)).rejects.toThrow('não controla saldo');
+    expect(await data('inputs', 'i-un')).toMatchObject({ stock: 0 });
+  });
+
+  it('does not accept fractional stock for finished products', async () => {
+    await expect(inventory.reconcile('product', 'p', 'set', 1.5, 'Conferência', day)).rejects.toThrow('quantidade inteira');
+    expect(await data('products', 'p')).toMatchObject({ stock: 10 });
+  });
+
+  it('bases relative reconciliation on the latest committed stock, not on the UI cache', async () => {
+    await inventory.reconcile('input', 'i', 'set', 5, 'Conferência', day);
+    await finance.createExpense(purchase());
+    const result = await inventory.reconcile('input', 'i', 'delta', -7, 'Ajuste após compra', day);
+    expect(result.movement.quantityDelta).toBe(-7);
+    expect(result.stockChange.stock).toBe(3);
+    expect(await data('inputs', 'i')).toMatchObject({ stock: 3 });
+  });
+
   it('rejects inventory adjustments that would make stock negative without partial writes', async () => {
     await expect(inventory.adjust('product', 'p', -11, 'TEST ONLY', day)).rejects.toThrow('Estoque insuficiente');
     expect(await data('products', 'p')).toMatchObject({ stock: 10 });

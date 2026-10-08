@@ -126,3 +126,37 @@ test('mobile production and purchases keep modal actions usable',async({page})=>
   await page.locator('dialog[open]').getByRole('button',{name:'Compra de insumo'}).click();
   await expect(page.locator('dialog[open]').getByRole('button',{name:'Adicionar insumo'})).toBeVisible();
 });
+
+test('bulk variations create distinct products for selected fragrances with one operation', async ({page}) => {
+  await page.goto('/catalogo');
+  await page.getByRole('button',{name:'Novo',exact:true}).click();
+  const dialog=page.locator('dialog[open]');
+  await choose(page,dialog.getByRole('combobox',{name:'Coleção'}),'Clássico QA');
+  await choose(page,dialog.getByRole('combobox',{name:'Formato'}),'Florzinha QA');
+  await dialog.getByRole('checkbox',{name:/Criar várias fragrâncias/}).check();
+  await dialog.getByRole('checkbox',{name:'Pêssego QA'}).check();
+  await dialog.getByRole('checkbox',{name:'Jasmim QA'}).check();
+  await expect(dialog.getByRole('button',{name:'Criar 2 variações'})).toBeVisible();
+  await dialog.getByRole('button',{name:'Criar 2 variações'}).click();
+  await expect(dialog).not.toBeVisible();
+  await expect(page.locator('.catalog-card').filter({hasText:'Clássico QA · Pêssego QA · Florzinha QA'})).toBeVisible();
+  await expect(page.locator('.catalog-card').filter({hasText:'Clássico QA · Jasmim QA · Florzinha QA'})).toBeVisible();
+});
+
+test('nested reference creation keeps product draft and selects new collection and fragrance', async ({page}) => {
+  await page.goto('/catalogo');
+  await page.getByRole('button',{name:'Novo',exact:true}).click();
+  const productDialog=page.locator('dialog[open]').first();
+  await productDialog.getByRole('button',{name:/Criar coleção/}).click();
+  const quickDialog=page.locator('dialog[open]').last();
+  await quickDialog.getByRole('textbox',{name:/Nome da coleção/}).fill('Nova Coleção QA');
+  await quickDialog.getByRole('button',{name:'Criar e selecionar'}).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(1);
+  await expect(productDialog.getByRole('combobox',{name:'Coleção'})).toContainText('Nova Coleção QA');
+  await productDialog.getByRole('button',{name:/Criar fragrância/}).click();
+  const fragDialog=page.locator('dialog[open]').last();
+  await fragDialog.getByRole('textbox',{name:/Nome da fragrância/}).fill('Nova Fragrância QA');
+  await fragDialog.getByRole('button',{name:'Criar e selecionar'}).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(1);
+  await expect(productDialog.getByRole('combobox',{name:'Fragrância'})).toContainText('Nova Fragrância QA');
+});

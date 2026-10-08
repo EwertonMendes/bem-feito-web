@@ -15,6 +15,8 @@ batch.set(db.doc('units/u'),{name:'un',active:true,...audit});
 batch.set(db.doc('units/ml'),{name:'ml',active:true,...audit});
 batch.set(db.doc('collections/qa-c'),{name:'Clássico QA',active:true,costComponents:[],...audit});
 batch.set(db.doc('fragrances/qa-f'),{name:'Lavanda QA',collectionId:'qa-c',active:true,costComponents:[],...audit});
+batch.set(db.doc('fragrances/qa-f2'),{name:'Pêssego QA',collectionId:'qa-c',active:true,costComponents:[],...audit});
+batch.set(db.doc('fragrances/qa-f3'),{name:'Jasmim QA',collectionId:'qa-c',active:true,costComponents:[],...audit});
 batch.set(db.doc('formats/qa-format'),{name:'Florzinha QA',approximateWeightGrams:5,active:true,costComponents:[],...audit});
 batch.set(db.doc('formatPrices/qa-price'),{collectionId:'qa-c',formatId:'qa-format',priceCents:999,active:true,...audit});
 for (const [id,name,mode,stock,unit,cost] of [

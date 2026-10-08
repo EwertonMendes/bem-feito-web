@@ -79,3 +79,5 @@ jobs:
 # Isolated QA rerun: fix select option locator and purchase-kind initialization.
 
 # Final isolated QA rerun: disambiguate desktop/mobile sale row assertion.
+
+# Extended browser validation of bulk fragrance products and contextual reference creation.

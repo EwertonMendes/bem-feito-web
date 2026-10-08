@@ -97,8 +97,12 @@ export class ProductionPage {
     void Promise.all([this.catalog.load(), this.references.load(), this.store.load()]).then(() => {
       const params = this.route.snapshot.queryParamMap;
       if (params.get('novo') === '1' || params.has('produto')) {
-        this.open(params.get('produto') ?? '', params.get('data') ?? todayBusinessDate());
-        void this.router.navigate([], { relativeTo: this.route, queryParams: { novo: null, produto: null, data: null }, queryParamsHandling: 'merge', replaceUrl: true });
+        const productId = params.get('produto') ?? '';
+        const date = params.get('data') ?? todayBusinessDate();
+        void this.router.navigate([], {
+          relativeTo: this.route, queryParams: { novo: null, produto: null, data: null },
+          queryParamsHandling: 'merge', replaceUrl: true,
+        }).then(() => this.open(productId, date));
       }
     });
   }

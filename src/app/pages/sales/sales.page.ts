@@ -56,8 +56,10 @@ export class SalesPage {
     const openRequested = this.route.snapshot.queryParamMap.get('novo') === '1' || !!initialProductId;
     afterNextRender(() => {
       if (openRequested) {
-        this.modals.openSale(initialProductId);
-        void this.router.navigate([], { relativeTo: this.route, queryParams: { novo: null, produto: null }, queryParamsHandling: 'merge', replaceUrl: true });
+        void this.router.navigate([], {
+          relativeTo: this.route, queryParams: { novo: null, produto: null },
+          queryParamsHandling: 'merge', replaceUrl: true,
+        }).then(() => this.modals.openSale(initialProductId));
       }
     });
   }

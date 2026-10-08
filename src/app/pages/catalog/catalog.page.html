@@ -35,7 +35,11 @@
       @for (item of filteredProducts(); track item.id) {
         <article class="catalog-card" [class.inactive]="!item.active">
           <bf-catalog-image [image]="item.image" [alt]="item.displayName" />
-          <div class="body"><div class="meta"><span>{{ item.code }}</span><span class="bf-badge" [class.muted]="!item.active">{{ item.active ? 'Ativo' : 'Inativo' }}</span></div><h2>{{ item.displayName }}</h2><div class="stats"><strong>{{ currency(item.salePriceCents) }}</strong><span [class.stock-danger]="item.stock < 0">{{ item.stock }} em estoque</span></div><button class="bf-button secondary" type="button" (click)="editor.editProduct(item)">Editar</button></div>
+          <div class="body"><div class="meta"><span>{{ item.code }}</span><span class="bf-badge" [class.muted]="!item.active">{{ item.active ? 'Ativo' : 'Inativo' }}</span></div><h2>{{ item.displayName }}</h2><div class="stats"><strong>{{ currency(item.salePriceCents) }}</strong><span [class.stock-danger]="item.stock === 0">{{ item.stock > 0 ? item.stock + ' em estoque' : 'Sem estoque' }}</span></div><div class="catalog-context-actions">
+  <button bfButton class="secondary" type="button" (click)="editor.editProduct(item)">Editar</button>
+  <button bfButton class="secondary" type="button" [disabled]="!item.active" (click)="modals.openProduction(item.id)"><bf-icon name="production" /> Produzir</button>
+  <button bfButton type="button" [disabled]="!item.active || item.stock <= 0" [attr.title]="item.stock <= 0 ? 'Sem estoque disponível para venda' : null" (click)="modals.openSale(item.id)"><bf-icon name="sales" /> Vender</button>
+</div></div>
         </article>
       } @empty { <bf-empty-state title="Nenhum produto ainda" description="Cadastre o primeiro sabonete para começar." /> }
     </div>
@@ -48,7 +52,7 @@
   } @else if (tab() === 'kits') {
     <div class="catalog-grid">
       @for (item of filteredKits(); track item.id) {
-        <article class="catalog-card"><bf-catalog-image [image]="item.image" [alt]="item.name" /><div class="body"><div class="meta"><span>{{ item.components.length }} regras</span><span class="bf-badge" [class.muted]="!item.active">{{ item.active ? 'Ativo' : 'Inativo' }}</span></div><h2>{{ item.name }}</h2><div class="stats"><strong>{{ currency(item.priceCents) }}</strong><span>{{ item.notes || 'Kit comercial' }}</span></div><button class="bf-button secondary" (click)="editor.editKit(item)">Editar</button></div></article>
+        <article class="catalog-card"><bf-catalog-image [image]="item.image" [alt]="item.name" /><div class="body"><div class="meta"><span>{{ item.components.length }} regras</span><span class="bf-badge" [class.muted]="!item.active">{{ item.active ? 'Ativo' : 'Inativo' }}</span></div><h2>{{ item.name }}</h2><div class="stats"><strong>{{ currency(item.priceCents) }}</strong><span>{{ item.notes || 'Kit comercial' }}</span></div><div class="kit-availability" [class.empty]="kitAvailable(item.id) === 0"><bf-icon [name]="kitAvailable(item.id) > 0 ? 'inventory' : 'alert'" /><span>{{kitAvailable(item.id) > 0 ? kitAvailable(item.id) + ' kit(s) disponíveis para venda' : 'Sem itens suficientes para montar'}}</span></div><div class="catalog-context-actions"><button bfButton class="secondary" type="button" (click)="editor.editKit(item)">Editar</button><button bfButton type="button" [disabled]="!item.active || kitAvailable(item.id) === 0" (click)="modals.openSale(undefined,item.id)"><bf-icon name="sales" /> Vender</button></div></div></article>
       } @empty { <bf-empty-state title="Nenhum kit" description="Crie combinações para vender mais rápido." /> }
     </div>
   } @else {

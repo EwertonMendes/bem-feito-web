@@ -1,5 +1,5 @@
 import { computed, effect, inject, Injectable, signal } from '@angular/core';
-import { Expense, ExpenseDraft } from '../../domain/models/finance.model';
+import { PurchaseBatchDraft, Expense, ExpenseDraft } from '../../domain/models/finance.model';
 import { Payment } from '../../domain/models/sales.model';
 import { DataRevisionService } from '../../core/firebase/data-revision.service';
 import { FinanceRepository } from '../../core/repositories/finance.repository';
@@ -200,6 +200,24 @@ export class FinanceStore {
       this.toast.success(draft.kind === 'input-purchase'
         ? 'Compra registrada e estoque atualizado.'
         : 'Saída registrada com sucesso.');
+      return result;
+    } catch (error) {
+      const message = this.errors.message(error);
+      this.operationErrorState.set(message);
+      this.toast.error(message);
+      return null;
+    }
+  }
+
+
+  async createPurchaseBatch(draft: PurchaseBatchDraft): Promise<ExpenseCreateResult | null> {
+    this.operationErrorState.set('');
+    try {
+      const result = await this.financeRepository.createPurchaseBatch(draft);
+      if (this.expensesGate.isLoaded) this.expensesState.update(items =>
+        [result.expense, ...items.filter(item => item.id !== result.expense.id)].sort(compareBusinessDateDesc));
+      if (this.expenseSummaryGate.isLoaded) this.totalOutState.update(value => value + result.expense.amountCents);
+      this.toast.success('Compra registrada. Custos e estoques atualizados.');
       return result;
     } catch (error) {
       const message = this.errors.message(error);

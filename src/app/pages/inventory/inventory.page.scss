@@ -71,3 +71,5 @@
  .adjustment-option{min-height:0}
  .stock-preview-current strong,.stock-preview-result strong{font-size:.88rem}
 }
+
+.stock-actions a{display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none}.stock-actions a:hover{transform:translateY(-1px);transition:transform .15s ease}

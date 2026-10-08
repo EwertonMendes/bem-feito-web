@@ -137,17 +137,17 @@
     </div>
 
     <div class="quick-actions">
-      <button class="sheet-row sheet-animate" type="button" (click)="mobileNavigate('/vendas?novo=1')">
+      <button class="sheet-row sheet-animate" type="button" (click)="modals.openSale()">
         <span class="sheet-row-icon"><bf-icon name="sales" /></span>
         <span class="sheet-row-copy"><strong>Nova venda</strong><small>Registrar uma nova venda</small></span>
         <bf-icon class="sheet-chevron" name="chevron-right" />
       </button>
-      <button class="sheet-row sheet-animate" type="button" (click)="mobileNavigate('/producao?novo=1')">
+      <button class="sheet-row sheet-animate" type="button" (click)="modals.openProduction()">
         <span class="sheet-row-icon"><bf-icon name="production" /></span>
         <span class="sheet-row-copy"><strong>Produção</strong><small>Registrar uma produção</small></span>
         <bf-icon class="sheet-chevron" name="chevron-right" />
       </button>
-      <button class="sheet-row sheet-animate" type="button" (click)="mobileNavigate('/financeiro?novo=compra')">
+      <button class="sheet-row sheet-animate" type="button" (click)="modals.openExpense('input-purchase')">
         <span class="sheet-row-icon"><bf-icon name="purchase" /></span>
         <span class="sheet-row-copy"><strong>Compra ou despesa</strong><small>Abrir em compra de insumo</small></span>
         <bf-icon class="sheet-chevron" name="chevron-right" />
@@ -220,5 +220,6 @@
     </div>
   </section>
 
+  <ng-container #modalOutlet />
   <bf-confirm-dialog #logoutConfirm />
 </div>

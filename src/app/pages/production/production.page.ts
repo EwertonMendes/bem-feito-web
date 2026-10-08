@@ -1,178 +1,123 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
-import { FormField, form, min, required } from '@angular/forms/signals';
-import { standardCostForProduct, trackingModeForInput } from '../../domain/logic/costing';
-import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
+import { ActivatedRoute, Router } from '@angular/router';
+import { Production, ProductionItem, ProductionConsumption } from '../../domain/models/production.model';
 import { CatalogStore } from '../../features/catalog/catalog.store';
+import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
 import { ProductionStore } from '../../features/production/production.store';
+import { BfProductionEditor } from '../../features/production/components/production-editor';
 import { todayBusinessDate, formatBusinessDate } from '../../core/utils/date';
 import { formatCurrency } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
 import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
 import { BfDialog } from '../../shared/ui/dialog/dialog';
-import { CatalogImage } from '../../shared/media/catalog-image/catalog-image';
+import { BfSelect, BfSelectOption } from '../../shared/ui/select/select';
 import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
 import { BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
-import { BfSelect, BfSelectOption } from '../../shared/ui/select/select';
-import { BfNumberInput } from '../../shared/ui/number-input/number-input';
-
-interface ProductionFormModel {
-  productId: string;
-  quantity: number;
-  businessDate: string;
-  notes: string;
-}
-
+interface ProductionDay { date: string; entries: Production[]; quantity: number; totalCents: number; pending: boolean; products: number; }
 @Component({
-  selector: 'bf-production-page',
-  imports: [FormField, BfIcon, CatalogImage, BfDialog, BfEmptyState, BfPageRefresh, BfTableSkeleton, BfSelect, BfNumberInput],
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  templateUrl: './production.page.html',
-  styleUrl: './production.page.scss',
+ selector: 'bf-production-page',
+ imports: [BfIcon, BfDialog, BfEmptyState, BfPageRefresh, BfTableSkeleton, BfProductionEditor, BfSelect],
+ changeDetection: ChangeDetectionStrategy.OnPush,
+ templateUrl: './production.page.html',
+ styleUrl: './production.page.scss',
 })
 export class ProductionPage {
-  readonly catalog = inject(CatalogStore);
-  readonly references = inject(CatalogReferenceStore);
-  readonly store = inject(ProductionStore);
-  private readonly route = inject(ActivatedRoute);
-  private readonly destroyRef = inject(DestroyRef);
-  private readonly dialog = viewChild.required<BfDialog>('productionDialog');
-
-  readonly currency = formatCurrency;
-  readonly date = formatBusinessDate;
-  readonly submitted = signal(false);
-  readonly saving = signal(false);
-  readonly formError = signal('');
-  readonly model = signal<ProductionFormModel>({ productId: '', quantity: 1, businessDate: todayBusinessDate(), notes: '' });
-  readonly productionForm = form(this.model, (p) => {
-    required(p.productId);
-    required(p.businessDate);
-    min(p.quantity, 1);
-  });
-  readonly formErrors = computed(() => {
-    const value = this.model();
-    return {
-      productId: value.productId ? '' : 'Selecione o produto.',
-      quantity: Number.isFinite(value.quantity) && value.quantity >= 1 ? '' : 'Informe uma quantidade de pelo menos 1.',
-      businessDate: value.businessDate ? '' : 'Informe a data.',
-    };
-  });
-  readonly productOptions = computed<BfSelectOption[]>(() => [
-    { value: '', label: 'Selecione' },
-    ...this.catalog.activeProducts().map((product) => ({
-      value: product.id,
-      label: product.displayName,
-      description: `Estoque atual: ${product.stock}`,
-      icon: 'product' as const,
-    })),
-  ]);
-  readonly selectedProduct = computed(() => this.catalog.products().find((item) => item.id === this.model().productId));
-  readonly costPreview = computed(() => {
-    const product = this.selectedProduct();
-    if (!product) return null;
-    try {
-      return standardCostForProduct(product, {
-        collection: this.references.collections().find((item) => item.id === product.collectionId),
-        fragrance: this.references.fragrances().find((item) => item.id === product.fragranceId),
-        format: this.references.formats().find((item) => item.id === product.formatId),
-      }, new Map(this.catalog.inputs().map((item) => [item.id, item])));
-    } catch {
-      return null;
-    }
-  });
-  readonly estimatedConsumptions = computed(() => {
-    const preview = this.costPreview();
-    if (!preview) return [];
-    return preview.components.map((component) => {
-      const input = this.catalog.inputs().find((item) => item.id === component.inputId);
-      const unit = this.references.units().find((item) => item.id === component.unitId);
-      const quantity = component.quantity * this.model().quantity;
-      const mode = input ? trackingModeForInput(input) : 'estimated';
-      return {
-        name: input?.name ?? 'Insumo',
-        quantity,
-        unit: unit?.name ?? '',
-        mode,
-        available: mode === 'untracked' ? null : Math.max(0, input?.stock ?? 0),
-        enough: mode !== 'exact' || (input?.stock ?? 0) >= quantity,
-        unitCostCents: component.unitCostCents,
-        totalCostCents: component.totalCostCents * this.model().quantity,
-        sources: component.sources.map((source) => source.source),
+ readonly catalog = inject(CatalogStore);
+ readonly references = inject(CatalogReferenceStore);
+ readonly store = inject(ProductionStore);
+ private readonly route = inject(ActivatedRoute);
+ private readonly router = inject(Router);
+ private readonly destroyRef = inject(DestroyRef);
+ private readonly productionEditor = viewChild.required<BfProductionEditor>('productionEditor');
+ private readonly detailDialog = viewChild.required<BfDialog>('detailDialog');
+ readonly currency = formatCurrency;
+ readonly date = formatBusinessDate;
+ readonly selectedDayDate = signal('');
+ readonly filterDate = signal('');
+ readonly filterProduct = signal('');
+ readonly filterCost = signal<'all' | 'partial' | 'complete'>('all');
+ readonly costFilterOptions: readonly BfSelectOption[] = [
+   {value:'all',label:'Todos'}, {value:'complete',label:'Calculado'}, {value:'partial',label:'Parcial'},
+ ];
+ changeCostFilter(value: string): void {
+   if (value === 'all' || value === 'complete' || value === 'partial') this.filterCost.set(value);
+ }
+  readonly days = computed<ProductionDay[]>(() => {
+    const byDate = new Map<string, ProductionDay>();
+    for (const entry of this.store.items()) {
+      const day = byDate.get(entry.businessDate) ?? {
+        date: entry.businessDate, entries: [], quantity: 0, totalCents: 0, pending: false, products: 0,
       };
-    });
+      day.entries.push(entry);
+      day.quantity += entry.quantity;
+      day.totalCents += entry.totalCostCents;
+      day.pending ||= entry.costPending;
+      byDate.set(day.date, day);
+    }
+    for (const day of byDate.values()) day.products = new Set(
+      day.entries.flatMap(entry => this.itemsFor(entry).map(item => item.productId))
+    ).size;
+    return [...byDate.values()].sort((a, b) => b.date.localeCompare(a.date));
   });
-  readonly estimatedTotalCostCents = computed(() => (this.costPreview()?.unitCostCents ?? 0) * this.model().quantity);
-  readonly pendingCostItems = computed(() => this.estimatedConsumptions().filter((item) => item.unitCostCents <= 0));
-  readonly blockingConsumptions = computed(() => this.estimatedConsumptions().filter((item) => !item.enough));
-
+  readonly selectedDay = computed(() => this.days().find(day => day.date === this.selectedDayDate()));
+  readonly detailItems = computed(() => {
+    const items = new Map<string, { productId: string; name: string; quantity: number; costCents: number; pending: boolean }>();
+    for (const entry of this.selectedDay()?.entries ?? []) {
+      for (const part of this.itemsFor(entry)) {
+        const previous = items.get(part.productId);
+        if (previous) { previous.quantity += part.quantity; previous.costCents += part.totalCostCents; previous.pending ||= part.costPending; }
+        else items.set(part.productId, { productId: part.productId, name: part.productName, quantity: part.quantity, costCents: part.totalCostCents, pending: part.costPending });
+      }
+    }
+    return [...items.values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  });
+  readonly detailConsumptions = computed(() => {
+    const values = new Map<string, ProductionConsumption>();
+    for (const entry of this.selectedDay()?.entries ?? []) {
+      for (const part of entry.consumptions ?? []) {
+        const old = values.get(part.inputId);
+        if (old) { old.quantity += part.quantity; old.totalCostCents += part.totalCostCents; }
+        else values.set(part.inputId, { ...part });
+      }
+    }
+    return [...values.values()];
+  });
+ readonly filteredDays = computed(() => this.days().filter(day => {
+   if (this.filterDate() && day.date !== this.filterDate()) return false;
+   if (this.filterCost() === 'partial' && !day.pending) return false;
+   if (this.filterCost() === 'complete' && day.pending) return false;
+   const text = this.filterProduct().trim().toLocaleLowerCase('pt-BR');
+   return !text || day.entries.some(entry => this.itemsFor(entry).some(item =>
+     item.productName.toLocaleLowerCase('pt-BR').includes(text)));
+ }));
   constructor() {
     this.destroyRef.onDestroy(this.catalog.activate());
     this.destroyRef.onDestroy(this.references.activate());
     this.destroyRef.onDestroy(this.store.activate());
     void Promise.all([this.catalog.load(), this.references.load(), this.store.load()]).then(() => {
-      if (this.route.snapshot.queryParamMap.get('novo') === '1') this.open();
+      const params = this.route.snapshot.queryParamMap;
+      if (params.get('novo') === '1' || params.has('produto')) {
+        const productId = params.get('produto') ?? '';
+        const date = params.get('data') ?? todayBusinessDate();
+        void this.router.navigate([], {
+          relativeTo: this.route, queryParams: { novo: null, produto: null, data: null },
+          queryParamsHandling: 'merge', replaceUrl: true,
+        }).then(() => this.open(productId, date));
+      }
     });
   }
-
-  open(): void {
-    this.submitted.set(false);
-    this.formError.set('');
-    this.store.clearOperationError();
-    this.model.set({ productId: this.catalog.activeProducts()[0]?.id ?? '', quantity: 1, businessDate: todayBusinessDate(), notes: '' });
-    this.dialog().open();
+  itemsFor(entry: Production): ProductionItem[] {
+    return entry.items?.length ? entry.items : [{
+      productId: entry.productId, productName: entry.productName, quantity: entry.quantity,
+      unitCostCents: entry.unitCostCents, totalCostCents: entry.totalCostCents,
+      costPending: entry.costPending, consumptions: entry.consumptions ?? [],
+    }];
   }
-
-  trackingLabel(mode: 'exact' | 'estimated' | 'untracked'): string {
-    if (mode === 'exact') return 'controlado';
-    if (mode === 'estimated') return 'estimado';
-    return 'sem controle de saldo';
+ open(productId = '', date = todayBusinessDate()): void { void this.productionEditor().open(productId, date); }
+  showDay(date: string): void {
+    this.selectedDayDate.set(date);
+    this.detailDialog().open();
   }
-
-  sourceLabel(sources: readonly string[]): string {
-    const labels: Record<string, string> = {
-      format: 'Formato',
-      collection: 'Coleção',
-      fragrance: 'Fragrância',
-      product: 'Ajuste do produto',
-    };
-    return [...new Set(sources)].map((source) => labels[source] ?? source).join(' + ');
-  }
-
-  stockLabel(item: { mode: 'exact' | 'estimated' | 'untracked'; available: number | null; unit: string }): string {
-    if (item.mode === 'untracked') return 'sem controle de saldo';
-    return `${item.mode === 'estimated' ? 'saldo aprox.' : 'disponível'} ${item.available ?? 0} ${item.unit}`;
-  }
-
-  async save(): Promise<void> {
-    if (this.saving()) return;
-    this.submitted.set(true);
-    this.formError.set('');
-    this.store.clearOperationError();
-
-    const errors = this.formErrors();
-    if (this.productionForm().invalid() || Object.values(errors).some(Boolean)) {
-      this.formError.set('Revise os campos destacados antes de confirmar.');
-      return;
-    }
-
-    const blocking = this.blockingConsumptions()[0];
-    if (blocking) {
-      this.formError.set(`Estoque insuficiente de ${blocking.name}: necessário ${blocking.quantity} ${blocking.unit}, disponível ${blocking.available ?? 0} ${blocking.unit}.`);
-      return;
-    }
-
-    const value = this.model();
-    this.saving.set(true);
-    try {
-      const result = await this.store.create(value.productId, value.quantity, value.businessDate, value.notes);
-      if (result) {
-        this.catalog.applyStockChanges(result.stockChanges);
-        this.dialog().close();
-      } else {
-        this.formError.set(this.store.operationError() || 'Não foi possível registrar a produção.');
-      }
-    } finally {
-      this.saving.set(false);
-    }
-  }
+  inputName(id: string): string { return this.catalog.inputs().find(item => item.id === id)?.name ?? 'Insumo'; }
+  unitName(id: string): string { return this.references.units().find(item => item.id === id)?.name ?? ''; }
 }

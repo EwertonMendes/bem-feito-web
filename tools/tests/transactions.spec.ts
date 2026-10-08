@@ -129,6 +129,59 @@ describe('Actual repositories against restrictive emulator rules', () => {
     expect(await count('stockMovements')).toBe(2);
   });
 
+  it('registers multiple products atomically and preserves itemized production costs', async () => {
+    const result = await production.createBatch([
+      { productId: 'p', quantity: 2 },
+      { productId: 'p-est', quantity: 1 },
+    ], day, 'Lançamento do dia');
+    expect(result.production.items).toHaveLength(2);
+    expect(result.production).toMatchObject({ quantity: 3, totalCostCents: 3000, costPending: false });
+    expect(await data('products', 'p')).toMatchObject({ stock: 12 });
+    expect(await data('products', 'p-est')).toMatchObject({ stock: 1 });
+    expect(await data('inputs', 'i')).toMatchObject({ stock: 10 });
+    expect(await data('inputs', 'i-est')).toMatchObject({ stock: 0 });
+    expect(await count('productions')).toBe(1);
+    expect(await count('stockMovements')).toBe(4);
+  });
+
+  it('does not partially register multi-product production when a controlled material is insufficient', async () => {
+    await expect(production.createBatch([
+      { productId: 'p', quantity: 5 },
+      { productId: 'p-est', quantity: 2 },
+    ], day)).rejects.toThrow('Estoque insuficiente');
+    expect(await count('productions')).toBe(0);
+    expect(await count('stockMovements')).toBe(0);
+    expect(await data('products', 'p')).toMatchObject({ stock: 10 });
+    expect(await data('inputs', 'i')).toMatchObject({ stock: 20 });
+  });
+
+  it('books one itemized purchase and updates the cost basis of each input once', async () => {
+    const result = await finance.createPurchaseBatch({
+      businessDate: day,
+      items: [
+        { inputId: 'i', unitId: 'u', quantity: 5, amountCents: 500 },
+        { inputId: 'i-est', unitId: 'u', quantity: 4, amountCents: 400 },
+        { inputId: 'i-un', unitId: 'u', quantity: 3, amountCents: 300 },
+      ],
+    });
+    expect(result.expense).toMatchObject({ kind: 'input-purchase', amountCents: 1200 });
+    expect(result.expense.items).toHaveLength(3);
+    expect(await count('expenses')).toBe(1);
+    expect(await data('inputs', 'i')).toMatchObject({ stock: 25, averageUnitCostCents: 100 });
+    expect(await data('inputs', 'i-est')).toMatchObject({ stock: 5, averageUnitCostCents: 120 });
+    expect(await data('inputs', 'i-un')).toMatchObject({ stock: 0, averageUnitCostCents: 100 });
+    expect(await count('stockMovements')).toBe(2);
+  });
+
+  it('rejects invalid itemized purchase before any Firestore write', async () => {
+    await expect(finance.createPurchaseBatch({
+      businessDate: day,
+      items: [{ inputId: 'i', unitId: 'u', quantity: 0, amountCents: 100 }],
+    })).rejects.toBeDefined();
+    expect(await count('expenses')).toBe(0);
+    expect(await data('inputs', 'i')).toMatchObject({ stock: 20 });
+  });
+
   it('updates cost for an untracked input without creating fake physical inventory', async () => {
     await finance.createExpense({ businessDate: day, kind: 'input-purchase', inputId: 'i-un', unitId: 'u', quantity: 5, amountCents: 500 });
     expect(await data('inputs', 'i-un')).toMatchObject({

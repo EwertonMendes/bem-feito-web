@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
 import { Addition, Kit, Product } from '../../../../domain/models/catalog.model';
+import { allocateKitStock } from '../../../../domain/logic/kit-stock';
 import { CatalogImageRef } from '../../../../domain/models/image.model';
 import { PaymentDraft, SaleDraft, SaleDraftLine } from '../../../../domain/models/sales.model';
 import { ToastService } from '../../../../core/services/toast.service';
@@ -78,12 +79,6 @@ interface KitAvailability {
   message: string;
   details: string[];
   productIds: string[];
-}
-
-interface KitRequirement {
-  index: number;
-  label: string;
-  candidates: Product[];
 }
 
 @Component({
@@ -235,7 +230,7 @@ export class SaleEditor {
     this.destroyRef.onDestroy(this.settings.activate());
   }
 
-  async open(): Promise<void> {
+  async open(initialProductId?: string, initialKitId?: string): Promise<void> {
     await Promise.all([
       this.catalog.load(),
       this.references.load(),
@@ -243,6 +238,14 @@ export class SaleEditor {
     ]);
 
     this.resetDraft();
+    if (initialProductId) {
+      const product = this.catalog.activeProducts().find(item => item.id === initialProductId);
+      if (product && this.canAddProduct(product)) this.addProduct(product);
+    }
+    if (initialKitId) {
+      const kit = this.catalog.activeKits().find(item => item.id === initialKitId);
+      if (kit) { this.catalogTab.set('kits'); this.addKit(kit); }
+    }
     this.dialog().open();
   }
 
@@ -679,92 +682,94 @@ export class SaleEditor {
     return slots;
   }
 
+  /**
+   * Bipartite-capacity matching: O(slots × candidate edges), avoiding exponential
+   * backtracking when kits contain dozens or hundreds of units.
+   */
   private planKit(kit: Kit): KitAvailability {
     const reserved = this.reservedProductQuantities();
-    const remaining = new Map(
-      this.catalog.activeProducts().map((product) => [
-        product.id,
-        Math.max(0, product.stock - (reserved.get(product.id) ?? 0)),
-      ])
-    );
+    const capacities = new Map(this.catalog.activeProducts().map(product => [
+      product.id, Math.max(0, product.stock - (reserved.get(product.id) ?? 0)),
+    ]));
+    const productIds = allocateKitStock(kit, this.catalog.activeProducts(), 1, reserved);
+    if (productIds) return { available: true, message: 'Disponível', details: [], productIds };
+    const shortages = [...kit.components].map(component => {
+      const count = this.matchingProducts(component).reduce((sum, product) =>
+        sum + (capacities.get(product.id) ?? 0), 0);
+      return count < component.quantity
+        ? (component.quantity - count) + '× ' + this.kitRequirementLabel(component) : '';
+    }).filter(Boolean);
+    const details = shortages.length ? shortages : ['Estoque insuficiente para combinar os itens do kit.'];
+    return { available: false, message: details.slice(0,2).join(' · '), details, productIds: [] };
+  }
 
-    const requirements: KitRequirement[] = [];
-    let index = 0;
-
-    for (const component of [...kit.components].sort((a, b) => a.order - b.order)) {
-      const candidates = this.matchingProducts(component);
-      const label = this.kitRequirementLabel(component);
-
-      for (let slot = 0; slot < component.quantity; slot++) {
-        requirements.push({ index, label, candidates });
-        index++;
+  /** An allocation group is a commercial requirement (format/collection/fragrance). */
+  kitAllocationGroups(line: KitCartLine): Array<{
+    index: number; label: string; target: number; allocated: number;
+    allocations: Array<{ productId: string; name: string; quantity: number }>;
+    candidates: Product[];
+  }> {
+    const kit = this.catalog.kits().find(item => item.id === line.sourceId);
+    if (!kit) return [];
+    let cursor = 0;
+    return [...kit.components].sort((a, b) => a.order - b.order).map((component, index) => {
+      const tally = new Map<string, number>();
+      for (const productId of line.componentProductIds.slice(cursor, cursor + component.quantity)) {
+        if (productId) tally.set(productId, (tally.get(productId) ?? 0) + 1);
       }
-    }
-
-    const productIds = Array<string>(requirements.length).fill('');
-    const ordered = [...requirements].sort(
-      (a, b) => a.candidates.length - b.candidates.length || a.index - b.index
-    );
-
-    const allocate = (position: number): boolean => {
-      if (position >= ordered.length) return true;
-
-      const requirement = ordered[position];
-      if (!requirement) return false;
-
-      const candidates = [...requirement.candidates].sort(
-        (a, b) => (remaining.get(b.id) ?? 0) - (remaining.get(a.id) ?? 0)
-      );
-
-      for (const product of candidates) {
-        const stock = remaining.get(product.id) ?? 0;
-        if (stock <= 0) continue;
-
-        remaining.set(product.id, stock - 1);
-        productIds[requirement.index] = product.id;
-
-        if (allocate(position + 1)) return true;
-
-        productIds[requirement.index] = '';
-        remaining.set(product.id, stock);
-      }
-
-      return false;
-    };
-
-    if (allocate(0)) {
+      cursor += component.quantity;
       return {
-        available: true,
-        message: 'Disponível',
-        details: [],
-        productIds,
+        index, label: this.kitRequirementLabel(component), target: component.quantity,
+        allocated: [...tally.values()].reduce((sum, count) => sum + count, 0),
+        allocations: [...tally].map(([productId, quantity]) => ({
+          productId, quantity, name: this.catalog.products().find(item => item.id === productId)?.displayName ?? 'Produto',
+        })),
+        candidates: this.matchingProducts(component).filter(product => !tally.has(product.id)),
       };
+    });
+  }
+
+  private allocationRange(kit: Kit, index: number): { start: number; length: number } | null {
+    const components = [...kit.components].sort((a, b) => a.order - b.order);
+    const selected = components[index];
+    if (!selected) return null;
+    return { start: components.slice(0, index).reduce((sum, item) => sum + item.quantity, 0), length: selected.quantity };
+  }
+
+  changeKitGroupQuantity(line: KitCartLine, index: number, productId: string, quantity: number): void {
+    const kit = this.catalog.kits().find(item => item.id === line.sourceId);
+    if (!kit || !Number.isSafeInteger(quantity) || quantity < 0) return;
+    const range = this.allocationRange(kit, index);
+    if (!range) return;
+    const ids = [...line.componentProductIds];
+    const previous = ids.slice(range.start, range.start + range.length);
+    const others = previous.filter(id => id && id !== productId);
+    if (quantity + others.length > range.length) {
+      this.toast.error('O total ultrapassa as unidades previstas para este grupo.');
+      return;
     }
+    const replacement = [
+      ...Array<string>(quantity).fill(productId),
+      ...others,
+      ...Array<string>(range.length - quantity - others.length).fill(''),
+    ];
+    ids.splice(range.start, range.length, ...replacement);
+    const reserved = this.reservedProductQuantities(line.key);
+    const counts = new Map<string, number>();
+    ids.forEach(id => { if (id) counts.set(id, (counts.get(id) ?? 0) + 1); });
+    for (const [id, count] of counts) {
+      const stock = this.catalog.products().find(item => item.id === id)?.stock ?? 0;
+      if (count > stock - (reserved.get(id) ?? 0)) {
+        this.toast.error('Estoque insuficiente para essa distribuição.');
+        return;
+      }
+    }
+    this.cart.update(items => items.map(item => item.key === line.key && item.kind === 'kit'
+      ? { ...item, componentProductIds: ids } : item));
+  }
 
-    const shortages = [...kit.components]
-      .sort((a, b) => a.order - b.order)
-      .map((component) => {
-        const available = this.matchingProducts(component).reduce(
-          (sum, product) => sum + Math.max(0, product.stock - (reserved.get(product.id) ?? 0)),
-          0
-        );
-        const missing = Math.max(0, component.quantity - available);
-        return missing > 0 ? missing + '× ' + this.kitRequirementLabel(component) : '';
-      })
-      .filter(Boolean);
-
-    const details = shortages.length
-      ? shortages
-      : ['Estoque insuficiente para combinar os itens exigidos por este kit.'];
-
-    return {
-      available: false,
-      message: shortages.length
-        ? 'Em falta: ' + shortages.slice(0, 2).join(' · ') + (shortages.length > 2 ? ' +' + (shortages.length - 2) : '')
-        : (details[0] ?? 'Estoque insuficiente para completar este kit.'),
-      details,
-      productIds: [],
-    };
+  addKitGroupProduct(line: KitCartLine, index: number, productId: string): void {
+    if (productId) this.changeKitGroupQuantity(line, index, productId, 1);
   }
 
   private matchingProducts(component: Kit['components'][number]): Product[] {

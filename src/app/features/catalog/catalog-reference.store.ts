@@ -79,16 +79,16 @@ export class CatalogReferenceStore {
     }, force).catch(() => undefined);
   }
 
-  async saveCollection(item: CollectionDefinition): Promise<void> {
-    await this.save(item, this.collectionRepository, this.collectionsState);
+  async saveCollection(item: CollectionDefinition): Promise<string> {
+    return this.save(item, this.collectionRepository, this.collectionsState);
   }
 
-  async saveFragrance(item: FragranceDefinition): Promise<void> {
-    await this.save(item, this.fragranceRepository, this.fragrancesState);
+  async saveFragrance(item: FragranceDefinition): Promise<string> {
+    return this.save(item, this.fragranceRepository, this.fragrancesState);
   }
 
-  async saveFormat(item: FormatDefinition): Promise<void> {
-    await this.save(item, this.formatRepository, this.formatsState);
+  async saveFormat(item: FormatDefinition): Promise<string> {
+    return this.save(item, this.formatRepository, this.formatsState);
   }
 
   async saveFormatPrice(item: FormatPrice): Promise<void> {
@@ -103,7 +103,7 @@ export class CatalogReferenceStore {
     item: T,
     repository: { create(value: Omit<T, 'id'>): Promise<string>; replace(value: T): Promise<void> },
     state: { update(updater: (items: T[]) => T[]): void },
-  ): Promise<void> {
+  ): Promise<string> {
     const id = item.id || await repository.create(this.withoutId(item));
     if (item.id) await repository.replace(item);
     const saved = { ...item, id };
@@ -113,6 +113,7 @@ export class CatalogReferenceStore {
         : [...items, saved];
       return next;
     });
+    return id;
   }
 
   private withoutId<T extends { id: string }>(value: T): Omit<T, 'id'> {

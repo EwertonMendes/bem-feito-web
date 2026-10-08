@@ -140,6 +140,14 @@ export class CatalogStore {
     return id;
   }
 
+  async createProductVariations(products: readonly Product[]): Promise<Product[]> {
+    const created = await this.productRepository.createMany(products);
+    const combined = [...this.productsState(), ...created].sort((a, b) =>
+      a.displayName.localeCompare(b.displayName, 'pt-BR'));
+    this.productsState.set(combined);
+    return created;
+  }
+
   async saveInput(input: InputItem): Promise<string> {
     const base = { ...input, stockStatus: stockStatusForInput(input) };
     if (base.id) {

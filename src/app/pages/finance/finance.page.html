@@ -24,8 +24,8 @@
     @if (!store.expensesInitialized()) {
       <bf-table-skeleton [columns]="6" [rows]="7" />
     } @else {
-      <div class="bf-table-wrap"><table class="bf-table"><thead><tr><th>ID</th><th>Data</th><th>Tipo</th><th>Categoria / Insumo</th><th>Valor</th><th>Forma</th></tr></thead><tbody>
-        @for(item of store.expenses();track item.id){<tr><td><strong>{{item.code}}</strong></td><td>{{date(item.businessDate)}}</td><td>{{item.kind}}</td><td>{{item.kind==='input-purchase'?inputName(item.inputId):categoryName(item.categoryId)}}</td><td>{{currency(item.amountCents)}}</td><td>{{paymentName(item.paymentMethodId || '')}}</td></tr>} @empty {<tr><td colspan="6"><bf-empty-state title="Nenhuma saída registrada" description="Compras de insumos e despesas aparecem aqui." /></td></tr>}
+      <div class="bf-table-wrap"><table class="bf-table"><thead><tr><th>ID</th><th>Data</th><th>Tipo</th><th>Categoria / Insumo</th><th>Valor</th><th>Forma</th><th></th></tr></thead><tbody>
+        @for(item of store.expenses();track item.id){<tr><td><strong>{{item.code}}</strong></td><td>{{date(item.businessDate)}}</td><td>{{item.kind}}</td><td>{{item.kind==='input-purchase'?purchaseDescription(item):categoryName(item.categoryId)}}</td><td>{{currency(item.amountCents)}}</td><td>{{paymentName(item.paymentMethodId || '')}}</td><td><button class="bf-button secondary" type="button" (click)="openExpenseDetails(item)">Ver</button></td></tr>} @empty {<tr><td colspan="7"><bf-empty-state title="Nenhuma saída registrada" description="Compras de insumos e despesas aparecem aqui." /></td></tr>}
       </tbody></table></div>
       @if (store.expenseHasMore()) { <div class="bf-actions"><button class="bf-button secondary" type="button" (click)="store.loadMoreExpenses()">Carregar mais</button></div> }
     }
@@ -33,7 +33,8 @@
     @if (!sales.receivablesInitialized()) {
       <bf-list-skeleton [rows]="6" />
     } @else {
-      <div class="receivable-list">@for(item of sales.openSales();track item.id){<article><div><strong>{{item.customerName || 'Cliente não informado'}}</strong><span>{{item.code}} · {{date(item.businessDate)}}</span></div><div class="amount"><strong>{{currency(item.balanceCents)}}</strong><span>{{item.dueDate ? 'vence ' + date(item.dueDate) : 'sem vencimento'}}</span></div><button class="bf-button" type="button" (click)="openReceipt(item.id)">Receber</button></article>} @empty {<bf-empty-state title="Nada a receber" description="Todas as vendas estão quitadas." />}</div>
+      @if(overdueOnly()) { <div class="bf-actions"><button class="bf-button secondary" type="button" (click)="overdueOnly.set(false)">Mostrar todas as contas</button></div> }
+      <div class="receivable-list">@for(item of visibleReceivables();track item.id){<article><div><strong>{{item.customerName || 'Cliente não informado'}}</strong><span>{{item.code}} · {{date(item.businessDate)}}</span></div><div class="amount"><strong>{{currency(item.balanceCents)}}</strong><span>{{item.dueDate ? 'vence ' + date(item.dueDate) : 'sem vencimento'}}</span></div><button class="bf-button" type="button" (click)="openReceipt(item.id)">Receber</button></article>} @empty {<bf-empty-state title="Nada a receber" description="Todas as vendas estão quitadas." />}</div>
       @if (sales.receivableHasMore()) { <div class="bf-actions"><button class="bf-button secondary" type="button" (click)="sales.loadMoreReceivables()">Carregar mais</button></div> }
     }
   } @else {
@@ -47,47 +48,21 @@
     }
   }
 
-  <dialog bfDialog #expenseDialog="bfDialog" class="bf-dialog">
-    <div class="bf-dialog-header"><h2>Registrar saída</h2><button class="bf-icon-button" (click)="expenseDialog.close()"><bf-icon name="close" /></button></div>
-    <div class="bf-dialog-body">
-      <div class="kind-grid">
-        <button type="button" [class.active]="model().kind==='input-purchase'" (click)="model.update(v=>({...v,kind:'input-purchase'}))">Compra de insumo</button>
-        <button type="button" [class.active]="model().kind==='operating-expense'" (click)="model.update(v=>({...v,kind:'operating-expense'}))">Despesa</button>
-        <button type="button" [class.active]="model().kind==='equipment'" (click)="model.update(v=>({...v,kind:'equipment'}))">Equipamento</button>
-        <button type="button" [class.active]="model().kind==='other'" (click)="model.update(v=>({...v,kind:'other'}))">Outro</button>
-      </div>
-      @if(expenseFormError()){<div class="bf-form-error" role="alert">{{expenseFormError()}}</div>}
-      <div class="bf-grid two" data-form="expense">
-        <label class="bf-field" [attr.data-invalid]="expenseSubmitted() && expenseErrors().businessDate ? 'true' : null"><span>Data</span><input class="bf-input" type="date" [class.invalid]="expenseSubmitted() && !!expenseErrors().businessDate" [formField]="expenseForm.businessDate" />@if(expenseSubmitted() && expenseErrors().businessDate){<small class="bf-field-error">{{expenseErrors().businessDate}}</small>}</label>
-        <label class="bf-field" [attr.data-invalid]="expenseSubmitted() && expenseErrors().amount ? 'true' : null"><span>Valor total</span><bf-number-input kind="currency" [formField]="expenseForm.amount" ariaLabel="Valor total" />@if(expenseSubmitted() && expenseErrors().amount){<small class="bf-field-error">{{expenseErrors().amount}}</small>}</label>
-        @if(model().kind==='input-purchase'){
-          <label class="bf-field full" [attr.data-invalid]="expenseSubmitted() && expenseErrors().inputId ? 'true' : null"><span>Insumo</span><bf-select [formField]="expenseForm.inputId" [options]="inputOptions()" ariaLabel="Insumo" />@if(expenseSubmitted() && expenseErrors().inputId){<small class="bf-field-error">{{expenseErrors().inputId}}</small>}</label>
-          <label class="bf-field full" [attr.data-invalid]="expenseSubmitted() && expenseErrors().quantity ? 'true' : null"><span>Quantidade comprada</span><bf-number-input kind="decimal" [decimals]="3" [suffix]="purchaseUnitName()" [formField]="expenseForm.quantity" ariaLabel="Quantidade comprada" />@if(expenseSubmitted() && expenseErrors().quantity){<small class="bf-field-error">{{expenseErrors().quantity}}</small>}</label>
-          <p class="purchase-hint full">Informe a quantidade na unidade base do insumo. O sistema atualiza o custo médio automaticamente.</p>
-        } @else {
-          <label class="bf-field full"><span>Categoria</span><bf-select [formField]="expenseForm.categoryId" [options]="expenseCategoryOptions()" ariaLabel="Categoria" /></label>
-        }
-        <label class="bf-field"><span>Forma de pagamento</span><bf-select [formField]="expenseForm.paymentMethodId" [options]="optionalPaymentMethodOptions()" ariaLabel="Forma de pagamento" /></label>
-        <label class="bf-field"><span>Link / comprovante</span><input class="bf-input" type="url" [formField]="expenseForm.link" /></label>
-        <label class="bf-field full"><span>Observações</span><textarea class="bf-textarea" [formField]="expenseForm.notes"></textarea></label>
-      </div>
-    </div>
-    <div class="bf-dialog-footer"><button class="bf-button secondary" (click)="expenseDialog.close()">Cancelar</button><button class="bf-button" [disabled]="expenseSaving()" (click)="save()">{{expenseSaving()?'Registrando...':'Registrar'}}</button></div>
-  </dialog>
-
-  <dialog bfDialog #receiptDialog="bfDialog" class="bf-dialog">
-    <div class="bf-dialog-header"><div><h2>Registrar recebimento</h2><small>{{selectedReceivable()?.code}} · {{selectedReceivable()?.customerName || 'Cliente'}}</small></div><button class="bf-icon-button" type="button" (click)="receiptDialog.close()"><bf-icon name="close" /></button></div>
-    <div class="bf-dialog-body">
-      <div class="receipt-balance"><span>Saldo atual</span><strong>{{currency(selectedReceivable()?.balanceCents || 0)}}</strong></div>
-      @if(receiptFormError()){<div class="bf-form-error" role="alert">{{receiptFormError()}}</div>}
-      <div class="bf-grid two" data-form="receipt">
-        <label class="bf-field" [attr.data-invalid]="receiptSubmitted() && receiptErrors().businessDate ? 'true' : null"><span>Data</span><input class="bf-input" type="date" [class.invalid]="receiptSubmitted() && !!receiptErrors().businessDate" [formField]="receiptForm.businessDate" />@if(receiptSubmitted() && receiptErrors().businessDate){<small class="bf-field-error">{{receiptErrors().businessDate}}</small>}</label>
-        <label class="bf-field" [attr.data-invalid]="receiptSubmitted() && receiptErrors().methodId ? 'true' : null"><span>Forma</span><bf-select [formField]="receiptForm.methodId" [options]="requiredPaymentMethodOptions()" ariaLabel="Forma de pagamento" />@if(receiptSubmitted() && receiptErrors().methodId){<small class="bf-field-error">{{receiptErrors().methodId}}</small>}</label>
-        <label class="bf-field full" [attr.data-invalid]="receiptSubmitted() && receiptErrors().amount ? 'true' : null"><span>Valor recebido</span><bf-number-input kind="currency" [formField]="receiptForm.amount" ariaLabel="Valor recebido" />@if(receiptSubmitted() && receiptErrors().amount){<small class="bf-field-error">{{receiptErrors().amount}}</small>}</label>
-      </div>
-      <p class="receipt-hint">Se o valor ultrapassar o saldo, o excedente será registrado como gorjeta.</p>
-    </div>
-    <div class="bf-dialog-footer"><button class="bf-button secondary" type="button" (click)="receiptDialog.close()">Cancelar</button><button class="bf-button" type="button" [disabled]="receiptSaving()" (click)="saveReceipt()">{{receiptSaving()?'Registrando...':'Confirmar recebimento'}}</button></div>
-  </dialog>
+  <bf-finance-dialogs #financeDialogs />
 
 </section>
+
+<dialog bfDialog #expenseDetailDialog="bfDialog" class="bf-dialog">
+  <div class="bf-dialog-header"><h2>Detalhes da saída</h2><button class="bf-icon-button" type="button" (click)="expenseDetailDialog.close()"><bf-icon name="close"/></button></div>
+  <div class="bf-dialog-body">
+    @if(selectedExpense();as expense){
+      <div class="receipt-balance"><span>{{expense.code}} · {{date(expense.businessDate)}}</span><strong>{{currency(expense.amountCents)}}</strong></div>
+      <h3>Itens registrados</h3>
+      @for(item of expense.items ?? [];track item.inputId){
+        <div class="purchase-detail-row"><strong>{{inputName(item.inputId)}}</strong><span>{{item.quantity}} {{purchaseUnit(item.inputId)}}</span><strong>{{currency(item.amountCents)}}</strong></div>
+      } @empty {<p>{{expense.kind==='input-purchase'?inputName(expense.inputId):categoryName(expense.categoryId)}}</p>}
+      @if(expense.notes){<p>{{expense.notes}}</p>}
+    }
+  </div>
+  <div class="bf-dialog-footer"><button class="bf-button secondary" type="button" (click)="expenseDetailDialog.close()">Fechar</button></div>
+</dialog>

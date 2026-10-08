@@ -1,3 +1,4 @@
+import { ModalActions } from '../../core/services/modal-actions.service';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { FormField, form, required } from '@angular/forms/signals';
@@ -31,6 +32,7 @@ interface AdjustmentModel {
   styleUrl: './inventory.page.scss',
 })
 export class InventoryPage {
+  readonly modals = inject(ModalActions);
   readonly catalog = inject(CatalogStore);
   readonly references = inject(CatalogReferenceStore);
   readonly store = inject(InventoryStore);
@@ -41,6 +43,7 @@ export class InventoryPage {
 
   readonly tab = signal<'product' | 'input'>('product');
   readonly search = signal('');
+  readonly lowOnly = signal(false);
   readonly selectedId = signal('');
   readonly selectedType = signal<'product' | 'input'>('product');
   readonly adjustmentMode = signal<StockAdjustmentMode>('set');
@@ -56,11 +59,11 @@ export class InventoryPage {
   readonly date = formatBusinessDate;
   readonly filteredProducts = computed(() => {
     const term = this.search().toLocaleLowerCase('pt-BR').trim();
-    return this.catalog.products().filter((item) => !term || (item.displayName + item.code).toLocaleLowerCase('pt-BR').includes(term));
+    return this.catalog.products().filter((item) => (!this.lowOnly() || item.stock <= item.minimumStock) && (!term || (item.displayName + item.code).toLocaleLowerCase('pt-BR').includes(term)));
   });
   readonly filteredInputs = computed(() => {
     const term = this.search().toLocaleLowerCase('pt-BR').trim();
-    return this.catalog.inputs().filter((item) => !term || (item.name + item.code).toLocaleLowerCase('pt-BR').includes(term));
+    return this.catalog.inputs().filter((item) => (!this.lowOnly() || (this.inputMode(item) !== 'untracked' && item.stock <= item.minimumStock)) && (!term || (item.name + item.code).toLocaleLowerCase('pt-BR').includes(term)));
   });
   readonly initialized = computed(() => this.catalog.initialized() && this.references.initialized());
   readonly refreshing = computed(() => this.initialized() && (this.catalog.loading() || this.references.loading()));
@@ -104,6 +107,8 @@ export class InventoryPage {
   readonly formatQuantity = (value: number): string => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 }).format(value);
 
   constructor() {
+    if (this.route.snapshot.queryParamMap.get('tipo') === 'input') this.tab.set('input');
+    if (this.route.snapshot.queryParamMap.get('status') === 'low') this.lowOnly.set(true);
     this.destroyRef.onDestroy(() => this.store.deactivateHistory());
     this.destroyRef.onDestroy(this.catalog.activate());
     this.destroyRef.onDestroy(this.references.activate());

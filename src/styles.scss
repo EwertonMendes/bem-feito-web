@@ -649,3 +649,20 @@ a { color: inherit; }
     animation-iteration-count: 1 !important;
   }
 }
+
+/* Shared kit allocation styling (kept global to respect component CSS budget). */
+/* Compact, quantity-based kit composition (no one-select-per-unit). */
+.kit-config-groups{display:grid;gap:12px;margin-top:12px}
+.kit-allocation{display:grid;gap:8px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2)}
+.kit-allocation-head{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:.78rem}
+.kit-allocation-head span{white-space:nowrap;font-variant-numeric:tabular-nums}
+.kit-missing{color:var(--warning)!important}
+.kit-allocation-row{display:grid;grid-template-columns:minmax(0,1fr) 90px;align-items:center;gap:10px}
+.kit-allocation-row span{font-size:.75rem;overflow-wrap:anywhere}
+.kit-allocation-row bf-number-input{min-width:0}
+
+/* Lightweight entrance motion for operational cards and editable rows. */
+@keyframes bf-enter {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}

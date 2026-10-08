@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Sale } from '../../domain/models/sales.model';
 import { CatalogStore } from '../../features/catalog/catalog.store';
-import { SaleEditor } from '../../features/sales/components/sale-editor/sale-editor';
+import { ModalActions } from '../../core/services/modal-actions.service';
 import { SalesStore } from '../../features/sales/sales.store';
 import { formatBusinessDate } from '../../core/utils/date';
 import { formatCurrency } from '../../core/utils/money';
@@ -14,7 +14,7 @@ import { BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
 
 @Component({
   selector: 'bf-sales-page',
-  imports: [BfIcon, BfDialog, SaleEditor, BfEmptyState, BfPageRefresh, BfTableSkeleton],
+  imports: [BfIcon, BfDialog, BfEmptyState, BfPageRefresh, BfTableSkeleton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sales.page.html',
   styleUrl: './sales.page.scss',
@@ -24,14 +24,19 @@ export class SalesPage {
   readonly catalog = inject(CatalogStore);
   private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly detailDialog = viewChild.required<BfDialog>('detailDialog');
-  private readonly saleEditor = viewChild.required<SaleEditor>('saleEditor');
+  readonly modals = inject(ModalActions);
 
   readonly currency = formatCurrency;
   readonly date = formatBusinessDate;
   readonly search = signal('');
   readonly statusFilter = signal<'all' | 'paid' | 'open' | 'cancelled'>('all');
-  readonly selectedSale = signal<Sale | null>(null);
+  private readonly selectedSnapshot = signal<Sale | null>(null);
+  readonly selectedSale = computed(() => {
+    const snapshot = this.selectedSnapshot();
+    return snapshot ? this.store.sales().find(sale => sale.id === snapshot.id) ?? snapshot : null;
+  });
 
   readonly filteredSales = computed(() => {
     const term = this.search().trim().toLocaleLowerCase('pt-BR');
@@ -47,14 +52,20 @@ export class SalesPage {
     this.destroyRef.onDestroy(this.store.activateSales());
     this.destroyRef.onDestroy(this.catalog.activate());
     void Promise.all([this.store.load(), this.catalog.load()]);
-    const openRequested = this.route.snapshot.queryParamMap.get('novo') === '1';
+    const initialProductId = this.route.snapshot.queryParamMap.get('produto') ?? undefined;
+    const openRequested = this.route.snapshot.queryParamMap.get('novo') === '1' || !!initialProductId;
     afterNextRender(() => {
-      if (openRequested) void this.saleEditor().open();
+      if (openRequested) {
+        void this.router.navigate([], {
+          relativeTo: this.route, queryParams: { novo: null, produto: null },
+          queryParamsHandling: 'merge', replaceUrl: true,
+        }).then(() => this.modals.openSale(initialProductId));
+      }
     });
   }
 
   openDetails(sale: Sale): void {
-    this.selectedSale.set(sale);
+    this.selectedSnapshot.set(sale);
     this.detailDialog().open();
   }
 
@@ -64,7 +75,7 @@ export class SalesPage {
     const result = await this.store.cancel(sale);
     if (!result) return;
     this.catalog.applyStockChanges(result.stockChanges);
-    this.selectedSale.set(result.sale);
+    this.selectedSnapshot.set(result.sale);
     this.detailDialog().close();
   }
 

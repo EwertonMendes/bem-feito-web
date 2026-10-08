@@ -10,6 +10,7 @@ import { formatCurrency, fromCents, toCents } from '../../../../core/utils/money
 import { CatalogReferenceStore } from '../../catalog-reference.store';
 import { CatalogStore } from '../../catalog.store';
 import { BfDialog } from '../../../../shared/ui/dialog/dialog';
+import { BfSettingsEditor, ReferenceSaved } from '../../../settings/editor/settings-editor';
 import { BfIcon } from '../../../../shared/ui/icon/icon';
 import { BfSelect, BfSelectOption } from '../../../../shared/ui/select/select';
 import { BfCheckbox } from '../../../../shared/ui/checkbox/checkbox';
@@ -24,7 +25,7 @@ interface AdditionFormModel { name: string; category: string; price: number; not
 
 @Component({
   selector: 'bf-catalog-editor',
-  imports: [FormField, BfDialog, BfIcon, BfSelect, BfCheckbox, BfImageUpload, CatalogImage, BfNumberInput],
+  imports: [FormField, BfDialog, BfIcon, BfSelect, BfCheckbox, BfImageUpload, CatalogImage, BfNumberInput, BfSettingsEditor],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './catalog-editor.html',
   styleUrl: './catalog-editor.scss',
@@ -37,10 +38,66 @@ export class CatalogEditor {
   private readonly toast = inject(ToastService);
   private readonly errors = inject(ErrorService);
   private readonly dialog = viewChild.required<BfDialog>('dialog');
+  private readonly referenceEditor = viewChild.required<BfSettingsEditor>('referenceEditor');
 
   readonly currency = formatCurrency;
   readonly imagesEnabled = this.images.enabled;
   readonly kind = signal<CatalogImageEntityKind>('products');
+  readonly bulkVariants = signal(false);
+  readonly selectedVariantFragranceIds = signal<string[]>([]);
+  toggleVariantFragrance(id: string, checked: boolean): void {
+    this.selectedVariantFragranceIds.update(current => checked
+      ? [...new Set([...current, id])] : current.filter(item => item !== id));
+  }
+  readonly bulkCostPreviews = computed(() => {
+    if (!this.bulkVariants() || this.kind() !== 'products') return [];
+    const model = this.productModel();
+    const inputs = new Map(this.store.inputs().map(input => [input.id, input]));
+    const collection = this.references.collections().find(item => item.id === model.collectionId);
+    const format = this.references.formats().find(item => item.id === model.formatId);
+    return this.availableFragrances()
+      .filter(fragrance => this.selectedVariantFragranceIds().includes(fragrance.id))
+      .map(fragrance => {
+        try {
+          const cost = standardCostForProduct({
+            recipe: this.recipe(),
+            additionalCostCents: toCents(model.additionalCost),
+            averageUnitCostCents: 0,
+          }, { collection, format, fragrance }, inputs);
+          return { id: fragrance.id, name: fragrance.name, costCents: cost.unitCostCents, pending: cost.costPending };
+        } catch {
+          return { id: fragrance.id, name: fragrance.name, costCents: 0, pending: true };
+        }
+      });
+  });
+
+  readonly suggestedPrice = computed(() => {
+    const model = this.productModel();
+    return this.references.formatPrices().find(item =>
+      item.active && item.collectionId === model.collectionId && item.formatId === model.formatId);
+  });
+  applySuggestedPrice(): void {
+    const price = this.suggestedPrice();
+    if (price) this.productModel.update(model => ({ ...model, salePrice: fromCents(price.priceCents) }));
+  }
+  openQuickReference(kind: 'collection' | 'fragrance' | 'format'): void {
+    if (kind === 'fragrance' && !this.productModel().collectionId) {
+      this.toast.error('Selecione ou crie uma coleção antes da fragrância.');
+      return;
+    }
+    this.referenceEditor().openNew(
+      kind === 'collection' ? 'collections' : kind === 'fragrance' ? 'fragrances' : 'formats',
+      this.productModel().collectionId,
+    );
+  }
+
+  onReferenceSaved(event: ReferenceSaved): void {
+    if (!event.id) return;
+    if (event.kind === 'collections') this.productModel.update(model => ({ ...model, collectionId: event.id, fragranceId: '' }));
+    if (event.kind === 'fragrances') this.productModel.update(model => ({ ...model, fragranceId: event.id }));
+    if (event.kind === 'formats') this.productModel.update(model => ({ ...model, formatId: event.id }));
+  }
+
   readonly editingId = signal('');
   readonly imageFile = signal<File | null>(null);
   readonly removeImage = signal(false);
@@ -167,6 +224,8 @@ export class CatalogEditor {
   openNew(kind: CatalogImageEntityKind): void {
     this.kind.set(kind);
     this.editingId.set('');
+    this.bulkVariants.set(false);
+    this.selectedVariantFragranceIds.set([]);
     this.resetImageChange();
     if (kind === 'products') {
       this.productModel.set({ collectionId: '', fragranceId: '', formatId: '', salePrice: 0, additionalCost: 0, minimumStock: 0, active: true });
@@ -184,6 +243,8 @@ export class CatalogEditor {
   }
 
   editProduct(item: Product): void {
+    this.bulkVariants.set(false);
+    this.selectedVariantFragranceIds.set([]);
     this.kind.set('products');
     this.editingId.set(item.id);
     this.resetImageChange();
@@ -292,6 +353,10 @@ export class CatalogEditor {
   }
 
   private async saveProduct(): Promise<void> {
+    if (this.bulkVariants() && !this.editingId()) {
+      await this.saveProductVariants();
+      return;
+    }
     if (this.productForm().invalid()) throw new Error('Revise os campos obrigatórios.');
     const model = this.productModel();
     const collection = this.references.collections().find((item) => item.id === model.collectionId);
@@ -308,6 +373,36 @@ export class CatalogEditor {
     };
     const id = await this.store.saveProduct(product);
     await this.applyImageChange('products', id, existing?.image, (image) => this.store.setProductImage(id, image));
+  }
+
+  private async saveProductVariants(): Promise<void> {
+    const model = this.productModel();
+    const collection = this.references.collections().find(item => item.id === model.collectionId && item.active);
+    const format = this.references.formats().find(item => item.id === model.formatId && item.active);
+    const fragranceIds = [...new Set(this.selectedVariantFragranceIds())];
+    if (!collection || !format || !fragranceIds.length || fragranceIds.length > 30 ||
+        model.salePrice < 0 || model.additionalCost < 0 ||
+        !Number.isSafeInteger(model.minimumStock) || model.minimumStock < 0) {
+      throw new Error('Selecione coleção, formato e até 30 fragrâncias, com valores válidos.');
+    }
+    const fragrances = fragranceIds.map(id => this.references.fragrances().find(
+      item => item.id === id && item.active && item.collectionId === model.collectionId));
+    if (fragrances.some(item => !item)) throw new Error('Uma das fragrâncias não pertence à coleção.');
+    for (const fragrance of fragrances) {
+      const exists = this.store.products().some(item => item.collectionId === model.collectionId &&
+        item.fragranceId === fragrance!.id && item.formatId === model.formatId);
+      if (exists) throw new Error('O produto ' + fragrance!.name + ' já está cadastrado neste formato.');
+    }
+    const products: Product[] = fragrances.map(fragrance => ({
+      id: '', code: '', active: model.active,
+      collectionId: model.collectionId, fragranceId: fragrance!.id, formatId: model.formatId,
+      displayName: collection.name + ' · ' + fragrance!.name + ' · ' + format.name,
+      salePriceCents: toCents(model.salePrice), additionalCostCents: toCents(model.additionalCost),
+      averageUnitCostCents: 0, stock: 0, minimumStock: model.minimumStock,
+      recipe: this.recipe().filter(part => part.inputId && part.quantity > 0 && part.unitId),
+    }));
+    await this.store.createProductVariations(products);
+    this.toast.success(products.length + ' variações criadas em um único cadastro.');
   }
 
   private async saveInput(): Promise<void> {

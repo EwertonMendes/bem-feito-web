@@ -9,11 +9,17 @@ import {
   inject,
   signal,
   viewChild,
+  ViewContainerRef,
+  ViewChild,
 } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '../../core/auth/auth.service';
+import { ModalActions, ModalRequest } from '../../core/services/modal-actions.service';
+import type { SaleEditor } from '../../features/sales/components/sale-editor/sale-editor';
+import type { BfProductionEditor } from '../../features/production/components/production-editor';
+import type { BfFinanceDialogs } from '../../features/finance/components/finance-dialogs';
 import { ThemeService } from '../../core/services/theme.service';
 import { NavigationLoadingService } from '../../core/state/navigation-loading.service';
 import { DriveConnectionBanner } from '../../features/google-drive/components/drive-connection-banner';
@@ -50,11 +56,43 @@ export class AppShell {
   readonly auth = inject(AuthService);
   readonly theme = inject(ThemeService);
   readonly navigation = inject(NavigationLoadingService);
+  readonly modals = inject(ModalActions);
 
   private readonly router = inject(Router);
   private readonly document = inject(DOCUMENT);
   private readonly destroyRef = inject(DestroyRef);
   private readonly logoutConfirm = viewChild.required<BfConfirmDialog>('logoutConfirm');
+  @ViewChild('modalOutlet', { read: ViewContainerRef }) private modalOutlet!: ViewContainerRef;
+  private saleEditorPromise?: Promise<SaleEditor>;
+  private productionEditorPromise?: Promise<BfProductionEditor>;
+  private financeDialogsPromise?: Promise<BfFinanceDialogs>;
+
+  private getSaleEditor(): Promise<SaleEditor> {
+    return this.saleEditorPromise ??= import('../../features/sales/components/sale-editor/sale-editor')
+      .then(({ SaleEditor }) => {
+        const ref = this.modalOutlet.createComponent(SaleEditor);
+        ref.changeDetectorRef.detectChanges();
+        return ref.instance;
+      }).catch(error => { this.saleEditorPromise = undefined; throw error; });
+  }
+
+  private getProductionEditor(): Promise<BfProductionEditor> {
+    return this.productionEditorPromise ??= import('../../features/production/components/production-editor')
+      .then(({ BfProductionEditor }) => {
+        const ref = this.modalOutlet.createComponent(BfProductionEditor);
+        ref.changeDetectorRef.detectChanges();
+        return ref.instance;
+      }).catch(error => { this.productionEditorPromise = undefined; throw error; });
+  }
+
+  private getFinanceDialogs(): Promise<BfFinanceDialogs> {
+    return this.financeDialogsPromise ??= import('../../features/finance/components/finance-dialogs')
+      .then(({ BfFinanceDialogs }) => {
+        const ref = this.modalOutlet.createComponent(BfFinanceDialogs);
+        ref.changeDetectorRef.detectChanges();
+        return ref.instance;
+      }).catch(error => { this.financeDialogsPromise = undefined; throw error; });
+  }
 
   readonly mobilePanel = signal<MobilePanel>(null);
   readonly currentUrl = signal(this.router.url);
@@ -88,6 +126,7 @@ export class AppShell {
   });
 
   constructor() {
+    this.modals.opened.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(request => this.openModal(request));
     this.router.events
       .pipe(
         filter((event): event is NavigationEnd => event instanceof NavigationEnd),
@@ -126,6 +165,14 @@ export class AppShell {
 
   closeMobilePanel(): void {
     this.mobilePanel.set(null);
+  }
+
+  async openModal(request: ModalRequest): Promise<void> {
+    this.closeMobilePanel();
+    if (request.kind === 'sale') await (await this.getSaleEditor()).open(request.productId, request.kitId);
+    if (request.kind === 'production') await (await this.getProductionEditor()).open(request.productId, request.date);
+    if (request.kind === 'expense') await (await this.getFinanceDialogs()).openExpense(request.expenseKind);
+    if (request.kind === 'receipt') await (await this.getFinanceDialogs()).openReceipt(request.saleId);
   }
 
   async mobileNavigate(path: string): Promise<void> {

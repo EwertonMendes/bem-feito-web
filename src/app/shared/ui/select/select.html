@@ -61,7 +61,7 @@
       [attr.data-active]="i === activeIndex()"
       [attr.aria-selected]="option.value === value()"
       [disabled]="option.disabled"
-      (pointerdown)="$event.preventDefault()"
+      (pointerdown)="$event.pointerType === 'mouse' && $event.preventDefault()"
       (mouseenter)="!option.disabled && activeIndex.set(i)"
       (click)="select(option, i)"
     >

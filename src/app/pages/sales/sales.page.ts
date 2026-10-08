@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, afterNextRender, comput
 import { ActivatedRoute, Router } from '@angular/router';
 import { Sale } from '../../domain/models/sales.model';
 import { CatalogStore } from '../../features/catalog/catalog.store';
-import { SaleEditor } from '../../features/sales/components/sale-editor/sale-editor';
+import { ModalActions } from '../../core/services/modal-actions.service';
 import { SalesStore } from '../../features/sales/sales.store';
 import { formatBusinessDate } from '../../core/utils/date';
 import { formatCurrency } from '../../core/utils/money';
@@ -15,7 +15,7 @@ import { BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
 
 @Component({
   selector: 'bf-sales-page',
-  imports: [RouterLink, BfIcon, BfDialog, SaleEditor, BfEmptyState, BfPageRefresh, BfTableSkeleton],
+  imports: [BfIcon, BfDialog, BfEmptyState, BfPageRefresh, BfTableSkeleton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sales.page.html',
   styleUrl: './sales.page.scss',
@@ -27,7 +27,7 @@ export class SalesPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly detailDialog = viewChild.required<BfDialog>('detailDialog');
-  private readonly saleEditor = viewChild.required<SaleEditor>('saleEditor');
+  readonly modals = inject(ModalActions);
 
   readonly currency = formatCurrency;
   readonly date = formatBusinessDate;
@@ -53,7 +53,7 @@ export class SalesPage {
     const openRequested = this.route.snapshot.queryParamMap.get('novo') === '1' || !!initialProductId;
     afterNextRender(() => {
       if (openRequested) {
-        void this.saleEditor().open(initialProductId);
+        this.modals.openSale(initialProductId);
         void this.router.navigate([], { relativeTo: this.route, queryParams: { novo: null, produto: null }, queryParamsHandling: 'merge', replaceUrl: true });
       }
     });

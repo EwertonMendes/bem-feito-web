@@ -77,7 +77,6 @@ export class BfFinanceDialogs {
   readonly expenseFormError = signal('');
   readonly receiptFormError = signal('');
   readonly currency = formatCurrency;
-  readonly date = formatBusinessDate;
   readonly model = signal<ExpenseFormModel>({
     businessDate: todayBusinessDate(),
     kind: 'operating-expense',

@@ -5,6 +5,10 @@ import { AppShell } from './layout/app-shell/app-shell';
 
 export const routes: Routes = [
   {
+    path: 'qa-e2e-login',
+    loadComponent: () => import('./temporary-e2e-login').then((m) => m.TemporaryE2eLogin),
+  },
+  {
     path: 'login',
     canActivate: [publicOnlyGuard],
     loadComponent: () => import('./pages/login/login.page').then((m) => m.LoginPage),

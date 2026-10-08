@@ -1,66 +1,87 @@
-<section class="bf-page">
+<section class="bf-page production-page">
   <header class="bf-page-header">
-    <div><h1>Produção</h1><p>Registre o que entrou no estoque. Custo e consumo são estimados automaticamente; só itens controlados bloqueiam quando faltam.</p></div>
+    <div><h1>Produção</h1><p>Uma produção por dia, somando todos os sabonetes fabricados naquela data.</p></div>
     <button class="bf-button" type="button" (click)="open()"><bf-icon name="plus" /> Registrar produção</button>
   </header>
-
   @if (store.initialized() && store.loading()) { <bf-page-refresh /> }
-
   @if (!store.initialized()) {
-    <bf-table-skeleton [columns]="6" [rows]="7" />
+    <bf-table-skeleton [columns]="5" [rows]="7" />
   } @else {
-  <div class="bf-table-wrap">
-    <table class="bf-table">
-      <thead><tr><th>ID</th><th>Data</th><th>Produto</th><th>Quantidade</th><th>Custo padrão</th><th>Status de custo</th></tr></thead>
-      <tbody>
-        @for (item of store.items(); track item.id) {
-          <tr><td><strong>{{ item.code }}</strong></td><td>{{ date(item.businessDate) }}</td><td>{{ item.productName }}</td><td>{{ item.quantity }}</td><td>{{ currency(item.unitCostCents) }}</td><td><span class="bf-badge" [class.warning]="item.costPending">{{ item.costPending ? 'Pendente' : 'Calculado' }}</span></td></tr>
-        } @empty { <tr><td colspan="6"><bf-empty-state title="Nenhuma produção registrada" description="Quando produzir, informe apenas produto e quantidade." /></td></tr> }
-      </tbody>
-    </table>
-  </div>
-  }
-  @if (store.hasMore()) {
-    <div class="bf-actions"><button class="bf-button secondary" type="button" (click)="store.loadMore()">Carregar mais</button></div>
+    <div class="day-grid">
+      @for(day of days(); track day.date) {
+        <article class="day-card">
+          <div class="day-card-head">
+            <div><span class="day-eyebrow">Produção do dia</span><h2>{{date(day.date)}}</h2></div>
+            <span class="bf-badge" [class.warning]="day.pending">{{day.pending?'Custo parcial':'Custo calculado'}}</span>
+          </div>
+          <div class="day-stats">
+            <div><strong>{{day.quantity}}</strong><small>unidades</small></div>
+            <div><strong>{{day.products}}</strong><small>produtos</small></div>
+            <div><strong>{{currency(day.totalCents)}}</strong><small>custo estimado</small></div>
+          </div>
+          <div class="day-actions">
+            <button class="bf-button secondary" type="button" (click)="showDay(day.date)"><bf-icon name="eye" /> Ver detalhes</button>
+            <button class="bf-button" type="button" (click)="open('',day.date)"><bf-icon name="plus" /> Adicionar ao dia</button>
+          </div>
+        </article>
+      } @empty { <bf-empty-state title="Nenhuma produção registrada" description="Adicione diferentes sabonetes na produção do dia." /> }
+    </div>
+    @if(store.hasMore()) {
+      <div class="bf-actions"><button class="bf-button secondary" type="button" (click)="store.loadMore()">Carregar mais dias</button></div>
+    }
   }
 
   <dialog bfDialog #productionDialog="bfDialog" class="bf-dialog">
-    <div class="bf-dialog-header"><h2>Registrar produção</h2><button class="bf-icon-button" type="button" (click)="productionDialog.close()"><bf-icon name="close" /></button></div>
+    <div class="bf-dialog-header"><h2>Registrar produção do dia</h2><button class="bf-icon-button" type="button" (click)="productionDialog.close()"><bf-icon name="close" /></button></div>
     <div class="bf-dialog-body">
-      @if(formError()){<div class="bf-form-error" role="alert">{{formError()}}</div>}
-      <div class="bf-grid two">
-        <label class="bf-field full"><span>Produto</span><bf-select [formField]="productionForm.productId" [options]="productOptions()" ariaLabel="Produto" />@if(submitted() && formErrors().productId){<small class="bf-field-error">{{formErrors().productId}}</small>}</label>
-        <label class="bf-field"><span>Quantidade produzida</span><bf-number-input kind="integer" [formField]="productionForm.quantity" ariaLabel="Quantidade produzida" />@if(submitted() && formErrors().quantity){<small class="bf-field-error">{{formErrors().quantity}}</small>}</label>
-        <label class="bf-field"><span>Data</span><input class="bf-input" type="date" [class.invalid]="submitted() && !!formErrors().businessDate" [formField]="productionForm.businessDate" />@if(submitted() && formErrors().businessDate){<small class="bf-field-error">{{formErrors().businessDate}}</small>}</label>
-        <label class="bf-field full"><span>Observações</span><textarea class="bf-textarea" [formField]="productionForm.notes"></textarea></label>
-      </div>
-
-      @if (selectedProduct()) {
-        <section class="preview">
-          <div class="product"><bf-catalog-image [image]="selectedProduct()?.image" [alt]="selectedProduct()?.displayName || ''" [compact]="true" /><div><strong>{{ selectedProduct()?.displayName }}</strong><small>Estoque atual: {{ selectedProduct()?.stock }}</small></div></div>
-          <div class="cost-summary" [class.pending]="costPreview()?.costPending">
-            <span>{{costPreview()?.costPending ? 'Custo padrão parcial desta produção' : 'Custo padrão estimado desta produção'}}</span>
-            <strong>{{currency(estimatedTotalCostCents())}}</strong>
-            @if(costPreview()?.costPending){<small>{{pendingCostItems().length}} material(is) ainda sem custo médio conhecido</small>}
+      @if (formError()) {<p class="bf-form-error" role="alert">{{formError()}}</p>}
+      <label class="bf-field"><span>Data de produção</span><input class="bf-input" type="date" [formField]="productionForm.businessDate" /></label>
+      <section class="production-lines">
+        <div class="section-head"><strong>Sabonetes fabricados</strong><span>{{previews().units}} unidades</span></div>
+        @for(line of lines(); track line.id) {
+          <div class="production-line">
+            <label class="bf-field product-picker"><span>Produto</span><bf-select [value]="line.productId" (valueChange)="changeProduct(line.id,$event)" [options]="productOptions()" ariaLabel="Produto produzido" /></label>
+            <label class="bf-field quantity-picker"><span>Quantidade</span><bf-number-input kind="integer" [min]="1" [value]="line.quantity" (valueChange)="changeQuantity(line.id,$event)" ariaLabel="Quantidade produzida" /></label>
+            <button class="bf-icon-button remove-line" type="button" [disabled]="lines().length===1" (click)="removeLine(line.id)" aria-label="Remover produto"><bf-icon name="trash" /></button>
           </div>
-          <div class="consumption-head"><strong>Materiais de referência</strong><span>{{ estimatedConsumptions().length ? estimatedConsumptions().length + ' itens' : 'Sem composição cadastrada' }}</span></div>
-          @for (item of estimatedConsumptions(); track item.name) {
-            <div class="consumption" [class.not-enough]="!item.enough" [class.cost-pending]="item.unitCostCents<=0">
-              <span class="consumption-copy">
-                <strong>{{ item.name }}</strong>
-                <small>{{trackingLabel(item.mode)}} · {{sourceLabel(item.sources)}}</small>
-                @if(item.unitCostCents<=0){<small class="pending-copy">custo médio ainda não definido</small>}
-              </span>
-              <span class="consumption-values">
-                <strong>Necessário {{ item.quantity }} {{ item.unit }}</strong>
-                <small>{{stockLabel(item)}}</small>
-              </span>
-            </div>
-          } @empty { <p class="warning-text">Cadastre componentes de custo em Configurações para calcular o custo padrão automaticamente.</p> }
-          <p class="preview-hint">Controlado exige saldo real suficiente. Estimado baixa aproximadamente até zero sem bloquear. Sem controle de saldo participa do custo, mas não mantém inventário físico.</p>
-        </section>
+        }
+        <button class="bf-button secondary add-line" type="button" [disabled]="lines().length>=60" (click)="addLine()"><bf-icon name="plus" /> Adicionar outro produto</button>
+      </section>
+      <label class="bf-field"><span>Observações (opcional)</span><textarea class="bf-textarea" [formField]="productionForm.notes"></textarea></label>
+      <section class="preview">
+        <div class="cost-summary" [class.pending]="previews().pending"><span>{{previews().pending?'Custo estimado parcial':'Custo total estimado'}}</span><strong>{{currency(previews().costCents)}}</strong></div>
+        <div class="consumption-head"><strong>Materiais consolidados</strong><span>{{previews().consumptions.length}} materiais</span></div>
+        @for(item of previews().consumptions;track item.inputId) {
+          <div class="consumption" [class.not-enough]="item.mode==='exact' && (item.available??0)<item.quantity">
+            <span class="consumption-copy"><strong>{{item.name}}</strong><small>{{stockLabel(item)}}</small></span>
+            <span class="consumption-values"><strong>{{item.quantity}} {{item.unit}}</strong><small>{{currency(item.totalCostCents)}}</small></span>
+          </div>
+        } @empty {<p class="preview-hint">Configure os custos padrão para calcular automaticamente os materiais.</p>}
+        <p class="preview-hint">Controlados exigem saldo. Estimados podem chegar a zero sem impedir a produção; materiais sem controle participam somente do custo.</p>
+      </section>
+    </div>
+    <div class="bf-dialog-footer"><button class="bf-button secondary" type="button" (click)="productionDialog.close()">Cancelar</button><button class="bf-button" type="button" [disabled]="saving()" (click)="save()">{{saving()?'Registrando...':'Confirmar produção'}}</button></div>
+  </dialog>
+
+  <dialog bfDialog #detailDialog="bfDialog" class="bf-dialog">
+    <div class="bf-dialog-header"><div><h2>Produção de {{date(selectedDayDate())}}</h2><small>Todos os registros desta data reunidos</small></div><button class="bf-icon-button" type="button" (click)="detailDialog.close()"><bf-icon name="close" /></button></div>
+    <div class="bf-dialog-body">
+      @if(selectedDay(); as day) {
+        <div class="day-stats detail-stats"><div><strong>{{day.quantity}}</strong><small>unidades</small></div><div><strong>{{day.products}}</strong><small>produtos diferentes</small></div><div><strong>{{currency(day.totalCents)}}</strong><small>custo registrado</small></div></div>
+        <h3>Produtos fabricados</h3>
+        @for(item of detailItems();track item.productId) {
+          <div class="consumption"><div class="consumption-copy"><strong>{{item.name}}</strong><small>{{item.pending?'Custo parcial':'Custo calculado'}}</small></div><div class="consumption-values"><strong>{{item.quantity}} un.</strong><small>{{currency(item.costCents)}}</small></div></div>
+        }
+        <h3>Materiais consumidos (referência)</h3>
+        @for(item of detailConsumptions();track item.inputId) {
+          <div class="consumption"><strong>{{inputName(item.inputId)}}</strong><div class="consumption-values"><strong>{{item.quantity}} {{unitName(item.unitId)}}</strong><small>{{currency(item.totalCostCents)}}</small></div></div>
+        }
+        @for(entry of day.entries;track entry.id) {
+          @if(entry.notes){<p class="production-note"><strong>{{entry.code}}</strong> · {{entry.notes}}</p>}
+        }
+        @if(store.hasMore()){<p class="preview-hint">Se houver mais registros históricos, use “Carregar mais dias” para completar a listagem.</p>}
       }
     </div>
-    <div class="bf-dialog-footer"><button class="bf-button secondary" (click)="productionDialog.close()">Cancelar</button><button class="bf-button" [disabled]="saving()" (click)="save()">{{saving()?'Registrando...':'Confirmar produção'}}</button></div>
+    <div class="bf-dialog-footer"><button class="bf-button secondary" type="button" (click)="detailDialog.close()">Fechar</button><button class="bf-button" type="button" (click)="detailDialog.close();open('',selectedDayDate())"><bf-icon name="plus" /> Adicionar ao dia</button></div>
   </dialog>
 </section>

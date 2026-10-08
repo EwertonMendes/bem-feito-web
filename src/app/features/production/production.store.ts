@@ -1,5 +1,5 @@
 import { effect, inject, Injectable, signal } from '@angular/core';
-import { Production } from '../../domain/models/production.model';
+import { Production, ProductionDraftItem } from '../../domain/models/production.model';
 import { DataRevisionService } from '../../core/firebase/data-revision.service';
 import { ProductionCreateResult } from '../../core/repositories/mutation-results';
 import { BusinessDateCursor, compareBusinessDateDesc } from '../../core/repositories/pagination';
@@ -91,9 +91,13 @@ export class ProductionStore {
     businessDate: string,
     notes?: string,
   ): Promise<ProductionCreateResult | null> {
+    return this.createBatch([{ productId, quantity }], businessDate, notes);
+  }
+
+  async createBatch(lines: readonly ProductionDraftItem[], businessDate: string, notes?: string): Promise<ProductionCreateResult | null> {
     this.operationErrorState.set('');
     try {
-      const result = await this.repository.create(productId, quantity, businessDate, notes);
+      const result = await this.repository.createBatch(lines, businessDate, notes);
       if (this.gate.isLoaded) {
         this.itemsState.update((items) => [result.production, ...items.filter((item) => item.id !== result.production.id)].sort(compareBusinessDateDesc));
       }

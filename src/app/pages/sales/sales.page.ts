@@ -32,7 +32,11 @@ export class SalesPage {
   readonly date = formatBusinessDate;
   readonly search = signal('');
   readonly statusFilter = signal<'all' | 'paid' | 'open' | 'cancelled'>('all');
-  readonly selectedSale = signal<Sale | null>(null);
+  private readonly selectedSnapshot = signal<Sale | null>(null);
+  readonly selectedSale = computed(() => {
+    const snapshot = this.selectedSnapshot();
+    return snapshot ? this.store.sales().find(sale => sale.id === snapshot.id) ?? snapshot : null;
+  });
 
   readonly filteredSales = computed(() => {
     const term = this.search().trim().toLocaleLowerCase('pt-BR');
@@ -59,7 +63,7 @@ export class SalesPage {
   }
 
   openDetails(sale: Sale): void {
-    this.selectedSale.set(sale);
+    this.selectedSnapshot.set(sale);
     this.detailDialog().open();
   }
 
@@ -69,7 +73,7 @@ export class SalesPage {
     const result = await this.store.cancel(sale);
     if (!result) return;
     this.catalog.applyStockChanges(result.stockChanges);
-    this.selectedSale.set(result.sale);
+    this.selectedSnapshot.set(result.sale);
     this.detailDialog().close();
   }
 

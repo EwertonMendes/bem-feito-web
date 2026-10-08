@@ -161,6 +161,10 @@
   box-shadow: 0 20px 52px color-mix(in srgb, #160f0b 22%, transparent), var(--shadow-sm);
   backdrop-filter: blur(18px);
   scrollbar-width: thin;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  scroll-padding-block: 9px;
+  box-sizing: border-box;
   scrollbar-color: color-mix(in srgb, var(--brand) 40%, transparent) transparent;
   animation: select-menu-in 130ms cubic-bezier(.2,.8,.2,1);
 }
@@ -279,10 +283,23 @@
 }
 
 .menu.descriptive .option {
-  min-height: 54px;
-  align-items: flex-start;
+  min-height: 60px;
+  align-items: center;
 }
 
 .menu.descriptive .selected-mark {
-  margin-top: 2px;
+  margin: 0;
+  align-self: center;
+}
+
+.menu.descriptive .media {
+  align-self: center;
+}
+
+/* Full option content remains reachable inside the scroll container. */
+.menu.descriptive {
+  padding-block: 8px 12px;
+}
+.menu.descriptive .option-copy {
+  overflow-wrap: break-word;
 }

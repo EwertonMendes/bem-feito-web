@@ -136,7 +136,7 @@
             <div class="sale-detail-line"><span>{{ item.quantity }}× {{ item.name }}</span><strong>{{ currency(item.totalCents) }}</strong></div>
             @if (item.kind==='kit' && item.components?.length) {
               <div class="sale-kit-components">
-                @for(part of item.components;track part.productId){
+                @for(part of item.components;track $index){
                   <span>{{part.quantity}}× {{part.name}}</span>
                 }
               </div>

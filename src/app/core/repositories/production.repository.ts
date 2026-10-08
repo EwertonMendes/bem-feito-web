@@ -31,20 +31,37 @@ export class ProductionRepository {
   private readonly revisions = inject(DataRevisionService);
 
   async page(pageSize = 40, cursor?: BusinessDateCursor | null): Promise<PageResult<Production>> {
-    const constraints = [
-      orderBy('businessDate', 'desc'),
-      orderBy(documentId(), 'desc'),
-      ...(cursor ? [startAfter(cursor.businessDate, cursor.id)] : []),
-      limit(pageSize + 1),
-    ];
-    const snapshot = await getDocs(query(collection(this.firestore, 'productions'), ...constraints));
-    const hasMore = snapshot.docs.length > pageSize;
-    const docs = snapshot.docs.slice(0, pageSize);
-    const items = docs.map((item) => ({ id: item.id, ...item.data() }) as Production);
-    const last = items.at(-1);
-    return { items, hasMore, nextCursor: hasMore && last ? { businessDate: last.businessDate, id: last.id } : null };
+    const source = collection(this.firestore, 'productions');
+    const fetchPage = (after?: BusinessDateCursor | null) => getDocs(query(source,
+      orderBy('businessDate', 'desc'), orderBy(documentId(), 'desc'),
+      ...(after ? [startAfter(after.businessDate, after.id)] : []),
+      limit(pageSize + 1)));
+    let snapshot = await fetchPage(cursor);
+    const result = snapshot.docs.slice(0, pageSize).map(item => ({ id: item.id, ...item.data() }) as Production);
+    if (!result.length) return { items: [], hasMore: false, nextCursor: null };
+    const lastDate = result[result.length - 1]!.businessDate;
+    let overflow = snapshot.docs.slice(pageSize);
+    // Keep the boundary day complete: never show partial daily totals just
+    // because its records straddle the 40-document pagination boundary.
+    while (overflow.length && overflow[0]?.data()['businessDate'] === lastDate) {
+      let count = 0;
+      while (count < overflow.length && overflow[count]?.data()['businessDate'] === lastDate) {
+        const item = overflow[count]!;
+        result.push({ id: item.id, ...item.data() } as Production);
+        count += 1;
+      }
+      if (count < overflow.length) break; // Next day is already buffered.
+      const last = result[result.length - 1]!;
+      snapshot = await fetchPage({ businessDate: last.businessDate, id: last.id });
+      overflow = snapshot.docs;
+    }
+    const last = result[result.length - 1]!;
+    const hasMore = overflow.length > 0;
+    return {
+      items: result, hasMore,
+      nextCursor: hasMore ? { businessDate: last.businessDate, id: last.id } : null,
+    };
   }
-
 
   /**
    * One atomic transaction per submission, regardless of the number of products.

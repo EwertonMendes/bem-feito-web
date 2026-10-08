@@ -10,6 +10,7 @@ import {
   signal,
   viewChild,
   ViewContainerRef,
+  ViewChild,
 } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
@@ -61,7 +62,7 @@ export class AppShell {
   private readonly document = inject(DOCUMENT);
   private readonly destroyRef = inject(DestroyRef);
   private readonly logoutConfirm = viewChild.required<BfConfirmDialog>('logoutConfirm');
-  private readonly modalOutlet = viewChild.required<ViewContainerRef>('modalOutlet', { read: ViewContainerRef });
+  @ViewChild('modalOutlet', { read: ViewContainerRef }) private modalOutlet!: ViewContainerRef;
   private saleEditorPromise?: Promise<SaleEditor>;
   private productionEditorPromise?: Promise<BfProductionEditor>;
   private financeDialogsPromise?: Promise<BfFinanceDialogs>;
@@ -69,7 +70,7 @@ export class AppShell {
   private getSaleEditor(): Promise<SaleEditor> {
     return this.saleEditorPromise ??= import('../../features/sales/components/sale-editor/sale-editor')
       .then(({ SaleEditor }) => {
-        const ref = this.modalOutlet().createComponent(SaleEditor);
+        const ref = this.modalOutlet.createComponent(SaleEditor);
         ref.changeDetectorRef.detectChanges();
         return ref.instance;
       }).catch(error => { this.saleEditorPromise = undefined; throw error; });
@@ -78,7 +79,7 @@ export class AppShell {
   private getProductionEditor(): Promise<BfProductionEditor> {
     return this.productionEditorPromise ??= import('../../features/production/components/production-editor')
       .then(({ BfProductionEditor }) => {
-        const ref = this.modalOutlet().createComponent(BfProductionEditor);
+        const ref = this.modalOutlet.createComponent(BfProductionEditor);
         ref.changeDetectorRef.detectChanges();
         return ref.instance;
       }).catch(error => { this.productionEditorPromise = undefined; throw error; });
@@ -87,7 +88,7 @@ export class AppShell {
   private getFinanceDialogs(): Promise<BfFinanceDialogs> {
     return this.financeDialogsPromise ??= import('../../features/finance/components/finance-dialogs')
       .then(({ BfFinanceDialogs }) => {
-        const ref = this.modalOutlet().createComponent(BfFinanceDialogs);
+        const ref = this.modalOutlet.createComponent(BfFinanceDialogs);
         ref.changeDetectorRef.detectChanges();
         return ref.instance;
       }).catch(error => { this.financeDialogsPromise = undefined; throw error; });

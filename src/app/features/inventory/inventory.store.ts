@@ -1,5 +1,6 @@
 import { effect, inject, Injectable, signal } from '@angular/core';
 import { StockMovement } from '../../domain/models/inventory.model';
+import { StockAdjustmentMode } from '../../domain/logic/stock-adjustment';
 import { DataRevisionService } from '../../core/firebase/data-revision.service';
 import { StockAdjustmentResult } from '../../core/repositories/mutation-results';
 import { BusinessDateCursor, compareBusinessDateDesc } from '../../core/repositories/pagination';
@@ -29,11 +30,13 @@ export class InventoryStore {
   private readonly movementsLoadingState = signal(false);
   private readonly movementsInitializedState = signal(false);
   private readonly hasMoreState = signal(false);
+  private readonly operationErrorState = signal('');
 
   readonly movements = this.movementsState.asReadonly();
   readonly movementsLoading = this.movementsLoadingState.asReadonly();
   readonly movementsInitialized = this.movementsInitializedState.asReadonly();
   readonly hasMore = this.hasMoreState.asReadonly();
+  readonly operationError = this.operationErrorState.asReadonly();
 
   constructor() {
     effect(() => {
@@ -112,22 +115,30 @@ export class InventoryStore {
     }
   }
 
-  async adjust(
+  clearOperationError(): void {
+    this.operationErrorState.set('');
+  }
+
+  async reconcile(
     itemType: 'product' | 'input',
     itemId: string,
+    mode: StockAdjustmentMode,
     quantity: number,
     reason: string,
     date: string,
   ): Promise<StockAdjustmentResult | null> {
+    this.operationErrorState.set('');
     try {
-      const result = await this.repository.adjust(itemType, itemId, quantity, reason, date);
+      const result = await this.repository.reconcile(itemType, itemId, mode, quantity, reason, date);
       this.toast.success('Ajuste registrado com sucesso.');
       if (this.currentItemId === itemId) {
         this.movementsState.update((items) => [result.movement, ...items.filter((item) => item.id !== result.movement.id)].sort(compareBusinessDateDesc));
       }
       return result;
     } catch (error) {
-      this.toast.error(this.errors.message(error));
+      const message = this.errors.message(error);
+      this.operationErrorState.set(message);
+      this.toast.error(message);
       return null;
     }
   }

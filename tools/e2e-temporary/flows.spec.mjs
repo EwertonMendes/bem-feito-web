@@ -89,7 +89,7 @@ test.describe('fluxo real de estoque com Firestore/Auth emulados', () => {
     await dialog.getByRole('textbox', { name: /Motivo/ }).fill('');
     await dialog.getByRole('button', { name: 'Registrar ajuste' }).click();
     await expect(dialog.getByRole('alert')).toContainText('motivo');
-    await expect(dialog.getByText(/Informe o motivo do ajuste para o histórico/)).toBeVisible();
+    await expect(dialog.locator('.bf-field-error')).toHaveText(/Informe o motivo do ajuste para o histórico/);
     await expect(dialog).toBeVisible();
   });
 

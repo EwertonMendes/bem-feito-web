@@ -4,6 +4,8 @@ import { readFile } from 'node:fs/promises';
 import { validateRequest, assertDestination, assertScope, requestHash, hash, redact } from './schema.ts';
 import { parseCommand, assertPermission, assertPull, authorize } from './gate.ts';
 import { FirestoreArchive } from './storage.ts';
+import { report } from './engine.ts';
+import { encode } from './codec.ts';
 const config = JSON.parse(await readFile(new URL('./config.json', import.meta.url), 'utf8'));
 const commit = 'a'.repeat(40);
 const request = { schemaVersion: 1, id: 'cost-test', environment: 'dev', projectId: 'bem-feito-dev', operation: 'update', changes: [{ collection: 'inputs', id: 'I00001', action: 'update', expected: { averageUnitCostCents: 100 }, values: { averageUnitCostCents: 150 } }] };
@@ -40,9 +42,19 @@ test('permissions, forks, stale SHAs, closed PRs and different branches are deni
   assertPull(pull, config, commit);
   for (const bad of [{ ...pull, state: 'closed' }, { ...pull, base: { ref: 'feature' } }, { ...pull, head: { ...pull.head, sha: 'b'.repeat(40) } }, { ...pull, head: { ...pull.head, repo: { id: 1, full_name: 'fork/repo' } } }]) assert.throws(() => assertPull(bad, config, commit));
 });
-test('public reports omit customer names, notes, source data and nested details', () => {
+test('public reports omit customer text, individual financial amounts and nested details', () => {
   const output = JSON.stringify(redact({ customerName: 'PRIVATE CUSTOMER', notes: 'PRIVATE NOTE', items: [{ phone: 'PRIVATE PHONE' }], averageUnitCostCents: 123, active: true }));
-  assert.ok(!output.includes('PRIVATE')); assert.ok(output.includes('123')); assert.ok(output.includes('true'));
+  assert.ok(!output.includes('PRIVATE')); assert.ok(!output.includes('123')); assert.ok(!output.includes('true'));
+  const rows = [
+    { path: 'sales/V00001', version: '1', before: encode({ customerName: 'PRIVATE', totalCents: 987654, value: 987654 }), after: encode({ totalCents: 765432 }) },
+    { path: 'sales/V00002', version: null, before: encode(null), after: encode({ totalCents: 543210 }) },
+    { path: 'dataAdminSmoke/smoke-test', version: '1', before: encode({ value: 10 }), after: encode({ value: 20 }) },
+  ];
+  const result = report({ schemaVersion: 1, requestHash: 'a'.repeat(64), projectId: 'bem-feito-dev', environment: 'dev', operation: 'migrate', scope: ['sales'], dependencies: [], rows }, {} as any);
+  const serialized = JSON.stringify(result);
+  for (const secret of ['PRIVATE', '987654', '765432', '543210']) assert.ok(!serialized.includes(secret));
+  assert.deepEqual(result.collectionCounts.sales, { before: 1, after: 2 });
+  assert.deepEqual(result.affectedDocuments[2].after, { value: 20 });
 });
 test('authorization checks live permission and unchanged real comment actor before fetching data', async () => {
   const actor = { id: 33728924, login: 'EwertonMendes', type: 'User' };

@@ -307,7 +307,7 @@ export class SalesRepository {
           ? productStockStatus(stock, (entity as Product).minimumStock)
           : stockStatusForInput({ ...(entity as InputItem), stock });
 
-        const physicalAllocation = isReservation ? Math.min(Math.max(0, available), required) : 0;
+        const physicalAllocation = draft.fulfillmentStatus === 'ready' ? required : 0;
         transaction.update(targetRef, { stock, stockStatus,
           ...(isReservation ? { committedStock: committedStock + required, reservedPhysicalStock: reservedPhysicalStock + physicalAllocation } : {}),
           updatedAt: serverTimestamp(), updatedBy: userId });
@@ -621,7 +621,7 @@ export class SalesRepository {
           : Number(snapshot.data()['committedStock'] ?? 0);
         const originallyReserved = Number(snapshot.data()['reservedPhysicalStock'] ?? Math.min(Number(snapshot.data()['committedStock'] ?? 0), Number(snapshot.data()['stock'] ?? 0)));
         const reservedPhysicalStock = currentSale.stockApplied === false
-          ? Math.max(0, originallyReserved + effect.quantityDelta)
+          ? Math.min(originallyReserved, committedStock)
           : originallyReserved;
         const stockStatus = effect.itemType === 'product'
           ? productStockStatus(stock, (entity as Product).minimumStock)

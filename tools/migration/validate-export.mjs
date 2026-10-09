@@ -174,7 +174,7 @@ for (const movement of list('stockMovements')) {
   deltas.set(key, (deltas.get(key) ?? 0) + movement.quantityDelta);
 }
 for (const [name, type] of [['products', 'product'], ['inputs', 'input']]) for (const item of list(name)) {
-  if (Math.abs((deltas.get(`${type}:${item.id}`) ?? 0) - item.stock) > 0.000001) errors.push(`${name}/${item.id}: histórico não reconcilia com estoque.`);
+  if (Math.abs((deltas.get(`${type}:${item.id}`) ?? 0) - item.stock) > 0.000001) errors.push(`${name}/${item.id}: histórico não reconcilia (movimentos=${(deltas.get(`${type}:${item.id}`) ?? 0).toFixed(3)}, declarado=${item.stock}).`);
 }
 
 console.log(`Validação: ${errors.length} erro(s), ${warnings.length} aviso(s).`);

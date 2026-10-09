@@ -145,8 +145,8 @@ export function assertScope(request: Request, paths: string[]) {
   const scope = [...request.destructive.paths].sort();
   invariant(new Set(scope).size === scope.length && canonical(scope) === canonical([...paths].sort()), 'Destructive scope differs from exact operation scope');
 }
-// Numeric values and booleans are safe for public reports; names/customer/source payloads stay private.
-export function redact(data: Payload | null): Payload | null {
+// Business values, including individual financial amounts, stay private in every public report.
+export function redact(data: Payload | null, publicNumericKeys: readonly string[] = []): Payload | null {
   if (!data) return null;
-  return Object.fromEntries(Object.entries(data).map(([k, v]) => [k, typeof v === 'number' || typeof v === 'boolean' ? v : '[redacted]']));
+  return Object.fromEntries(Object.entries(data).map(([k, v]) => [k, publicNumericKeys.includes(k) && typeof v === 'number' ? v : '[redacted]']));
 }

@@ -103,7 +103,16 @@ export function validBackupPath(path: string) {
   return /^(collections|fragrances|formats|formatPrices|units|paymentMethods|expenseCategories|expenseTypes|inputs|products|kits|additions|expenses|productions|sales|payments|stockAdjustments|stockMovements|counters|migrationRuns|migrationSources|dataAdminSmoke)\/[A-Za-z0-9][A-Za-z0-9_-]{0,99}(\/sheets\/[A-Za-zÀ-ÿ0-9 _-]{1,100})?$/.test(path) || path === 'system/bank-snapshot';
 }
 export function report(plan: Plan, db: Firestore) {
-  return { planHash: hash(plan), requestHash: plan.requestHash, projectId: plan.projectId, operation: plan.operation, scope: plan.scope, affectedDocuments: plan.rows.map(row => ({ path: row.path, exists: row.version !== null, before: redact(withoutAudit(decode(row.before, db))), after: redact(withoutAudit(decode(row.after, db))) })), ...(plan.sourceHash ? { sourceHash: plan.sourceHash } : {}) };
+  const collectionCounts: Record<string, { before: number; after: number }> = {};
+  for (const row of plan.rows.filter(row => row.path.split('/').length === 2)) {
+    const counts = collectionCounts[row.path.split('/')[0]] ??= { before: 0, after: 0 };
+    if (decode(row.before, db) !== null) counts.before++;
+    if (decode(row.after, db) !== null) counts.after++;
+  }
+  return { planHash: hash(plan), requestHash: plan.requestHash, projectId: plan.projectId, operation: plan.operation, scope: plan.scope, collectionCounts, affectedDocuments: plan.rows.map(row => {
+    const publicKeys = row.path.startsWith('dataAdminSmoke/smoke-') ? ['value'] : [];
+    return { path: row.path, exists: row.version !== null, before: redact(withoutAudit(decode(row.before, db)), publicKeys), after: redact(withoutAudit(decode(row.after, db)), publicKeys) };
+  }), ...(plan.sourceHash ? { sourceHash: plan.sourceHash } : {}) };
 }
 async function verifyResult(plan: Plan, db: Firestore) {
   const current = await db.getAll(...plan.rows.map(row => db.doc(row.path)));

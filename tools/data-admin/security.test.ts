@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { validateRequest, assertDestination, assertScope, requestHash, hash, redact } from './schema.ts';
 import { parseCommand, assertPermission, assertPull, authorize } from './gate.ts';
+import { FirestoreArchive } from './storage.ts';
 const config = JSON.parse(await readFile(new URL('./config.json', import.meta.url), 'utf8'));
 const commit = 'a'.repeat(40);
 const request = { schemaVersion: 1, id: 'cost-test', environment: 'dev', projectId: 'bem-feito-dev', operation: 'update', changes: [{ collection: 'inputs', id: 'I00001', action: 'update', expected: { averageUnitCostCents: 100 }, values: { averageUnitCostCents: 150 } }] };
@@ -93,4 +94,26 @@ test('PROD requires exact owner dispatch, hashes and owner environment approval 
   await assert.rejects(authorize({ ...event, sender: otherActor }, { ...env, GITHUB_ACTOR: otherActor.login, GITHUB_TRIGGERING_ACTOR: otherActor.login }, { ...prodConfig, productionApprovers: [config.ownerId, '123456'] }, p => p.startsWith('collaborators/') ? Promise.resolve({ permission: 'write', user: otherActor }) : api(p)), /repository owner/);
   await assert.rejects(authorize({ ...event, inputs: { ...event.inputs, request_hash: 'f'.repeat(64) } }, env, prodConfig, api));
   await assert.rejects(authorize(event, env, prodConfig, p => p.endsWith('deployment-branch-policies') ? Promise.resolve({ branch_policies: [{ name: '*', type: 'branch' }] }) : api(p)));
+});
+test('archive IAM guard flushes deferred batchWrite and accepts only permission denials', async () => {
+  const events: string[] = [];
+  let rejectWrite: (error: unknown) => void = () => {};
+  let denialCode = 7;
+  const deny = async (name: string) => { events.push(name); throw Object.assign(new Error('simulated denial'), { code: denialCode }); };
+  const db = {
+    doc: () => ({ update: () => deny('commit'), delete: () => deny('delete') }),
+    collection: () => ({ limit: () => ({ get: () => deny('list') }) }),
+    bulkWriter: () => ({
+      onWriteError: () => {},
+      update: () => new Promise((_resolve, reject) => { events.push('queued-batch'); rejectWrite = reject; }),
+      close: async () => { events.push('flush-batch'); rejectWrite(Object.assign(new Error('simulated denial'), { code: denialCode })); },
+    }),
+  };
+  const archive = new FirestoreArchive(db as any);
+  archive.put = async () => 'f'.repeat(64);
+  archive.get = async () => ({ schemaVersion: 1 });
+  assert.deepEqual(await archive.assertAccess({ runId: 'test', phase: 'preview' }), { createReadVerified: true, updateDeleteListDenied: true });
+  assert.deepEqual(events, ['commit', 'queued-batch', 'flush-batch', 'delete', 'list']);
+  denialCode = 5;
+  await assert.rejects(archive.assertAccess({ runId: 'test', phase: 'preview' }), /denial could not be verified/);
 });

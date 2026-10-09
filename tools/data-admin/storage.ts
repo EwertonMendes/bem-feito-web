@@ -26,7 +26,9 @@ export class FirestoreArchive implements Archive {
     await denied(() => ref.update({ schemaVersion: 1 }), 'commit update');
     await denied(async () => {
       const bulk = this.db.bulkWriter(); bulk.onWriteError(() => false);
-      try { await bulk.update(ref, { schemaVersion: 1 }); } finally { await bulk.close(); }
+      const pending = bulk.update(ref, { schemaVersion: 1 });
+      const closed = bulk.close(); // Flush the partial batch before awaiting its write promise.
+      try { await pending; } finally { await closed; }
     }, 'batchWrite update');
     await denied(() => ref.delete(), 'delete');
     await denied(() => this.db.collection('archive-audit').limit(1).get(), 'list');

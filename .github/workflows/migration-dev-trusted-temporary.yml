@@ -57,4 +57,5 @@ jobs:
           node tools/migration/fetch-sheets.mjs --preflight
           node tools/migration/fetch-sheets.mjs
           node tools/migration/normalize-legacy.mjs
+          node tools/migration/reconcile-legacy.mjs
           node tools/migration/validate-export.mjs

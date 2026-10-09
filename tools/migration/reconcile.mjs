@@ -50,10 +50,10 @@ const report = {
     operationalExpensesCents: periodExpenses
       .filter((expense) => expense.kind === 'operating-expense')
       .reduce((sum, expense) => sum + Number(expense.amountCents ?? 0), 0),
-    cashOutCents: periodExpenses.reduce((sum, expense) => sum + Number(expense.amountCents ?? 0), 0),
+    cashOutCents: periodExpenses.reduce((sum, expense) => sum + Number(expense.bankDebitCents ?? expense.amountCents ?? 0), 0),
     cashFlowCents:
       periodPayments.reduce((sum, payment) => sum + Number(payment.amountReceivedCents ?? 0), 0)
-      - periodExpenses.reduce((sum, expense) => sum + Number(expense.amountCents ?? 0), 0),
+      - periodExpenses.reduce((sum, expense) => sum + Number(expense.bankDebitCents ?? expense.amountCents ?? 0), 0),
     itemsSold: periodSales.reduce((sum, sale) => sum + physicalItems(sale), 0),
     averageTicketCents: periodSales.length
       ? Math.round(periodSales.reduce((sum, sale) => sum + Number(sale.totalCents ?? 0), 0) / periodSales.length)

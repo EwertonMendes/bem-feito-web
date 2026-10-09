@@ -9,6 +9,9 @@ const warnings = [];
 const list = (name) => Array.isArray(data[name]) ? data[name] : [];
 const index = (name) => new Map(list(name).map((item) => [item.id, item]));
 
+const productStockStatus = (stock, minimumStock) => stock < 0 ? 'negative' : stock <= minimumStock ? 'low' : 'ok';
+const inputStockStatus = (stock, minimumStock, configured) => !configured ? 'untracked' : stock < 0 ? 'negative' : stock <= minimumStock ? 'low' : 'ok';
+
 const ensureUnique = (name) => {
   const seen = new Set();
   for (const item of list(name)) {
@@ -96,8 +99,6 @@ const finite = (value) => typeof value === 'number' && Number.isFinite(value);
 const positive = (value) => finite(value) && value > 0 && value <= 1000000;
 const idValid = (value) => typeof value === 'string' && value.length > 0 && value.length <= 500 && !value.includes('/');
 const paymentMethods = index('paymentMethods');
-const productStockStatus = (stock, minimumStock) => stock < 0 ? 'negative' : stock <= minimumStock ? 'low' : 'ok';
-const inputStockStatus = (stock, minimumStock, configured) => !configured ? 'untracked' : stock < 0 ? 'negative' : stock <= minimumStock ? 'low' : 'ok';
 const expectedSaleAnalytics = (items) => {
   let cogsCents = 0;
   let itemsSold = 0;

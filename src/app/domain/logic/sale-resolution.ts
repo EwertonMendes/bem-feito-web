@@ -155,6 +155,12 @@ export function resolveSaleDraft(
       : catalog.inputs.get(effect.itemId);
     if (!entity) throw new Error('Item de estoque não encontrado.');
 
+    // Orders awaiting production commit full demand, even before physical stock exists.
+    if (draft.fulfillmentStatus === 'in-production') {
+      stockEffects.push(effect);
+      continue;
+    }
+
     if (effect.itemType === 'input' && trackingModeForInput(entity as InputItem) === 'estimated') {
       const available = Math.max(0, entity.stock);
       const requested = Math.abs(effect.quantityDelta);

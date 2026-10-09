@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "dev-smoke-read-20261009-v2",
+  "environment": "dev",
+  "projectId": "bem-feito-dev",
+  "operation": "inspect",
+  "targets": [
+    {
+      "collection": "dataAdminSmoke",
+      "id": "smoke-20261009"
+    }
+  ]
+}

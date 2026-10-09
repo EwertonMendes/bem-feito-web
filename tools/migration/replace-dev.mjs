@@ -81,8 +81,19 @@ const bankRef = db.doc('system/bank-snapshot');
 const priorBank = await bankRef.get();
 if (priorBank.exists) originals.push({ path: bankRef.path, payload: priorBank.data() });
 if (originals.length > 3500) throw new Error('Número inesperado de documentos DEV. Revisão manual obrigatória.');
+const canonical = value => {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === 'object') {
+    if (typeof value.toDate === 'function') return { $timestamp: value.toDate().toISOString() };
+    if (value instanceof Uint8Array) return { $bytes: Buffer.from(value).toString('base64') };
+    return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, nested]) => [key, canonical(nested)]));
+  }
+  return value;
+};
 const contentsHash = list => createHash('sha256').update(JSON.stringify(
-  list.map(({ path, payload }) => ({ path, payload })).sort((a, b) => a.path.localeCompare(b.path))
+  list.map(({ path, payload }) => ({ path, payload: canonical(payload) }))
+    .sort((a, b) => a.path.localeCompare(b.path))
 )).digest('hex');
 const originalHash = contentsHash(originals);
 await manifest.create({
@@ -133,8 +144,8 @@ async function restore() {
 }
 let cleared = false;
 try {
-  await eraseDestination();
   cleared = true;
+  await eraseDestination();
   console.log('Somente coleções operacionais DEV foram limpas; autenticação e usuários preservados.');
   run(process.execPath, ['tools/migration/import-firestore.mjs', '--commit'], {
     env: { ...process.env, MIGRATION_ACTOR: 'dev-snapshot-2026-10-09' },

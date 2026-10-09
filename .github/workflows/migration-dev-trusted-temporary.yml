@@ -1,0 +1,56 @@
+name: TEMP - DEV migration trusted preflight
+on:
+  issue_comment:
+    types: [created]
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+  id-token: write
+jobs:
+  read-only-preflight:
+    if: >-
+      github.event.issue.pull_request &&
+      github.event.comment.body == '/migration-dev-check' &&
+      github.event.comment.user.login == github.repository_owner
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Resolve owner PR with successful CI
+        uses: actions/github-script@v9
+        id: source
+        with:
+          script: |
+            const {owner,repo}=context.repo;
+            const {data:pull}=await github.rest.pulls.get({owner,repo,pull_number:context.issue.number});
+            if(pull.state!=='open'||pull.user.login!==owner||pull.head.repo.full_name!==context.repo.owner+'/'+repo||!pull.head.ref.startsWith('feat/operacao-financeiro-migracao-')) {
+              core.setFailed('Untrusted migration source');return;
+            }
+            const {data:runs}=await github.rest.actions.listWorkflowRuns({owner,repo,workflow_id:'ci.yml',head_sha:pull.head.sha,event:'push',status:'success',per_page:5});
+            if(!runs.workflow_runs.some(run=>run.head_sha===pull.head.sha && run.conclusion==='success')) {
+              core.setFailed('Wait for CI success on head SHA '+pull.head.sha);return;
+            }
+            core.setOutput('sha',pull.head.sha);
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.22.3
+          cache: npm
+      - run: npm ci --no-fund
+      - uses: google-github-actions/auth@v3
+        with:
+          project_id: bem-feito-dev
+          workload_identity_provider: projects/312978463343/locations/global/workloadIdentityPools/github-actions/providers/github
+          service_account: github-deploy@bem-feito-dev.iam.gserviceaccount.com
+          create_credentials_file: true
+          export_environment_variables: true
+      - name: Read private spreadsheet in runner only, without writes
+        env:
+          MIGRATION_SNAPSHOT_ID: 1aPBxplXEK4-6YkR5zNGa3E9uTTUf7rrbho9JcvmfUX0
+        run: |
+          node tools/migration/fetch-sheets.mjs --preflight
+          node tools/migration/fetch-sheets.mjs
+          node tools/migration/normalize-legacy.mjs
+          node tools/migration/validate-export.mjs

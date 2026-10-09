@@ -27,7 +27,7 @@ for (const row of legacyRows('Compras e Despesas')) {
   const source = text(row['Origem do pagamento']).toLocaleLowerCase('pt-BR');
   expense.fundingSource = source.includes('maria') ? 'maria' :
     source.includes('bem feito') ? 'business' :
-    source.includes('pessoal') ? 'owner-unassigned' : 'unverified';
+    source.includes('pessoal') ? 'ewerton' : 'unverified';
   expense.bankDebitCents = expense.fundingSource === 'business' ? expense.amountCents : 0;
   if (expense.kind !== 'input-purchase') continue;
   const receipt = text(row.Recebimento).toLocaleLowerCase('pt-BR');

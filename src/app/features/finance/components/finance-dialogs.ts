@@ -11,6 +11,7 @@ import { todayBusinessDate } from '../../../core/utils/date';
 import { formatCurrency, fromCents, toCents } from '../../../core/utils/money';
 import { BfIcon } from '../../../shared/ui/icon/icon';
 import { BfDialog } from '../../../shared/ui/dialog/dialog';
+import { BfCheckbox } from '../../../shared/ui/checkbox/checkbox';
 import { BfSelect, BfSelectOption } from '../../../shared/ui/select/select';
 import { paymentMethodIcon } from '../../../shared/ui/select/payment-method-icon';
 import { BfNumberInput } from '../../../shared/ui/number-input/number-input';
@@ -43,7 +44,7 @@ interface ExpenseFormModel {
 }
 @Component({
  selector: 'bf-finance-dialogs',
- imports: [FormField, BfIcon, BfDialog, BfSelect, BfNumberInput],
+ imports: [FormField, BfIcon, BfDialog, BfSelect, BfCheckbox, BfNumberInput],
  changeDetection: ChangeDetectionStrategy.OnPush,
  templateUrl: './finance-dialogs.html',
  styleUrl: './finance-dialogs.scss',
@@ -60,6 +61,8 @@ export class BfFinanceDialogs {
  private readonly receiptDialog = viewChild.required<BfDialog>('receiptDialog');
  readonly selectedReceiptSale = signal<Sale | null>(null);
  readonly purchaseLines = signal<PurchaseFormLine[]>([]);
+ readonly fundingOptions: BfSelectOption[] = [{value:'business',label:'Conta Bem Feito'}, {value:'ewerton',label:'Ewerton · aporte pessoal'}, {value:'maria',label:'Maria · aporte pessoal'}];
+ readonly arrivalOptions: BfSelectOption[] = [{value:'received',label:'Já chegaram'}, {value:'pending',label:'Aguardando entrega'}];
  readonly purchaseTotalCents = computed(() => this.purchaseLines().reduce((sum, item) => sum + toCents(item.amount), 0));
   newPurchaseLine(): void {
     if (this.purchaseLines().length >= 40) return;

@@ -147,3 +147,9 @@ test('executor backs up, audits and restores through the independent Firestore a
   assert.equal((await db.doc('dataAdminSmoke/smoke-test').get()).data()?.value, 10);
   assert.ok((await archiveDb.collection('archive-audit').get()).size >= 4);
 });
+test('archive access guard rejects excessive update privilege before a business operation', async () => {
+  const storage = new FirestoreArchive(archiveDb);
+  // The emulator has no IAM restrictions, so the guard must reject its excessive access.
+  await assert.rejects(storage.assertAccess({ runId: 'emulator-probe', phase: 'preview' }), /unexpectedly permits commit update/);
+  assert.equal((await db.doc('dataAdminSmoke/smoke-test').get()).data()?.value, 10);
+});

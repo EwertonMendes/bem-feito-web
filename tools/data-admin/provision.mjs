@@ -34,6 +34,7 @@ async function ensure(url, createUrl, body) {
   catch (error) { if (!error.message.includes('HTTP 404')) throw error; return call(createUrl, 'POST', body); }
 }
 async function waitOperation(operation) {
+  if (operation?.error) throw new Error('IAM provisioning operation failed');
   if (!operation?.name?.includes('/operations/') || operation.done) return;
   for (let attempts = 0; attempts < 30; attempts++) {
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -89,7 +90,11 @@ const archiveProject = await call(`https://cloudresourcemanager.googleapis.com/v
 const archiveBilling = await call(`https://cloudbilling.googleapis.com/v1/projects/${archive.projectId}/billingInfo`);
 if (archiveBilling.billingEnabled || archiveBilling.billingAccountName) throw new Error('Archive billing must remain disabled');
 const archiveDb = await call(`https://firestore.googleapis.com/v1/projects/${archive.projectId}/databases/(default)`);
-if (archiveDb.databaseEdition !== 'STANDARD' || archiveDb.type !== 'FIRESTORE_NATIVE' || archiveDb.locationId !== 'southamerica-east1') throw new Error('Archive database protection differs');
+if (archiveDb.databaseEdition !== 'STANDARD' || archiveDb.type !== 'FIRESTORE_NATIVE' || archiveDb.locationId !== 'southamerica-east1' || archiveDb.deleteProtectionState !== 'DELETE_PROTECTION_ENABLED' || archiveDb.freeTier !== true || archiveDb.pointInTimeRecoveryEnablement !== 'POINT_IN_TIME_RECOVERY_DISABLED') throw new Error('Archive database protection/free tier differs');
+const archiveRelease = await call(`https://firebaserules.googleapis.com/v1/projects/${archive.projectId}/releases/cloud.firestore`);
+const archiveRules = await call(`https://firebaserules.googleapis.com/v1/${archiveRelease.rulesetName}`);
+const expectedRules = await readFile(new URL('./archive.rules', import.meta.url), 'utf8');
+if (archiveRules.source?.files?.length !== 1 || archiveRules.source.files[0].content !== expectedRules) throw new Error('Private archive client rules differ');
 const roleId = 'dataArchiveAppend';
 const role = { title: 'Private archive read and create only', includedPermissions: archivePermissions, stage: 'GA' };
 const archiveRole = await ensure(`https://iam.googleapis.com/v1/projects/${archive.projectId}/roles/${roleId}`, `https://iam.googleapis.com/v1/projects/${archive.projectId}/roles`, { roleId, role });

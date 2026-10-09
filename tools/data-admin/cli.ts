@@ -18,6 +18,7 @@ try {
   invariant(env.archive?.kind === 'firestore' && env.archive.projectId !== env.projectId && env.archive.databaseId === '(default)', 'Independent free-tier archive required');
   const archiveApp = initializeApp({ credential: applicationDefault(), projectId: env.archive.projectId }, 'private-archive');
   const archive = new FirestoreArchive(getFirestore(archiveApp, env.archive.databaseId));
+  const archiveAccess = await archive.assertAccess({ runId: authorization.actor.runId, phase: authorization.command.mode });
   let result;
   if (authorization.command.mode === 'preview') {
     const plan = request.operation === 'migrate' ? await prepareMigration(request, db, env) : await prepare(request, db, archive);
@@ -34,7 +35,7 @@ try {
     }
     result = await apply(request, saved, db, archive, authorization.actor);
   }
-  const publicReport = JSON.stringify(result, null, 2);
+  const publicReport = JSON.stringify({ ...result, archiveAccess }, null, 2);
   console.log(publicReport);
   if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, `\n### Data administration\n\n\`\`\`json\n${publicReport}\n\`\`\`\n`);
 } catch (error) {

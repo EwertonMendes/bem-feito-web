@@ -12,6 +12,27 @@ export class FirestoreArchive implements Archive {
     invariant(['plans', 'backups', 'audit'].includes(prefix) && /^[a-f0-9]{64}$/.test(id), 'Invalid archive hash');
     return this.db.doc(`archive-${prefix}/${id}`);
   }
+  async assertAccess(context: { runId: string; phase: string }) {
+    const id = await this.put('audit', { schemaVersion: 1, event: 'archive-iam-probe', ...context, at: new Date().toISOString() });
+    const ref = this.ref('audit', id);
+    async function denied(action: () => Promise<unknown>, name: string) {
+      try { await action(); }
+      catch (error: any) {
+        invariant(Number(error.code) === 7, `Archive ${name} denial could not be verified`); return;
+      }
+      throw new Error(`Archive IAM unexpectedly permits ${name}; business writes blocked`);
+    }
+    // Probe only this synthetic audit manifest, preserving its content even if update is allowed.
+    await denied(() => ref.update({ schemaVersion: 1 }), 'commit update');
+    await denied(async () => {
+      const bulk = this.db.bulkWriter(); bulk.onWriteError(() => false);
+      try { await bulk.update(ref, { schemaVersion: 1 }); } finally { await bulk.close(); }
+    }, 'batchWrite update');
+    await denied(() => ref.delete(), 'delete');
+    await denied(() => this.db.collection('archive-audit').limit(1).get(), 'list');
+    await this.get('audit', id);
+    return { createReadVerified: true, updateDeleteListDenied: true };
+  }
   async put(prefix: 'plans' | 'backups' | 'audit', value: any) {
     const id = hash(value); const ref = this.ref(prefix, id);
     const buffer = Buffer.from(JSON.stringify(value), 'utf8');

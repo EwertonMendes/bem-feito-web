@@ -4,6 +4,23 @@ import { Firestore } from 'firebase-admin/firestore';
 const config = JSON.parse(await readFile(new URL('./config.json', import.meta.url), 'utf8'));
 const env = config.environments.dev;
 const auth = ownerAuth();
+const archiveProject = config.environments.dev.archive.projectId;
+const archiveChecks = await Promise.allSettled([
+  cloudRequest(auth, `https://cloudbilling.googleapis.com/v1/projects/${env.projectId}/billingInfo`),
+  cloudRequest(auth, `https://cloudbilling.googleapis.com/v1/projects/${archiveProject}/billingInfo`),
+  cloudRequest(auth, `https://firestore.googleapis.com/v1/projects/${archiveProject}/databases`),
+  cloudRequest(auth, `https://cloudresourcemanager.googleapis.com/v1/projects/${archiveProject}:getIamPolicy`, 'POST', { options: { requestedPolicyVersion: 3 } }),
+  cloudRequest(auth, `https://iam.googleapis.com/v1/projects/${archiveProject}/roles/dataArchiveAppend`),
+  cloudRequest(auth, `https://firebaserules.googleapis.com/v1/projects/${archiveProject}/releases/cloud.firestore`),
+]);
+for (const [i, result] of archiveChecks.entries()) {
+  if (result.status === 'rejected') { console.log(JSON.stringify({ check: `archive-${i}`, error: result.reason.message })); continue; }
+  if (i === 5) {
+    const rules = await cloudRequest(auth, `https://firebaserules.googleapis.com/v1/${result.value.rulesetName}`);
+    const expected = await readFile(new URL('./archive.rules', import.meta.url), 'utf8');
+    console.log(JSON.stringify({ check: 'archive-deny-all-rules', verified: rules.source?.files?.length === 1 && rules.source.files[0].content === expected }));
+  } else console.log(JSON.stringify({ check: ['dev-billing', 'archive-billing', 'archive-databases', 'archive-policy', 'archive-role'][i], value: result.value }));
+}
 const results = await Promise.allSettled([
   cloudRequest(auth, `https://iam.googleapis.com/v1/projects/${env.projectNumber}/locations/global/workloadIdentityPools/github-actions/providers/github`),
   cloudRequest(auth, `https://cloudresourcemanager.googleapis.com/v1/projects/${env.projectId}:getIamPolicy`, 'POST', { options: { requestedPolicyVersion: 3 } }),
@@ -22,6 +39,12 @@ for (const [i, result] of results.entries()) {
 for (const path of [env.provider, `projects/${env.projectId}/serviceAccounts/${env.reader}`, `projects/${env.projectId}/serviceAccounts/${env.writer}`]) {
   try { const value = await cloudRequest(auth, `https://iam.googleapis.com/v1/${path}`); console.log(JSON.stringify({ check: 'new-resource', name: value.name, state: value.state, disabled: value.disabled, condition: value.attributeCondition })); }
   catch (error) { console.log(JSON.stringify({ check: 'new-resource', error: error.message })); }
+}
+for (const email of [env.reader, env.writer]) {
+  const url = `https://iam.googleapis.com/v1/projects/${env.projectId}/serviceAccounts/${email}`;
+  console.log(JSON.stringify({ check: 'data-account-trust', email, policy: await cloudRequest(auth, `${url}:getIamPolicy`, 'POST') }));
+  const keys = await cloudRequest(auth, `${url}/keys?keyTypes=USER_MANAGED`);
+  console.log(JSON.stringify({ check: 'no-static-keys', email, userManagedKeyCount: keys.keys?.length ?? 0 }));
 }
 const db = new Firestore({ projectId: env.projectId, auth });
 const collections = ['collections', 'fragrances', 'formats', 'formatPrices', 'units', 'paymentMethods', 'expenseCategories', 'expenseTypes', 'inputs', 'products', 'kits', 'additions', 'expenses', 'productions', 'sales', 'payments', 'stockAdjustments', 'stockMovements', 'counters', 'migrationRuns', 'migrationSources'];

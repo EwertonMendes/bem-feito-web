@@ -10,7 +10,12 @@ if (!token) throw new Error('Credencial OAuth do serviço indisponível.');
 const base = 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(id);
 async function sheetsFetch(suffix) {
   const response = await fetch(base + suffix, { headers: { Authorization: 'Bearer ' + token } });
-  if (!response.ok) throw new Error('Google Sheets indisponível ou sem permissão: HTTP ' + response.status);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    const reason = payload.error?.errors?.[0]?.reason ?? payload.error?.status ?? 'unknown';
+    const message = String(payload.error?.message ?? '').replace(/[A-Za-z0-9_-]{22,}/g, '[redacted]').slice(0, 220);
+    throw new Error('Google Sheets HTTP ' + response.status + ' (' + reason + '): ' + message);
+  }
   return response.json();
 }
 const metadata = await sheetsFetch('?fields=spreadsheetId,properties(title,timeZone),sheets(properties(title,gridProperties))');

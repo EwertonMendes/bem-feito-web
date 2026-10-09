@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { validateRequest, assertDestination, assertScope, requestHash, hash, redact } from './schema.ts';
 import { parseCommand, assertPermission, assertPull, authorize } from './gate.ts';
 import { FirestoreArchive } from './storage.ts';
-import { report } from './engine.ts';
+import { report, validBackupPath } from './engine.ts';
 import { encode } from './codec.ts';
 const config = JSON.parse(await readFile(new URL('./config.json', import.meta.url), 'utf8'));
 const commit = 'a'.repeat(40);
@@ -55,6 +55,11 @@ test('public reports omit customer text, individual financial amounts and nested
   for (const secret of ['PRIVATE', '987654', '765432', '543210']) assert.ok(!serialized.includes(secret));
   assert.deepEqual(result.collectionCounts.sales, { before: 1, after: 2 });
   assert.deepEqual(result.affectedDocuments[2].after, { value: 20 });
+});
+
+test('historical fixture backups stay restricted to registered migration source descendants', () => {
+  for (const collection of ['additions', 'collections', 'formats', 'fragrances', 'inputs', 'kits', 'products', 'units']) assert.equal(validBackupPath(`migrationSources/legacy-run/devTestFixtures/${collection}__legacy123`), true);
+  for (const path of ['users/u/devTestFixtures/units__x', 'sales/s/devTestFixtures/units__x', 'migrationSources/run/devTestFixtures/users__x', 'migrationSources/run/unknown/units__x', 'migrationSources/run/devTestFixtures/units__x/nested/x', 'migrationSources/run/devTestFixtures/units__../x']) assert.equal(validBackupPath(path), false);
 });
 test('authorization checks live permission and unchanged real comment actor before fetching data', async () => {
   const actor = { id: 33728924, login: 'EwertonMendes', type: 'User' };

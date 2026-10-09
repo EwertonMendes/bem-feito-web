@@ -100,7 +100,9 @@ export async function prepare(request: Request, db: Firestore, archive: Archive)
   return { schemaVersion: 1, requestHash: requestHash(request), projectId: request.projectId, environment: request.environment, operation: request.operation, scope, rows, dependencies };
 }
 export function validBackupPath(path: string) {
-  return /^(collections|fragrances|formats|formatPrices|units|paymentMethods|expenseCategories|expenseTypes|inputs|products|kits|additions|expenses|productions|sales|payments|stockAdjustments|stockMovements|counters|migrationRuns|migrationSources|dataAdminSmoke)\/[A-Za-z0-9][A-Za-z0-9_-]{0,99}(\/sheets\/[A-Za-zÀ-ÿ0-9 _-]{1,100})?$/.test(path) || path === 'system/bank-snapshot';
+  return /^(collections|fragrances|formats|formatPrices|units|paymentMethods|expenseCategories|expenseTypes|inputs|products|kits|additions|expenses|productions|sales|payments|stockAdjustments|stockMovements|counters|migrationRuns|migrationSources|dataAdminSmoke)\/[A-Za-z0-9][A-Za-z0-9_-]{0,99}(\/sheets\/[A-Za-zÀ-ÿ0-9 _-]{1,100})?$/.test(path)
+    || /^migrationSources\/[A-Za-z0-9][A-Za-z0-9_-]{0,99}\/devTestFixtures\/(additions|collections|formats|fragrances|inputs|kits|products|units)__[A-Za-z0-9][A-Za-z0-9_-]{0,59}$/.test(path)
+    || path === 'system/bank-snapshot';
 }
 export function report(plan: Plan, db: Firestore) {
   const collectionCounts: Record<string, { before: number; after: number }> = {};

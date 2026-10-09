@@ -45,7 +45,12 @@ export async function prepareMigration(request: Request, db: Firestore, env: any
     const current = await ref.get(); if (current.exists) old.set(ref.path, snapshotRow(current));
     for (const sub of await ref.listCollections()) for (const doc of await sub.listDocuments()) await gather(doc);
   }
-  for (const collection of MIGRATION_COLLECTIONS) for (const doc of await db.collection(collection).listDocuments()) await gather(doc);
+  // Bounded parallel reads include every descendant; transaction versions/root queries still
+  // reject any changed destination at apply. Never skip an unknown descendant to save time.
+  for (const collection of MIGRATION_COLLECTIONS) {
+    const roots = await db.collection(collection).listDocuments();
+    for (let offset = 0; offset < roots.length; offset += 15) await Promise.all(roots.slice(offset, offset + 15).map(gather));
+  }
   await gather(db.doc('system/bank-snapshot'));
   const desired = new Map<string, any>();
   for (const collection of MIGRATION_COLLECTIONS.filter(c => !['migrationRuns', 'migrationSources'].includes(c))) {

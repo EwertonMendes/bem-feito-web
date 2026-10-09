@@ -134,17 +134,19 @@ service cloud.firestore {
           && fields(data, ['collectionId', 'formatId', 'priceCents', 'active'], [])
           && text(data.collectionId) && text(data.formatId) && money(data.priceCents) && data.active is bool)
         || (name == 'products'
-          && fields(data, ['code', 'active', 'collectionId', 'fragranceId', 'formatId', 'displayName', 'salePriceCents', 'additionalCostCents', 'averageUnitCostCents', 'stock', 'minimumStock', 'recipe'], ['image', 'stockStatus'])
+          && fields(data, ['code', 'active', 'collectionId', 'fragranceId', 'formatId', 'displayName', 'salePriceCents', 'additionalCostCents', 'averageUnitCostCents', 'stock', 'minimumStock', 'recipe'], ['image', 'stockStatus', 'committedStock'])
           && text(data.code) && text(data.displayName) && data.active is bool
           && text(data.collectionId) && text(data.fragranceId) && text(data.formatId)
           && money(data.salePriceCents) && money(data.additionalCostCents) && money(data.averageUnitCostCents)
           && stock(data.stock) && quantity(data.minimumStock) && data.recipe is list
+           && (!('committedStock' in data) || quantity(data.committedStock))
           && validProductStockStatus(data)
           && (!('image' in data) || validImage(data.image)))
         || (name == 'inputs'
-          && fields(data, ['code', 'active', 'name', 'unitId', 'stock', 'minimumStock', 'averageUnitCostCents'], ['image', 'minimumStockConfigured', 'trackingMode', 'stockStatus', 'costBasisQuantity', 'costBasisValueCents'])
+          && fields(data, ['code', 'active', 'name', 'unitId', 'stock', 'minimumStock', 'averageUnitCostCents'], ['image', 'minimumStockConfigured', 'trackingMode', 'stockStatus', 'costBasisQuantity', 'costBasisValueCents', 'committedStock'])
           && text(data.code) && text(data.name) && text(data.unitId) && data.active is bool
           && stock(data.stock) && quantity(data.minimumStock) && money(data.averageUnitCostCents)
+           && (!('committedStock' in data) || quantity(data.committedStock))
           && (!('minimumStockConfigured' in data) || data.minimumStockConfigured is bool)
           && (!('trackingMode' in data) || data.trackingMode in ['exact', 'estimated', 'untracked'])
           && (!('costBasisQuantity' in data) || quantity(data.costBasisQuantity))
@@ -193,13 +195,15 @@ service cloud.firestore {
 
     function validOperation(name, data) {
       return (name == 'sales'
-          && fields(data, ['code', 'businessDate', 'discountCents', 'subtotalCents', 'totalCents', 'receivedCents', 'tipCents', 'balanceCents', 'paymentStatus', 'status', 'items', 'paymentIds', 'stockEffects'], ['customerName', 'dueDate', 'notes', 'cancelledAt', 'cancelledBy', 'analyticsVersion', 'cogsCents', 'itemsSold', 'missingCostItems'])
+          && fields(data, ['code', 'businessDate', 'discountCents', 'subtotalCents', 'totalCents', 'receivedCents', 'tipCents', 'balanceCents', 'paymentStatus', 'status', 'items', 'paymentIds', 'stockEffects'], ['customerName', 'dueDate', 'notes', 'cancelledAt', 'cancelledBy', 'analyticsVersion', 'cogsCents', 'itemsSold', 'missingCostItems', 'fulfillmentStatus', 'stockApplied'])
           && text(data.code) && businessDate(data)
           && money(data.discountCents) && money(data.subtotalCents) && money(data.totalCents)
           && money(data.receivedCents) && money(data.tipCents) && money(data.balanceCents)
           && data.discountCents <= data.subtotalCents && data.totalCents == data.subtotalCents - data.discountCents
           && data.receivedCents <= data.totalCents
           && data.status in ['active', 'cancelled']
+           && (!('fulfillmentStatus' in data) || data.fulfillmentStatus in ['in-production', 'ready', 'delivered'])
+           && (!('stockApplied' in data) || data.stockApplied is bool)
           && data.paymentStatus in ['paid', 'pending', 'partial', 'cancelled']
           && ((data.status == 'cancelled' && data.paymentStatus == 'cancelled' && data.balanceCents == 0)
             || (data.status == 'active' && data.balanceCents == data.totalCents - data.receivedCents

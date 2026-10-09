@@ -6,10 +6,13 @@ import { encode, decode } from './codec.ts';
 import { hash, validateRequest } from './schema.ts';
 import { prepare, apply, snapshotRow, assertPlanCapacity } from './engine.ts';
 import type { Archive } from './storage.ts';
+import { FirestoreArchive } from './storage.ts';
 
 assert.equal(process.env.FIRESTORE_EMULATOR_HOST, '127.0.0.1:8080', 'Destructive tests require an isolated emulator');
 const app = initializeApp({ projectId: 'demo-bem-feito' }, 'data-admin-tests');
 const db = getFirestore(app);
+const archiveApp = initializeApp({ projectId: 'demo-bem-feito-archive' }, 'archive-tests');
+const archiveDb = getFirestore(archiveApp);
 class MemoryArchive implements Archive {
   objects = new Map<string, any>(); fail = false;
   async put(prefix: string, value: any) { if (this.fail) throw new Error('Simulated archive failure'); const id = hash(value); this.objects.set(`${prefix}/${id}`, structuredClone(value)); assert.equal(hash(await this.get(prefix as any, id)), id); return id; }
@@ -29,6 +32,8 @@ after(async () => {
   await db.doc('collections/admin-test-parent').delete();
   await db.doc('fragrances/admin-test-child').delete();
   await deleteApp(app);
+  for (const prefix of ['plans', 'backups', 'audit']) await archiveDb.recursiveDelete(archiveDb.collection(`archive-${prefix}`));
+  await deleteApp(archiveApp);
 });
 test('dry-run makes no Firestore writes', async () => {
   const before = (await db.doc('dataAdminSmoke/smoke-test').get()).updateTime;
@@ -118,4 +123,27 @@ test('registered replacement can commit and restore more than 500 documents atom
   await apply(restore, restoration, db, archive, { ...actor, approvedPlan: hash(restoration) });
   assert.equal((await db.collection('dataAdminSmoke').get()).size, 1);
   assert.throws(() => assertPlanCapacity(Array.from({ length: 2001 }, (_, i) => ({ path: `x/${i}`, version: null, before: encode(null), after: encode(null) }))));
+});
+test('independent Firestore archive chunks large private payloads, rereads checksums and creates idempotently', async () => {
+  const storage = new FirestoreArchive(archiveDb);
+  const value = { schemaVersion: 1, payload: 'x'.repeat(1_100_000) };
+  const id = await storage.put('backups', value);
+  assert.deepEqual(await storage.get('backups', id), value);
+  const timestamp = (await archiveDb.doc(`archive-backups/${id}`).get()).updateTime!;
+  assert.equal(await storage.put('backups', value), id);
+  assert.ok((await archiveDb.doc(`archive-backups/${id}`).get()).updateTime!.isEqual(timestamp));
+  assert.equal((await db.doc(`archive-backups/${id}`).get()).exists, false);
+  await archiveDb.doc(`archive-backups/${id}/parts/0000`).update({ data: Buffer.from('tampered').toString('base64') });
+  await assert.rejects(storage.get('backups', id), /checksum/);
+});
+test('executor backs up, audits and restores through the independent Firestore archive adapter', async () => {
+  const storage = new FirestoreArchive(archiveDb);
+  const req = request('archive-engine'); const plan = await prepare(req, db, storage);
+  const result = await apply(req, plan, db, storage, { ...actor, approvedPlan: hash(plan) });
+  assert.equal((await storage.get('backups', result.backup)).operationId, req.id);
+  const restoration = validateRequest({ schemaVersion: 1, id: 'restore-archive-engine', environment: 'dev', projectId: 'bem-feito-dev', operation: 'restore', backup: result.backup, destructive: { projectId: 'bem-feito-dev', paths: ['dataAdminSmoke/smoke-test'] } });
+  const restorePlan = await prepare(restoration, db, storage);
+  await apply(restoration, restorePlan, db, storage, { ...actor, approvedPlan: hash(restorePlan) });
+  assert.equal((await db.doc('dataAdminSmoke/smoke-test').get()).data()?.value, 10);
+  assert.ok((await archiveDb.collection('archive-audit').get()).size >= 4);
 });

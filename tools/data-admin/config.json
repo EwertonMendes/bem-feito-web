@@ -11,7 +11,7 @@
       "projectId": "bem-feito-dev",
       "projectNumber": "312978463343",
       "databaseId": "(default)",
-      "bucket": "bem-feito-dev-data-admin",
+      "archive": { "kind": "firestore", "projectId": "bem-feito-archive-dev", "databaseId": "(default)" },
       "provider": "projects/312978463343/locations/global/workloadIdentityPools/github-data/providers/github",
       "reader": "github-data-dev-read@bem-feito-dev.iam.gserviceaccount.com",
       "writer": "github-data-dev@bem-feito-dev.iam.gserviceaccount.com",

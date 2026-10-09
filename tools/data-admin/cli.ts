@@ -1,9 +1,8 @@
 import { readFile, appendFile } from 'node:fs/promises';
 import { initializeApp, applicationDefault } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { getStorage } from 'firebase-admin/storage';
 import { validateRequest, assertDestination, invariant, hash, requestHash } from './schema.ts';
-import { BucketArchive } from './storage.ts';
+import { FirestoreArchive } from './storage.ts';
 import { apply, prepare, report } from './engine.ts';
 import { prepareMigration } from './migration.ts';
 
@@ -16,13 +15,15 @@ try {
   invariant(authorization.destination.projectId === env.projectId && authorization.actor.trustedSha === process.env.GITHUB_SHA, 'Authorization context differs');
   const app = initializeApp({ credential: applicationDefault(), projectId: env.projectId });
   const db = getFirestore(app, env.databaseId);
-  const archive = new BucketArchive(getStorage(app).bucket(env.bucket));
+  invariant(env.archive?.kind === 'firestore' && env.archive.projectId !== env.projectId && env.archive.databaseId === '(default)', 'Independent free-tier archive required');
+  const archiveApp = initializeApp({ credential: applicationDefault(), projectId: env.archive.projectId }, 'private-archive');
+  const archive = new FirestoreArchive(getFirestore(archiveApp, env.archive.databaseId));
   let result;
   if (authorization.command.mode === 'preview') {
     const plan = request.operation === 'migrate' ? await prepareMigration(request, db, env) : await prepare(request, db, archive);
     const planHash = await archive.put('plans', plan);
     await archive.put('plans', { schemaVersion: 1, event: 'preview-audit', at: new Date().toISOString(), actor: authorization.actor, planHash, requestHash: plan.requestHash, scope: plan.scope });
-    result = { status: 'preview-only-no-firestore-writes', ...report(plan, db), planHash, requestSha: authorization.actor.requestSha };
+    result = { status: 'preview-only-no-business-writes', ...report(plan, db), planHash, requestSha: authorization.actor.requestSha };
   } else {
     const saved = await archive.get('plans', authorization.command.plan);
     invariant(saved.requestHash === requestHash(request) && hash(saved) === authorization.command.plan, 'Stored plan differs from approved request');

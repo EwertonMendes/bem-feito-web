@@ -18,13 +18,16 @@ const condition = [
   `assertion.environment in ['data-${target}-preview','data-${target}-execute']`,
   `(assertion.environment!='data-prod-execute' || assertion.event_name=='workflow_dispatch')`,
 ].join(' && ');
-const plan = { target, project: env.projectId, serviceAccounts: [env.reader, env.writer], permissions: { reader: readPermissions, writer: writePermissions, archive: ['storage.objects.get', 'storage.objects.create'] }, provider: env.provider, condition, bucket: { name: env.bucket, location: 'SOUTHAMERICA-EAST1', retentionDays: 90, uniformAccess: true, publicAccess: 'enforced' } };
+const archivePermissions = ['datastore.databases.getMetadata', 'datastore.entities.get', 'datastore.entities.create'];
+const plan = { target, project: env.projectId, serviceAccounts: [env.reader, env.writer], permissions: { reader: readPermissions, writer: writePermissions, archive: archivePermissions }, provider: env.provider, condition, archive: { project: env.archive?.projectId, database: '(default)', retention: 'indefinite', billing: 'must-be-disabled' } };
 console.log(JSON.stringify(plan, null, 2));
 if (!process.argv.includes('--apply')) process.exit(0);
 const auth = ownerAuth();
 const call = (url, method, data) => cloudRequest(auth, url, method, data);
 const project = await call(`https://cloudresourcemanager.googleapis.com/v1/projects/${env.projectId}`);
 if (String(project.projectNumber) !== env.projectNumber || project.projectId !== env.projectId) throw new Error('Project identity differs');
+const billing = await call(`https://cloudbilling.googleapis.com/v1/projects/${env.projectId}/billingInfo`);
+if (billing.billingEnabled || billing.billingAccountName) throw new Error('Billing must remain disabled; no paid resources may be provisioned');
 // Create only new dedicated resources. Never edit the existing deploy provider or service account.
 async function ensure(url, createUrl, body) {
   try { return await call(url); }
@@ -47,8 +50,6 @@ for (const email of [env.reader, env.writer]) {
 const roles = {
   dataAdminRead: { title: 'Data administration read', includedPermissions: readPermissions, stage: 'GA' },
   dataAdminWrite: { title: 'Data administration write', includedPermissions: writePermissions, stage: 'GA' },
-  dataArchiveRead: { title: 'Data archive read', includedPermissions: ['storage.objects.get'], stage: 'GA' },
-  dataArchiveCreate: { title: 'Data archive append', includedPermissions: ['storage.objects.create'], stage: 'GA' },
 };
 for (const [id, role] of Object.entries(roles)) {
   const current = await ensure(`https://iam.googleapis.com/v1/projects/${env.projectId}/roles/${id}`, `https://iam.googleapis.com/v1/projects/${env.projectId}/roles`, { roleId: id, role });
@@ -82,23 +83,25 @@ for (const [email, role] of [[env.reader, 'dataAdminRead'], [env.writer, 'dataAd
   if (!policy.bindings.some(b => b.role === fullRole && b.members?.includes(member) && b.condition?.expression === expression)) policy.bindings.push({ role: fullRole, members: [member], condition: { title: 'default-database-only', expression } });
 }
 await call(`https://cloudresourcemanager.googleapis.com/v1/projects/${env.projectId}:setIamPolicy`, 'POST', { policy });
-const bucketUrl = `https://storage.googleapis.com/storage/v1/b/${env.bucket}`;
-const bucket = await ensure(bucketUrl, `https://storage.googleapis.com/storage/v1/b?project=${env.projectId}`, { name: env.bucket, location: 'SOUTHAMERICA-EAST1', storageClass: 'STANDARD', iamConfiguration: { uniformBucketLevelAccess: { enabled: true }, publicAccessPrevention: 'enforced' }, retentionPolicy: { retentionPeriod: '7776000' }, versioning: { enabled: true } });
-if (String(bucket.projectNumber) !== env.projectNumber || bucket.location !== 'SOUTHAMERICA-EAST1' || !bucket.iamConfiguration?.uniformBucketLevelAccess?.enabled || bucket.iamConfiguration?.publicAccessPrevention !== 'enforced' || Number(bucket.retentionPolicy?.retentionPeriod) < 7776000) throw new Error('Existing archive bucket ownership/protection differs');
-const bucketPolicy = await call(`${bucketUrl}/iam?optionsRequestedPolicyVersion=3`);
-bucketPolicy.version = 3; bucketPolicy.bindings ??= [];
-const grants = [
-  [env.reader, 'dataArchiveRead', ['plans', 'backups']],
-  [env.reader, 'dataArchiveCreate', ['plans']],
-  [env.writer, 'dataArchiveRead', ['plans', 'backups', 'audit']],
-  [env.writer, 'dataArchiveCreate', ['backups', 'audit']],
-];
-for (const [email, role, prefixes] of grants) {
-  const fullRole = `projects/${env.projectId}/roles/${role}`;
+const archive = env.archive;
+if (archive?.kind !== 'firestore' || archive.projectId === env.projectId || archive.databaseId !== '(default)') throw new Error('Independent free-tier archive configuration required');
+const archiveProject = await call(`https://cloudresourcemanager.googleapis.com/v1/projects/${archive.projectId}`);
+const archiveBilling = await call(`https://cloudbilling.googleapis.com/v1/projects/${archive.projectId}/billingInfo`);
+if (archiveBilling.billingEnabled || archiveBilling.billingAccountName) throw new Error('Archive billing must remain disabled');
+const archiveDb = await call(`https://firestore.googleapis.com/v1/projects/${archive.projectId}/databases/(default)`);
+if (archiveDb.databaseEdition !== 'STANDARD' || archiveDb.type !== 'FIRESTORE_NATIVE' || archiveDb.locationId !== 'southamerica-east1') throw new Error('Archive database protection differs');
+const roleId = 'dataArchiveAppend';
+const role = { title: 'Private archive read and create only', includedPermissions: archivePermissions, stage: 'GA' };
+const archiveRole = await ensure(`https://iam.googleapis.com/v1/projects/${archive.projectId}/roles/${roleId}`, `https://iam.googleapis.com/v1/projects/${archive.projectId}/roles`, { roleId, role });
+if (JSON.stringify([...archiveRole.includedPermissions].sort()) !== JSON.stringify([...archivePermissions].sort())) throw new Error('Archive role differs; review required');
+const archivePolicy = await call(`https://cloudresourcemanager.googleapis.com/v1/projects/${archive.projectId}:getIamPolicy`, 'POST', { options: { requestedPolicyVersion: 3 } });
+archivePolicy.version = 3; archivePolicy.bindings ??= [];
+const archiveExpression = `resource.name == 'projects/${archive.projectId}/databases/(default)'`;
+for (const email of [env.reader, env.writer]) {
+  const fullRole = `projects/${archive.projectId}/roles/${roleId}`;
   const member = `serviceAccount:${email}`;
-  const expression = prefixes.map(prefix => `resource.name.startsWith('projects/_/buckets/${env.bucket}/objects/${prefix}/')`).join(' || ');
-  if (!bucketPolicy.bindings.some(b => b.role === fullRole && b.members?.includes(member) && b.condition?.expression === expression)) bucketPolicy.bindings.push({ role: fullRole, members: [member], condition: { title: `${role}-${email.split('@')[0]}`, expression } });
+  if (!archivePolicy.bindings.some(b => b.role === fullRole && b.members?.includes(member) && b.condition?.expression === archiveExpression)) archivePolicy.bindings.push({ role: fullRole, members: [member], condition: { title: 'private-default-archive-only', expression: archiveExpression } });
 }
-if (bucketPolicy.bindings.some(b => b.members?.some(m => ['allUsers', 'allAuthenticatedUsers'].includes(m)))) throw new Error('Public archive binding rejected');
-await call(`${bucketUrl}/iam`, 'PUT', bucketPolicy);
-console.log('Dedicated identities, restricted provider and protected archive configured; deploy identity unchanged.');
+if (archivePolicy.bindings.some(b => b.members?.some(m => ['allUsers', 'allAuthenticatedUsers'].includes(m)))) throw new Error('Public archive binding rejected');
+await call(`https://cloudresourcemanager.googleapis.com/v1/projects/${archive.projectId}:setIamPolicy`, 'POST', { policy: archivePolicy });
+console.log(JSON.stringify({ result: 'Dedicated identities, restricted provider and independent free-tier archive configured', archiveProjectNumber: archiveProject.projectNumber }));

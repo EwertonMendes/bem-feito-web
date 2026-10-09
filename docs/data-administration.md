@@ -4,7 +4,7 @@
 
 O executor permanente está nesta PR de infraestrutura, separado do PR #28. **Ainda não está liberado para operações reais.** As duas contas DEV, os papéis personalizados e a federação foram criados e conferidos na API. O snapshot privado foi compartilhado como leitor com ambas as contas. A `master` agora exige PR, uma aprovação, descarte de aprovações antigas, aprovação do último push por outra pessoa e CI `validate`, inclusive para administradores. Os ambientes `data-dev-preview` e `data-dev-execute` aceitam exclusivamente a branch `master`, sem tags e sem bypass administrativo.
 
-Faltam: vincular faturamento ao projeto DEV, provisionar o bucket e seus vínculos IAM, revisar e integrar esta PR à `master`, e executar o smoke test pelo executor revisado. A API de Storage recusou criar o bucket com HTTP 403: `The billing account for the owning project is disabled in state absent`. Nenhum documento de negócio DEV foi modificado. Não houve merge do PR #28, migração ou acesso a dados PROD.
+**Faturamento é proibido nesta infraestrutura.** DEV permanece Spark, sem conta de faturamento. O arquivo privado usa um Firestore Standard `(default)` em projeto separado, `bem-feito-archive-dev`, também sem faturamento. O bucket GCS foi descartado. Faltam aprovar e provisionar esse projeto de arquivos e os vínculos mínimos descritos abaixo, revisar/integrar esta PR e executar o smoke test por OIDC. Nenhum documento de negócio DEV foi modificado; não houve merge do PR #28, migração ou acesso a dados PROD.
 
 PROD permanece `null` em `tools/data-admin/config.json`: somente `bem-feito-dev` foi encontrado nas configurações e projetos Firebase acessíveis; o ambiente Angular de produção contém placeholders. Nenhum Project ID, identidade ou bucket PROD foi inventado. O executor rejeita qualquer solicitação PROD enquanto faltar configuração real revisada.
 
@@ -14,7 +14,7 @@ PROD permanece `null` em `tools/data-admin/config.json`: somente `bem-feito-dev`
 flowchart LR
   A[Conector GitHub: JSON em PR + comentário] --> B[Gate na master protegida]
   B --> C[Prévia: identidade DEV de leitura]
-  C --> D[Plano imutável em GCS privado]
+  C --> D[Plano no Firestore privado de projeto separado]
   D --> E[Autorização com SHA + hash da solicitação + hash do plano]
   E --> F[Gate repetido antes de OIDC]
   F --> G[Backup verificado + transação atômica + recibo]
@@ -31,14 +31,14 @@ A proteção da branch torna a revisão independente indispensável para mudanç
 
 | Identidade DEV | Firestore `(default)` | Arquivo privado planejado |
 |---|---|---|
-| `github-data-dev-read@bem-feito-dev.iam.gserviceaccount.com` | `datastore.databases.get`, `getMetadata`, `entities.get`, `entities.list` | Ler `plans/`, `backups/`; criar `plans/` |
-| `github-data-dev@bem-feito-dev.iam.gserviceaccount.com` | Leitura anterior + `entities.create`, `update`, `delete` | Ler `plans/`, `backups/`, `audit/`; criar `backups/`, `audit/` |
+| `github-data-dev-read@bem-feito-dev.iam.gserviceaccount.com` | `datastore.databases.get`, `getMetadata`, `entities.get`, `entities.list` | Ler e criar documentos no arquivo separado; o executor cria somente planos e auditoria de prévia |
+| `github-data-dev@bem-feito-dev.iam.gserviceaccount.com` | Leitura anterior + `entities.create`, `update`, `delete` | Ler e criar documentos no arquivo separado; o executor cria backups e auditoria |
 
-Os papéis de projeto são `dataAdminRead`, `dataAdminWrite`, `dataArchiveRead` e `dataArchiveCreate`. Os vínculos Firestore usam a condição `resource.name == 'projects/bem-feito-dev/databases/(default)'`. A limitação a coleções e campos é aplicada pelo executor; IAM Firestore não oferece uma lista de coleções por esse papel. Nenhuma dessas identidades recebeu Owner, Editor, Auth, Hosting, IAM ou permissões PROD. A identidade existente `github-deploy` e seu provider não foram alterados; ela continua sem escrita de documentos.
+Os papéis DEV são `dataAdminRead` e `dataAdminWrite`, condicionados a `resource.name == 'projects/bem-feito-dev/databases/(default)'`. O papel no projeto de arquivos é `dataArchiveAppend`: somente `datastore.databases.getMetadata`, `datastore.entities.get` e `datastore.entities.create`, condicionado ao `(default)` desse projeto. Não tem update, delete, list, export, IAM ou permissões de outro banco. Prefixos e campos são controlados pelo executor; IAM é limitado ao banco, não às coleções. Cada escrita no arquivo exige `exists:false`, usa nomes derivados do hash e não sobrescreve. As regras do projeto de arquivos negam todas as leituras/gravações por clientes Firebase; apenas IAM autorizado acessa os dados privados. Nenhuma identidade técnica recebe Owner, Editor, Auth, Hosting, IAM ou PROD. A identidade `github-deploy` e seu provider permanecem destinados ao deploy.
 
 Provider novo: `projects/312978463343/locations/global/workloadIdentityPools/github-data/providers/github`. Emissor: `https://token.actions.githubusercontent.com`. Exige repositório `EwertonMendes/bem-feito-web`, repository ID `1406056807`, owner ID `33728924`, branch `refs/heads/master`, ref type `branch`, workflow `EwertonMendes/bem-feito-web/.github/workflows/data-admin.yml@refs/heads/master`, runner GitHub hospedado, evento `issue_comment` ou `workflow_dispatch` e ambiente DEV específico. O subject é `github:<repository_id>:<environment>`; cada conta aceita somente o subject de sua fase, por `roles/iam.workloadIdentityUser`. Não há chaves estáticas. O claim OIDC não substitui a consulta da proteção atual da branch feita pelo gate.
 
-O bootstrap administrativo é `node tools/data-admin/provision.mjs` (mostra plano) e `node tools/data-admin/provision.mjs --apply` (recursos aprovados). Usa a sessão local existente do proprietário no Firebase CLI, com `FIREBASE_TOOLS_MODULE` apontando para o `package.json` instalado do Firebase CLI. Não persiste nem imprime tokens. Reexecução reutiliza recursos e preserva os outros vínculos IAM/etags; diferenças de confiança ou proteção exigem revisão e interrompem a execução. Não faz operações de negócio.
+O bootstrap administrativo é `node tools/data-admin/provision.mjs` (plano) e `node tools/data-admin/provision.mjs --apply` (recursos aprovados). Para o projeto de arquivos, crie primeiro o projeto Firebase gratuito pelo CLI e execute `node tools/data-admin/provision-archive.mjs --apply`, que habilita somente Firestore Standard, proteção de exclusão e regras deny-all. Ambos usam a sessão existente do proprietário, com `FIREBASE_TOOLS_MODULE` apontando ao package.json instalado do CLI, e abortam se houver faturamento vinculado. Não persistem/imprimem tokens e não executam operações de negócio. Reexecução preserva vínculos/etags e recusa diferenças de confiança ou proteção.
 
 ## Pedidos pelo conector GitHub
 
@@ -49,7 +49,7 @@ O bootstrap administrativo é `node tools/data-admin/provision.mjs` (mostra plan
    /data-admin preview operations/requests/<nome>.json <SHA_DO_PR>
    ```
 
-3. Localize a execução **Firebase data administration** em Actions, iniciada pelo comentário. Leia `requestHash`, `planHash`, `requestSha`, caminhos e valores numéricos no resumo do job `operation`. Preview não escreve no Firestore; salva plano e auditoria de prévia no bucket privado.
+3. Localize a execução **Firebase data administration** em Actions, iniciada pelo comentário. Leia `requestHash`, `planHash`, `requestSha`, caminhos e valores numéricos no resumo do job `operation`. Preview não escreve no banco de negócio; salva plano e auditoria no projeto privado separado.
 4. Confira destino, documentos, valores e pré-condições. Em DEV, a autorização específica é outro comentário com os hashes exatos da prévia:
 
    ```text
@@ -64,15 +64,17 @@ Exemplo de custo: copie `operations/examples/input-cost.json` para requests, sub
 
 ## PROD
 
-Após identificar o projeto real, configure contas reader/writer, provider e bucket independentes em uma PR revisada. Cadastre IDs de aprovadores humanos em `productionApprovers`; configure `data-prod-preview` e `data-prod-execute` exclusivamente para `master`. Em execute, exija revisores humanos da lista, prevenção de autoaprovação e `can_admins_bypass: false`. O repositório público atual oferece esses controles de Environment, visíveis nas configurações; uma mudança de visibilidade/plano deve ser reavaliada.
+Após identificar o projeto real, configure contas reader/writer, provider e projeto de arquivos independente em uma PR revisada, mantendo a restrição de não vincular faturamento. Cadastre IDs humanos em `productionApprovers`; configure `data-prod-preview` e `data-prod-execute` exclusivamente para `master`, com revisores, prevenção de autoaprovação e `can_admins_bypass: false`. O repositório público atual oferece esses controles de Environment; mudança de visibilidade/plano exige reavaliação.
 
 Um humano autorizado deve despachar **apply** com PR, SHA e ambos os hashes específicos. O job para antes de OIDC na aprovação protegida e revalida tudo após a aprovação. Aprovação de PR, push, merge, comentário, CI ou permissão de escrita isoladamente não executam PROD. Sem revisor diferente do solicitante, a operação permanece bloqueada. O provisionador PROD exige configuração real, separada de DEV, e autorização administrativa para seus vínculos.
 
 ## Backup, auditoria e recuperação
 
-Bucket planejado: `gs://bem-feito-dev-data-admin`, região `southamerica-east1`, acesso uniforme, prevenção de acesso público, versionamento e retenção mínima de 90 dias. Não será travado irreversivelmente nesta implantação. Não há lifecycle de exclusão. As contas técnicas não podem listar, excluir, atualizar nem sobrescrever objetos, inclusive após a retenção. A retenção é um mínimo; objetos permanecem até decisão administrativa do proprietário.
+Arquivo privado planejado: Firestore Standard `(default)` de `bem-feito-archive-dev`, região `southamerica-east1`, sem faturamento, independente do banco substituível. Retenção indefinida, sem TTL ou exclusão automática, preservando o mínimo de 90 dias. Contas técnicas não recebem update/delete/list nem administração do banco. Proteção de exclusão do banco e regras de cliente deny-all são verificadas pelo provisionador. Administradores do projeto continuam responsáveis por não alterar/excluir arquivos sem revisão; não há promessa de retenção legal irrevogável.
 
-Planos, backups e auditorias recebem nome SHA-256 do conteúdo. Upload usa `ifGenerationMatch: 0` e CRC32C; download independente confere CRC32C e SHA-256 antes da primeira gravação. Writer pode reler auditoria para essa verificação. Nenhum backup ou exportação privada vira artefato público do Actions. Relatórios públicos mostram caminhos e valores numéricos/bool; strings e estruturas internas são ocultadas.
+O free tier oferece 1 GiB armazenado, 50 mil leituras/dia e 20 mil escritas/dia por projeto ([cotas oficiais](https://firebase.google.com/docs/firestore/quotas)). Cada projeto tem somente seu banco gratuito; nenhum serviço pago, GCS, backup nativo pago, PITR ou faturamento é habilitado. Ao atingir a cota, a operação falha fechada, sem mudar o negócio e sem upgrade automático. O proprietário acompanha o armazenamento no console e pode arquivar manualmente cópias fora do serviço após a retenção mínima. Gratuito não significa armazenamento ilimitado.
+
+Planos, backups e auditorias usam SHA-256 do conteúdo em `archive-plans`, `archive-backups` e `archive-audit`. JSON privado é fragmentado em blocos de até 400 KB, com checksum SHA-256 individual, para respeitar o limite de 1 MiB por documento. Manifesto e fragmentos são criados atomicamente com `exists:false`. A leitura independente remonta o JSON e confere tamanho, checksums e hash completo antes da primeira gravação de negócio. Repetição relê o arquivo existente sem sobrescrever. Nenhum arquivo privado vira artefato público do Actions; relatórios ocultam strings e estruturas internas.
 
 Antes da transação, há backup e evento `intent` privado com ator, SHA do pedido, SHA do executor, run/comment IDs, horário, escopo, hashes e referência ao backup. A transação verifica versões e relações, aplica todas as alterações, invalida as revisões de dados da aplicação e cria o recibo `dataAdminOperations/<id>`. Uma leitura posterior confere conteúdo e, na migração, o conjunto exato de documentos nas raízes; gera evento `verified`. Repetições geram evento `replay`. Os arquivos de auditoria ficam fora das coleções substituíveis.
 
@@ -94,23 +96,23 @@ Para restaurar, crie outra solicitação:
 }
 ```
 
-Repita preview/apply com SHA e hashes novos. Para migração, `paths` é a mesma lista de coleções e `system/bank-snapshot` da solicitação original. Restore valida destino, caminhos autorizados, versões atuais e relações; restaura tipos Firestore sem perda e faz outro backup antes de gravar. Se surgirem documentos novos fora do backup nas coleções abrangidas, bloqueia a recuperação para revisão. Não copie conteúdo privado do backup para o PR. O proprietário pode consultar o objeto em `https://console.cloud.google.com/storage/browser/bem-feito-dev-data-admin/backups?project=bem-feito-dev`; o hash do resumo corresponde a `backups/<hash>.json`.
+Repita preview/apply com SHA e hashes novos. Para migração, `paths` é a lista de coleções e `system/bank-snapshot` original. Restore valida destino, caminhos, versões e relações; restaura tipos Firestore sem perda e faz outro backup. Documentos novos fora do backup nas coleções abrangidas bloqueiam a recuperação para revisão. Não copie conteúdo privado ao PR. O hash do resumo corresponde a `archive-backups/<hash>` e seus descendentes `parts/` no [Firestore do arquivo privado](https://console.firebase.google.com/project/bem-feito-archive-dev/firestore/databases/-default-/data).
 
 ## Liberação e smoke test obrigatório
 
-1. O proprietário vincula faturamento em [Billing DEV](https://console.cloud.google.com/billing?project=bem-feito-dev). Reexecute o provisionador aprovado e confira bucket/políticas pela API.
+1. Aprove a criação gratuita do projeto separado e os vínculos mínimos de arquivo. Não vincule faturamento a nenhum projeto. Execute `provision-archive.mjs --apply` e `provision.mjs --apply`; confira bancos, regras, proteção e IAM pela API.
 2. Outro colaborador com escrita revisa o código, com CI passando, e integra somente esta PR de infraestrutura à `master`. Não faça merge do PR #28. Não use executor de branch de PR com credenciais para testar antes da revisão.
-3. Abra um PR de solicitações copiando os quatro arquivos `dev-smoke-*.json` e o pedido de migração. Execute inspect por preview: documento ausente. Execute create: 10; repita apply para idempotência. Execute update: 20. Crie restore com o backup do update: volta a 10. Execute delete e depois inspect: `exists: false`. Confira os objetos privados e recibos de cada etapa. Nenhum dado real precisa ser modificado nesse teste.
+3. Abra um PR com os quatro arquivos `dev-smoke-*.json` e o pedido de migração. Inspect por preview: ausente. Create: 10; repita apply para idempotência. Update: 20. Restore com backup do update: volta a 10. Delete e inspect: `exists: false`. Confira os arquivos privados e recibos. Verifique também que as identidades do arquivo não podem atualizar/excluir o documento de teste do arquivo antes de confiar nas permissões reais. Nenhum dado real precisa ser modificado.
 4. Execute preview da migração para verificar ADC/Drive, fonte, projeto, capacidade, estado DEV e backup/plano privado. Não publique apply da migração durante a validação da infraestrutura.
 5. Somente depois do sucesso real desse fluxo, retire `.github/workflows/migration-dev-trusted-temporary.yml` por PR revisada e revogue a leitura do snapshot concedida à antiga `github-deploy`. Não use mais os comandos temporários. Esta PR não concede escrita à identidade antiga.
 
-O teste negativo de CI `deny-untrusted-data-oidc` usa um JWT real de branch não confiável e exige rejeição pela confiança do provider; nunca imprime JWT/access token. Testes locais de autorização simulam a API GitHub, cobrindo falta de escrita, forks, SHAs antigos, comentários alterados, reruns, branch desprotegida e proteção PROD. A suíte do emulador usa `demo-bem-feito`, testa dry-run, backup/restore, concorrência, relações, idempotência, colisão de IDs e transação/restauração de 600 documentos; seu armazenamento injetado não comprova IAM/GCS real. Os testes positivos de WIF, Firestore e GCS reais continuam pendentes até os passos 1–3.
+O teste negativo real `deny-untrusted-data-oidc` passou com HTTP 400 `unauthorized_client`, sem credenciais. O gate também cobre falta de escrita, forks, SHA antigo, comentário alterado, rerun, branch desprotegida e PROD. A suíte do emulador usa `demo-bem-feito` e `demo-bem-feito-archive`: dry-run, backup/restore, concorrência, relações, idempotência, colisão, 600 documentos atômicos e arquivo separado com fragmentação/checksums. Isso não comprova IAM real. Os testes positivos OIDC/Firestore e negações IAM reais continuam pendentes dos passos 1–3.
 
 ## Migração do PR #28
 
 Pedido preparado: `operations/requests/dev-migration-20261009.json`. Registro permitido: `legacy-sheets-v1`, somente `bem-feito-dev`. O planner exige que o SHA indicado continue sendo o head do PR #28 aberto e não integrado, tenha CI push bem-sucedida e esteja publicado no `deployment.json` do DEV. Os jobs isolados executam os testes de transações e regras da aplicação antes de credenciais administrativas.
 
-Reutiliza os scripts fetch, convert, normalize, reconcile e validate inspecionados no SHA `08d4951142881bc2f34aaae46c4ebbd07063cc75` do PR #28. Os wrappers import/verify/replace e o backup no mesmo Firestore foram substituídos pela transação e GCS permanentes. Leitura exclusiva do snapshot privado configurado, jamais alteração da planilha oficial.
+Reutiliza fetch, convert, normalize, reconcile e validate inspecionados no SHA `08d4951142881bc2f34aaae46c4ebbd07063cc75` do PR #28. Os wrappers import/verify/replace e o backup no mesmo banco foram substituídos pela transação e arquivo em projeto independente. Leitura exclusiva do snapshot privado; jamais altera a planilha oficial.
 
 Prévia exporta de novo, normaliza e concilia, exige 0 erros, 25 vendas, 24 recebimentos, 45 produções, 16 despesas, saldo 48.169 centavos, aportes em bens 85.311 centavos, V00024 em produção e V00025 pronta. A exportação privada conferida nesta tarefa passou com 0 erros e 19 avisos de custo ausente, que não foram preenchidos artificialmente. Tem 463 documentos de negócio conciliados; a união dos atuais e futuros soma 569 raízes, além de descendentes históricos explicitamente aceitos e backupados. Alteração de fonte ou versão do destino entre preview/apply exige nova autorização.
 
@@ -118,7 +120,7 @@ Substitui somente as 21 coleções listadas no pedido e `system/bank-snapshot`, 
 
 Instrução para outra instância do ChatGPT, **após liberação e smoke test**:
 
-> Em EwertonMendes/bem-feito-web, sem merge do PR #28, use data-admin.yml e legacy-sheets-v1 no DEV bem-feito-dev. Abra um PR de solicitação com operations/requests/dev-migration-20261009.json atualizado para o SHA do PR #28 publicado no DEV. Pelo conector GitHub, comente /data-admin preview seguido do caminho e SHA desse novo PR; confira os totais, E2E isolados e hashes. Com a autorização do proprietário para esse plano, comente /data-admin apply com caminho, SHA, requestHash e planHash exatos. Confira readback-verified, os IDs da fonte e a ausência dos IDs antigos fora dela; informe o link da execução e gs://bem-feito-dev-data-admin/backups/<backup>.json. Preserve o backup para restore e não execute nada em PROD.
+> Em EwertonMendes/bem-feito-web, sem merge do PR #28 e sem faturamento, use data-admin.yml e legacy-sheets-v1 no DEV bem-feito-dev. Abra PR com operations/requests/dev-migration-20261009.json atualizado ao SHA do PR #28 publicado. Pelo conector, comente /data-admin preview com caminho e SHA do novo PR; confira totais, E2E isolados e hashes. Com autorização do proprietário para esse plano, comente /data-admin apply com caminho, SHA, requestHash e planHash exatos. Confira readback-verified, IDs da fonte e ausência dos IDs antigos fora dela; informe o link da execução e archive-backups/<backup> no projeto bem-feito-archive-dev. Preserve o backup para restore e não execute PROD.
 
 ## Revogação e manutenção
 

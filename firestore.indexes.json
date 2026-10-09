@@ -279,6 +279,20 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "sales",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fulfillmentStatus",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

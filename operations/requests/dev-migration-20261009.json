@@ -5,14 +5,32 @@
   "projectId": "bem-feito-dev",
   "operation": "migrate",
   "migration": "legacy-sheets-v1",
-  "deploymentSha": "08d4951142881bc2f34aaae46c4ebbd07063cc75",
+  "deploymentSha": "cafb459c2e49072e566f9bca86c23da82288ad81",
   "destructive": {
     "projectId": "bem-feito-dev",
     "paths": [
-      "collections", "fragrances", "formats", "formatPrices", "units", "paymentMethods",
-      "expenseCategories", "expenseTypes", "inputs", "products", "kits", "additions",
-      "expenses", "productions", "sales", "payments", "stockAdjustments", "stockMovements",
-      "counters", "migrationRuns", "migrationSources", "system/bank-snapshot"
+      "collections",
+      "fragrances",
+      "formats",
+      "formatPrices",
+      "units",
+      "paymentMethods",
+      "expenseCategories",
+      "expenseTypes",
+      "inputs",
+      "products",
+      "kits",
+      "additions",
+      "expenses",
+      "productions",
+      "sales",
+      "payments",
+      "stockAdjustments",
+      "stockMovements",
+      "counters",
+      "migrationRuns",
+      "migrationSources",
+      "system/bank-snapshot"
     ]
   }
 }

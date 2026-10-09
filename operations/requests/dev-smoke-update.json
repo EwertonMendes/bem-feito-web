@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "id": "dev-smoke-update-20261009-v1",
+  "environment": "dev",
+  "projectId": "bem-feito-dev",
+  "operation": "update",
+  "changes": [{ "collection": "dataAdminSmoke", "id": "smoke-20261009", "action": "update", "expected": { "value": 10 }, "values": { "value": 20 } }]
+}

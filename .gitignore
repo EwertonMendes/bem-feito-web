@@ -32,3 +32,4 @@ tools/migration/reconciliation.json
 tools/migration/legacy-raw.json
 tools/migration/migration-data.json
 tools/migration/.private/
+tools/data-admin/.private/

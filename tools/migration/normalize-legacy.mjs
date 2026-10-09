@@ -594,4 +594,7 @@ const result = {
 };
 
 await writeFile(outputPath, `${JSON.stringify(result, null, 2)}\n`);
+console.log('Totais normalizados (somente quantidades):', JSON.stringify(Object.fromEntries(
+  Object.entries(result).filter(([,rows]) => Array.isArray(rows)).map(([key, rows]) => [key, rows.length])
+)));
 console.log(`Arquivo normalizado criado em ${outputPath}`);

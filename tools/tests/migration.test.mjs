@@ -32,6 +32,9 @@ test('Migration excludes template slots, converts Sheets dates, preserves source
     assert.equal(data.inputs[0].stockStatus, 'untracked');
     assert.equal(data.expenses[0].businessDate, '2026-10-01');
     assert.equal(data.expenses[0].amountCents, 125);
+    // The permanent migration additionally requires an explicitly reconciled bank snapshot.
+    data.bankSnapshot = { businessDate: '2026-10-01', balanceCents: 0, ownerFundedCents: 0 };
+    await writeFile(dataPath, JSON.stringify(data));
     assert.equal(run('validate-export.mjs', dataPath).status, 0);
     data.inputs[0].stock = 3;
     await writeFile(dataPath, JSON.stringify(data));

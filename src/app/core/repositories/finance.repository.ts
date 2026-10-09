@@ -120,10 +120,14 @@ export class FinanceRepository {
         }
       }
 
-      const expense: Expense = { id: expenseRef.id, ...draft, code };
+      const expense: Expense = { id: expenseRef.id, ...draft, code,
+        fundingSource: draft.fundingSource ?? 'business',
+        bankDebitCents: (draft.fundingSource ?? 'business') === 'business' ? draft.amountCents : 0 };
       transaction.set(expenseRef, {
         ...draft,
         code,
+        fundingSource: expense.fundingSource,
+        bankDebitCents: expense.bankDebitCents,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         createdBy: userId,
@@ -207,6 +211,7 @@ export class FinanceRepository {
       const expense: Expense = {
         id: expenseRef.id, code: entityCode('M', sequence, 6),
         businessDate: draft.businessDate, kind: 'input-purchase', amountCents: total,
+        bankDebitCents: (draft.fundingSource ?? 'business') === 'business' ? total : 0,
         items, notes: draft.notes, link: draft.link, paymentMethodId: draft.paymentMethodId,
         fundingSource: draft.fundingSource ?? 'business', receiptStatus: received ? 'received' : 'pending',
         stockApplied: received, charges,

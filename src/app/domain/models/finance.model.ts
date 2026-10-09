@@ -42,6 +42,8 @@ export interface Expense extends AuditFields {
   quantity?: number;
   unitId?: string;
   amountCents: number;
+  /** Cash actually disbursed by the business; owner-funded purchases remain noncash contributions. */
+  bankDebitCents?: number;
   paymentMethodId?: string;
   notes?: string;
   link?: string;

@@ -222,9 +222,10 @@ service cloud.firestore {
           && money(data.appliedCents) && money(data.tipCents)
           && data.amountReceivedCents == data.appliedCents + data.tipCents && data.status in ['active', 'reversed'])
         || (name == 'expenses'
-          && fields(data, ['code', 'businessDate', 'kind', 'amountCents'], ['categoryId', 'inputId', 'quantity', 'unitId', 'paymentMethodId', 'notes', 'link', 'items', 'fundingSource', 'receiptStatus', 'stockApplied', 'charges'])
+          && fields(data, ['code', 'businessDate', 'kind', 'amountCents'], ['categoryId', 'inputId', 'quantity', 'unitId', 'paymentMethodId', 'notes', 'link', 'items', 'fundingSource', 'receiptStatus', 'stockApplied', 'charges', 'bankDebitCents'])
           && text(data.code) && businessDate(data) && money(data.amountCents) && data.amountCents > 0
           && data.kind in ['input-purchase', 'operating-expense', 'equipment', 'other']
+          && (!('bankDebitCents' in data) || money(data.bankDebitCents))
           && (!('fundingSource' in data) || data.fundingSource in ['business', 'ewerton', 'maria'])
           && (!('receiptStatus' in data) || data.receiptStatus in ['pending', 'received'])
           && (!('stockApplied' in data) || data.stockApplied is bool)
@@ -312,6 +313,11 @@ service cloud.firestore {
       allow create: if canOperate() && validDataRevisionCreate(request.resource.data);
       allow update: if canOperate() && validDataRevisionUpdate(request.resource.data);
       allow delete: if false;
+    }
+
+    match /system/bank-snapshot {
+      allow read: if activeUser();
+      allow write: if false; // Finance reconciliation is imported through reviewed administrative tooling.
     }
 
     match /system/read-optimization {

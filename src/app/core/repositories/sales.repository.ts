@@ -294,13 +294,22 @@ export class SalesRepository {
         const targetRef = doc(this.firestore, effect.itemType === 'product' ? 'products' : 'inputs', effect.itemId);
         const entity = effect.itemType === 'product' ? products.get(effect.itemId) : inputs.get(effect.itemId);
         if (!entity) continue;
-        const stock = entity.stock + effect.quantityDelta;
+        const isReservation = draft.fulfillmentStatus === 'ready' || draft.fulfillmentStatus === 'in-production';
+        const required = -effect.quantityDelta;
+        const committedStock = Number(entity.committedStock ?? 0);
+        const available = Number(entity.stock ?? 0) - committedStock;
+        if (!isReservation && required > available) throw new Error('Estoque disponível insuficiente para concluir a venda.');
+        if (draft.fulfillmentStatus === 'ready' && required > available) throw new Error('Para reservar itens que ainda serão produzidos, selecione Encomenda.');
+        const stock = isReservation ? entity.stock : entity.stock + effect.quantityDelta;
         const stockStatus = effect.itemType === 'product'
           ? productStockStatus(stock, (entity as Product).minimumStock)
           : stockStatusForInput({ ...(entity as InputItem), stock });
 
-        transaction.update(targetRef, { stock, stockStatus, updatedAt: serverTimestamp(), updatedBy: userId });
+        transaction.update(targetRef, { stock, stockStatus,
+          ...(isReservation ? { committedStock: committedStock + required } : {}),
+          updatedAt: serverTimestamp(), updatedBy: userId });
         stockChanges.push({ itemType: effect.itemType, itemId: effect.itemId, stock });
+        if (isReservation) continue;
 
         const movementRef = doc(collection(this.firestore, 'stockMovements'));
         transaction.set(movementRef, {
@@ -337,6 +346,8 @@ export class SalesRepository {
         items: lines,
         paymentIds,
         stockEffects,
+        fulfillmentStatus: draft.fulfillmentStatus ?? 'delivered',
+        stockApplied: draft.fulfillmentStatus !== 'ready' && draft.fulfillmentStatus !== 'in-production',
         ...analytics,
       };
 
@@ -353,6 +364,8 @@ export class SalesRepository {
         balanceCents,
         paymentStatus: sale.paymentStatus,
         status: sale.status,
+        fulfillmentStatus: sale.fulfillmentStatus,
+        stockApplied: sale.stockApplied,
         notes: sale.notes,
         items: lines,
         paymentIds,
@@ -536,7 +549,12 @@ export class SalesRepository {
         if (!snapshot?.exists()) throw new Error('Não foi possível reverter o estoque da venda.');
 
         const entity = { id: snapshot.id, ...snapshot.data() } as Product | InputItem;
-        const stock = Number(snapshot.data()['stock'] ?? 0) - effect.quantityDelta;
+        const stock = currentSale.stockApplied === false
+          ? Number(snapshot.data()['stock'] ?? 0)
+          : Number(snapshot.data()['stock'] ?? 0) - effect.quantityDelta;
+        const committedStock = currentSale.stockApplied === false
+          ? Math.max(0, Number(snapshot.data()['committedStock'] ?? 0) + effect.quantityDelta)
+          : Number(snapshot.data()['committedStock'] ?? 0);
         const stockStatus = effect.itemType === 'product'
           ? productStockStatus(stock, (entity as Product).minimumStock)
           : stockStatusForInput({ ...(entity as InputItem), stock });
@@ -544,11 +562,13 @@ export class SalesRepository {
         transaction.update(snapshot.ref, {
           stock,
           stockStatus,
+          committedStock,
           updatedAt: serverTimestamp(),
           updatedBy: userId,
         });
         stockChanges.push({ itemType: effect.itemType, itemId: effect.itemId, stock });
 
+        if (currentSale.stockApplied === false) continue;
         const movementRef = doc(collection(this.firestore, 'stockMovements'));
         transaction.set(movementRef, {
           itemType: effect.itemType,

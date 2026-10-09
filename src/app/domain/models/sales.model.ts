@@ -2,6 +2,8 @@ import { AuditFields } from './common.model';
 import { CatalogImageRef } from './image.model';
 
 export type SaleStatus = 'active' | 'cancelled';
+/** Commercial fulfillment is independent from payment and cancellation. */
+export type FulfillmentStatus = 'in-production' | 'ready' | 'delivered';
 export type PaymentStatus = 'paid' | 'pending' | 'partial' | 'cancelled';
 export type SaleLineKind = 'product' | 'kit' | 'addition';
 
@@ -51,6 +53,10 @@ export interface Sale extends AuditFields {
   items: SaleLineSnapshot[];
   paymentIds: string[];
   stockEffects: StockEffect[];
+  /** Legacy sales without this field are considered delivered. */
+  fulfillmentStatus?: FulfillmentStatus;
+  /** False for orders that reserve inventory until delivery. Legacy sales are true. */
+  stockApplied?: boolean;
   analyticsVersion?: 1;
   cogsCents?: number;
   itemsSold?: number;
@@ -108,4 +114,5 @@ export interface SaleDraft {
   notes?: string;
   lines: SaleDraftLine[];
   payments: PaymentDraft[];
+  fulfillmentStatus?: FulfillmentStatus;
 }

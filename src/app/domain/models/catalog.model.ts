@@ -22,6 +22,8 @@ export interface Product extends AuditFields {
   additionalCostCents: number;
   averageUnitCostCents: number;
   stock: number;
+  /** Units committed to open orders, including those still requiring production. */
+  committedStock?: number;
   minimumStock: number;
   stockStatus?: StockStatus;
   image?: CatalogImageRef;

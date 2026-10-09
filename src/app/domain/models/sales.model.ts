@@ -34,6 +34,7 @@ export interface StockEffect {
   itemId: string;
   quantityDelta: number;
   unitCostCents: number;
+  unitCostDeciCents?: number;
 }
 
 export interface Sale extends AuditFields {

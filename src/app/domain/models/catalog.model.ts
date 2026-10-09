@@ -37,6 +37,7 @@ export interface InputItem extends AuditFields {
   name: string;
   unitId: string;
   stock: number;
+  committedStock?: number;
   minimumStock: number;
   minimumStockConfigured?: boolean;
   trackingMode?: InputTrackingMode;

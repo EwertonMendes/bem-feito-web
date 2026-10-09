@@ -33,6 +33,7 @@ import { allocatePayments, paymentStatus } from '../utils/sale-calculations';
 import {
   SaleCancellationResult,
   SaleCreateResult,
+  SaleFulfillmentResult,
   SalePaymentResult,
   SalePaymentReversalResult,
   StockChange,
@@ -308,7 +309,7 @@ export class SalesRepository {
         transaction.update(targetRef, { stock, stockStatus,
           ...(isReservation ? { committedStock: committedStock + required } : {}),
           updatedAt: serverTimestamp(), updatedBy: userId });
-        stockChanges.push({ itemType: effect.itemType, itemId: effect.itemId, stock });
+        stockChanges.push({ itemType: effect.itemType, itemId: effect.itemId, stock, ...(isReservation ? { committedStock: committedStock + required } : {}) });
         if (isReservation) continue;
 
         const movementRef = doc(collection(this.firestore, 'stockMovements'));
@@ -518,6 +519,65 @@ export class SalesRepository {
     });
   }
 
+
+  /** Advance fulfillment without changing financial settlement. */
+  async advanceFulfillment(saleId: string, next: 'ready' | 'delivered'): Promise<SaleFulfillmentResult> {
+    const userId = this.auth.user()?.uid;
+    if (!userId) throw new Error('Sessão inválida.');
+    return runTransaction(this.firestore, async (transaction) => {
+      const saleRef = doc(this.firestore, 'sales', saleId);
+      const saleSnapshot = await transaction.get(saleRef);
+      if (!saleSnapshot.exists()) throw new Error('Venda não encontrada.');
+      const current = { id: saleSnapshot.id, ...saleSnapshot.data() } as Sale;
+      if (current.status !== 'active') throw new Error('Venda cancelada.');
+      if (current.stockApplied !== false) throw new Error('Esta venda já teve o estoque baixado.');
+      const previous = current.fulfillmentStatus ?? 'delivered';
+      if (next === 'ready' && previous !== 'in-production') throw new Error('A encomenda não está em produção.');
+      if (next === 'delivered' && previous !== 'ready' && previous !== 'in-production') throw new Error('Estado de entrega inválido.');
+
+      const refs = new Map<string, DocumentSnapshot>();
+      for (const effect of current.stockEffects) {
+        const path = effect.itemType === 'product' ? 'products' : 'inputs';
+        refs.set(path + ':' + effect.itemId, await transaction.get(doc(this.firestore, path, effect.itemId)));
+      }
+      const changes: StockChange[] = [];
+      for (const effect of current.stockEffects) {
+        const path = effect.itemType === 'product' ? 'products' : 'inputs';
+        const snapshot = refs.get(path + ':' + effect.itemId);
+        if (!snapshot?.exists()) throw new Error('Item da encomenda não encontrado no estoque.');
+        const required = -effect.quantityDelta;
+        const committed = Number(snapshot.data()['committedStock'] ?? 0);
+        const physical = Number(snapshot.data()['stock'] ?? 0);
+        if (required < 0 || committed < required) throw new Error('Reserva inconsistente. É necessária conciliação.');
+        if (next === 'ready') {
+          if (physical < committed) throw new Error('Ainda faltam unidades para concluir esta encomenda.');
+          continue;
+        }
+        if (physical < required) throw new Error('Estoque físico insuficiente para entregar.');
+        const entity = { id: snapshot.id, ...snapshot.data() } as Product | InputItem;
+        const stock = physical - required;
+        const committedStock = committed - required;
+        const stockStatus = effect.itemType === 'product'
+          ? productStockStatus(stock, (entity as Product).minimumStock)
+          : stockStatusForInput({ ...(entity as InputItem), stock });
+        transaction.update(snapshot.ref, { stock, committedStock, stockStatus, updatedAt: serverTimestamp(), updatedBy: userId });
+        changes.push({ itemType: effect.itemType, itemId: effect.itemId, stock, committedStock });
+        const movementRef = doc(collection(this.firestore, 'stockMovements'));
+        transaction.set(movementRef, {
+          itemType: effect.itemType, itemId: effect.itemId, quantityDelta: effect.quantityDelta,
+          unitCostCents: effect.unitCostCents, totalCostCents: Math.round(required * effect.unitCostCents),
+          sourceType: 'sale', sourceId: current.id, businessDate: todayBusinessDate(),
+          createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+          createdBy: userId, updatedBy: userId,
+        } satisfies Omit<StockMovement, 'id'>);
+      }
+      const sale: Sale = { ...current, fulfillmentStatus: next, stockApplied: next === 'delivered' };
+      transaction.update(saleRef, { fulfillmentStatus: next, stockApplied: next === 'delivered', updatedAt: serverTimestamp(), updatedBy: userId });
+      this.revisions.touchTransaction(transaction, 'sales', ...(next === 'delivered' ? ['inventory'] as const : []));
+      return { sale, stockChanges: changes };
+    });
+  }
+
   async cancel(saleId: string): Promise<SaleCancellationResult> {
     const userId = this.auth.user()?.uid;
     if (!userId) throw new Error('Sessão inválida.');
@@ -566,7 +626,7 @@ export class SalesRepository {
           updatedAt: serverTimestamp(),
           updatedBy: userId,
         });
-        stockChanges.push({ itemType: effect.itemType, itemId: effect.itemId, stock });
+        stockChanges.push({ itemType: effect.itemType, itemId: effect.itemId, stock, committedStock });
 
         if (currentSale.stockApplied === false) continue;
         const movementRef = doc(collection(this.firestore, 'stockMovements'));

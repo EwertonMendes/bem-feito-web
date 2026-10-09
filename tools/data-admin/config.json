@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "repository": "EwertonMendes/bem-feito-web",
+  "repositoryId": "1406056807",
+  "ownerId": "33728924",
+  "branch": "master",
+  "workflow": "data-admin.yml",
+  "productionApprovers": ["33728924"],
+  "environments": {
+    "dev": {
+      "projectId": "bem-feito-dev",
+      "projectNumber": "312978463343",
+      "databaseId": "(default)",
+      "bucket": "bem-feito-dev-data-admin",
+      "provider": "projects/312978463343/locations/global/workloadIdentityPools/github-data/providers/github",
+      "reader": "github-data-dev-read@bem-feito-dev.iam.gserviceaccount.com",
+      "writer": "github-data-dev@bem-feito-dev.iam.gserviceaccount.com",
+      "snapshotId": "1SadA_IgdPX9Y718AgwixVTAqkNU5bIu67urOvoqz8yM"
+    },
+    "prod": null
+  }
+}

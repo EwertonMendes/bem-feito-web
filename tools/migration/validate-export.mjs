@@ -9,6 +9,9 @@ const warnings = [];
 const list = (name) => Array.isArray(data[name]) ? data[name] : [];
 const index = (name) => new Map(list(name).map((item) => [item.id, item]));
 
+const productStockStatus = (stock, minimumStock) => stock < 0 ? 'negative' : stock <= minimumStock ? 'low' : 'ok';
+const inputStockStatus = (stock, minimumStock, configured) => !configured ? 'untracked' : stock < 0 ? 'negative' : stock <= minimumStock ? 'low' : 'ok';
+
 const ensureUnique = (name) => {
   const seen = new Set();
   for (const item of list(name)) {
@@ -36,6 +39,7 @@ const products = index('products');
 const kits = index('kits');
 const additions = index('additions');
 const sales = index('sales');
+if (!data.bankSnapshot || !Number.isSafeInteger(data.bankSnapshot.balanceCents) || !data.bankSnapshot.businessDate) errors.push('Snapshot bancário não conciliado.');
 
 for (const item of list('fragrances')) if (!collections.has(item.collectionId)) errors.push(`fragrances/${item.id}: collectionId inválido.`);
 for (const item of list('formatPrices')) {
@@ -96,8 +100,6 @@ const finite = (value) => typeof value === 'number' && Number.isFinite(value);
 const positive = (value) => finite(value) && value > 0 && value <= 1000000;
 const idValid = (value) => typeof value === 'string' && value.length > 0 && value.length <= 500 && !value.includes('/');
 const paymentMethods = index('paymentMethods');
-const productStockStatus = (stock, minimumStock) => stock < 0 ? 'negative' : stock <= minimumStock ? 'low' : 'ok';
-const inputStockStatus = (stock, minimumStock, configured) => !configured ? 'untracked' : stock < 0 ? 'negative' : stock <= minimumStock ? 'low' : 'ok';
 const expectedSaleAnalytics = (items) => {
   let cogsCents = 0;
   let itemsSold = 0;
@@ -143,7 +145,7 @@ for (const addition of list('additions')) for (const component of addition.compo
 for (const production of list('productions')) if (!positive(production.quantity)) errors.push(`productions/${production.id}: quantidade inválida.`);
 for (const expense of list('expenses')) {
   if (expense.amountCents <= 0) errors.push(`expenses/${expense.id}: valor inválido.`);
-  if (expense.kind === 'input-purchase' && (!inputs.has(expense.inputId) || !positive(expense.quantity) || inputs.get(expense.inputId)?.unitId !== expense.unitId)) errors.push(`expenses/${expense.id}: compra inválida.`);
+  if (expense.kind === 'input-purchase' && !expense.legacyUnallocatedPurchase && (!inputs.has(expense.inputId) || !positive(expense.quantity) || inputs.get(expense.inputId)?.unitId !== expense.unitId)) errors.push(`expenses/${expense.id}: compra inválida.`);
   if (expense.paymentMethodId && !paymentMethods.has(expense.paymentMethodId)) errors.push(`expenses/${expense.id}: forma de pagamento inválida.`);
 }
 for (const payment of list('payments')) {
@@ -173,7 +175,7 @@ for (const movement of list('stockMovements')) {
   deltas.set(key, (deltas.get(key) ?? 0) + movement.quantityDelta);
 }
 for (const [name, type] of [['products', 'product'], ['inputs', 'input']]) for (const item of list(name)) {
-  if (Math.abs((deltas.get(`${type}:${item.id}`) ?? 0) - item.stock) > 0.000001) errors.push(`${name}/${item.id}: histórico não reconcilia com estoque.`);
+  if (Math.abs((deltas.get(`${type}:${item.id}`) ?? 0) - item.stock) > 0.000001) errors.push(`${name}/${item.id}: histórico não reconcilia (movimentos=${(deltas.get(`${type}:${item.id}`) ?? 0).toFixed(3)}, declarado=${item.stock}).`);
 }
 
 console.log(`Validação: ${errors.length} erro(s), ${warnings.length} aviso(s).`);

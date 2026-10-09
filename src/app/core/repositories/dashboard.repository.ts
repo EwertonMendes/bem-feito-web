@@ -183,7 +183,8 @@ export class DashboardRepository {
       cashOutCents: Number(expensesData.cashOutCents ?? 0),
       bankSnapshotCents: cashSnapshot.exists() ? Number(cashSnapshot.data()['balanceCents'] ?? 0) : null,
       bankSnapshotDate: cashSnapshot.exists() ? String(cashSnapshot.data()['businessDate'] ?? '') : null,
-      ownerFundedCents: Number(ownerFunded.data().value ?? 0),
+      ownerFundedCents: cashSnapshot.exists() && Number.isInteger(cashSnapshot.data()['ownerFundedCents'])
+        ? Number(cashSnapshot.data()['ownerFundedCents']) : Number(ownerFunded.data().value ?? 0),
       ordersPending: Number(pendingCount.data().value ?? 0),
       tipsCents: Number(paymentsData.tipsCents ?? 0),
       discountsCents: Number(salesData.discountsCents ?? 0),

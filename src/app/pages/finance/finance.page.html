@@ -62,7 +62,7 @@
         <div class="purchase-detail-row"><strong>{{inputName(item.inputId)}}</strong><span>{{item.quantity}} {{purchaseUnit(item.inputId)}}</span><strong>{{currency(item.amountCents)}}</strong></div>
       } @empty {<p>{{expense.kind==='input-purchase'?inputName(expense.inputId):categoryName(expense.categoryId)}}</p>}
       @if(expense.notes){<p>{{expense.notes}}</p>}
-      <p>Origem: {{ expense.fundingSource === 'ewerton' ? 'Ewerton (aporte)' : expense.fundingSource === 'maria' ? 'Maria (aporte)' : 'Conta Bem Feito' }}</p>
+      <p>Origem: {{ expense.fundingSource === 'ewerton' ? 'Ewerton (aporte)' : expense.fundingSource === 'maria' ? 'Maria (aporte)' : expense.fundingSource === 'owner-unassigned' ? 'Aporte pessoal a atribuir' : expense.fundingSource === 'unverified' ? 'Origem a confirmar' : 'Conta Bem Feito' }}</p>
       @if(expense.charges?.length){<h3>Custos adicionais</h3>@for(charge of expense.charges ?? [];track $index){<div class="purchase-detail-row"><span>{{ charge.kind === 'shipping' ? 'Frete' : charge.kind === 'interest' ? 'Juros' : charge.description || 'Outro' }}</span><strong>{{currency(charge.amountCents)}}</strong></div>}}
       @if(expense.receiptStatus === 'pending'){<p>Compra a receber · ainda não adicionada ao estoque.</p>}
     }

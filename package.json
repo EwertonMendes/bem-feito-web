@@ -23,6 +23,7 @@
     "deploy:prepare:dev": "node tools/deploy/prepare-deployment.mjs",
     "deploy:verify:dev": "node tools/deploy/verify-deployment.mjs",
     "migration:normalize": "node tools/migration/normalize-legacy.mjs",
+    "migration:source-reconcile": "node tools/migration/reconcile-legacy.mjs",
     "migration:validate": "node tools/migration/validate-export.mjs",
     "migration:reconcile": "node tools/migration/reconcile.mjs",
     "migration:import": "node tools/migration/import-firestore.mjs",

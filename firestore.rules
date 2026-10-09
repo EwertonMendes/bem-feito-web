@@ -207,6 +207,7 @@ service cloud.firestore {
           && data.status in ['active', 'cancelled']
            && (!('fulfillmentStatus' in data) || data.fulfillmentStatus in ['in-production', 'ready', 'delivered'])
            && (!('stockApplied' in data) || data.stockApplied is bool)
+          && (!('legacyUnallocatedPurchase' in data) || data.legacyUnallocatedPurchase is bool)
           && data.paymentStatus in ['paid', 'pending', 'partial', 'cancelled']
           && ((data.status == 'cancelled' && data.paymentStatus == 'cancelled' && data.balanceCents == 0)
             || (data.status == 'active' && data.balanceCents == data.totalCents - data.receivedCents
@@ -225,15 +226,18 @@ service cloud.firestore {
           && money(data.appliedCents) && money(data.tipCents)
           && data.amountReceivedCents == data.appliedCents + data.tipCents && data.status in ['active', 'reversed'])
         || (name == 'expenses'
-          && fields(data, ['code', 'businessDate', 'kind', 'amountCents'], ['categoryId', 'inputId', 'quantity', 'unitId', 'paymentMethodId', 'notes', 'link', 'items', 'fundingSource', 'receiptStatus', 'stockApplied', 'charges', 'bankDebitCents'])
+          && fields(data, ['code', 'businessDate', 'kind', 'amountCents'], ['categoryId', 'inputId', 'quantity', 'unitId', 'paymentMethodId', 'notes', 'link', 'items', 'fundingSource', 'receiptStatus', 'stockApplied', 'charges', 'bankDebitCents', 'legacyUnallocatedPurchase'])
           && text(data.code) && businessDate(data) && money(data.amountCents) && data.amountCents > 0
           && data.kind in ['input-purchase', 'operating-expense', 'equipment', 'other']
           && (!('bankDebitCents' in data) || money(data.bankDebitCents))
-          && (!('fundingSource' in data) || data.fundingSource in ['business', 'ewerton', 'maria'])
+          && (!('fundingSource' in data) || data.fundingSource in ['business', 'ewerton', 'maria', 'owner-unassigned', 'unverified'])
           && (!('receiptStatus' in data) || data.receiptStatus in ['pending', 'received'])
           && (!('stockApplied' in data) || data.stockApplied is bool)
           && (!('charges' in data) || (data.charges is list && data.charges.size() <= 20))
           && (data.kind != 'input-purchase'
+            || ('legacyUnallocatedPurchase' in data && data.legacyUnallocatedPurchase == true
+              && data.stockApplied == false && data.receiptStatus == 'received'
+              && !('inputId' in data) && !('items' in data))
             || (text(data.inputId) && quantity(data.quantity) && data.quantity > 0)
             || ('items' in data && data.items is list && data.items.size() > 0 && data.items.size() <= 40
               && data.items[0].inputId is string && data.items[0].quantity is number

@@ -39,6 +39,7 @@ const products = index('products');
 const kits = index('kits');
 const additions = index('additions');
 const sales = index('sales');
+if (!data.bankSnapshot || !Number.isSafeInteger(data.bankSnapshot.balanceCents) || !data.bankSnapshot.businessDate) errors.push('Snapshot bancário não conciliado.');
 
 for (const item of list('fragrances')) if (!collections.has(item.collectionId)) errors.push(`fragrances/${item.id}: collectionId inválido.`);
 for (const item of list('formatPrices')) {
@@ -144,7 +145,7 @@ for (const addition of list('additions')) for (const component of addition.compo
 for (const production of list('productions')) if (!positive(production.quantity)) errors.push(`productions/${production.id}: quantidade inválida.`);
 for (const expense of list('expenses')) {
   if (expense.amountCents <= 0) errors.push(`expenses/${expense.id}: valor inválido.`);
-  if (expense.kind === 'input-purchase' && (!inputs.has(expense.inputId) || !positive(expense.quantity) || inputs.get(expense.inputId)?.unitId !== expense.unitId)) errors.push(`expenses/${expense.id}: compra inválida.`);
+  if (expense.kind === 'input-purchase' && !expense.legacyUnallocatedPurchase && (!inputs.has(expense.inputId) || !positive(expense.quantity) || inputs.get(expense.inputId)?.unitId !== expense.unitId)) errors.push(`expenses/${expense.id}: compra inválida.`);
   if (expense.paymentMethodId && !paymentMethods.has(expense.paymentMethodId)) errors.push(`expenses/${expense.id}: forma de pagamento inválida.`);
 }
 for (const payment of list('payments')) {

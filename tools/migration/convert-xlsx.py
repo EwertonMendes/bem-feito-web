@@ -6,7 +6,7 @@ Never logs spreadsheet values, addresses, customer names, or payment identifiers
 import sys
 import json
 from pathlib import Path
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from io import BytesIO
 from openpyxl import load_workbook
 
@@ -64,10 +64,32 @@ for page in workbook.worksheets:
 counts = {name:len(records) for name,records in sheets.items()}
 if counts.get('Vendas',0)<25 or counts.get('Recebimentos',0)<24 or counts.get('Produção',0)<45:
     raise RuntimeError("Snapshot misses required reconciled historic records")
+cash_sheet = workbook['Caixa e Aportes']
+def money_cents(cell):
+    value = cash_sheet[cell].value
+    if value is None or not isinstance(value,(int,float)):
+        raise RuntimeError("Bank snapshot numerical input missing")
+    return round(value*100)
+raw_date = cash_sheet['B5'].value
+if isinstance(raw_date,datetime):
+    recorded_date = raw_date.date().isoformat()
+elif isinstance(raw_date,date):
+    recorded_date = raw_date.isoformat()
+elif isinstance(raw_date,(int,float)):
+    recorded_date = (date(1899,12,30)+timedelta(days=int(raw_date))).isoformat()
+else:
+    raise RuntimeError("Bank snapshot date missing")
+bank_snapshot = {
+    'balanceCents':money_cents('B4'),
+    'businessDate':recorded_date,
+    'ownerFundedCents':money_cents('B6'),
+    'reimbursementDueCents':money_cents('B9'),
+    'source':'legacy-bank-audit'
+}
 out = {
     'schemaVersion':1,'spreadsheetId':snapshot_id,'spreadsheetName':title,
     'timeZone':'America/Sao_Paulo','exportedAt':datetime.now().isoformat(),
-    'sheets':sheets,'views':views
+    'sheets':sheets,'views':views,'sourceMetadata':{'bankSnapshot':bank_snapshot}
 }
 destination = Path('tools/migration/legacy-raw.json')
 destination.write_text(json.dumps(out,ensure_ascii=False,default=str),encoding='utf8')

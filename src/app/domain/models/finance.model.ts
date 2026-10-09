@@ -1,7 +1,7 @@
 import { AuditFields } from './common.model';
 
 export type ExpenseKind = 'input-purchase' | 'operating-expense' | 'equipment' | 'other';
-export type FundingSource = 'business' | 'ewerton' | 'maria';
+export type FundingSource = 'business' | 'ewerton' | 'maria' | 'owner-unassigned' | 'unverified';
 export type ReceiptStatus = 'pending' | 'received';
 /** Charges belong to the same purchase payment; they never create a second cash movement. */
 export interface AcquisitionCharge {
@@ -50,6 +50,7 @@ export interface Expense extends AuditFields {
   fundingSource?: FundingSource;
   receiptStatus?: ReceiptStatus;
   stockApplied?: boolean;
+  legacyUnallocatedPurchase?: boolean;
   charges?: AcquisitionCharge[];
 }
 

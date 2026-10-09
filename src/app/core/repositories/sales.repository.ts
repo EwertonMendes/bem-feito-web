@@ -318,7 +318,7 @@ export class SalesRepository {
           itemId: effect.itemId,
           quantityDelta: effect.quantityDelta,
           unitCostCents: effect.unitCostCents,
-          totalCostCents: Math.round(Math.abs(effect.quantityDelta) * effect.unitCostCents),
+          totalCostCents: Math.round(Math.abs(effect.quantityDelta) * (effect.unitCostDeciCents ?? effect.unitCostCents * 10) / 10),
           sourceType: 'sale',
           sourceId: saleRef.id,
           businessDate: draft.businessDate,
@@ -565,7 +565,7 @@ export class SalesRepository {
         const movementRef = doc(collection(this.firestore, 'stockMovements'));
         transaction.set(movementRef, {
           itemType: effect.itemType, itemId: effect.itemId, quantityDelta: effect.quantityDelta,
-          unitCostCents: effect.unitCostCents, totalCostCents: Math.round(required * effect.unitCostCents),
+          unitCostCents: effect.unitCostCents, totalCostCents: Math.round(required * (effect.unitCostDeciCents ?? effect.unitCostCents * 10) / 10),
           sourceType: 'sale', sourceId: current.id, businessDate: todayBusinessDate(),
           createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
           createdBy: userId, updatedBy: userId,
@@ -635,7 +635,7 @@ export class SalesRepository {
           itemId: effect.itemId,
           quantityDelta: -effect.quantityDelta,
           unitCostCents: effect.unitCostCents,
-          totalCostCents: Math.round(Math.abs(effect.quantityDelta) * effect.unitCostCents),
+          totalCostCents: Math.round(Math.abs(effect.quantityDelta) * (effect.unitCostDeciCents ?? effect.unitCostCents * 10) / 10),
           sourceType: 'sale-cancellation',
           sourceId: currentSale.id,
           businessDate: todayBusinessDate(),

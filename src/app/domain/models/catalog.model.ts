@@ -21,6 +21,8 @@ export interface Product extends AuditFields {
   salePriceCents: number;
   additionalCostCents: number;
   averageUnitCostCents: number;
+  /** Tenths of a cent, preserving historical R$0.264/R$0.384 unit costs. */
+  unitCostDeciCents?: number;
   stock: number;
   /** Units committed to open orders, including those still requiring production. */
   committedStock?: number;

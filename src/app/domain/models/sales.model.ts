@@ -12,6 +12,7 @@ export interface SaleResolvedComponent {
   name: string;
   quantity: number;
   unitCostCents: number;
+  unitCostDeciCents?: number;
 }
 
 export interface SaleLineSnapshot {

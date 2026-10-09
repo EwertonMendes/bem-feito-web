@@ -147,7 +147,7 @@ export class ProductionRepository {
             previous.totalCostCents += consumption.totalCostCents;
           } else consumptionByInput.set(consumption.inputId, { ...consumption });
         }
-        const itemCost = cost.unitCostCents * quantity;
+        const itemCost = Math.round((product.unitCostDeciCents ?? cost.unitCostCents * 10) * quantity / 10);
         items.push({
           productId, productName: product.displayName, quantity,
           unitCostCents: cost.unitCostCents, totalCostCents: itemCost,
@@ -170,11 +170,11 @@ export class ProductionRepository {
       const productionRef = doc(collection(this.firestore, 'productions'));
       transaction.set(counterRef, { value: sequence, updatedAt: serverTimestamp() }, { merge: true });
       const stockChanges: ProductionCreateResult['stockChanges'] = [];
-      const movement = (itemType: 'product' | 'input', itemId: string, delta: number, unitCostCents: number) => {
+      const movement = (itemType: 'product' | 'input', itemId: string, delta: number, unitCostCents: number, exactTotalCents?: number) => {
         const ref = doc(collection(this.firestore, 'stockMovements'));
         transaction.set(ref, {
           itemType, itemId, quantityDelta: delta, unitCostCents,
-          totalCostCents: Math.round(Math.abs(delta) * unitCostCents),
+          totalCostCents: exactTotalCents ?? Math.round(Math.abs(delta) * unitCostCents),
           sourceType: 'production', sourceId: productionRef.id, businessDate,
           createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
           createdBy: userId, updatedBy: userId,
@@ -207,7 +207,7 @@ export class ProductionRepository {
           updatedAt: serverTimestamp(), updatedBy: userId,
         });
         stockChanges.push({ itemType: 'product', itemId: item.productId, stock, averageUnitCostCents: item.unitCostCents });
-        movement('product', item.productId, item.quantity, item.unitCostCents);
+        movement('product', item.productId, item.quantity, item.unitCostCents, item.totalCostCents);
       }
 
       const first = items[0]!;

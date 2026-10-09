@@ -134,12 +134,13 @@ service cloud.firestore {
           && fields(data, ['collectionId', 'formatId', 'priceCents', 'active'], [])
           && text(data.collectionId) && text(data.formatId) && money(data.priceCents) && data.active is bool)
         || (name == 'products'
-          && fields(data, ['code', 'active', 'collectionId', 'fragranceId', 'formatId', 'displayName', 'salePriceCents', 'additionalCostCents', 'averageUnitCostCents', 'stock', 'minimumStock', 'recipe'], ['image', 'stockStatus', 'committedStock'])
+          && fields(data, ['code', 'active', 'collectionId', 'fragranceId', 'formatId', 'displayName', 'salePriceCents', 'additionalCostCents', 'averageUnitCostCents', 'stock', 'minimumStock', 'recipe'], ['image', 'stockStatus', 'committedStock', 'unitCostDeciCents'])
           && text(data.code) && text(data.displayName) && data.active is bool
           && text(data.collectionId) && text(data.fragranceId) && text(data.formatId)
           && money(data.salePriceCents) && money(data.additionalCostCents) && money(data.averageUnitCostCents)
           && stock(data.stock) && quantity(data.minimumStock) && data.recipe is list
            && (!('committedStock' in data) || quantity(data.committedStock))
+          && (!('unitCostDeciCents' in data) || money(data.unitCostDeciCents))
           && validProductStockStatus(data)
           && (!('image' in data) || validImage(data.image)))
         || (name == 'inputs'

@@ -26,6 +26,8 @@ export interface Product extends AuditFields {
   stock: number;
   /** Units committed to open orders, including those still requiring production. */
   committedStock?: number;
+  /** Physical pieces assigned to commitments; the rest requires production. */
+  reservedPhysicalStock?: number;
   minimumStock: number;
   stockStatus?: StockStatus;
   image?: CatalogImageRef;
@@ -40,6 +42,7 @@ export interface InputItem extends AuditFields {
   unitId: string;
   stock: number;
   committedStock?: number;
+  reservedPhysicalStock?: number;
   minimumStock: number;
   minimumStockConfigured?: boolean;
   trackingMode?: InputTrackingMode;

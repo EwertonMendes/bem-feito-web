@@ -8,6 +8,7 @@ export interface StockChange {
   itemId: string;
   stock: number;
   committedStock?: number;
+  reservedPhysicalStock?: number;
   averageUnitCostCents?: number;
 }
 

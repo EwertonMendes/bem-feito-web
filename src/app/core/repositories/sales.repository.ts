@@ -298,7 +298,8 @@ export class SalesRepository {
         const isReservation = draft.fulfillmentStatus === 'ready' || draft.fulfillmentStatus === 'in-production';
         const required = -effect.quantityDelta;
         const committedStock = Number(entity.committedStock ?? 0);
-        const available = Number(entity.stock ?? 0) - committedStock;
+        const reservedPhysicalStock = Number(entity.reservedPhysicalStock ?? Math.min(committedStock, Number(entity.stock ?? 0)));
+        const available = Number(entity.stock ?? 0) - reservedPhysicalStock;
         if (!isReservation && required > available) throw new Error('Estoque disponível insuficiente para concluir a venda.');
         if (draft.fulfillmentStatus === 'ready' && required > available) throw new Error('Para reservar itens que ainda serão produzidos, selecione Encomenda.');
         const stock = isReservation ? entity.stock : entity.stock + effect.quantityDelta;
@@ -306,10 +307,11 @@ export class SalesRepository {
           ? productStockStatus(stock, (entity as Product).minimumStock)
           : stockStatusForInput({ ...(entity as InputItem), stock });
 
+        const physicalAllocation = isReservation ? Math.min(Math.max(0, available), required) : 0;
         transaction.update(targetRef, { stock, stockStatus,
-          ...(isReservation ? { committedStock: committedStock + required } : {}),
+          ...(isReservation ? { committedStock: committedStock + required, reservedPhysicalStock: reservedPhysicalStock + physicalAllocation } : {}),
           updatedAt: serverTimestamp(), updatedBy: userId });
-        stockChanges.push({ itemType: effect.itemType, itemId: effect.itemId, stock, ...(isReservation ? { committedStock: committedStock + required } : {}) });
+        stockChanges.push({ itemType: effect.itemType, itemId: effect.itemId, stock, ...(isReservation ? { committedStock: committedStock + required, reservedPhysicalStock: reservedPhysicalStock + physicalAllocation } : {}) });
         if (isReservation) continue;
 
         const movementRef = doc(collection(this.firestore, 'stockMovements'));
@@ -548,20 +550,22 @@ export class SalesRepository {
         const required = -effect.quantityDelta;
         const committed = Number(snapshot.data()['committedStock'] ?? 0);
         const physical = Number(snapshot.data()['stock'] ?? 0);
+        const physicallyReserved = Number(snapshot.data()['reservedPhysicalStock'] ?? Math.min(physical, committed));
         if (required < 0 || committed < required) throw new Error('Reserva inconsistente. É necessária conciliação.');
         if (next === 'ready') {
           if (physical < committed) throw new Error('Ainda faltam unidades para concluir esta encomenda.');
           continue;
         }
-        if (physical < required) throw new Error('Estoque físico insuficiente para entregar.');
+        if (physical < required || physicallyReserved < required) throw new Error('Estoque físico reservado insuficiente para entregar.');
         const entity = { id: snapshot.id, ...snapshot.data() } as Product | InputItem;
         const stock = physical - required;
         const committedStock = committed - required;
+        const reservedPhysicalStock = physicallyReserved - required;
         const stockStatus = effect.itemType === 'product'
           ? productStockStatus(stock, (entity as Product).minimumStock)
           : stockStatusForInput({ ...(entity as InputItem), stock });
-        transaction.update(snapshot.ref, { stock, committedStock, stockStatus, updatedAt: serverTimestamp(), updatedBy: userId });
-        changes.push({ itemType: effect.itemType, itemId: effect.itemId, stock, committedStock });
+        transaction.update(snapshot.ref, { stock, committedStock, reservedPhysicalStock, stockStatus, updatedAt: serverTimestamp(), updatedBy: userId });
+        changes.push({ itemType: effect.itemType, itemId: effect.itemId, stock, committedStock, reservedPhysicalStock });
         const movementRef = doc(collection(this.firestore, 'stockMovements'));
         transaction.set(movementRef, {
           itemType: effect.itemType, itemId: effect.itemId, quantityDelta: effect.quantityDelta,
@@ -615,6 +619,10 @@ export class SalesRepository {
         const committedStock = currentSale.stockApplied === false
           ? Math.max(0, Number(snapshot.data()['committedStock'] ?? 0) + effect.quantityDelta)
           : Number(snapshot.data()['committedStock'] ?? 0);
+        const originallyReserved = Number(snapshot.data()['reservedPhysicalStock'] ?? Math.min(Number(snapshot.data()['committedStock'] ?? 0), Number(snapshot.data()['stock'] ?? 0)));
+        const reservedPhysicalStock = currentSale.stockApplied === false
+          ? Math.max(0, originallyReserved + effect.quantityDelta)
+          : originallyReserved;
         const stockStatus = effect.itemType === 'product'
           ? productStockStatus(stock, (entity as Product).minimumStock)
           : stockStatusForInput({ ...(entity as InputItem), stock });
@@ -623,10 +631,11 @@ export class SalesRepository {
           stock,
           stockStatus,
           committedStock,
+          reservedPhysicalStock,
           updatedAt: serverTimestamp(),
           updatedBy: userId,
         });
-        stockChanges.push({ itemType: effect.itemType, itemId: effect.itemId, stock, committedStock });
+        stockChanges.push({ itemType: effect.itemType, itemId: effect.itemId, stock, committedStock, reservedPhysicalStock });
 
         if (currentSale.stockApplied === false) continue;
         const movementRef = doc(collection(this.firestore, 'stockMovements'));

@@ -772,7 +772,7 @@ export class SaleEditor {
     for (const [id, count] of counts) {
       if (this.fulfillmentStatus() === 'in-production') continue;
       const candidate = this.catalog.products().find(item => item.id === id);
-      const stock = (candidate?.stock ?? 0) - (candidate?.committedStock ?? 0);
+      const stock = (candidate?.stock ?? 0) - (candidate?.reservedPhysicalStock ?? Math.min(candidate?.stock ?? 0, candidate?.committedStock ?? 0));
       if (count > stock - (reserved.get(id) ?? 0)) {
         this.toast.error('Estoque insuficiente para essa distribuição.');
         return;
@@ -829,7 +829,7 @@ export class SaleEditor {
   private availableProductStock(productId: string): number {
     const product = this.catalog.products().find((item) => item.id === productId);
     if (!product) return 0;
-    return Math.max(0, product.stock - (product.committedStock ?? 0) - (this.reservedProductQuantities().get(productId) ?? 0));
+    return Math.max(0, product.stock - (product.reservedPhysicalStock ?? Math.min(product.stock, product.committedStock ?? 0)) - (this.reservedProductQuantities().get(productId) ?? 0));
   }
 
   private selectionFitsStock(productIds: string[], excludeLineKey: string): boolean {

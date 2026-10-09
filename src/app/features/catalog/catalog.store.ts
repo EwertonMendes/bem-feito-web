@@ -224,6 +224,8 @@ export class CatalogStore {
           ...item,
           stock: change.stock,
           committedStock: change.committedStock ?? item.committedStock,
+          reservedPhysicalStock: change.reservedPhysicalStock ?? item.reservedPhysicalStock,
+          reservedPhysicalStock: change.reservedPhysicalStock ?? item.reservedPhysicalStock,
           averageUnitCostCents: change.averageUnitCostCents ?? item.averageUnitCostCents,
         };
         return { ...updated, stockStatus: stockStatusForProduct(updated) };

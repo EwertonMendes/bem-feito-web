@@ -201,12 +201,16 @@ export class ProductionRepository {
       for (const item of items) {
         const product = products.get(item.productId)!;
         const stock = product.stock + item.quantity;
+        const committedStock = product.committedStock ?? 0;
+        const previousReserved = product.reservedPhysicalStock ?? Math.min(product.stock, committedStock);
+        const reservedPhysicalStock = Math.min(stock, previousReserved + Math.min(item.quantity, Math.max(0, committedStock - previousReserved)));
         transaction.update(doc(this.firestore, 'products', item.productId), {
           stock, stockStatus: productStockStatus(stock, product.minimumStock),
+          reservedPhysicalStock,
           averageUnitCostCents: item.unitCostCents,
           updatedAt: serverTimestamp(), updatedBy: userId,
         });
-        stockChanges.push({ itemType: 'product', itemId: item.productId, stock, averageUnitCostCents: item.unitCostCents });
+        stockChanges.push({ itemType: 'product', itemId: item.productId, stock, reservedPhysicalStock, averageUnitCostCents: item.unitCostCents });
         movement('product', item.productId, item.quantity, item.unitCostCents, item.totalCostCents);
       }
 

@@ -535,7 +535,7 @@ export class SalesRepository {
       if (current.stockApplied !== false) throw new Error('Esta venda já teve o estoque baixado.');
       const previous = current.fulfillmentStatus ?? 'delivered';
       if (next === 'ready' && previous !== 'in-production') throw new Error('A encomenda não está em produção.');
-      if (next === 'delivered' && previous !== 'ready' && previous !== 'in-production') throw new Error('Estado de entrega inválido.');
+      if (next === 'delivered' && previous !== 'ready') throw new Error('Marque a encomenda como pronta antes da entrega.');
 
       const refs = new Map<string, DocumentSnapshot>();
       for (const effect of current.stockEffects) {
@@ -554,6 +554,14 @@ export class SalesRepository {
         if (required < 0 || committed < required) throw new Error('Reserva inconsistente. É necessária conciliação.');
         if (next === 'ready') {
           if (physical < committed) throw new Error('Ainda faltam unidades para concluir esta encomenda.');
+          // Allocate currently free physical units, but never exceed total active demand.
+          if (physicallyReserved < committed) {
+            transaction.update(snapshot.ref, {
+              reservedPhysicalStock: committed, updatedAt: serverTimestamp(), updatedBy: userId,
+            });
+            changes.push({ itemType: effect.itemType, itemId: effect.itemId, stock: physical,
+              committedStock: committed, reservedPhysicalStock: committed });
+          }
           continue;
         }
         if (physical < required || physicallyReserved < required) throw new Error('Estoque físico reservado insuficiente para entregar.');
@@ -577,7 +585,7 @@ export class SalesRepository {
       }
       const sale: Sale = { ...current, fulfillmentStatus: next, stockApplied: next === 'delivered' };
       transaction.update(saleRef, { fulfillmentStatus: next, stockApplied: next === 'delivered', updatedAt: serverTimestamp(), updatedBy: userId });
-      this.revisions.touchTransaction(transaction, 'sales', ...(next === 'delivered' ? ['inventory'] as const : []));
+      this.revisions.touchTransaction(transaction, 'sales', 'inventory');
       return { sale, stockChanges: changes };
     });
   }

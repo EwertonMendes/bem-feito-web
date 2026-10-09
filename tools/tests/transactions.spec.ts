@@ -91,6 +91,16 @@ describe('Actual repositories against restrictive emulator rules', () => {
     expect(await count('stockMovements')).toBe(0);
   });
 
+  it('moves newly available physical stock into an existing order on ready transition', async () => {
+    const created = await sales.create({ ...draft(), fulfillmentStatus: 'in-production',
+      lines: [{ kind: 'product', sourceId: 'p', quantity: 2 }] });
+    expect(await data('products', 'p')).toMatchObject({ stock: 10, committedStock: 2, reservedPhysicalStock: 0 });
+    await sales.advanceFulfillment(created.sale.id, 'ready');
+    expect(await data('products', 'p')).toMatchObject({ stock: 10, committedStock: 2, reservedPhysicalStock: 2 });
+    await sales.advanceFulfillment(created.sale.id, 'delivered');
+    expect(await data('products', 'p')).toMatchObject({ stock: 8, committedStock: 0, reservedPhysicalStock: 0 });
+  });
+
   it('reserves ready stock and only decrements inventory at physical delivery', async () => {
     const result = await sales.create({ ...draft(), fulfillmentStatus: 'ready', lines: [{ kind: 'product', sourceId: 'p', quantity: 2 }] });
     expect(await data('products', 'p')).toMatchObject({ stock: 10, committedStock: 2, reservedPhysicalStock: 2 });

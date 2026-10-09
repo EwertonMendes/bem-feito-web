@@ -27,6 +27,8 @@ export async function authorize(event: any, env: NodeJS.ProcessEnv, config: any,
   sha(env.GITHUB_SHA); invariant(env.GITHUB_WORKFLOW_SHA === env.GITHUB_SHA, 'Workflow/executor commit differs');
   const branch = await api('branches/master');
   invariant(branch.protected === true && branch.commit.sha === env.GITHUB_SHA, 'Protected current master required');
+  const executorCi = await api(`actions/workflows/ci.yml/runs?head_sha=${env.GITHUB_SHA}&event=push&status=success&per_page=100`);
+  invariant(executorCi.workflow_runs?.some((run: any) => run.head_sha === env.GITHUB_SHA && run.conclusion === 'success' && run.head_repository?.id === Number(config.repositoryId)), 'Exact trusted master CI must pass before credentials');
   let command: Command; let actor: any; let pr: number; let commentId = '';
   if (env.GITHUB_EVENT_NAME === 'issue_comment') {
     invariant(event.action === 'created' && event.issue?.pull_request, 'Only newly created PR comments accepted');
@@ -63,10 +65,10 @@ export async function authorize(event: any, env: NodeJS.ProcessEnv, config: any,
   invariant(policies.branch_policies?.length === 1 && policies.branch_policies[0].name === 'master' && policies.branch_policies[0].type === 'branch', 'Environment allows untrusted branches/tags');
   if (request.environment === 'prod' && command.mode === 'apply') {
     invariant(env.GITHUB_EVENT_NAME === 'workflow_dispatch', 'PROD apply requires human dispatch and environment approval');
-    invariant(config.productionApprovers.includes(String(actor.id)), 'PROD request is not specifically authorized by a production approver');
+    invariant(String(actor.id) === config.ownerId && config.productionApprovers.includes(config.ownerId), 'PROD requires the repository owner to authorize this exact plan');
     const reviewers = protection.protection_rules?.find((r: any) => r.type === 'required_reviewers');
-    invariant(reviewers?.prevent_self_review === true && reviewers.reviewers?.length > 0 && protection.can_admins_bypass === false, 'PROD approval/self-review/bypass protection missing');
-    invariant(reviewers.reviewers.every((r: any) => r.type === 'User' && config.productionApprovers.includes(String(r.reviewer.id))), 'Unapproved PROD environment reviewer');
+    invariant(reviewers?.prevent_self_review === false && reviewers.reviewers?.length === 1 && protection.can_admins_bypass === false, 'PROD owner approval/no-bypass protection missing');
+    invariant(reviewers.reviewers[0].type === 'User' && String(reviewers.reviewers[0].reviewer.id) === config.ownerId, 'PROD environment must require the repository owner');
   }
   if (request.operation === 'migrate') {
     const evolution = await api('pulls/28');

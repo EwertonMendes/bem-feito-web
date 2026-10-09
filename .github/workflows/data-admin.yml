@@ -50,6 +50,8 @@ jobs:
       environment: ${{ steps.gate.outputs.environment }}
       migration: ${{ steps.gate.outputs.migration }}
       deployment_sha: ${{ steps.gate.outputs.deployment_sha }}
+      request_hash: ${{ steps.gate.outputs.request_hash }}
+      plan_hash: ${{ steps.gate.outputs.plan_hash }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -90,6 +92,7 @@ jobs:
       - run: npm run test:rules
 
   operation:
+    name: ${{ needs.gate.outputs.mode }} request ${{ needs.gate.outputs.request_hash }} plan ${{ needs.gate.outputs.plan_hash }}
     needs: [gate, isolated-e2e]
     if: >-
       always() && needs.gate.result == 'success' &&

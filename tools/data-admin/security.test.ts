@@ -50,6 +50,7 @@ test('authorization checks live permission and unchanged real comment actor befo
   const env = { GITHUB_REPOSITORY: config.repository, GITHUB_REF: 'refs/heads/master', GITHUB_WORKFLOW_REF: `${config.repository}/.github/workflows/data-admin.yml@refs/heads/master`, GITHUB_SHA: commit, GITHUB_WORKFLOW_SHA: commit, GITHUB_RUN_ATTEMPT: '1', GITHUB_EVENT_NAME: 'issue_comment', GITHUB_ACTOR: actor.login, GITHUB_TRIGGERING_ACTOR: actor.login, GITHUB_RUN_ID: '1' };
   const api = async (path: string) => {
     if (path === 'branches/master') return { protected: true, commit: { sha: commit } };
+    if (path.startsWith('actions/workflows/ci.yml/runs?')) return { workflow_runs: [{ head_sha: commit, conclusion: 'success', head_repository: { id: 1406056807 } }] };
     if (path === 'issues/comments/123') return event.comment;
     if (path.startsWith('collaborators/')) return { permission: 'write', user: actor };
     if (path === 'pulls/99') return { state: 'open', base: { ref: 'master' }, head: { sha: commit, repo: { id: 1406056807, full_name: config.repository } } };
@@ -64,18 +65,20 @@ test('authorization checks live permission and unchanged real comment actor befo
   await assert.rejects(authorize(event, { ...env, GITHUB_RUN_ATTEMPT: '2' }, config, api));
   await assert.rejects(authorize(event, { ...env, GITHUB_REF: 'refs/heads/feature' }, config, api));
   await assert.rejects(authorize(event, env, config, p => p === 'branches/master' ? Promise.resolve({ protected: false, commit: { sha: commit } }) : api(p)));
+  await assert.rejects(authorize(event, env, config, p => p.startsWith('actions/workflows/ci.yml/runs?') ? Promise.resolve({ workflow_runs: [] }) : api(p)));
   await assert.rejects(authorize(event, env, config, p => p === 'issues/comments/123' ? Promise.resolve({ ...event.comment, body: body + ' changed' }) : api(p)));
   await assert.rejects(authorize(event, { ...env, GITHUB_EVENT_NAME: 'pull_request_target' }, config, api));
 });
-test('PROD requires a specific human dispatch, hashes, independent reviewers and no bypass', async () => {
+test('PROD requires exact owner dispatch, hashes and owner environment approval without bypass', async () => {
   const actor = { id: 33728924, login: 'EwertonMendes', type: 'User' };
   const prodRequest = { ...request, environment: 'prod', projectId: 'isolated-production' };
-  const prodConfig = { ...config, productionApprovers: ['33728924', '123456'], environments: { ...config.environments, prod: { ...config.environments.dev, projectId: 'isolated-production' } } };
+  const prodConfig = { ...config, environments: { ...config.environments, prod: { ...config.environments.dev, projectId: 'isolated-production' } } };
   const event = { repository: { id: 1406056807, owner: { id: 33728924 } }, sender: actor, inputs: { mode: 'apply', pr: '99', path: 'operations/requests/cost.json', sha: commit, request_hash: requestHash(validateRequest(prodRequest)), plan_hash: 'c'.repeat(64) } };
   const env = { GITHUB_REPOSITORY: config.repository, GITHUB_REF: 'refs/heads/master', GITHUB_WORKFLOW_REF: `${config.repository}/.github/workflows/data-admin.yml@refs/heads/master`, GITHUB_SHA: commit, GITHUB_WORKFLOW_SHA: commit, GITHUB_RUN_ATTEMPT: '1', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_ACTOR: actor.login, GITHUB_TRIGGERING_ACTOR: actor.login, GITHUB_RUN_ID: '1' };
-  const protection = { deployment_branch_policy: { custom_branch_policies: true }, can_admins_bypass: false, protection_rules: [{ type: 'required_reviewers', prevent_self_review: true, reviewers: [{ type: 'User', reviewer: { id: 123456 } }] }] };
+  const protection = { deployment_branch_policy: { custom_branch_policies: true }, can_admins_bypass: false, protection_rules: [{ type: 'required_reviewers', prevent_self_review: false, reviewers: [{ type: 'User', reviewer: { id: 33728924 } }] }] };
   const api = async (path: string) => {
     if (path === 'branches/master') return { protected: true, commit: { sha: commit } };
+    if (path.startsWith('actions/workflows/ci.yml/runs?')) return { workflow_runs: [{ head_sha: commit, conclusion: 'success', head_repository: { id: 1406056807 } }] };
     if (path.startsWith('collaborators/')) return { permission: 'admin', user: actor };
     if (path === 'pulls/99') return { state: 'open', base: { ref: 'master' }, head: { sha: commit, repo: { id: 1406056807, full_name: config.repository } } };
     if (path.startsWith('contents/')) return { type: 'file', size: 400, path: event.inputs.path, encoding: 'base64', content: Buffer.from(JSON.stringify(prodRequest)).toString('base64') };
@@ -85,7 +88,9 @@ test('PROD requires a specific human dispatch, hashes, independent reviewers and
   };
   assert.equal((await authorize(event, env, prodConfig, api)).environment, 'data-prod-execute');
   await assert.rejects(authorize(event, env, { ...prodConfig, productionApprovers: ['123456'] }, api));
-  for (const bad of [{ ...protection, can_admins_bypass: true }, { ...protection, protection_rules: [] }, { ...protection, protection_rules: [{ ...protection.protection_rules[0], prevent_self_review: false }] }, { ...protection, protection_rules: [{ ...protection.protection_rules[0], reviewers: [{ type: 'User', reviewer: { id: 999 } }] }] }]) await assert.rejects(authorize(event, env, prodConfig, p => p === 'environments/data-prod-execute' ? Promise.resolve(bad) : api(p)));
+  for (const bad of [{ ...protection, can_admins_bypass: true }, { ...protection, protection_rules: [] }, { ...protection, protection_rules: [{ ...protection.protection_rules[0], prevent_self_review: true }] }, { ...protection, protection_rules: [{ ...protection.protection_rules[0], reviewers: [{ type: 'User', reviewer: { id: 999 } }] }] }]) await assert.rejects(authorize(event, env, prodConfig, p => p === 'environments/data-prod-execute' ? Promise.resolve(bad) : api(p)));
+  const otherActor = { id: 123456, login: 'other-writer', type: 'User' };
+  await assert.rejects(authorize({ ...event, sender: otherActor }, { ...env, GITHUB_ACTOR: otherActor.login, GITHUB_TRIGGERING_ACTOR: otherActor.login }, { ...prodConfig, productionApprovers: [config.ownerId, '123456'] }, p => p.startsWith('collaborators/') ? Promise.resolve({ permission: 'write', user: otherActor }) : api(p)), /repository owner/);
   await assert.rejects(authorize({ ...event, inputs: { ...event.inputs, request_hash: 'f'.repeat(64) } }, env, prodConfig, api));
   await assert.rejects(authorize(event, env, prodConfig, p => p.endsWith('deployment-branch-policies') ? Promise.resolve({ branch_policies: [{ name: '*', type: 'branch' }] }) : api(p)));
 });

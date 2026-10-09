@@ -109,6 +109,7 @@ export class SaleEditor {
   readonly mobileView = signal<MobileView>('catalog');
   readonly detailsExpanded = signal(true);
   readonly submitting = signal(false);
+  readonly fulfillmentStatus = signal<'delivered' | 'in-production' | 'ready'>('delivered');
   readonly model = signal<SaleFormModel>(this.defaultModel());
   readonly saleForm = form(this.model, (p) => {
     required(p.businessDate);
@@ -270,7 +271,7 @@ export class SaleEditor {
   }
 
   canAddProduct(product: Product): boolean {
-    return this.availableProductStock(product.id) > 0;
+    return product.active && (this.fulfillmentStatus() === 'in-production' || this.availableProductStock(product.id) > 0);
   }
 
   addProduct(product: Product): void {
@@ -372,7 +373,7 @@ export class SaleEditor {
       return;
     }
 
-    if (line.kind === 'product' && delta > 0) {
+    if (line.kind === 'product' && delta > 0 && this.fulfillmentStatus() !== 'in-production') {
       const product = this.catalog.products().find((item) => item.id === line.sourceId);
       if (product && this.availableProductStock(product.id) < delta) {
         this.toast.error('Todo o estoque disponível de ' + product.displayName + ' já está comprometido neste pedido.');
@@ -495,7 +496,7 @@ export class SaleEditor {
       return;
     }
 
-    if (this.remainingCents() > 0 && !this.model().customerName.trim()) {
+    if ((this.remainingCents() > 0 || this.fulfillmentStatus() !== 'delivered') && !this.model().customerName.trim()) {
       this.toast.error('Informe o cliente quando houver saldo a receber.');
       this.mobileView.set('order');
       queueMicrotask(() => {
@@ -508,6 +509,7 @@ export class SaleEditor {
 
     const draft: SaleDraft = {
       businessDate: this.model().businessDate,
+      fulfillmentStatus: this.fulfillmentStatus(),
       customerName: this.model().customerName.trim() || undefined,
       dueDate: this.model().dueDate || undefined,
       discountCents: this.discountCents(),
@@ -584,6 +586,7 @@ export class SaleEditor {
     const method = this.settings.paymentMethods().find((item) => item.active);
 
     this.cart.set([]);
+    this.fulfillmentStatus.set('delivered');
     this.model.set(this.defaultModel());
     this.payments.set(
       method
@@ -687,6 +690,15 @@ export class SaleEditor {
    * backtracking when kits contain dozens or hundreds of units.
    */
   private planKit(kit: Kit): KitAvailability {
+    if (this.fulfillmentStatus() === 'in-production') {
+      const productIds: string[] = [];
+      for (const requirement of [...kit.components].sort((a, b) => a.order - b.order)) {
+        const product = this.matchingProducts(requirement)[0];
+        if (!product) return { available: false, message: 'Cadastre uma variação deste sabonete', details: [], productIds: [] };
+        productIds.push(...Array(requirement.quantity).fill(product.id));
+      }
+      return { available: true, message: 'Sob encomenda', details: [], productIds };
+    }
     const reserved = this.reservedProductQuantities();
     const capacities = new Map(this.catalog.activeProducts().map(product => [
       product.id, Math.max(0, product.stock - (reserved.get(product.id) ?? 0)),
@@ -758,7 +770,9 @@ export class SaleEditor {
     const counts = new Map<string, number>();
     ids.forEach(id => { if (id) counts.set(id, (counts.get(id) ?? 0) + 1); });
     for (const [id, count] of counts) {
-      const stock = this.catalog.products().find(item => item.id === id)?.stock ?? 0;
+      if (this.fulfillmentStatus() === 'in-production') continue;
+      const candidate = this.catalog.products().find(item => item.id === id);
+      const stock = (candidate?.stock ?? 0) - (candidate?.committedStock ?? 0);
       if (count > stock - (reserved.get(id) ?? 0)) {
         this.toast.error('Estoque insuficiente para essa distribuição.');
         return;
@@ -815,10 +829,11 @@ export class SaleEditor {
   private availableProductStock(productId: string): number {
     const product = this.catalog.products().find((item) => item.id === productId);
     if (!product) return 0;
-    return Math.max(0, product.stock - (this.reservedProductQuantities().get(productId) ?? 0));
+    return Math.max(0, product.stock - (product.committedStock ?? 0) - (this.reservedProductQuantities().get(productId) ?? 0));
   }
 
   private selectionFitsStock(productIds: string[], excludeLineKey: string): boolean {
+    if (this.fulfillmentStatus() === 'in-production') return true;
     const reserved = this.reservedProductQuantities(excludeLineKey);
     const selected = new Map<string, number>();
 

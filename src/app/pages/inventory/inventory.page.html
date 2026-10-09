@@ -31,7 +31,7 @@
         <article class="stock-card product-card">
           <bf-catalog-image [image]="item.image" [alt]="item.displayName" [compact]="true" />
           <div class="identity"><strong>{{item.displayName}}</strong><span>{{item.code}} · produto acabado</span></div>
-          <div class="balance" [class.low]="item.stock<=item.minimumStock"><strong>{{item.stock}}</strong><span>mín. {{item.minimumStock}}</span></div>
+          <div class="balance" [class.low]="item.stock<=item.minimumStock"><strong>{{item.stock}}</strong><span>reservado {{item.committedStock ?? 0}} · livre {{item.stock - (item.committedStock ?? 0) > 0 ? item.stock - (item.committedStock ?? 0) : 0}}</span></div>
           <div class="stock-actions"><button class="bf-button secondary" type="button" (click)="modals.openProduction(item.id)"><bf-icon name="production" /> Produzir</button><button class="bf-button secondary" (click)="openHistory('product',item.id)">Histórico</button><button class="bf-button" (click)="openAdjustment('product',item.id)">Ajustar</button></div>
         </article>
       } @empty {<bf-empty-state title="Nenhum produto" description="Cadastre produtos no Catálogo." />}

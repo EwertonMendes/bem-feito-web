@@ -69,6 +69,21 @@ export class SalesPage {
     this.detailDialog().open();
   }
 
+  fulfillmentLabel(sale: Sale): string {
+    if (sale.status === 'cancelled') return 'Cancelada';
+    const status = sale.fulfillmentStatus ?? 'delivered';
+    return status === 'in-production' ? 'Em produção' : status === 'ready' ? 'Pronto' : 'Entregue';
+  }
+
+  async advanceSelected(next: 'ready' | 'delivered'): Promise<void> {
+    const sale = this.selectedSale();
+    if (!sale || sale.status !== 'active') return;
+    const result = await this.store.advanceFulfillment(sale.id, next);
+    if (!result) return;
+    this.catalog.applyStockChanges(result.stockChanges);
+    this.selectedSnapshot.set(result.sale);
+  }
+
   async cancelSelected(): Promise<void> {
     const sale = this.selectedSale();
     if (!sale || sale.status === 'cancelled' || !window.confirm('Cancelar ' + sale.code + '? O estoque será revertido e os recebimentos serão estornados.')) return;

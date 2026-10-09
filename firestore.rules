@@ -141,7 +141,6 @@ service cloud.firestore {
           && stock(data.stock) && quantity(data.minimumStock) && data.recipe is list
            && (!('committedStock' in data) || quantity(data.committedStock))
           && (!('reservedPhysicalStock' in data) || (quantity(data.reservedPhysicalStock) && data.reservedPhysicalStock <= data.stock))
-          && (!('reservedPhysicalStock' in data) || (quantity(data.reservedPhysicalStock) && data.reservedPhysicalStock <= data.stock))
           && (!('unitCostDeciCents' in data) || money(data.unitCostDeciCents))
           && validProductStockStatus(data)
           && (!('image' in data) || validImage(data.image)))
@@ -150,6 +149,7 @@ service cloud.firestore {
           && text(data.code) && text(data.name) && text(data.unitId) && data.active is bool
           && stock(data.stock) && quantity(data.minimumStock) && money(data.averageUnitCostCents)
            && (!('committedStock' in data) || quantity(data.committedStock))
+          && (!('reservedPhysicalStock' in data) || (quantity(data.reservedPhysicalStock) && data.reservedPhysicalStock <= data.stock))
           && (!('minimumStockConfigured' in data) || data.minimumStockConfigured is bool)
           && (!('trackingMode' in data) || data.trackingMode in ['exact', 'estimated', 'untracked'])
           && (!('costBasisQuantity' in data) || quantity(data.costBasisQuantity))

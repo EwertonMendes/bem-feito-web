@@ -33,6 +33,13 @@ interface ExpenseFormModel {
   paymentMethodId: string;
   notes: string;
   link: string;
+  fundingSource: 'business' | 'ewerton' | 'maria';
+  receiptStatus: 'received' | 'pending';
+  shipping: number;
+  interest: number;
+  otherCharge: number;
+  otherDescription: string;
+  capitalizeOther: boolean;
 }
 @Component({
  selector: 'bf-finance-dialogs',
@@ -87,6 +94,8 @@ export class BfFinanceDialogs {
     paymentMethodId: '',
     notes: '',
     link: '',
+    fundingSource: 'business', receiptStatus: 'received', shipping: 0, interest: 0,
+    otherCharge: 0, otherDescription: '', capitalizeOther: false,
   });
   readonly expenseForm = form(this.model, (p) => {
     required(p.businessDate);
@@ -158,6 +167,17 @@ export class BfFinanceDialogs {
     this.destroyRef.onDestroy(this.sales.activateReceivables());
     this.destroyRef.onDestroy(this.settings.activate());
  }
+  setFundingSource(value: string): void {
+    if (value === 'business' || value === 'ewerton' || value === 'maria') this.model.update(model => ({ ...model, fundingSource: value }));
+  }
+  setReceiptStatus(value: string): void {
+    if (value === 'received' || value === 'pending') this.model.update(model => ({ ...model, receiptStatus: value }));
+  }
+  patchCharge(field: 'shipping' | 'interest' | 'otherCharge', amount: number): void {
+    this.model.update(model => ({ ...model, [field]: Math.max(0, amount) }));
+  }
+  setOtherDescription(description: string): void { this.model.update(model => ({ ...model, otherDescription: description })); }
+  setCapitalizeOther(value: boolean): void { this.model.update(model => ({ ...model, capitalizeOther: value })); }
   changeExpenseKind(kind: ExpenseKind): void {
     this.model.update(value => ({ ...value, kind, amount: kind === 'input-purchase' ? fromCents(this.purchaseTotalCents()) : 0 }));
     if (kind === 'input-purchase' && !this.purchaseLines().length) this.newPurchaseLine();
@@ -180,6 +200,8 @@ export class BfFinanceDialogs {
       paymentMethodId: this.settings.paymentMethods().find((item) => item.active)?.id ?? '',
       notes: '',
       link: '',
+      fundingSource: 'business', receiptStatus: 'received', shipping: 0, interest: 0,
+      otherCharge: 0, otherDescription: '', capitalizeOther: false,
     });
     this.dialog().open();
   }
@@ -251,6 +273,12 @@ export class BfFinanceDialogs {
       }));
       const draft: PurchaseBatchDraft = {
         businessDate: value.businessDate, items,
+        fundingSource: value.fundingSource, receiptStatus: value.receiptStatus,
+        charges: [
+          ...(toCents(value.shipping) > 0 ? [{ kind: 'shipping' as const, amountCents: toCents(value.shipping), capitalized: true }] : []),
+          ...(toCents(value.interest) > 0 ? [{ kind: 'interest' as const, amountCents: toCents(value.interest), capitalized: false }] : []),
+          ...(toCents(value.otherCharge) > 0 ? [{ kind: 'other' as const, amountCents: toCents(value.otherCharge), capitalized: value.capitalizeOther, description: value.otherDescription.trim() || undefined }] : []),
+        ],
         paymentMethodId: value.paymentMethodId || undefined,
         notes: value.notes.trim() || undefined, link: value.link.trim() || undefined,
       };
@@ -270,6 +298,7 @@ export class BfFinanceDialogs {
       categoryId: value.categoryId || undefined,
       amountCents: toCents(value.amount),
       paymentMethodId: value.paymentMethodId || undefined,
+      fundingSource: value.fundingSource,
       notes: value.notes.trim() || undefined,
       link: value.link.trim() || undefined,
     };

@@ -62,7 +62,10 @@
         <div class="purchase-detail-row"><strong>{{inputName(item.inputId)}}</strong><span>{{item.quantity}} {{purchaseUnit(item.inputId)}}</span><strong>{{currency(item.amountCents)}}</strong></div>
       } @empty {<p>{{expense.kind==='input-purchase'?inputName(expense.inputId):categoryName(expense.categoryId)}}</p>}
       @if(expense.notes){<p>{{expense.notes}}</p>}
+      <p>Origem: {{ expense.fundingSource === 'ewerton' ? 'Ewerton (aporte)' : expense.fundingSource === 'maria' ? 'Maria (aporte)' : 'Conta Bem Feito' }}</p>
+      @if(expense.charges?.length){<h3>Custos adicionais</h3>@for(charge of expense.charges ?? [];track $index){<div class="purchase-detail-row"><span>{{ charge.kind === 'shipping' ? 'Frete' : charge.kind === 'interest' ? 'Juros' : charge.description || 'Outro' }}</span><strong>{{currency(charge.amountCents)}}</strong></div>}}
+      @if(expense.receiptStatus === 'pending'){<p>Compra a receber · ainda não adicionada ao estoque.</p>}
     }
   </div>
-  <div class="bf-dialog-footer"><button class="bf-button secondary" type="button" (click)="expenseDetailDialog.close()">Fechar</button></div>
+  <div class="bf-dialog-footer">@if(selectedExpense()?.receiptStatus==='pending'){<button class="bf-button" type="button" (click)="receiveSelectedPurchase()">Confirmar recebimento</button>}<button class="bf-button secondary" type="button" (click)="expenseDetailDialog.close()">Fechar</button></div>
 </dialog>

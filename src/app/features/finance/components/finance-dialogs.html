@@ -28,6 +28,16 @@
         } @else {
           <label class="bf-field full"><span>Categoria</span><bf-select [formField]="expenseForm.categoryId" [options]="expenseCategoryOptions()" ariaLabel="Categoria" /></label>
         }
+        <label class="bf-field"><span>Origem do pagamento</span><select class="bf-input" [value]="model().fundingSource" (change)="setFundingSource($any($event.target).value)"><option value="business">Conta Bem Feito</option><option value="ewerton">Ewerton · pessoal (aporte)</option><option value="maria">Maria · pessoal (aporte)</option></select></label>
+        @if(model().kind==='input-purchase'){
+          <label class="bf-field"><span>Entrega dos insumos</span><select class="bf-input" [value]="model().receiptStatus" (change)="setReceiptStatus($any($event.target).value)"><option value="received">Já chegaram</option><option value="pending">Aguardando entrega</option></select></label>
+          <label class="bf-field"><span>Frete (incorporar ao custo)</span><bf-number-input kind="currency" [value]="model().shipping" (valueChange)="patchCharge('shipping',$event)" ariaLabel="Frete" /></label>
+          <label class="bf-field"><span>Juros do parcelamento</span><bf-number-input kind="currency" [value]="model().interest" (valueChange)="patchCharge('interest',$event)" ariaLabel="Juros" /></label>
+          <label class="bf-field"><span>Outros custos de aquisição</span><bf-number-input kind="currency" [value]="model().otherCharge" (valueChange)="patchCharge('otherCharge',$event)" ariaLabel="Outros custos" /></label>
+          <label class="bf-field"><span>Descrição do custo</span><input class="bf-input" [value]="model().otherDescription" (input)="setOtherDescription($any($event.target).value)" /></label>
+          <label class="bf-field full"><input type="checkbox" [checked]="model().capitalizeOther" (change)="setCapitalizeOther($any($event.target).checked)" /> Incorporar outros custos ao custo médio do insumo</label>
+          <p class="purchase-hint full">Frete e juros pertencem à mesma compra. Juros não aumentam o custo dos sabonetes. Compras pessoais são aportes sem saída da conta Bem Feito.</p>
+        }
         <label class="bf-field"><span>Forma de pagamento</span><bf-select [formField]="expenseForm.paymentMethodId" [options]="optionalPaymentMethodOptions()" ariaLabel="Forma de pagamento" /></label>
         <label class="bf-field"><span>Link / comprovante</span><input class="bf-input" type="url" [formField]="expenseForm.link" /></label>
         <label class="bf-field full"><span>Observações</span><textarea class="bf-textarea" [formField]="expenseForm.notes"></textarea></label>

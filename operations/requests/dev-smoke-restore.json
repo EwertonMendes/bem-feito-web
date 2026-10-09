@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "dev-smoke-restore-20261009-v1",
+  "environment": "dev",
+  "projectId": "bem-feito-dev",
+  "operation": "restore",
+  "backup": "50d2c1a3a5fbd61d3cb5f739ab97e82736a8915c64743d440d22ef19d4647863",
+  "destructive": {
+    "projectId": "bem-feito-dev",
+    "paths": [
+      "dataAdminSmoke/smoke-20261009"
+    ]
+  }
+}

@@ -1,0 +1,33 @@
+name: TEMP - End-to-end business flows (emulator)
+on:
+  push:
+    branches: [feat/operacao-financeiro-migracao-20261009]
+    paths:
+      - .github/workflows/e2e-temporary.yml
+      - tools/tests/transactions.spec.ts
+      - src/app/core/repositories/**
+      - src/app/domain/logic/**
+permissions:
+  contents: read
+jobs:
+  e2e-business:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.22.3
+          cache: npm
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci --no-fund
+      - name: Exercise orders, reservations, purchases, receipts and cancellations
+        run: npm run test:transactions
+      - name: Reject invalid operations through production-equivalent Firestore rules
+        run: npm run test:rules
+      - name: Ensure no test records persist
+        run: |
+          echo "All tests execute against demo-bem-feito in a transient Firestore emulator."
+          echo "Firebase emulators:exec tears down the disposable datastore after the process."

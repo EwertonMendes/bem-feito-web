@@ -1,75 +1,33 @@
 import { GoogleAuth } from 'google-auth-library';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 const id = process.env.MIGRATION_SNAPSHOT_ID;
 if (!id || !/^[A-Za-z0-9_-]+$/.test(id)) throw new Error('Snapshot ID ausente.');
-const client = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'] });
+const client = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/drive.readonly'] });
 const token = await client.getAccessToken();
-if (!token) throw new Error('Credencial OAuth do serviço indisponível.');
-const base = 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(id);
-async function sheetsFetch(suffix) {
-  const response = await fetch(base + suffix, { headers: { Authorization: 'Bearer ' + token } });
+if (!token) throw new Error('Credencial de serviço indisponível.');
+const url = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id);
+async function access(suffix) {
+  const response = await fetch(url + suffix, { headers: { Authorization: 'Bearer ' + token } });
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
     const reason = payload.error?.errors?.[0]?.reason ?? payload.error?.status ?? 'unknown';
     const message = String(payload.error?.message ?? '').replace(/[A-Za-z0-9_-]{22,}/g, '[redacted]').slice(0, 220);
-    throw new Error('Google Sheets HTTP ' + response.status + ' (' + reason + '): ' + message);
+    throw new Error('Private Google Drive export HTTP ' + response.status + ' (' + reason + '): ' + message);
   }
-  return response.json();
+  return response;
 }
-const metadata = await sheetsFetch('?fields=spreadsheetId,properties(title,timeZone),sheets(properties(title,gridProperties))');
-const tabs = metadata.sheets.map(sheet => sheet.properties.title);
-const mandatory = ['Vendas', 'Itens da Venda', 'Recebimentos', 'Produção', 'Compras e Despesas', 'Produtos', 'Insumos', 'Kits', 'Itens do Kit', 'Adicionais', 'Itens do Adicional', 'Cadastros', 'Preços de Formato'];
-const missing = mandatory.filter(name => !tabs.includes(name));
-if (missing.length) throw new Error('Abas obrigatórias ausentes: ' + missing.join(', '));
+const metadata = await (await access('?fields=id,name,mimeType')).json();
+if (metadata.mimeType !== 'application/vnd.google-apps.spreadsheet') throw new Error('Fonte não é uma planilha nativa.');
 if (process.argv.includes('--preflight')) {
-  console.log('Snapshot acessível por service account. Abas: ' + tabs.length + '; obrigatórias: ' + mandatory.length + '.');
+  console.log('Arquivo temporário acessível pelo Google Drive. ID privado verificado.');
   process.exit(0);
 }
-const optional = ['Receitas', 'Ajustes de Estoque', 'Consumos da Venda'];
-const fullSource = [...mandatory, ...optional, 'Movimentações de Capital', 'Custos de Aquisição', 'Caixa e Aportes', 'Acompanhamento Encomendas', 'Reservas de Embalagem', 'Inventário 08-10', 'Controle Simplificado', 'Ficha de Produção'];
-const selected = fullSource.filter(name => tabs.includes(name));
-const ranges = selected.map(name => "'" + name.replace(/'/g, "''") + "'!A4:W1200");
-const params = new URLSearchParams({ valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'SERIAL_NUMBER' });
-for (const range of ranges) params.append('ranges', range);
-const response = await sheetsFetch('/values:batchGet?' + params);
-function dateSerial(value) {
-  if (typeof value !== 'number' || value < 30000 || value > 90000) return value;
-  return new Date(Math.round((value - 25569) * 86400000)).toISOString().slice(0, 10);
-}
-const dateColumns = new Set(['Data', 'Vencimento', 'Data da compra', 'Data do lote informada', 'Data Venda']);
-const data = {};
-for (let index = 0; index < selected.length; index++) {
-  const values = response.valueRanges[index]?.values ?? [];
-  const headers = (values[0] ?? []).map(String);
-  data[selected[index]] = values.slice(1).map(row => Object.fromEntries(headers
-    .filter(Boolean).map((header, i) => [header, dateColumns.has(header) ? dateSerial(row[i] ?? '') : (row[i] ?? '')])));
-}
-const keys = {
-  'Vendas':'Venda_ID', 'Itens da Venda':'Item_ID', 'Recebimentos':'Pagamento_ID',
-  'Produção':'Produção_ID', 'Compras e Despesas':'Mov_ID', 'Produtos':'Produto_ID',
-  'Insumos':'Insumo_ID','Receitas':'Receita_ID','Ajustes de Estoque':'Ajuste_ID',
-  'Kits':'Kit_ID','Itens do Kit':'Kit_Item_ID','Cadastros':'Cadastro_ID',
-  'Preços de Formato':'Preço_ID','Adicionais':'Adicional_ID',
-  'Itens do Adicional':'Adicional_Item_ID','Consumos da Venda':'Consumo_ID'
-};
-const sheets = {};
-const views = {};
-for (const [name, rows] of Object.entries(data)) {
-  if (keys[name]) sheets[name] = rows.filter(row => row[keys[name]] !== '' && row[keys[name]] != null);
-  else views[name] = rows.filter(row => Object.values(row).some(value => value !== '' && value != null));
-}
-const counts = Object.fromEntries(Object.entries(sheets).map(([name, rows]) => [name, rows.length]));
-console.log('Fonte lida de snapshot privado; contagens operacionais:', JSON.stringify(counts));
-if ((counts.Vendas ?? 0) < 25 || (counts.Recebimentos ?? 0) < 24 || (counts.Produção ?? 0) < 45) {
-  throw new Error('Snapshot menor que a referência conciliada; abortando.');
-}
-const raw = {
-  schemaVersion: 1, spreadsheetId: id, spreadsheetName: metadata.properties.title,
-  exportedAt: new Date().toISOString(), sheets, views,
-  sourceMetadata: {timeZone:metadata.properties.timeZone, sheetNames:tabs}
-};
-await mkdir(resolve('tools/migration'), {recursive:true});
-await writeFile(resolve('tools/migration/legacy-raw.json'), JSON.stringify(raw));
-console.log('Exportação disponível somente neste runner; não versione nem publique o JSON.');
+const type = encodeURIComponent('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+const binary = Buffer.from(await (await access('/export?mimeType=' + type)).arrayBuffer());
+if (binary.length < 300 || binary.length > 25_000_000) throw new Error('Arquivo de exportação XLSX inválido.');
+const result = spawnSync('python3', ['tools/migration/convert-xlsx.py', id, metadata.name], {
+  input: binary, maxBuffer: 1024 * 1024 * 10, encoding: 'utf8',
+});
+if (result.status !== 0) throw new Error('Conversão XLSX falhou: ' + String(result.stderr).slice(0, 500));
+console.log(result.stdout.trim());

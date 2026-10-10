@@ -54,3 +54,9 @@
 .entry-actions .bf-button{min-width:0;padding:8px 5px}
 .entry-actions .bf-button:only-child{grid-column:1/-1}
 .history-row{grid-template-columns:minmax(0,1fr)}}
+
+.history-snapshot{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.history-snapshot>div{min-width:0;display:grid;align-content:start;gap:5px;background:var(--surface-2);border-radius:8px;padding:9px}
+.history-snapshot small{color:var(--muted);font-weight:700}
+.history-snapshot span{font-size:.74rem;overflow-wrap:anywhere}
+@media(max-width:520px){.history-snapshot{grid-template-columns:1fr}}

@@ -81,6 +81,21 @@
                         <div><strong>{{change.kind==='cancellation'?'Lançamento cancelado':'Produção corrigida'}}</strong><small>{{historyWhen(change)}}</small></div>
                         <span>{{historySummary(change)}}</span>
                         <p>{{change.reason}}</p>
+                        <div class="history-snapshot">
+                          <div><small>Antes</small>
+                            @for(item of change.before.items;track item.productId){
+                              <span>{{item.quantity}}× {{item.productName}}</span>
+                            }
+                          </div>
+                          <div><small>Depois</small>
+                            @if(change.kind==='cancellation'){<span>Lançamento cancelado</span>}
+                            @else {
+                              @for(item of change.after.items;track item.productId){
+                                <span>{{item.quantity}}× {{item.productName}}</span>
+                              }
+                            }
+                          </div>
+                        </div>
                       </div>
                     } @empty {<p class="preview-hint">Nenhuma correção registrada neste lançamento.</p>}
                   }

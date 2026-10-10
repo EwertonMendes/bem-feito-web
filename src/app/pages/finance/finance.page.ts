@@ -1,3 +1,4 @@
+import { BfLoadingButton } from '../../shared/ui/button/loading-button';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
@@ -16,7 +17,7 @@ import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
 import { BfListSkeleton, BfSkeleton, BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
 @Component({
  selector: 'bf-finance-page',
- imports: [BfIcon, BfDialog, BfEmptyState, BfPageRefresh, BfListSkeleton, BfSkeleton, BfTableSkeleton, BfFinanceDialogs],
+ imports: [BfLoadingButton, BfIcon, BfDialog, BfEmptyState, BfPageRefresh, BfListSkeleton, BfSkeleton, BfTableSkeleton, BfFinanceDialogs],
  changeDetection: ChangeDetectionStrategy.OnPush,
  templateUrl: './finance.page.html',
  styleUrl: './finance.page.scss',
@@ -33,15 +34,23 @@ export class FinancePage {
  private readonly dialogs = viewChild.required<BfFinanceDialogs>('financeDialogs');
  private readonly expenseDetailDialog = viewChild.required<BfDialog>('expenseDetailDialog');
  readonly selectedExpense = signal<Expense | null>(null);
+ readonly receivingPurchase = signal(false);
+ readonly reversingPaymentId = signal('');
  readonly overdueOnly = signal(false);
  readonly tab = signal<'expenses' | 'receivables' | 'payments'>('expenses');
  async receiveSelectedPurchase(): Promise<void> {
+   if (this.receivingPurchase()) return;
    const selected = this.selectedExpense();
    if (!selected || selected.receiptStatus !== 'pending') return;
-   const result = await this.store.receivePurchase(selected.id);
-   if (!result) return;
-   this.catalog.applyStockChanges(result.stockChanges ?? []);
-   this.selectedExpense.set(result.expense);
+   this.receivingPurchase.set(true);
+   try {
+     const result = await this.store.receivePurchase(selected.id);
+     if (!result) return;
+     this.catalog.applyStockChanges(result.stockChanges ?? []);
+     this.selectedExpense.set(result.expense);
+   } finally {
+     this.receivingPurchase.set(false);
+   }
  }
  readonly currency = formatCurrency;
  readonly date = formatBusinessDate;
@@ -80,7 +89,11 @@ export class FinancePage {
        });
    }
  }
- openExpenseDetails(expense: Expense): void { this.selectedExpense.set(expense); this.expenseDetailDialog().open(); }
+ openExpenseDetails(expense: Expense): void {
+   if (this.receivingPurchase()) return;
+   this.selectedExpense.set(expense);
+   this.expenseDetailDialog().open();
+ }
  purchaseDescription(expense: Expense): string { return expense.items?.length ? expense.items.length+' insumo(s)' : this.inputName(expense.inputId); }
  purchaseUnit(inputId: string): string {
    const input = this.catalog.inputs().find(item => item.id === inputId);
@@ -95,9 +108,15 @@ export class FinancePage {
    if (tab === 'receivables') await Promise.all([this.sales.loadReceivables(), this.sales.loadReceivableSummary()]);
  }
  async reversePayment(paymentId: string): Promise<void> {
+   if (this.reversingPaymentId()) return;
    if (!window.confirm('Estornar este recebimento? O saldo da venda será reaberto.')) return;
-   const result = await this.sales.reversePayment(paymentId);
-   if (result) this.store.applyPaymentReversal(result.payment);
+   this.reversingPaymentId.set(paymentId);
+   try {
+     const result = await this.sales.reversePayment(paymentId);
+     if (result) this.store.applyPaymentReversal(result.payment);
+   } finally {
+     this.reversingPaymentId.set('');
+   }
  }
  paymentName(id: string): string { return this.settings.paymentMethods().find(x => x.id === id)?.name ?? 'Outro'; }
  categoryName(id?: string): string { return id ? this.settings.expenseCategories().find(x => x.id === id)?.name ?? '—' : '—'; }

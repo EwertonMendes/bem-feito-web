@@ -67,7 +67,7 @@
     }
   </div>
 
-  <dialog bfDialog #adjustmentDialog="bfDialog" class="bf-dialog">
+  <dialog bfDialog #adjustmentDialog="bfDialog" class="bf-dialog" [busy]="saving()">
     <div class="bf-dialog-header">
       <div><h2>Ajustar estoque</h2><small>{{selectedName()}}</small></div>
       <button class="bf-icon-button" type="button" aria-label="Fechar ajuste" (click)="adjustmentDialog.close()"><bf-icon name="close" /></button>
@@ -124,7 +124,7 @@
     </div>
     <div class="bf-dialog-footer">
       <button class="bf-button secondary" type="button" [disabled]="saving()" (click)="adjustmentDialog.close()">Cancelar</button>
-      <button class="bf-button" type="button" [disabled]="saving()" (click)="saveAdjustment()">{{saving()?'Registrando...':'Registrar ajuste'}}</button>
+      <button class="bf-button" type="button" [disabled]="saving()" [bfLoadingButton]="saving()" (click)="saveAdjustment()">{{saving()?'Registrando...':'Registrar ajuste'}}</button>
     </div>
   </dialog>
 

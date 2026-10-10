@@ -666,3 +666,24 @@ a { color: inherit; }
   from { opacity: 0; transform: translateY(7px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Spinner reutilizável para operações de gravação e outras ações externas. */
+.bf-button.bf-button-loading { cursor: progress; }
+.bf-button.bf-button-loading:disabled { opacity: .86; }
+.bf-button.bf-button-loading::before {
+  content: '';
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  box-sizing: border-box;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: bf-button-spin .7s linear infinite;
+}
+.bf-button.bf-button-loading bf-icon { display: none; }
+@keyframes bf-button-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .bf-button.bf-button-loading::before { animation-duration: 1.5s; }
+}

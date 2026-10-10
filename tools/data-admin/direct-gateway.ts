@@ -34,7 +34,7 @@ const FIELDS: Record<string, Record<string, FieldKind>> = {
   dataAdminSmoke: { value:'money' },
 };
 const CREATABLE = new Set(['collections','formats','units','paymentMethods','expenseCategories','dataAdminSmoke']);
-const DELETABLE = new Set(['dataAdminSmoke','fragrances','formats','expenseCategories']);
+const DELETABLE = new Set(['dataAdminSmoke','expenseCategories']);
 const MAX_PAYLOAD = 10000;
 const props = (v: unknown, keys: string[]) => {
   invariant(!!v && typeof v === 'object' && !Array.isArray(v), 'Expected object');
@@ -125,18 +125,14 @@ const statusInput = (d: Payload, stock: number) =>
     stock <= Number(d.minimumStock ?? 0) ? 'low' : 'ok';
 
 async function noDependents(db: Firestore, collection: string, id: string) {
-  const refs: Record<string, [string,string][]> = {
-    fragrances: [['products','fragranceId']],
-    formats: [['products','formatId'],['formatPrices','formatId']],
-    expenseCategories: [['expenses','categoryId'],['expenses','expenseCategoryId']],
-  };
-  for (const [target,field] of refs[collection] ?? []) {
-    const docs = await db.collection(target).where(field,'==',id).limit(1).get();
-    invariant(docs.empty, 'Document is referenced; deactivate it instead of deleting');
+  // Other reference catalogs can appear inside nested kit recipes and cannot be
+  // safely hard-deleted without a fully indexed dependency graph.
+  if (collection === 'expenseCategories') {
+    for (const field of ['categoryId','expenseCategoryId']) {
+      const doc = await db.collection('expenses').where(field,'==',id).limit(1).get();
+      invariant(doc.empty, 'Expense category is referenced; deactivate instead');
+    }
   }
-  // Formats can also occur in nested kit components. Without a complete inverse index,
-  // physical deletion could orphan a kit, therefore delete is intentionally rejected.
-  invariant(collection !== 'formats', 'Format may be referenced by kits; deactivate instead');
 }
 function snapshotData(row: Row, data: Payload | null) { row.after = encode(data); }
 async function createOrPatchOrDelete(db: Firestore,input: DirectRequest): Promise<Row[]> {

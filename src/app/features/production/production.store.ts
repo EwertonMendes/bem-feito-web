@@ -1,7 +1,8 @@
 import { effect, inject, Injectable, signal } from '@angular/core';
-import { Production, ProductionDraftItem } from '../../domain/models/production.model';
+import { Production, ProductionDraftItem, ProductionCorrectionDraft, ProductionCorrectionHistory, ProductionCorrectionPreview } from '../../domain/models/production.model';
 import { DataRevisionService } from '../../core/firebase/data-revision.service';
-import { ProductionCreateResult } from '../../core/repositories/mutation-results';
+import { ProductionCreateResult, ProductionCorrectionResult } from '../../core/repositories/mutation-results';
+import { ProductionCorrectionRepository } from '../../core/repositories/production-correction.repository';
 import { BusinessDateCursor, compareBusinessDateDesc } from '../../core/repositories/pagination';
 import { ProductionRepository } from '../../core/repositories/production.repository';
 import { ErrorService } from '../../core/services/error.service';
@@ -13,6 +14,7 @@ const PAGE_SIZE = 40;
 @Injectable({ providedIn: 'root' })
 export class ProductionStore {
   private readonly repository = inject(ProductionRepository);
+  private readonly corrections = inject(ProductionCorrectionRepository);
   private readonly revisions = inject(DataRevisionService);
   private readonly toast = inject(ToastService);
   private readonly errors = inject(ErrorService);
@@ -78,6 +80,30 @@ export class ProductionStore {
       this.hasMoreState.set(page.hasMore);
     } catch (error) {
       this.toast.error(this.errors.message(error));
+    }
+  }
+
+  async history(productionId: string): Promise<ProductionCorrectionHistory[]> {
+    return this.corrections.history(productionId);
+  }
+
+  async previewCorrection(productionId: string, draft: ProductionCorrectionDraft): Promise<ProductionCorrectionPreview> {
+    return this.corrections.preview(productionId, draft);
+  }
+
+  async correct(productionId: string, draft: ProductionCorrectionDraft): Promise<ProductionCorrectionResult | null> {
+    this.operationErrorState.set('');
+    try {
+      const result = await this.corrections.apply(productionId, draft);
+      this.itemsState.update(items => items.map(item => item.id === result.production.id ? result.production : item)
+        .sort(compareBusinessDateDesc));
+      this.toast.success(draft.cancel ? 'Produção cancelada e estoque reconciliado.' : 'Produção corrigida com sucesso.');
+      return result;
+    } catch (error) {
+      const message = this.errors.message(error);
+      this.operationErrorState.set(message);
+      this.toast.error(message);
+      return null;
     }
   }
 

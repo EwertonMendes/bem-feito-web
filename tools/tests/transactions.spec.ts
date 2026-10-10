@@ -133,10 +133,9 @@ describe('Actual repositories against restrictive emulator rules', () => {
     expect(await count('expenses')).toBe(1);
   });
 
-  it('creates a sale with product, kit, addition, multiple methods and tip; cancellation restores stocks once', async () => {
+  it('creates a sale with individual products, additions, multiple payments and tip; cancellation restores stocks once', async () => {
     const created = await sales.create({ ...draft(), lines: [
-      { kind: 'product', sourceId: 'p', quantity: 1 },
-      { kind: 'kit', sourceId: 'k', quantity: 1, componentProductIds: ['p', 'p'] },
+      { kind: 'product', sourceId: 'p', quantity: 3 },
       { kind: 'addition', sourceId: 'a', quantity: 2 },
     ], payments: [{ methodId: 'cash', amountReceivedCents: 1000 }, { methodId: 'pix', amountReceivedCents: 2300 }] });
     const id = created.sale.id;

@@ -41,6 +41,17 @@ test('Migration excludes template slots, converts Sheets dates, preserves source
     const failed = run('validate-export.mjs', dataPath);
     assert.equal(failed.status, 1);
     assert.match(failed.stderr, /histórico não reconcilia/);
+    const safe = spawnSync(process.execPath, ['tools/migration/validate-export.mjs', dataPath], {
+      encoding: 'utf8',
+      env: { ...process.env, MIGRATION_SAFE_DIAGNOSTICS: '1' },
+    });
+    assert.equal(safe.status, 1);
+    const match = safe.stderr.match(/^MIGRATION_SAFE_DIAGNOSTICS=(.+)$/m);
+    assert.ok(match);
+    const diagnostic = JSON.parse(match[1]);
+    assert.equal(diagnostic.categories['stock-ledger'], 1);
+    assert.equal(diagnostic.count, 1);
+    assert.equal(JSON.stringify(diagnostic).includes('inputs/i'), false);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 

@@ -1,3 +1,4 @@
+import { BfLoadingButton } from '../../shared/ui/button/loading-button';
 import { ChangeDetectionStrategy, Component, DestroyRef, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Sale } from '../../domain/models/sales.model';
@@ -14,7 +15,7 @@ import { BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
 
 @Component({
   selector: 'bf-sales-page',
-  imports: [BfIcon, BfDialog, BfEmptyState, BfPageRefresh, BfTableSkeleton],
+  imports: [BfLoadingButton, BfIcon, BfDialog, BfEmptyState, BfPageRefresh, BfTableSkeleton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sales.page.html',
   styleUrl: './sales.page.scss',
@@ -32,6 +33,7 @@ export class SalesPage {
   readonly date = formatBusinessDate;
   readonly search = signal('');
   readonly statusFilter = signal<'all' | 'paid' | 'open' | 'cancelled'>('all');
+  readonly pendingAction = signal<'ready' | 'delivered' | 'cancel' | null>(null);
   private readonly selectedSnapshot = signal<Sale | null>(null);
   readonly selectedSale = computed(() => {
     const snapshot = this.selectedSnapshot();
@@ -65,6 +67,7 @@ export class SalesPage {
   }
 
   openDetails(sale: Sale): void {
+    if (this.pendingAction()) return;
     this.selectedSnapshot.set(sale);
     this.detailDialog().open();
   }
@@ -76,22 +79,34 @@ export class SalesPage {
   }
 
   async advanceSelected(next: 'ready' | 'delivered'): Promise<void> {
+    if (this.pendingAction()) return;
     const sale = this.selectedSale();
     if (!sale || sale.status !== 'active') return;
-    const result = await this.store.advanceFulfillment(sale.id, next);
-    if (!result) return;
-    this.catalog.applyStockChanges(result.stockChanges);
-    this.selectedSnapshot.set(result.sale);
+    this.pendingAction.set(next);
+    try {
+      const result = await this.store.advanceFulfillment(sale.id, next);
+      if (!result) return;
+      this.catalog.applyStockChanges(result.stockChanges);
+      this.selectedSnapshot.set(result.sale);
+    } finally {
+      this.pendingAction.set(null);
+    }
   }
 
   async cancelSelected(): Promise<void> {
+    if (this.pendingAction()) return;
     const sale = this.selectedSale();
     if (!sale || sale.status === 'cancelled' || !window.confirm('Cancelar ' + sale.code + '? O estoque será revertido e os recebimentos serão estornados.')) return;
-    const result = await this.store.cancel(sale);
-    if (!result) return;
-    this.catalog.applyStockChanges(result.stockChanges);
-    this.selectedSnapshot.set(result.sale);
-    this.detailDialog().close();
+    this.pendingAction.set('cancel');
+    try {
+      const result = await this.store.cancel(sale);
+      if (!result) return;
+      this.catalog.applyStockChanges(result.stockChanges);
+      this.selectedSnapshot.set(result.sale);
+      this.detailDialog().closeAfterSuccess();
+    } finally {
+      this.pendingAction.set(null);
+    }
   }
 
   paymentStatusLabel(sale: Sale): string {

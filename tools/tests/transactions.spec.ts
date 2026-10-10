@@ -137,13 +137,13 @@ describe('Actual repositories against restrictive emulator rules', () => {
     const created = await sales.create({ ...draft(), lines: [
       { kind: 'product', sourceId: 'p', quantity: 3 },
       { kind: 'addition', sourceId: 'a', quantity: 2 },
-    ], payments: [{ methodId: 'cash', amountReceivedCents: 1000 }, { methodId: 'pix', amountReceivedCents: 2300 }] });
+    ], payments: [{ methodId: 'cash', amountReceivedCents: 1000 }, { methodId: 'pix', amountReceivedCents: 2500 }] });
     const id = created.sale.id;
     expect(created.sale).toMatchObject({ cogsCents: 1700, itemsSold: 3, missingCostItems: 0, analyticsVersion: 1 });
     expect(created.stockChanges).toHaveLength(2);
     expect(await data('products', 'p')).toMatchObject({ stock: 7 });
     expect(await data('inputs', 'i')).toMatchObject({ stock: 18 });
-    expect(await data('sales', id)).toMatchObject({ totalCents: 3200, receivedCents: 3200, tipCents: 100, balanceCents: 0, paymentStatus: 'paid' });
+    expect(await data('sales', id)).toMatchObject({ totalCents: 3400, receivedCents: 3400, tipCents: 100, balanceCents: 0, paymentStatus: 'paid' });
     expect(await count('payments')).toBe(2);
     await sales.cancel(id);
     expect(await data('products', 'p')).toMatchObject({ stock: 10 });

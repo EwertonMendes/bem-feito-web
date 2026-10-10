@@ -84,7 +84,7 @@ export type BfIconName =
   // Generic actions, media and states
   | 'plus' | 'minus' | 'search' | 'sun' | 'moon' | 'logout' | 'close' | 'trash' | 'image'
   | 'calendar' | 'alert' | 'info' | 'chevron-right' | 'arrow-right' | 'eye' | 'check'
-  | 'tick' | 'upload' | 'more';
+  | 'tick' | 'upload' | 'more' | 'history';
 
 const ICONS = {
   dashboard: LucideLayoutDashboard,
@@ -152,6 +152,7 @@ const ICONS = {
   tick: LucideCheck,
   upload: LucideUpload,
   more: LucideEllipsis,
+  history: LucideClock3,
 } as const satisfies Record<BfIconName, unknown>;
 
 @Component({

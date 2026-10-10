@@ -34,3 +34,35 @@
 .day-actions>.bf-button{width:100%;min-width:0;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 8px;font-size:.81rem}
 @media(max-width:880px){.production-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:480px){.production-filters{grid-template-columns:minmax(0,1fr)}.day-grid{grid-template-columns:minmax(0,1fr)}}
+
+.production-entries{display:grid;gap:10px;margin-top:10px}
+.production-entry{border:1px solid var(--line);border-radius:14px;background:var(--surface-2);padding:14px;min-width:0}
+.entry-heading,.entry-actions{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.entry-heading>div{display:grid;gap:4px}.entry-heading strong{font-size:.94rem}
+.entry-heading small{color:var(--muted);font-size:.75rem}
+.entry-products{display:grid;gap:5px;margin:11px 0;color:var(--muted-strong);font-size:.81rem;overflow-wrap:anywhere}
+.entry-actions{justify-content:flex-start;flex-wrap:wrap;margin-top:10px}
+.entry-actions .bf-button{min-height:38px;padding:7px 12px;font-size:.78rem}
+.entry-actions bf-icon,.entry-actions svg{width:15px;height:15px;flex:none}
+.entry-history{border-top:1px solid var(--line);padding-top:10px;margin-top:12px;display:grid;gap:8px}
+.history-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;padding:10px;border-radius:10px;background:var(--surface)}
+.history-row>div{display:grid;gap:3px}.history-row small{color:var(--muted);font-size:.7rem}
+.history-row>span{font-size:.75rem;color:var(--muted-strong);font-weight:650}
+.history-row p{grid-column:1/-1;margin:0;font-size:.8rem;overflow-wrap:anywhere}
+@media(max-width:480px){.production-entry{padding:12px}
+.entry-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+.entry-actions .bf-button{min-width:0;padding:8px 5px}
+.entry-actions .bf-button:only-child{grid-column:1/-1}
+.history-row{grid-template-columns:minmax(0,1fr)}}
+
+.history-snapshot{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.history-snapshot>div{min-width:0;display:grid;align-content:start;gap:5px;background:var(--surface-2);border-radius:8px;padding:9px}
+.history-snapshot small{color:var(--muted);font-weight:700}
+.history-snapshot span{font-size:.74rem;overflow-wrap:anywhere}
+@media(max-width:520px){.history-snapshot{grid-template-columns:1fr}}
+
+/* Pagination follows the grid instead of touching the last day card. */
+.production-load-more{margin-top:22px;justify-content:flex-end}
+.production-load-more .bf-button{min-height:44px;display:inline-flex;align-items:center;gap:8px}
+.production-load-more .load-more-chevron{display:inline-flex;align-items:center;justify-content:center;transform:rotate(90deg)}
+@media(max-width:640px){.production-load-more{justify-content:center;margin-top:20px}}

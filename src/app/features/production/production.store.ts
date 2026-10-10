@@ -26,12 +26,14 @@ export class ProductionStore {
   private readonly loadingState = signal(false);
   private readonly initializedState = signal(false);
   private readonly hasMoreState = signal(false);
+  private readonly loadingMoreState = signal(false);
   private readonly operationErrorState = signal('');
 
   readonly items = this.itemsState.asReadonly();
   readonly loading = this.loadingState.asReadonly();
   readonly initialized = this.initializedState.asReadonly();
   readonly hasMore = this.hasMoreState.asReadonly();
+  readonly loadingMore = this.loadingMoreState.asReadonly();
   readonly operationError = this.operationErrorState.asReadonly();
 
   constructor() {
@@ -69,7 +71,8 @@ export class ProductionStore {
   }
 
   async loadMore(): Promise<void> {
-    if (!this.hasMoreState() || !this.cursor) return;
+    if (this.loadingState() || this.loadingMoreState() || !this.hasMoreState() || !this.cursor) return;
+    this.loadingMoreState.set(true);
     try {
       const page = await this.repository.page(PAGE_SIZE, this.cursor);
       const known = new Set(this.itemsState().map((item) => item.id));
@@ -78,7 +81,15 @@ export class ProductionStore {
       this.hasMoreState.set(page.hasMore);
     } catch (error) {
       this.toast.error(this.errors.message(error));
+    } finally {
+      this.loadingMoreState.set(false);
     }
+  }
+
+  /** State update after an atomic correction, without reloading the entire page. */
+  applyCorrection(production: Production): void {
+    this.itemsState.update(items => items.map(item => item.id === production.id ? production : item)
+      .sort(compareBusinessDateDesc));
   }
 
   clearOperationError(): void {

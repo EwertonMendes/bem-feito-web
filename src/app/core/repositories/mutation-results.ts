@@ -1,6 +1,6 @@
 import { Expense } from '../../domain/models/finance.model';
 import { StockAdjustment, StockMovement } from '../../domain/models/inventory.model';
-import { Production } from '../../domain/models/production.model';
+import { Production, ProductionCorrectionImpact } from '../../domain/models/production.model';
 import { Payment, Sale } from '../../domain/models/sales.model';
 
 export interface StockChange {
@@ -56,5 +56,11 @@ export interface StockAdjustmentResult {
 
 export interface SaleFulfillmentResult {
   sale: Sale;
+  stockChanges: StockChange[];
+}
+
+export interface ProductionCorrectionResult {
+  production: Production;
+  impacts: ProductionCorrectionImpact[];
   stockChanges: StockChange[];
 }

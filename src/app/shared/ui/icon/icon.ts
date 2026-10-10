@@ -28,8 +28,6 @@ import {
   LucideFactory,
   LucideFlaskConical,
   LucideHandCoins,
-  LucideHistory,
-  LucidePencil,
   LucideImage,
   LucideInfo,
   LucideLayoutDashboard,
@@ -154,8 +152,8 @@ const ICONS = {
   tick: LucideCheck,
   upload: LucideUpload,
   more: LucideEllipsis,
-  edit: LucidePencil,
-  history: LucideHistory,
+  edit: LucideWrench,
+  history: LucideClock3,
 } as const satisfies Record<BfIconName, unknown>;
 
 @Component({

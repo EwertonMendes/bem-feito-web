@@ -117,7 +117,9 @@ export class ProductionCorrectionEditor {
     }
     const draft: ProductionCorrectionDraft = {
       expectedVersion: production.correctionVersion ?? 0,
-      businessDate: this.date(), notes: this.notes(), reason: this.reason().trim(), cancel, lines,
+      businessDate: cancel ? production.businessDate : this.date(),
+      notes: cancel ? (production.notes ?? '') : this.notes(),
+      reason: this.reason().trim(), cancel, lines,
     };
     this.error.set('');
     this.reviewingCancellation.set(cancel);

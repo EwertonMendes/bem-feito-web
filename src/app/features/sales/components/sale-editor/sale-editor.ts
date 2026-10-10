@@ -25,6 +25,7 @@ import { BfConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-di
 import { BfDialog } from '../../../../shared/ui/dialog/dialog';
 import { BfIcon } from '../../../../shared/ui/icon/icon';
 import { BfSelect, BfSelectOption } from '../../../../shared/ui/select/select';
+import { BfSelectSearch } from '../../../../shared/ui/select-search/select-search';
 import { paymentMethodIcon } from '../../../../shared/ui/select/payment-method-icon';
 import { BfNumberInput } from '../../../../shared/ui/number-input/number-input';
 
@@ -83,7 +84,7 @@ interface KitAvailability {
 
 @Component({
   selector: 'bf-sale-editor',
-  imports: [FormField, BfConfirmDialog, BfDialog, BfIcon, CatalogImage, BfSelect, BfNumberInput],
+  imports: [FormField, BfConfirmDialog, BfDialog, BfIcon, CatalogImage, BfSelect, BfSelectSearch, BfNumberInput],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sale-editor.html',
   styleUrl: './sale-editor.scss',
@@ -420,6 +421,7 @@ export class SaleEditor {
       value: product.id,
       label: product.displayName,
       description: 'Estoque ' + product.stock,
+      image: product.image,
     }));
   }
 

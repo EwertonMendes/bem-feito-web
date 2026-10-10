@@ -14,6 +14,8 @@ import {
 } from '@angular/core';
 import { FormValueControl } from '@angular/forms/signals';
 import { BfIcon, BfIconName } from '../icon/icon';
+import { CatalogImage } from '../../media/catalog-image/catalog-image';
+import { CatalogImageRef } from '../../../domain/models/image.model';
 
 export interface BfSelectOption {
   value: string;
@@ -21,6 +23,8 @@ export interface BfSelectOption {
   description?: string;
   icon?: BfIconName;
   imageSrc?: string;
+  /** Imagem privada gerenciada pelo Google Drive; carregada apenas quando visível. */
+  image?: CatalogImageRef;
   imageAlt?: string;
   disabled?: boolean;
 }
@@ -29,7 +33,7 @@ let selectSequence = 0;
 
 @Component({
   selector: 'bf-select',
-  imports: [BfIcon],
+  imports: [BfIcon, CatalogImage],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './select.html',
   styleUrl: './select.scss',
@@ -52,6 +56,20 @@ export class BfSelect implements FormValueControl<string> {
   readonly descriptive = input(false);
   readonly touch = output<void>();
 
+  /** O variant bf-select-search herda toda a lógica e habilita o campo de pesquisa. */
+  readonly searchable: boolean = false;
+  readonly searchQuery = signal('');
+  readonly filteredOptions = computed(() => {
+    const options = this.options();
+    if (!this.searchable) return options;
+    const term = normalizeSelectText(this.searchQuery());
+    if (!term) return options;
+    return options.filter(option => option.value && normalizeSelectText(
+      option.label + ' ' + (option.description ?? '')
+    ).includes(term));
+  });
+
+  private readonly searchInput = viewChild<ElementRef<HTMLInputElement>>('searchInput');
   readonly open = signal(false);
   readonly activeIndex = signal(-1);
   readonly selectedOption = computed(() => this.options().find((option) => option.value === this.value()));
@@ -73,7 +91,8 @@ export class BfSelect implements FormValueControl<string> {
 
   openMenu(): void {
     if (this.disabled() || this.open()) return;
-    const options = this.options();
+    this.searchQuery.set('');
+    const options = this.filteredOptions();
     const selectedIndex = options.findIndex((option) => option.value === this.value() && !option.disabled);
     this.activeIndex.set(selectedIndex >= 0 ? selectedIndex : this.firstEnabledIndex());
     this.open.set(true);
@@ -81,7 +100,10 @@ export class BfSelect implements FormValueControl<string> {
     const menu = this.menu().nativeElement;
     if (!menu.matches(':popover-open')) menu.showPopover();
     this.bindViewportListeners();
-    requestAnimationFrame(() => this.positionMenu());
+    requestAnimationFrame(() => {
+      this.positionMenu();
+      if (this.searchable) this.searchInput()?.nativeElement.focus({ preventScroll: true });
+    });
   }
 
   close(restoreFocus = false): void {
@@ -98,6 +120,20 @@ export class BfSelect implements FormValueControl<string> {
     this.value.set(option.value);
     this.activeIndex.set(index);
     this.close(true);
+  }
+
+  onSearchInput(value: string): void {
+    this.searchQuery.set(value);
+    this.activeIndex.set(this.firstEnabledIndex());
+    this.scrollActiveIntoView();
+    requestAnimationFrame(() => this.positionMenu());
+  }
+
+  onSearchKeydown(event: KeyboardEvent): void {
+    if (['ArrowDown', 'ArrowUp', 'Enter', 'Escape', 'Tab'].includes(event.key)) {
+      event.stopPropagation();
+      this.onTriggerKeydown(event);
+    }
   }
 
   onTriggerKeydown(event: KeyboardEvent): void {
@@ -134,7 +170,7 @@ export class BfSelect implements FormValueControl<string> {
     if ((event.key === 'Enter' || event.key === ' ') && this.open()) {
       event.preventDefault();
       const index = this.activeIndex();
-      const option = this.options()[index];
+      const option = this.filteredOptions()[index];
       if (option) this.select(option, index);
       return;
     }
@@ -169,7 +205,7 @@ export class BfSelect implements FormValueControl<string> {
   }
 
   private moveActive(delta: 1 | -1): void {
-    const options = this.options();
+    const options = this.filteredOptions();
     if (!options.length) return;
 
     let index = this.activeIndex();
@@ -184,11 +220,11 @@ export class BfSelect implements FormValueControl<string> {
   }
 
   private firstEnabledIndex(): number {
-    return this.options().findIndex((option) => !option.disabled);
+    return this.filteredOptions().findIndex((option) => !option.disabled);
   }
 
   private lastEnabledIndex(): number {
-    const options = this.options();
+    const options = this.filteredOptions();
     for (let index = options.length - 1; index >= 0; index -= 1) {
       if (!options[index]?.disabled) return index;
     }
@@ -253,4 +289,9 @@ export class BfSelect implements FormValueControl<string> {
     menu.style.top = `${top}px`;
     menu.style.maxHeight = `${finalHeight}px`;
   }
+}
+
+/** Filtro tolerante a acentos, caixa e espaços para nomes de catálogo. */
+export function normalizeSelectText(value: string): string {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
 }

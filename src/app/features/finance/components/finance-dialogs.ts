@@ -13,6 +13,7 @@ import { BfIcon } from '../../../shared/ui/icon/icon';
 import { BfDialog } from '../../../shared/ui/dialog/dialog';
 import { BfCheckbox } from '../../../shared/ui/checkbox/checkbox';
 import { BfSelect, BfSelectOption } from '../../../shared/ui/select/select';
+import { BfSelectSearch } from '../../../shared/ui/select-search/select-search';
 import { paymentMethodIcon } from '../../../shared/ui/select/payment-method-icon';
 import { BfNumberInput } from '../../../shared/ui/number-input/number-input';
 interface PurchaseFormLine { id: string; inputId: string; quantity: number; amount: number; }
@@ -44,7 +45,7 @@ interface ExpenseFormModel {
 }
 @Component({
  selector: 'bf-finance-dialogs',
- imports: [FormField, BfIcon, BfDialog, BfSelect, BfCheckbox, BfNumberInput],
+ imports: [FormField, BfIcon, BfDialog, BfSelect, BfSelectSearch, BfCheckbox, BfNumberInput],
  changeDetection: ChangeDetectionStrategy.OnPush,
  templateUrl: './finance-dialogs.html',
  styleUrl: './finance-dialogs.scss',

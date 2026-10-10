@@ -247,7 +247,7 @@
                             </div>
                           }
                           @if(group.allocated<group.target && group.candidates.length) {
-                            <bf-select [compact]="true" value=""
+                            <bf-select-search [compact]="true" value=""
                               [ariaLabel]="'Adicionar fragrância em ' + group.label"
                               [options]="[{value:'',label:'Adicionar outro produto'},...productSelectOptions(group.candidates)]"
                               (valueChange)="addKitGroupProduct(line,group.index,$event)" />

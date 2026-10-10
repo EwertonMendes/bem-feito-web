@@ -18,7 +18,7 @@
           <div class="cost-head"><div><strong>Componentes de custo padrão</strong><small>{{costScopeHint()}}</small></div><button class="bf-button secondary" type="button" (click)="addCostComponent()">+ Insumo</button></div>
           @for(component of costComponents();track $index;let i=$index){
             <div class="cost-row">
-              <bf-select [value]="component.inputId" (valueChange)="selectCostInput(i,$event)" [options]="costInputOptions()" ariaLabel="Insumo" />
+              <bf-select-search [value]="component.inputId" (valueChange)="selectCostInput(i,$event)" [options]="costInputOptions()" ariaLabel="Insumo" />
               <bf-number-input kind="decimal" [decimals]="3" [min]="0" [value]="component.quantity" (valueChange)="patchCostComponent(i,{quantity:$event})" ariaLabel="Quantidade do componente" />
               <span class="cost-unit">{{unitName(component.unitId)}}</span>
               <span class="cost-money"><small>{{componentUnitCostLabel(component)}}</small><strong>{{componentTotalCostLabel(component)}}</strong></span>

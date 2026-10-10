@@ -7,7 +7,7 @@
         <div class="section-head"><strong>Sabonetes fabricados</strong><span>{{previews().units}} unidades</span></div>
         @for(line of lines(); track line.id) {
           <div class="production-line">
-            <label class="bf-field product-picker"><span>Produto</span><bf-select [value]="line.productId" (valueChange)="changeProduct(line.id,$event)" [options]="productOptions()" ariaLabel="Produto produzido" /></label>
+            <label class="bf-field product-picker"><span>Produto</span><bf-select-search [value]="line.productId" (valueChange)="changeProduct(line.id,$event)" [options]="productOptions()" ariaLabel="Produto produzido" /></label>
             <label class="bf-field quantity-picker"><span>Quantidade</span><bf-number-input kind="integer" [min]="1" [value]="line.quantity" (valueChange)="changeQuantity(line.id,$event)" ariaLabel="Quantidade produzida" /></label>
             <button class="bf-icon-button remove-line" type="button" [disabled]="lines().length===1" (click)="removeLine(line.id)" aria-label="Remover produto"><bf-icon name="trash" /></button>
           </div>

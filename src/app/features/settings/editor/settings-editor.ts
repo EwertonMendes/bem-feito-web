@@ -10,6 +10,7 @@ import { formatCurrency, fromCents, toCents } from '../../../core/utils/money';
 import { BfIcon } from '../../../shared/ui/icon/icon';
 import { BfDialog } from '../../../shared/ui/dialog/dialog';
 import { BfSelect, BfSelectOption } from '../../../shared/ui/select/select';
+import { BfSelectSearch } from '../../../shared/ui/select-search/select-search';
 import { BfCheckbox } from '../../../shared/ui/checkbox/checkbox';
 import { BfNumberInput } from '../../../shared/ui/number-input/number-input';
 
@@ -24,7 +25,7 @@ interface ExpenseTypeModel extends SimpleModel { kind: ExpenseType['kind']; }
 
 @Component({
  selector: 'bf-settings-editor',
- imports: [FormField, BfIcon, BfDialog, BfSelect, BfCheckbox, BfNumberInput],
+ imports: [FormField, BfIcon, BfDialog, BfSelect, BfSelectSearch, BfCheckbox, BfNumberInput],
  changeDetection: ChangeDetectionStrategy.OnPush,
  templateUrl: './settings-editor.html',
  styleUrl: './settings-editor.scss'

@@ -7,14 +7,9 @@ export type Find = { name: string; collection: string; filters: Filter[]; limit:
 export type Lookup = { name: string; from: string; path: string; collection: string; limit: number };
 export type QueryPlan = { schemaVersion: 1; environment: 'dev'; projectId: 'bem-feito-dev'; queries: Find[]; lookups?: Lookup[] };
 
-const COLLECTIONS = new Set([
-  'collections', 'fragrances', 'formats', 'formatPrices', 'units', 'paymentMethods',
-  'expenseCategories', 'expenseTypes', 'inputs', 'products', 'kits', 'additions',
-  'expenses', 'productions', 'sales', 'payments', 'stockAdjustments', 'stockMovements',
-]);
+const RESERVED_COLLECTIONS = new Set(['system','dataAdminOperations','migrationRuns','migrationSources','counters']);
 const MAX_TOTAL = 120;
 const FIELD = /^[A-Za-z][A-Za-z0-9_]{0,63}(?:\.[A-Za-z][A-Za-z0-9_]{0,63}){0,3}$/;
-const SECRET_FIELDS = new Set(['customerName', 'customerPhone', 'customerEmail', 'phone', 'email', 'address', 'notes', 'description']);
 const exact = (value: Record<string, unknown>, allowed: string[]) => {
   if (Object.keys(value).some(k => !allowed.includes(k) || ['__proto__', 'prototype', 'constructor'].includes(k))) throw Error('Unexpected query property');
 };
@@ -23,7 +18,7 @@ const obj = (v: unknown): Record<string, unknown> => {
   return v as Record<string, unknown>;
 };
 const field = (v: unknown): string => {
-  if (typeof v !== 'string' || !FIELD.test(v) || v.split('.').some(k => SECRET_FIELDS.has(k))) throw Error('Query field not allowed');
+  if (typeof v !== 'string' || !FIELD.test(v)) throw Error('Query field not allowed');
   return v;
 };
 const name = (v: unknown): string => {
@@ -31,7 +26,7 @@ const name = (v: unknown): string => {
   return v;
 };
 const collection = (v: unknown): string => {
-  if (typeof v !== 'string' || !COLLECTIONS.has(v)) throw Error('Collection not allowed');
+  if (typeof v !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$/.test(v) || RESERVED_COLLECTIONS.has(v)) throw Error('Invalid or protected collection');
   return v;
 };
 const count = (v: unknown, max: number): number => {
@@ -57,7 +52,7 @@ export function validateQueryPlan(input: string): QueryPlan {
     const q = obj(candidate); exact(q, ['name', 'collection', 'filters', 'limit', 'orderBy', 'select']);
     const id = name(q.name); if (aliases.has(id)) throw Error('Duplicate query name'); aliases.add(id);
     collection(q.collection); total += count(q.limit, 40);
-    if (!Array.isArray(q.filters) || q.filters.length < 1 || q.filters.length > 3) throw Error('A bounded filtered query is required');
+    if (!Array.isArray(q.filters) || q.filters.length > 3) throw Error('Invalid filters');
     for (const f of q.filters) {
       const v = obj(f); exact(v, ['field', 'op', 'value']); field(v.field);
       if (!['==', '>', '<', '>=', '<=', 'in'].includes(String(v.op))) throw Error('Filter operator not allowed');
@@ -85,7 +80,7 @@ export function validateQueryPlan(input: string): QueryPlan {
     aliases.add(alias); collection(l.collection); total += count(l.limit, 40);
     if (typeof l.path !== 'string' || l.path.length > 140 ||
         !/^[A-Za-z][A-Za-z0-9_]*(?:\[\])?(?:\.[A-Za-z][A-Za-z0-9_]*(?:\[\])?){0,3}$/.test(l.path) ||
-        l.path.split('.').some(s => SECRET_FIELDS.has(s.replace('[]', '')))) throw Error('Invalid lookup path');
+        l.path.split('.').some(s => ['__proto__','constructor','prototype'].includes(s.replace('[]', '')))) throw Error('Invalid lookup path');
   }
   if (total > MAX_TOTAL) throw Error('Request exceeds the 120-document read budget');
   return plan as QueryPlan;

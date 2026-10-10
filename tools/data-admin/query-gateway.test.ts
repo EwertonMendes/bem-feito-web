@@ -11,8 +11,8 @@ test('query restrictions prevent broad or unauthorized requests', () => {
   for (const p of [
     {...basic,projectId:'other-project'},
     {...basic,queries:[{...basic.queries[0],limit:1000}]},
-    {...basic,queries:[{...basic.queries[0],filters:[]}]},
-    {...basic,queries:[{...basic.queries[0],collection:'users'}]},
+    {...basic,queries:[{...basic.queries[0],collection:'system'}]},
+    {...basic,queries:[{...basic.queries[0],filters:[{field:'illegal field',op:'==',value:1}]}]},
   ]) assert.throws(()=>validateQueryPlan(JSON.stringify(p)));
 });
 test('result encryption uses authenticated RSA and AES and hides its plaintext', () => {
@@ -28,4 +28,14 @@ test('result encryption uses authenticated RSA and AES and hides its plaintext',
   decipher.setAuthTag(Buffer.from(envelope.tag,'base64url'));
   const result=Buffer.concat([decipher.update(Buffer.from(envelope.data,'base64url')),decipher.final()]).toString();
   assert.equal(result,plain);
+});
+
+test('all ordinary collections and fields can be queried with bounded limits', () => {
+  const query={...basic,queries:[{
+    name:'orders',collection:'expenses',filters:[],limit:20,
+    select:['receiptStatus','notes','fundingSource','amountCents']
+  }]};
+  assert.equal(validateQueryPlan(JSON.stringify(query)).queries[0].select?.[1],'notes');
+  const users={...basic,queries:[{name:'any',collection:'users',filters:[],limit:5}]};
+  assert.equal(validateQueryPlan(JSON.stringify(users)).queries[0].collection,'users');
 });

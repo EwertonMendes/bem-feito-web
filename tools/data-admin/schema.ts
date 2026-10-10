@@ -6,7 +6,7 @@ export type Target = { collection: string; id: string };
 export type Change = Target & { action: 'create' | 'update' | 'delete'; expected: Payload | null; values?: Payload };
 export type Request = {
   schemaVersion: 1; id: string; environment: Environment; projectId: string;
-  operation: 'read' | 'inspect' | 'verify' | 'create' | 'update' | 'delete' | 'batch-update' | 'backup' | 'restore' | 'migrate' | 'revert-test-production';
+  operation: 'read' | 'inspect' | 'verify' | 'create' | 'update' | 'delete' | 'batch-update' | 'backup' | 'restore' | 'migrate';
   targets?: Target[]; changes?: Change[]; backup?: string; migration?: 'legacy-sheets-v1';
   deploymentSha?: string; destructive?: { projectId: string; paths: string[] };
 };
@@ -76,7 +76,7 @@ export function validateRequest(value: unknown): Request {
   invariant(value.schemaVersion === 1, 'Unknown schema version'); identifier(value.id);
   invariant(['dev', 'prod'].includes(String(value.environment)), 'Unknown environment');
   invariant(typeof value.projectId === 'string' && /^[a-z][a-z0-9-]{5,29}$/.test(value.projectId), 'Invalid project ID');
-  const operations = ['read', 'inspect', 'verify', 'create', 'update', 'delete', 'batch-update', 'backup', 'restore', 'migrate', 'revert-test-production'];
+  const operations = ['read', 'inspect', 'verify', 'create', 'update', 'delete', 'batch-update', 'backup', 'restore', 'migrate'];
   invariant(operations.includes(String(value.operation)), 'Operation not allowed');
   const op = String(value.operation);
   if (['read', 'inspect', 'verify', 'backup'].includes(op)) {
@@ -86,12 +86,6 @@ export function validateRequest(value: unknown): Request {
   } else if (op === 'restore') {
     digest(value.backup);
     invariant(value.targets === undefined && value.changes === undefined && value.migration === undefined && value.deploymentSha === undefined, 'Incompatible restore fields');
-  } else if (op === 'revert-test-production') {
-    invariant(value.environment === 'dev' && value.projectId === 'bem-feito-dev', 'DEV-only test reversal');
-    invariant(Array.isArray(value.targets) && value.targets.length === 1, 'Exactly one production target required');
-    value.targets.forEach(target);
-    invariant(value.targets[0].collection === 'productions' && value.targets[0].id === 'vz7mI3n8Yw6f0WUQ97nO', 'Unregistered production reversal');
-    invariant(value.changes === undefined && value.backup === undefined && value.migration === undefined && value.deploymentSha === undefined, 'Incompatible correction fields');
   } else if (op === 'migrate') {
     invariant(value.environment === 'dev' && value.projectId === 'bem-feito-dev', 'Migration is DEV only');
     invariant(value.migration === 'legacy-sheets-v1', 'Unknown registered migration'); sha(value.deploymentSha);
@@ -125,9 +119,9 @@ export function validateRequest(value: unknown): Request {
     object(value.destructive); exact(value.destructive, ['projectId', 'paths']);
     invariant(value.destructive.projectId === value.projectId, 'Destructive project confirmation differs');
     invariant(Array.isArray(value.destructive.paths) && value.destructive.paths.length > 0 && value.destructive.paths.every(p => typeof p === 'string' && /^[A-Za-z][A-Za-z0-9]*(\/[A-Za-z0-9][A-Za-z0-9_-]{0,99})?$/.test(p)), 'Invalid destructive scope');
-    invariant(['delete', 'migrate', 'restore', 'revert-test-production'].includes(op), 'Unneeded destructive confirmation');
+    invariant(['delete', 'migrate', 'restore'].includes(op), 'Unneeded destructive confirmation');
   }
-  if (['delete', 'migrate', 'restore', 'revert-test-production'].includes(op)) invariant(value.destructive !== undefined, 'Explicit destructive project and scope required');
+  if (['delete', 'migrate', 'restore'].includes(op)) invariant(value.destructive !== undefined, 'Explicit destructive project and scope required');
   const paths = ((value.targets ?? value.changes ?? []) as Target[]).map(p => p.collection + '/' + p.id);
   invariant(new Set(paths).size === paths.length, 'Duplicate target');
   return value as Request;

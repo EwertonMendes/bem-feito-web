@@ -16,7 +16,7 @@ on:
         required: false
       mode:
         type: choice
-        options: [preview, apply, query]
+        options: [preview, apply, query, direct]
         required: true
         default: preview
       request_hash:
@@ -27,6 +27,9 @@ on:
         required: false
       query:
         description: Bounded JSON query (query mode only)
+        required: false
+      operation:
+        description: Direct validated DEV operation JSON (direct mode only)
         required: false
       recipient_public_key:
         description: Base64url RSA-3072 SPKI public key for private results
@@ -44,7 +47,7 @@ jobs:
     if: >-
       github.repository_id == '1406056807' &&
       github.ref == 'refs/heads/master' &&
-      ((github.event_name == 'workflow_dispatch' && inputs.mode != 'query') ||
+      ((github.event_name == 'workflow_dispatch' && inputs.mode != 'query' && inputs.mode != 'direct') ||
        (github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/data-admin ')))
     runs-on: ubuntu-latest
     permissions:
@@ -194,3 +197,46 @@ jobs:
           GATEWAY_QUERY: ${{ inputs.query }}
           GATEWAY_KEY: ${{ inputs.recipient_public_key }}
         run: node --experimental-strip-types tools/data-admin/query-cli.ts
+
+  direct:
+    name: Direct DEV operation (no PR)
+    if: >-
+      github.repository_id == '1406056807' &&
+      github.ref == 'refs/heads/master' &&
+      github.event_name == 'workflow_dispatch' && inputs.mode == 'direct'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment:
+      name: data-dev-execute
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 22.22.3
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts --no-fund
+      - name: Authorize direct DEV operation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GATEWAY_DIRECT: ${{ inputs.operation }}
+        run: node --experimental-strip-types tools/data-admin/direct-gate.ts
+      - name: Obtain short-lived DEV writer through protected OIDC
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          project_id: bem-feito-dev
+          workload_identity_provider: projects/312978463343/locations/global/workloadIdentityPools/github-data/providers/github
+          service_account: github-data-dev@bem-feito-dev.iam.gserviceaccount.com
+          create_credentials_file: true
+          export_environment_variables: true
+      - name: Apply audited direct operation and verify result
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GATEWAY_DIRECT: ${{ inputs.operation }}
+        run: node --experimental-strip-types tools/data-admin/direct-cli.ts

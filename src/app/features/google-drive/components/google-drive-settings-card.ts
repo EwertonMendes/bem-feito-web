@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { BfLoadingButton } from '../../../shared/ui/button/loading-button';
 import { AuthService } from '../../../core/auth/auth.service';
 import { DriveIntegrationService } from '../../../core/google-drive/drive-integration.service';
 import { ErrorService } from '../../../core/services/error.service';
@@ -6,6 +7,7 @@ import { ToastService } from '../../../core/services/toast.service';
 
 @Component({
   selector: 'bf-google-drive-settings-card',
+  imports: [BfLoadingButton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="drive-card">
@@ -51,7 +53,8 @@ import { ToastService } from '../../../core/services/toast.service';
             <button
               class="bf-button secondary"
               type="button"
-              [disabled]="busy()"
+              [disabled]="!!busy()"
+              [bfLoadingButton]="busy() === 'connect'"
               (click)="connect()"
             >
               {{ connectLabel() }}
@@ -61,7 +64,8 @@ import { ToastService } from '../../../core/services/toast.service';
             <button
               class="bf-button"
               type="button"
-              [disabled]="busy()"
+              [disabled]="!!busy()"
+              [bfLoadingButton]="busy() === 'configure'"
               (click)="configure()"
             >
               {{ busy() === 'configure'

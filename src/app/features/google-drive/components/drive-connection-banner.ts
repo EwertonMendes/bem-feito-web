@@ -5,11 +5,12 @@ import { filter } from 'rxjs';
 import { DriveIntegrationService } from '../../../core/google-drive/drive-integration.service';
 import { ErrorService } from '../../../core/services/error.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { BfLoadingButton } from '../../../shared/ui/button/loading-button';
 import { BfIcon } from '../../../shared/ui/icon/icon';
 
 @Component({
   selector: 'bf-drive-connection-banner',
-  imports: [BfIcon],
+  imports: [BfIcon, BfLoadingButton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (visible()) {
@@ -41,6 +42,7 @@ import { BfIcon } from '../../../shared/ui/icon/icon';
           class="bf-button secondary connect"
           type="button"
           [disabled]="connecting()"
+          [bfLoadingButton]="connecting()"
           (click)="connect()"
         >
           {{ connecting() ? 'Conectando...' : actionLabel() }}

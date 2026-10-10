@@ -4,7 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { FormField, form, required } from '@angular/forms/signals';
 import { trackingModeForInput } from '../../domain/logic/costing';
 import { planStockAdjustment, StockAdjustmentMode } from '../../domain/logic/stock-adjustment';
-import { InputItem } from '../../domain/models/catalog.model';
+import { InputItem, Product } from '../../domain/models/catalog.model';
 import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
 import { CatalogStore } from '../../features/catalog/catalog.store';
 import { InventoryStore } from '../../features/inventory/inventory.store';
@@ -56,6 +56,10 @@ export class InventoryPage {
     required(p.businessDate);
   });
   readonly currency = formatCurrency;
+  availableStock(item: Product): number {
+    const reserved = item.reservedPhysicalStock ?? Math.min(item.stock, item.committedStock ?? 0);
+    return Math.max(0, item.stock - reserved);
+  }
   readonly date = formatBusinessDate;
   readonly filteredProducts = computed(() => {
     const term = this.search().toLocaleLowerCase('pt-BR').trim();

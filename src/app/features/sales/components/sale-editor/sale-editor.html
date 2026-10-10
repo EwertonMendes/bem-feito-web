@@ -422,13 +422,18 @@
         </section>
 
         <section class="customer-section panel-section">
+          <div class="bf-field"><strong>Atendimento</strong><div class="bf-segments" aria-label="Tipo de atendimento">
+            <button type="button" [class.active]="fulfillmentStatus()==='delivered'" (click)="fulfillmentStatus.set('delivered')">Entrega imediata</button>
+            <button type="button" [class.active]="fulfillmentStatus()==='ready'" (click)="fulfillmentStatus.set('ready')">Pronto para retirada</button>
+            <button type="button" [class.active]="fulfillmentStatus()==='in-production'" (click)="fulfillmentStatus.set('in-production')">Encomenda</button>
+          </div><small>Encomendas reservam os itens sem baixar estoque físico; a produção pode ser feita depois.</small></div>
           <div class="section-heading compact-heading">
             <div>
               <span class="section-icon"><bf-icon name="customer" /></span>
               <div>
                 <h3>Cliente</h3>
-                @if (remainingCents()>0) {
-                  <small>Obrigatório quando houver saldo em aberto.</small>
+                @if (remainingCents()>0 || fulfillmentStatus()!=='delivered') {
+                  <small>Obrigatório para encomendas e saldo em aberto.</small>
                 } @else {
                   <small>Opcional para vendas totalmente recebidas.</small>
                 }
@@ -448,7 +453,7 @@
               id="sale-customer-name"
               class="bf-input"
               [formField]="saleForm.customerName"
-              [placeholder]="remainingCents()>0 ? 'Nome do cliente *' : 'Nome do cliente (opcional)'"
+              [placeholder]="remainingCents()>0 || fulfillmentStatus()!=='delivered' ? 'Nome do cliente *' : 'Nome do cliente (opcional)'"
             />
           </label>
         </section>

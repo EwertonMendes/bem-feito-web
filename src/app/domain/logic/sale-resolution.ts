@@ -50,13 +50,14 @@ export function resolveSaleDraft(
         unitPriceCents,
         unitCostCents,
         totalCents: Math.round(unitPriceCents * line.quantity),
-        totalCostCents: Math.round(unitCostCents * line.quantity),
+        totalCostCents: Math.round((product.unitCostDeciCents ?? unitCostCents * 10) * line.quantity / 10),
       });
       addEffect({
         itemType: 'product',
         itemId: product.id,
         quantityDelta: -line.quantity,
         unitCostCents,
+        ...(product.unitCostDeciCents !== undefined ? { unitCostDeciCents: product.unitCostDeciCents } : {}),
       });
       continue;
     }
@@ -69,7 +70,7 @@ export function resolveSaleDraft(
 
       const components = [];
       let cursor = 0;
-      let kitCostCents = 0;
+      let kitCostDeciCents = 0;
 
       for (const component of [...kit.components].sort((a, b) => a.order - b.order)) {
         for (let slot = 0; slot < component.quantity; slot++) {
@@ -81,7 +82,7 @@ export function resolveSaleDraft(
           if (component.fragranceId && product.fragranceId !== component.fragranceId) throw new Error(`Fragrância inválida no kit ${kit.name}.`);
 
           const componentUnitCostCents = catalog.productUnitCosts.get(product.id) ?? product.averageUnitCostCents;
-          kitCostCents += componentUnitCostCents;
+          kitCostDeciCents += product.unitCostDeciCents ?? componentUnitCostCents * 10;
           components.push({
             productId: product.id,
             name: product.displayName,
@@ -93,9 +94,11 @@ export function resolveSaleDraft(
             itemId: product.id,
             quantityDelta: -1,
             unitCostCents: componentUnitCostCents,
+            ...(product.unitCostDeciCents !== undefined ? { unitCostDeciCents: product.unitCostDeciCents } : {}),
           });
         }
       }
+      const kitCostCents = Math.round(kitCostDeciCents / 10);
 
       lines.push({
         id: createId(),
@@ -151,6 +154,12 @@ export function resolveSaleDraft(
       ? catalog.products.get(effect.itemId)
       : catalog.inputs.get(effect.itemId);
     if (!entity) throw new Error('Item de estoque não encontrado.');
+
+    // Orders awaiting production commit full demand, even before physical stock exists.
+    if (draft.fulfillmentStatus === 'in-production') {
+      stockEffects.push(effect);
+      continue;
+    }
 
     if (effect.itemType === 'input' && trackingModeForInput(entity as InputItem) === 'estimated') {
       const available = Math.max(0, entity.stock);

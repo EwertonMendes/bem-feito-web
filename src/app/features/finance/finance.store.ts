@@ -217,7 +217,7 @@ export class FinanceStore {
       if (this.expensesGate.isLoaded) this.expensesState.update(items =>
         [result.expense, ...items.filter(item => item.id !== result.expense.id)].sort(compareBusinessDateDesc));
       if (this.expenseSummaryGate.isLoaded) this.totalOutState.update(value => value + result.expense.amountCents);
-      this.toast.success('Compra registrada. Custos e estoques atualizados.');
+      this.toast.success(draft.receiptStatus === 'pending' ? 'Compra registrada aguardando entrega.' : 'Compra registrada com custos e estoque atualizados.');
       return result;
     } catch (error) {
       const message = this.errors.message(error);
@@ -225,6 +225,15 @@ export class FinanceStore {
       this.toast.error(message);
       return null;
     }
+  }
+
+  async receivePurchase(expenseId: string): Promise<ExpenseCreateResult | null> {
+    try {
+      const result = await this.financeRepository.receivePurchase(expenseId);
+      if (this.expensesGate.isLoaded) this.expensesState.update(items => items.map(item => item.id === expenseId ? result.expense : item));
+      this.toast.success('Materiais recebidos e estoque atualizado.');
+      return result;
+    } catch (error) { this.toast.error(this.errors.message(error)); return null; }
   }
 
   applyPayments(payments: readonly Payment[]): void {

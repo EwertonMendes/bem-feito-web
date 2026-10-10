@@ -7,6 +7,8 @@ export interface StockChange {
   itemType: 'product' | 'input';
   itemId: string;
   stock: number;
+  committedStock?: number;
+  reservedPhysicalStock?: number;
   averageUnitCostCents?: number;
 }
 
@@ -50,4 +52,9 @@ export interface StockAdjustmentResult {
   adjustment: StockAdjustment;
   movement: StockMovement;
   stockChange: StockChange;
+}
+
+export interface SaleFulfillmentResult {
+  sale: Sale;
+  stockChanges: StockChange[];
 }

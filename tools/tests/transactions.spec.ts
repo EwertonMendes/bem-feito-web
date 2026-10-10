@@ -81,6 +81,58 @@ beforeEach(async () => {
 afterAll(async () => { injector?.destroy(); await env?.cleanup(); });
 
 describe('Actual repositories against restrictive emulator rules', () => {
+  it('keeps a future order off physical stock and releases commitments on cancellation', async () => {
+    const created = await sales.create({ ...draft(), fulfillmentStatus: 'in-production', lines: [{ kind: 'product', sourceId: 'p', quantity: 50 }] });
+    expect(created.sale).toMatchObject({ fulfillmentStatus: 'in-production', stockApplied: false, paymentStatus: 'pending' });
+    expect(await data('products', 'p')).toMatchObject({ stock: 10, committedStock: 50, reservedPhysicalStock: 0 });
+    await expect(sales.advanceFulfillment(created.sale.id, 'ready')).rejects.toThrow('faltam');
+    await sales.cancel(created.sale.id);
+    expect(await data('products', 'p')).toMatchObject({ stock: 10, committedStock: 0, reservedPhysicalStock: 0 });
+    expect(await count('stockMovements')).toBe(0);
+  });
+
+  it('moves newly available physical stock into an existing order on ready transition', async () => {
+    const created = await sales.create({ ...draft(), fulfillmentStatus: 'in-production',
+      lines: [{ kind: 'product', sourceId: 'p', quantity: 2 }] });
+    expect(await data('products', 'p')).toMatchObject({ stock: 10, committedStock: 2, reservedPhysicalStock: 0 });
+    await sales.advanceFulfillment(created.sale.id, 'ready');
+    expect(await data('products', 'p')).toMatchObject({ stock: 10, committedStock: 2, reservedPhysicalStock: 2 });
+    await sales.advanceFulfillment(created.sale.id, 'delivered');
+    expect(await data('products', 'p')).toMatchObject({ stock: 8, committedStock: 0, reservedPhysicalStock: 0 });
+  });
+
+  it('reserves ready stock and only decrements inventory at physical delivery', async () => {
+    const result = await sales.create({ ...draft(), fulfillmentStatus: 'ready', lines: [{ kind: 'product', sourceId: 'p', quantity: 2 }] });
+    expect(await data('products', 'p')).toMatchObject({ stock: 10, committedStock: 2, reservedPhysicalStock: 2 });
+    await sales.advanceFulfillment(result.sale.id, 'delivered');
+    expect(await data('products', 'p')).toMatchObject({ stock: 8, committedStock: 0, reservedPhysicalStock: 0 });
+    await expect(sales.advanceFulfillment(result.sale.id, 'delivered')).rejects.toThrow();
+    expect(await count('stockMovements')).toBe(1);
+    await sales.cancel(result.sale.id);
+    expect(await data('products', 'p')).toMatchObject({ stock: 10, committedStock: 0, reservedPhysicalStock: 0 });
+  });
+
+  it('keeps pending purchased materials out of inventory and recognizes freight once on receipt', async () => {
+    const result = await finance.createPurchaseBatch({
+      businessDate: day, fundingSource: 'maria', receiptStatus: 'pending',
+      items: [{ inputId: 'i', unitId: 'u', quantity: 2, amountCents: 500 }],
+      charges: [
+        { kind: 'shipping', amountCents: 100, capitalized: true },
+        { kind: 'interest', amountCents: 60, capitalized: false },
+      ],
+    });
+    expect(result.expense).toMatchObject({ amountCents: 660, bankDebitCents: 0, receiptStatus: 'pending', stockApplied: false });
+    expect(result.stockChanges).toHaveLength(0);
+    expect(await data('inputs', 'i')).toMatchObject({ stock: 20, averageUnitCostCents: 100 });
+    expect(await count('stockMovements')).toBe(0);
+    const received = await finance.receivePurchase(result.expense.id);
+    expect(received.expense).toMatchObject({ receiptStatus: 'received', stockApplied: true });
+    expect(await data('inputs', 'i')).toMatchObject({ stock: 22, costBasisValueCents: 2600 });
+    expect(await count('stockMovements')).toBe(1);
+    await expect(finance.receivePurchase(result.expense.id)).rejects.toThrow();
+    expect(await count('expenses')).toBe(1);
+  });
+
   it('creates a sale with product, kit, addition, multiple methods and tip; cancellation restores stocks once', async () => {
     const created = await sales.create({ ...draft(), lines: [
       { kind: 'product', sourceId: 'p', quantity: 1 },

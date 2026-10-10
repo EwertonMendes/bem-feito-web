@@ -26,7 +26,12 @@
       </section>
       <section class="dashboard-panel alerts"><div class="section-head"><bf-skeleton width="118px" height="22px" /></div>@for (item of skeletonFour; track item) { <div class="alert-row"><bf-skeleton shape="circle" width="24px" height="24px" /><bf-skeleton width="24px" height="14px" /><bf-skeleton width="72%" height="12px" /><bf-skeleton width="50px" height="12px" /></div> }</section>
     </div>
-    <div class="financial-strip">@for (item of skeletonThree; track item) { <article class="financial-card"><bf-skeleton shape="circle" width="44px" height="44px" /><div style="width:100%"><bf-skeleton width="86px" height="10px" radius="5px" /><div style="height:8px"></div><bf-skeleton width="128px" height="20px" /></div></article> }</div>
+    <div class="compact-metrics" aria-label="Resumo de capital e operações">
+    <article class="compact-card"><span class="compact-icon"><bf-icon name="cash-flow" /></span><span>Saldo bancário confirmado</span><strong>{{ store.bankSnapshotCents() === null ? 'Não conciliado' : currency(store.bankSnapshotCents()!) }}</strong></article>
+    <article class="compact-card"><span class="compact-icon"><bf-icon name="received" /></span><span>Aportes em compras</span><strong>{{ currency(store.ownerFundedCents()) }}</strong></article>
+    <article class="compact-card"><span class="compact-icon"><bf-icon name="order" /></span><span>Encomendas abertas</span><strong>{{ store.ordersPending() }}</strong></article>
+  </div>
+  <div class="financial-strip">@for (item of skeletonThree; track item) { <article class="financial-card"><bf-skeleton shape="circle" width="44px" height="44px" /><div style="width:100%"><bf-skeleton width="86px" height="10px" radius="5px" /><div style="height:8px"></div><bf-skeleton width="128px" height="20px" /></div></article> }</div>
   } @else {
   <div class="metric-grid">
     <article class="metric-card tint-sage">
@@ -86,7 +91,7 @@
 
   <div class="financial-strip">
     <article class="financial-card tint-sage"><span class="financial-icon"><bf-icon name="cogs" /></span><div><span>CMV estimado</span><strong>{{ currency(store.cogsCents()) }}</strong></div></article>
-    <article class="financial-card tint-sand"><span class="financial-icon sand"><bf-icon name="cash-out" /></span><div><span>Saídas de caixa</span><strong>{{ currency(store.cashOutCents()) }}</strong></div></article>
+    <article class="financial-card tint-sand"><span class="financial-icon sand"><bf-icon name="cash-out" /></span><div><span>Saídas da conta Bem Feito</span><strong>{{ currency(store.cashOutCents()) }}</strong></div></article>
     <article class="financial-card tint-sage"><span class="financial-icon"><bf-icon name="cash-flow" /></span><div><span>Fluxo de caixa</span><strong [class.negative]="store.cashFlowCents() < 0">{{ currency(store.cashFlowCents()) }}</strong></div></article>
   </div>
   }

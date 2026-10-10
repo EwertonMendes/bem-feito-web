@@ -21,7 +21,13 @@ export interface Product extends AuditFields {
   salePriceCents: number;
   additionalCostCents: number;
   averageUnitCostCents: number;
+  /** Tenths of a cent, preserving historical R$0.264/R$0.384 unit costs. */
+  unitCostDeciCents?: number;
   stock: number;
+  /** Units committed to open orders, including those still requiring production. */
+  committedStock?: number;
+  /** Physical pieces assigned to commitments; the rest requires production. */
+  reservedPhysicalStock?: number;
   minimumStock: number;
   stockStatus?: StockStatus;
   image?: CatalogImageRef;
@@ -35,6 +41,8 @@ export interface InputItem extends AuditFields {
   name: string;
   unitId: string;
   stock: number;
+  committedStock?: number;
+  reservedPhysicalStock?: number;
   minimumStock: number;
   minimumStockConfigured?: boolean;
   trackingMode?: InputTrackingMode;

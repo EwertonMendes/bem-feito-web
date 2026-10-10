@@ -52,7 +52,15 @@ const checks = [
   ['dashboard:expenses-period', () => db.collection('expenses')
     .where('businessDate', '>=', startDate)
     .where('businessDate', '<=', endDate)
-    .aggregate({ cashOutCents: AggregateField.sum('amountCents') }).get()],
+    .aggregate({ cashOutCents: AggregateField.sum('bankDebitCents') }).get()],
+  ['dashboard:personal-funding', () => db.collection('expenses')
+    .where('fundingSource', 'in', ['ewerton', 'maria'])
+    .aggregate({ value: AggregateField.sum('amountCents') }).get()],
+  ['finance:input-purchase-bank-debits', () => db.collection('expenses')
+    .where('kind', '==', 'input-purchase')
+    .where('businessDate', '>=', startDate)
+    .where('businessDate', '<=', endDate)
+    .aggregate({ value: AggregateField.sum('bankDebitCents') }).get()],
   ['dashboard:operating-expenses-period', () => db.collection('expenses')
     .where('kind', '==', 'operating-expense')
     .where('businessDate', '>=', startDate)
@@ -68,6 +76,10 @@ const checks = [
       overdueCount: AggregateField.count(),
       overdueCents: AggregateField.sum('balanceCents'),
     }).get()],
+  ['dashboard:pending-orders', () => db.collection('sales')
+    .where('status', '==', 'active')
+    .where('fulfillmentStatus', 'in', ['in-production', 'ready'])
+    .aggregate({ value: AggregateField.count() }).get()],
   ['dashboard:products-status-completeness', () => db.collection('products')
     .where('stockStatus', 'in', ['negative', 'low', 'ok'])
     .aggregate({ value: AggregateField.count() }).get()],

@@ -4,6 +4,8 @@ import {
   count,
   getAggregateFromServer,
   getDocs,
+  getDoc,
+  doc,
   query,
   sum,
   where,
@@ -22,6 +24,11 @@ export interface DashboardMetrics {
   receivableCents: number;
   operationalExpenseCents: number;
   cashOutCents: number;
+  /** Opening snapshot from audited banking records, not the period's cash flow. */
+  bankSnapshotCents: number | null;
+  bankSnapshotDate: string | null;
+  ownerFundedCents: number;
+  ordersPending: number;
   tipsCents: number;
   discountsCents: number;
   overdueCents: number;
@@ -68,6 +75,8 @@ export class DashboardRepository {
       where('businessDate', '>=', startDate),
       where('businessDate', '<=', endDate),
     );
+    const ownerFunding = query(collection(this.firestore, 'expenses'), where('fundingSource', 'in', ['ewerton', 'maria']));
+    const pendingOrders = query(collection(this.firestore, 'sales'), where('status', '==', 'active'), where('fulfillmentStatus', 'in', ['in-production', 'ready']));
     const operatingExpensesInPeriod = query(
       collection(this.firestore, 'expenses'),
       where('kind', '==', 'operating-expense'),
@@ -93,6 +102,9 @@ export class DashboardRepository {
       receivableAggregate,
       overdueAggregate,
       stockAlerts,
+      cashSnapshot,
+      ownerFunded,
+      pendingCount,
     ] = await Promise.all([
       getAggregateFromServer(salesInPeriod, {
         revenueCents: sum('totalCents'),
@@ -111,7 +123,7 @@ export class DashboardRepository {
         tipsCents: sum('tipCents'),
       }),
       getAggregateFromServer(expensesInPeriod, {
-        cashOutCents: sum('amountCents'),
+        cashOutCents: sum('bankDebitCents'),
       }),
       getAggregateFromServer(operatingExpensesInPeriod, {
         operationalExpenseCents: sum('amountCents'),
@@ -124,6 +136,9 @@ export class DashboardRepository {
         overdueCents: sum('balanceCents'),
       }),
       this.stockAlerts(),
+      getDoc(doc(this.firestore, 'system', 'bank-snapshot')),
+      getAggregateFromServer(ownerFunding, { value: sum('amountCents') }),
+      getAggregateFromServer(pendingOrders, { value: count() }),
     ]);
 
     const salesData = salesAggregate.data();
@@ -166,6 +181,11 @@ export class DashboardRepository {
       receivableCents: Number(receivableAggregate.data().receivableCents ?? 0),
       operationalExpenseCents: Number(operatingExpensesData.operationalExpenseCents ?? 0),
       cashOutCents: Number(expensesData.cashOutCents ?? 0),
+      bankSnapshotCents: cashSnapshot.exists() ? Number(cashSnapshot.data()['balanceCents'] ?? 0) : null,
+      bankSnapshotDate: cashSnapshot.exists() ? String(cashSnapshot.data()['businessDate'] ?? '') : null,
+      ownerFundedCents: cashSnapshot.exists() && Number.isInteger(cashSnapshot.data()['ownerFundedCents'])
+        ? Number(cashSnapshot.data()['ownerFundedCents']) : Number(ownerFunded.data().value ?? 0),
+      ordersPending: Number(pendingCount.data().value ?? 0),
       tipsCents: Number(paymentsData.tipsCents ?? 0),
       discountsCents: Number(salesData.discountsCents ?? 0),
       overdueCents: Number(overdueAggregate.data().overdueCents ?? 0),

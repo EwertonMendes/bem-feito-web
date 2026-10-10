@@ -16,6 +16,15 @@ export function assertPull(pull: any, config: any, commit: string) {
   invariant(pull.state === 'open' && pull.base.ref === config.branch, 'Open PR against protected master required');
   invariant(String(pull.head.repo?.id) === config.repositoryId && pull.head.repo?.full_name === config.repository && pull.head.sha === commit, 'Forks and stale/request SHA mismatch rejected');
 }
+export function assertTrustedMasterMigration(
+  request: Pick<Request, 'operation' | 'environment' | 'deploymentSha'>,
+  trustedSha: string,
+): void {
+  if (request.operation !== 'migrate') return;
+  invariant(request.environment === 'dev' && !!trustedSha && request.deploymentSha === trustedSha,
+    'Migration must target the exact current protected master commit');
+}
+
 export async function githubApi(path: string, token: string): Promise<any> {
   const response = await fetch(`https://api.github.com/repos/EwertonMendes/bem-feito-web/${path}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' } });
   invariant(response.ok, `GitHub authorization API failed: HTTP ${response.status}`); return response.json();
@@ -71,10 +80,9 @@ export async function authorize(event: any, env: NodeJS.ProcessEnv, config: any,
     invariant(reviewers.reviewers[0].type === 'User' && String(reviewers.reviewers[0].reviewer.id) === config.ownerId, 'PROD environment must require the repository owner');
   }
   if (request.operation === 'migrate') {
-    const evolution = await api('pulls/28');
-    invariant(evolution.state === 'open' && !evolution.merged && String(evolution.head.repo?.id) === config.repositoryId && evolution.head.sha === request.deploymentSha, 'PR #28 migration application SHA differs');
+    assertTrustedMasterMigration(request, env.GITHUB_SHA!);
     const ci = await api(`actions/workflows/ci.yml/runs?head_sha=${request.deploymentSha}&event=push&status=success&per_page=100`);
-    invariant(ci.workflow_runs?.some((run: any) => run.head_sha === request.deploymentSha && run.conclusion === 'success' && run.head_repository?.id === Number(config.repositoryId)), 'Exact PR #28 CI must pass');
+    invariant(ci.workflow_runs?.some((run: any) => run.head_sha === request.deploymentSha && run.conclusion === 'success' && run.head_repository?.id === Number(config.repositoryId)), 'Exact protected master CI must pass');
   }
   return { command, request, destination, environment, pr, actor: { login: actor.login, id: String(actor.id), requestSha: command.sha, trustedSha: env.GITHUB_SHA, runId: env.GITHUB_RUN_ID!, commentId, ...(command.plan ? { approvedPlan: command.plan } : {}) } };
 }

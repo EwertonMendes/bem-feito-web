@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { validateRequest, assertDestination, assertScope, requestHash, hash, redact } from './schema.ts';
-import { parseCommand, assertPermission, assertPull, authorize } from './gate.ts';
+import { parseCommand, assertPermission, assertPull, assertTrustedMasterMigration, authorize } from './gate.ts';
 import { FirestoreArchive } from './storage.ts';
 import { report, validBackupPath } from './engine.ts';
 import { encode } from './codec.ts';
@@ -42,6 +42,14 @@ test('permissions, forks, stale SHAs, closed PRs and different branches are deni
   assertPull(pull, config, commit);
   for (const bad of [{ ...pull, state: 'closed' }, { ...pull, base: { ref: 'feature' } }, { ...pull, head: { ...pull.head, sha: 'b'.repeat(40) } }, { ...pull, head: { ...pull.head, repo: { id: 1, full_name: 'fork/repo' } } }]) assert.throws(() => assertPull(bad, config, commit));
 });
+test('DEV migration must match current protected master; no dependence on obsolete PR #28', () => {
+  const migration = { operation: 'migrate' as const, environment: 'dev' as const, deploymentSha: commit };
+  assertTrustedMasterMigration(migration, commit);
+  assert.throws(() => assertTrustedMasterMigration(migration, 'b'.repeat(40)), /exact current protected master/);
+  assert.throws(() => assertTrustedMasterMigration({ ...migration, environment: 'prod' }, commit), /exact current protected master/);
+  assertTrustedMasterMigration({ operation: 'update', environment: 'dev' }, commit);
+});
+
 test('public reports omit customer text, individual financial amounts and nested details', () => {
   const output = JSON.stringify(redact({ customerName: 'PRIVATE CUSTOMER', notes: 'PRIVATE NOTE', items: [{ phone: 'PRIVATE PHONE' }], averageUnitCostCents: 123, active: true }));
   assert.ok(!output.includes('PRIVATE')); assert.ok(!output.includes('123')); assert.ok(!output.includes('true'));

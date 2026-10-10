@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "dev-sync-current-20261010-v1",
+  "environment": "dev",
+  "projectId": "bem-feito-dev",
+  "operation": "migrate",
+  "migration": "legacy-sheets-v1",
+  "deploymentSha": "c3cd1bd01bbf28b163ebe48db402c340e2f29fdf",
+  "destructive": {
+    "projectId": "bem-feito-dev",
+    "paths": [
+      "collections",
+      "fragrances",
+      "formats",
+      "formatPrices",
+      "units",
+      "paymentMethods",
+      "expenseCategories",
+      "expenseTypes",
+      "inputs",
+      "products",
+      "kits",
+      "additions",
+      "expenses",
+      "productions",
+      "sales",
+      "payments",
+      "stockAdjustments",
+      "stockMovements",
+      "counters",
+      "migrationRuns",
+      "migrationSources",
+      "system/bank-snapshot"
+    ]
+  }
+}

@@ -36,7 +36,10 @@
     "firebase:deploy:dev:firestore": "npx --yes --package firebase-tools@15.32.1 firebase deploy --project bem-feito-dev --only firestore --non-interactive",
     "firebase:wait-indexes:dev": "node tools/deploy/wait-for-firestore-indexes.mjs",
     "firebase:deploy:dev:hosting": "npx --yes --package firebase-tools@15.32.1 firebase deploy --project bem-feito-dev --only hosting --non-interactive",
-    "firebase:verify-queries:dev": "node tools/deploy/verify-firestore-queries.mjs"
+    "firebase:verify-queries:dev": "node tools/deploy/verify-firestore-queries.mjs",
+    "test:data-admin": "node --experimental-strip-types --test tools/data-admin/security.test.ts",
+    "check:data-admin": "tsc -p tools/data-admin/tsconfig.json",
+    "test:data-admin:emulator": "npx --yes --package firebase-tools@15.32.1 firebase emulators:exec --only firestore --project demo-bem-feito \"node --experimental-strip-types --test tools/data-admin/emulator.test.ts\""
   },
   "dependencies": {
     "@angular/common": "^22.2.1",

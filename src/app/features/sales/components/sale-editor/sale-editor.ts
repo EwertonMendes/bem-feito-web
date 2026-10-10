@@ -101,7 +101,7 @@ export class SaleEditor {
   private readonly confirmDialog = viewChild.required<BfConfirmDialog>('confirmDialog');
 
   readonly currency = formatCurrency;
-  readonly catalogTab = signal<'products' | 'kits' | 'additions'>('products');
+  readonly catalogTab = signal<'products' | 'additions'>('products');
   readonly catalogSearch = signal('');
   readonly catalogCategory = signal('');
   readonly cart = signal<CartLine[]>([]);
@@ -231,7 +231,7 @@ export class SaleEditor {
     this.destroyRef.onDestroy(this.settings.activate());
   }
 
-  async open(initialProductId?: string, initialKitId?: string): Promise<void> {
+  async open(initialProductId?: string, _initialKitId?: string): Promise<void> {
     await Promise.all([
       this.catalog.load(),
       this.references.load(),
@@ -243,14 +243,10 @@ export class SaleEditor {
       const product = this.catalog.activeProducts().find(item => item.id === initialProductId);
       if (product && this.canAddProduct(product)) this.addProduct(product);
     }
-    if (initialKitId) {
-      const kit = this.catalog.activeKits().find(item => item.id === initialKitId);
-      if (kit) { this.catalogTab.set('kits'); this.addKit(kit); }
-    }
     this.dialog().open();
   }
 
-  selectCatalogTab(tab: 'products' | 'kits' | 'additions'): void {
+  selectCatalogTab(tab: 'products' | 'additions'): void {
     this.catalogTab.set(tab);
     this.catalogCategory.set('');
   }
@@ -335,24 +331,8 @@ export class SaleEditor {
     return this.kitAvailabilityById().get(kit.id) ?? this.planKit(kit);
   }
 
-  addKit(kit: Kit): void {
-    const availability = this.kitAvailability(kit);
-
-    if (!availability.available) {
-      this.toast.error(availability.message + '.');
-      return;
-    }
-
-    this.cart.update((items) => [
-      ...items,
-      {
-        key: crypto.randomUUID(),
-        kind: 'kit',
-        sourceId: kit.id,
-        quantity: 1,
-        componentProductIds: availability.productIds,
-      },
-    ]);
+  addKit(_kit: Kit): void {
+    this.toast.error('Kits desativados. Adicione os produtos individualmente e aplique o desconto manual.');
   }
 
   changeQuantity(line: CartLine, delta: number): void {

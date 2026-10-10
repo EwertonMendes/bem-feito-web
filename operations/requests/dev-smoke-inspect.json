@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "id": "dev-smoke-inspect-20261009-v1",
+  "environment": "dev",
+  "projectId": "bem-feito-dev",
+  "operation": "inspect",
+  "targets": [{ "collection": "dataAdminSmoke", "id": "smoke-20261009" }]
+}

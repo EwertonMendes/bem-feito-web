@@ -87,6 +87,25 @@ describe('sale resolution', () => {
     ]);
   });
 
+  it('rejects an inactive historical kit without changing existing sale snapshots', () => {
+    const archivedKit: Kit = {
+      id: 'archived-kit',
+      active: false,
+      name: 'Kit histórico',
+      priceCents: 1000,
+      components: [{ id: 'slot', formatId: 'round', quantity: 1, order: 1 }],
+    };
+    const draft = emptyDraft();
+    draft.lines = [{ kind: 'kit', sourceId: 'archived-kit', quantity: 1, componentProductIds: ['p1'] }];
+    expect(() => resolveSaleDraft(draft, {
+      products: new Map([['p1', product('p1')]]),
+      kits: new Map([['archived-kit', archivedKit]]),
+      additions: new Map(),
+      inputs: new Map(),
+      productUnitCosts: new Map(),
+    })).toThrow('Kit inativo.');
+  });
+
   it('uses exact stock strictly and estimated stock approximately', () => {
     const addition: Addition = {
       id: 'a1',

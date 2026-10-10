@@ -10,6 +10,7 @@ import { CatalogImageRef } from '../../../domain/models/image.model';
 import { CatalogStore } from '../../catalog/catalog.store';
 import { CatalogReferenceStore } from '../../catalog/catalog-reference.store';
 import { formatCurrency } from '../../../core/utils/money';
+import { formatBusinessDate } from '../../../core/utils/date';
 import { productionItems } from '../../../domain/logic/production-correction';
 import {
   Production, ProductionCorrectionDraft, ProductionCorrectionPreview, ProductionDraftItem,
@@ -31,6 +32,7 @@ export class ProductionCorrectionEditor {
   readonly corrections = inject(ProductionCorrectionService);
   private readonly dialog = viewChild.required<BfDialog>('correctionDialog');
   readonly currency = formatCurrency;
+  readonly readableDate = formatBusinessDate;
   readonly production = signal<Production | null>(null);
   readonly date = signal('');
   readonly notes = signal('');
@@ -44,6 +46,7 @@ export class ProductionCorrectionEditor {
   readonly error = signal('');
   readonly busy = computed(() => this.reviewing() || this.saving());
   readonly isCancellation = computed(() => this.reviewedDraft()?.cancel ?? false);
+  readonly originalItems = computed(() => this.production() ? productionItems(this.production()!) : []);
   readonly units = computed(() => this.lines().reduce((total, line) => total + Math.max(0, Number(line.quantity) || 0), 0));
   readonly productOptions = computed<BfSelectOption[]>(() => {
     const historical = new Set(this.lines().map(x => x.productId));

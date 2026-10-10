@@ -48,6 +48,26 @@
             <span>{{isCancellation() ? 'Os efeitos deste lançamento serão revertidos, sem apagar seu histórico.' : 'O estoque será atualizado ao confirmar.'}}</span>
           </div>
         </div>
+        <div class="review-differences">
+          <div class="review-state">
+            <span class="review-state-label">Registrado anteriormente · {{readableDate(production()!.businessDate)}}</span>
+            @for(item of originalItems();track item.productId){
+              <span><strong>{{item.quantity}}×</strong> {{item.productName}}</span>
+            }
+          </div>
+          <div class="review-state">
+            <span class="review-state-label">{{isCancellation()?'Cancelamento': 'Após corrigir'}} · {{readableDate(plan.corrected.businessDate)}}</span>
+            @if(isCancellation()){<span class="state-cancelled">Nenhuma produção ativa</span>}
+            @else {
+              @for(item of plan.corrected.items ?? [];track item.productId){
+                <span><strong>{{item.quantity}}×</strong> {{item.productName}}</span>
+              }
+            }
+          </div>
+        </div>
+        @if((production()?.notes ?? '') !== (reviewedDraft()?.notes ?? '')){
+          <p class="review-notes">As observações do lançamento também serão atualizadas.</p>
+        }
         <div class="review-summary">
           <div><span>Quantidade</span><strong>{{isCancellation() ? 0 : plan.corrected.quantity}} un.</strong></div>
           <div><span>Variação de custo</span><strong>{{plan.costDeltaCents>0?'+':plan.costDeltaCents<0?'-':''}}{{currency(plan.costDeltaCents < 0 ? -plan.costDeltaCents : plan.costDeltaCents)}}</strong></div>

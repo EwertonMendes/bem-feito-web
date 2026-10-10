@@ -158,7 +158,7 @@ export class ProductionCorrectionRepository {
         const nextReserved = quantityDelta > 0
           ? Math.min(stock, reserved + Math.min(quantityDelta, Math.max(0, committed - reserved))) : reserved;
         const item = after.find(x => x.productId === itemId);
-        const cost = item?.unitCostCents ?? product.averageUnitCostCents;
+        const cost = quantityDelta > 0 ? (item?.unitCostCents ?? product.averageUnitCostCents) : product.averageUnitCostCents;
         impacts.push({ itemType: 'product', itemId, name: product.displayName, quantityDelta, stockBefore: product.stock, stockAfter: stock, unitLabel: 'un.' });
         stockChanges.push({ itemType: 'product', itemId, stock, reservedPhysicalStock: nextReserved, averageUnitCostCents: cost });
         changes.push({ ref: productSnapshots.get(itemId)!.ref, data: {

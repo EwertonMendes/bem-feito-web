@@ -77,8 +77,8 @@
       </button>
     } @else {
       <button class="bf-button secondary" type="button" [disabled]="busy()" (click)="correctionDialog.close()">Fechar</button>
-      <button class="bf-button secondary cancel-production" type="button" [disabled]="busy()" [bfLoadingButton]="reviewing()" (click)="preview(true)">Cancelar lançamento</button>
-      <button class="bf-button" type="button" [disabled]="busy()" [bfLoadingButton]="reviewing()" (click)="preview(false)">
+      <button class="bf-button secondary cancel-production" type="button" [disabled]="busy()" [bfLoadingButton]="reviewing() && reviewingCancellation()" (click)="preview(true)">Cancelar lançamento</button>
+      <button class="bf-button" type="button" [disabled]="busy()" [bfLoadingButton]="reviewing() && !reviewingCancellation()" (click)="preview(false)">
         {{reviewing() ? 'Conferindo...' : 'Revisar impactos'}}
       </button>
     }

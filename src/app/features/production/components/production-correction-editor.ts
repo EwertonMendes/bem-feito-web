@@ -39,6 +39,7 @@ export class ProductionCorrectionEditor {
   readonly review = signal<ProductionCorrectionPreview | null>(null);
   readonly reviewedDraft = signal<ProductionCorrectionDraft | null>(null);
   readonly reviewing = signal(false);
+  readonly reviewingCancellation = signal(false);
   readonly saving = signal(false);
   readonly error = signal('');
   readonly busy = computed(() => this.reviewing() || this.saving());
@@ -116,6 +117,7 @@ export class ProductionCorrectionEditor {
       businessDate: this.date(), notes: this.notes(), reason: this.reason().trim(), cancel, lines,
     };
     this.error.set('');
+    this.reviewingCancellation.set(cancel);
     this.reviewing.set(true);
     try {
       const result = await this.store.previewCorrection(production.id, draft);

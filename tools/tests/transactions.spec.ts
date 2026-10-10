@@ -434,6 +434,22 @@ describe('Actual repositories against restrictive emulator rules', () => {
     expect(await count('productionCorrections')).toBe(0);
   });
 
+
+  it('replaces the wrong soap without duplicating stock or its ingredient consumption', async () => {
+    const id = (await production.create('p', 1, day)).production.id;
+    const updated = { expectedVersion: 0, businessDate: day, notes: '', reason: 'Sabonete errado',
+      cancel: false, lines: [{ productId: 'p-est', quantity: 1 }] };
+    const preview = await productionCorrection.preview(id, updated);
+    expect(preview.impacts.filter(x => x.itemType === 'product').map(x => x.quantityDelta)).toEqual([-1, 1]);
+    const result = await productionCorrection.apply(id, updated);
+    expect(result.production.items?.[0].productId).toBe('p-est');
+    expect(await data('products', 'p')).toMatchObject({ stock: 10 });
+    expect(await data('products', 'p-est')).toMatchObject({ stock: 1 });
+    expect(await data('inputs', 'i')).toMatchObject({ stock: 20 });
+    expect(await data('inputs', 'i-est')).toMatchObject({ stock: 0 });
+    expect(await count('productionCorrections')).toBe(1);
+  });
+
   it('can change the date without changing physical inventory balances', async () => {
     const id = (await production.create('p', 1, day)).production.id;
     const draft = { ...correctionDraft(1), businessDate: '2026-10-06', notes: 'Lote corrigido' };

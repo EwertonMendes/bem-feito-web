@@ -42,7 +42,7 @@
 .correction-date{max-width:none}
 .correction-footer{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:12px}
 .correction-footer .bf-button{min-width:0;width:100%;font-size:.78rem;padding:9px 7px;white-space:normal;line-height:1.3}
-.correction-footer .cancel-production{grid-column:1;grid-row:2}
-.correction-footer .cancel-production+.bf-button{grid-column:2;grid-row:2}
+.correction-footer .cancel-production{grid-column:2;grid-row:1}
+.correction-footer .cancel-production+.bf-button{grid-column:1/-1;grid-row:2}
 .impact-line{align-items:flex-start}.impact-values{max-width:42%}
 }

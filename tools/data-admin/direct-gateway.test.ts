@@ -22,7 +22,7 @@ test('direct rejects invalid payloads, protected infrastructure and unrelated pr
   for(const p of [
     {...patch,environment:'prod'}, {...patch,projectId:'another-project'},
     {...patch,values:{stock:300},expected:{}},
-    {...patch,values:{amountCents:Infinity},expected:{amountCents:100}},
+    {...patch,values:{amountCents:{nested:Array(251).fill(1)}},expected:{amountCents:100}},
     {...patch,values:{salePriceCents:1600},expected:{salePriceCents:1000,stock:1}},
     {...patch,values:{salePriceCents:1600},expected:{salePriceCents:1500},script:'eval()'},
     {...patch,documentId:'../users/admin'},

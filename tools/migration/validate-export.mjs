@@ -180,6 +180,26 @@ for (const [name, type] of [['products', 'product'], ['inputs', 'input']]) for (
   if (Math.abs((deltas.get(`${type}:${item.id}`) ?? 0) - item.stock) > 0.000001) errors.push(`${name}/${item.id}: histórico não reconcilia (movimentos=${(deltas.get(`${type}:${item.id}`) ?? 0).toFixed(3)}, declarado=${item.stock}).`);
 }
 
+// Export only aggregate validation categories when requested by the trusted runner.
+// No record IDs, customers, payment amounts, source excerpts or warnings leave the job.
+if (process.env.MIGRATION_SAFE_DIAGNOSTICS === '1') {
+  const diagnosticGroups = [
+    ['stock-ledger', /histórico não reconcilia/],
+    ['sale-payments', /recebimentos\/saldo divergentes|alocação divergente|recebimento inválido|pagamento inexistente|vínculo inverso ausente/],
+    ['sale-totals', /analytics divergente|total divergente|venda inválida|quantidade de item inválida/],
+    ['purchases', /compra inválida|forma de pagamento inválida|valor inválido/],
+    ['recipes', /receita referencia|consumo\/unidade inválido|fragrância de outra coleção/],
+    ['stock-status', /stockStatus divergente|estoque inválido|mínimo inválido/],
+    ['relationships', /inexistente|collectionId inválido|formatId inválido|fragranceId inválido|unitId inválido/],
+    ['other', /[\s\S]*/],
+  ];
+  const counts = Object.fromEntries(diagnosticGroups.map(([name]) => [name, 0]));
+  for (const error of errors) {
+    const match = diagnosticGroups.find(([, pattern]) => pattern.test(error));
+    counts[match[0]]++;
+  }
+  console.error('MIGRATION_SAFE_DIAGNOSTICS=' + JSON.stringify({ count: errors.length, categories: counts }));
+}
 console.log(`Validação: ${errors.length} erro(s), ${warnings.length} aviso(s).`);
 for (const warning of warnings) console.warn(`AVISO: ${warning}`);
 for (const error of errors) console.error(`ERRO: ${error}`);

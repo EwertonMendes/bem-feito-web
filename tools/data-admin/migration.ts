@@ -10,7 +10,26 @@ import type { Request } from './schema.ts';
 export function runRegisteredScript(script: string, args: string[] = [], extraEnv: Record<string, string> = {}) {
   // Callers are trusted modules, never request-supplied paths, arguments, shell or code.
   const result = spawnSync(process.execPath, [script, ...args], { shell: false, encoding: 'utf8', maxBuffer: 12_000_000, timeout: 180_000, env: { ...process.env, ...extraEnv } });
-  invariant(result.status === 0, `Registered migration stage failed: ${script}; private payload suppressed`);
+  if (result.status !== 0) {
+    // The invoked script's stdout/stderr may contain private source data.
+    // Never print raw output. Admit only independently validated, fixed category counts.
+    let summary = '';
+    if (script === 'tools/migration/validate-export.mjs') {
+      const line = String(result.stderr).split('\n').find((item) => item.startsWith('MIGRATION_SAFE_DIAGNOSTICS='));
+      if (line) {
+        try {
+          const payload = JSON.parse(line.slice('MIGRATION_SAFE_DIAGNOSTICS='.length));
+          const keys = ['stock-ledger', 'sale-payments', 'sale-totals', 'purchases', 'recipes', 'stock-status', 'relationships', 'other'];
+          const numbers = [payload.count, ...keys.map((name) => payload.categories?.[name])];
+          if (Object.keys(payload.categories ?? {}).length === keys.length && numbers.every((n) => Number.isSafeInteger(n) && n >= 0 && n <= 10000) &&
+              numbers.slice(1).reduce((sum, n) => sum + n, 0) === payload.count) {
+            summary = '; safe counts: ' + keys.map((name) => name + '=' + payload.categories[name]).join(',');
+          }
+        } catch { /* Invalid private runner response remains hidden. */ }
+      }
+    }
+    throw new Error(`Registered migration stage failed: ${script}; private payload suppressed${summary}`);
+  }
 }
 function stableSource(value: any): any {
   if (Array.isArray(value)) return value.map(stableSource);
@@ -24,7 +43,7 @@ export async function prepareMigration(request: Request, db: Firestore, env: any
   runRegisteredScript('tools/migration/fetch-sheets.mjs', [], { MIGRATION_SNAPSHOT_ID: env.snapshotId });
   runRegisteredScript('tools/migration/normalize-legacy.mjs');
   runRegisteredScript('tools/migration/reconcile-legacy.mjs');
-  runRegisteredScript('tools/migration/validate-export.mjs');
+  runRegisteredScript('tools/migration/validate-export.mjs', [], { MIGRATION_SAFE_DIAGNOSTICS: '1' });
   const raw = JSON.parse(await readFile('tools/migration/legacy-raw.json', 'utf8'));
   const data = stableSource(JSON.parse(await readFile('tools/migration/migration-data.json', 'utf8')));
   invariant(raw.spreadsheetId === env.snapshotId && data.source?.spreadsheetId === env.snapshotId, 'Snapshot source differs');

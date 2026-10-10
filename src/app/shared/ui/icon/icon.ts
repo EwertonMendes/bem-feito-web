@@ -28,6 +28,8 @@ import {
   LucideFactory,
   LucideFlaskConical,
   LucideHandCoins,
+  LucideHistory,
+  LucidePencil,
   LucideImage,
   LucideInfo,
   LucideLayoutDashboard,
@@ -84,7 +86,7 @@ export type BfIconName =
   // Generic actions, media and states
   | 'plus' | 'minus' | 'search' | 'sun' | 'moon' | 'logout' | 'close' | 'trash' | 'image'
   | 'calendar' | 'alert' | 'info' | 'chevron-right' | 'arrow-right' | 'eye' | 'check'
-  | 'tick' | 'upload' | 'more';
+  | 'tick' | 'upload' | 'more' | 'edit' | 'history';
 
 const ICONS = {
   dashboard: LucideLayoutDashboard,
@@ -152,6 +154,8 @@ const ICONS = {
   tick: LucideCheck,
   upload: LucideUpload,
   more: LucideEllipsis,
+  edit: LucidePencil,
+  history: LucideHistory,
 } as const satisfies Record<BfIconName, unknown>;
 
 @Component({

@@ -43,13 +43,13 @@
     } @else if(review(); as plan) {
       <div class="correction-review" [class.cancelled]="isCancellation()">
         <div class="review-head">
-          <bf-icon [name]="isCancellation() ? 'alert' : 'check-circle'"/>
+          <bf-icon [name]="isCancellation() ? 'alert' : 'check'"/>
           <div><strong>{{isCancellation() ? 'Cancelar esta produção?' : 'Confira as alterações'}}</strong>
             <span>{{isCancellation() ? 'Os efeitos deste lançamento serão revertidos, sem apagar seu histórico.' : 'O estoque será atualizado ao confirmar.'}}</span>
           </div>
         </div>
         <div class="review-summary">
-          <div><span>Quantidade</span><strong>{{plan.corrected.quantity}} un.</strong></div>
+          <div><span>Quantidade</span><strong>{{isCancellation() ? 0 : plan.corrected.quantity}} un.</strong></div>
           <div><span>Variação de custo</span><strong>{{plan.costDeltaCents>0?'+':plan.costDeltaCents<0?'-':''}}{{currency(plan.costDeltaCents < 0 ? -plan.costDeltaCents : plan.costDeltaCents)}}</strong></div>
         </div>
         <h3>Alterações no estoque</h3>

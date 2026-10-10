@@ -67,7 +67,7 @@
               @if(entry.notes){<p class="production-note">{{entry.notes}}</p>}
               <div class="entry-actions">
                 @if(entry.status!=='cancelled') {
-                  <button class="bf-button secondary" type="button" (click)="editEntry(entry)"><bf-icon name="pencil"/> Corrigir</button>
+                  <button class="bf-button secondary" type="button" (click)="editEntry(entry)"><bf-icon name="edit"/> Corrigir</button>
                 }
                 <button class="bf-button ghost" type="button" [disabled]="historyLoading()" (click)="showHistory(entry)"><bf-icon name="history"/> {{historyEntryId()===entry.id?'Ocultar histórico':'Histórico'}}</button>
               </div>

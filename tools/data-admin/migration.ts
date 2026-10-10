@@ -28,9 +28,26 @@ export async function prepareMigration(request: Request, db: Firestore, env: any
   const raw = JSON.parse(await readFile('tools/migration/legacy-raw.json', 'utf8'));
   const data = stableSource(JSON.parse(await readFile('tools/migration/migration-data.json', 'utf8')));
   invariant(raw.spreadsheetId === env.snapshotId && data.source?.spreadsheetId === env.snapshotId, 'Snapshot source differs');
-  invariant(data.bankSnapshot?.balanceCents === 48169 && data.bankSnapshot?.ownerFundedCents === 85311 && data.bankSnapshot?.reimbursementDueCents === 0, 'Approved bank reconciliation differs');
-  for (const [name, total] of Object.entries({ sales: 25, payments: 24, productions: 45, expenses: 16 })) invariant(data[name]?.length === total, 'Approved source counts differ');
-  for (const [id, state] of [['V00024', 'in-production'], ['V00025', 'ready']]) invariant(data.sales.find((s: any) => s.id === id)?.fulfillmentStatus === state, 'Open order reconciliation differs');
+  invariant(data.bankSnapshot?.balanceCents === 57944 && data.bankSnapshot?.ownerFundedCents === 73641 && data.bankSnapshot?.reimbursementDueCents === 0 && data.bankSnapshot?.businessDate === '2026-10-09', 'Approved bank reconciliation differs');
+  for (const [name, total] of Object.entries({ sales: 25, payments: 25, productions: 47, expenses: 16 })) invariant(data[name]?.length === total, 'Approved source counts differ');
+  for (const [id, state] of [['V00024', 'delivered'], ['V00025', 'ready']]) invariant(data.sales.find((sale: any) => sale.id === id)?.fulfillmentStatus === state, 'Order reconciliation differs');
+  invariant(data.kits.length === 20 && data.kits.every((kit: any) => kit.active === false), 'All historical kits must be inactive');
+  const oldKitFormat = data.formats.find((format: any) => format.name === 'Kit Mini');
+  invariant(oldKitFormat && data.products.every((p: any) => p.formatId !== oldKitFormat.id || p.active === false), 'Legacy Kit Mini products must be inactive');
+  const katiaPayments = data.payments.filter((p: any) => p.saleId === 'V00024' && p.status === 'active');
+  const pix = data.paymentMethods.find((method: any) => method.name.toLocaleLowerCase('pt-BR') === 'pix');
+  invariant(katiaPayments.length === 2 && !!pix && katiaPayments.every((p: any) => p.amountReceivedCents === 9750 && p.methodId === pix.id), 'Katia must have exactly two R$97.50 Pix payments');
+  const katia = data.sales.find((sale: any) => sale.id === 'V00024');
+  invariant(katia?.totalCents === 19500 && katia?.receivedCents === 19500 && katia?.balanceCents === 0, 'Katia settlement differs');
+  for (const [id, amount] of [['M000005', 2200], ['M000006', 1680], ['M000007', 7790]] as const) {
+    const purchase = data.expenses.find((item: any) => item.id === id);
+    invariant(purchase?.amountCents === amount && purchase?.fundingSource === 'business', 'Shopee funding reconciliation differs: ' + id);
+  }
+  for (const [id, quantity] of [['BASE-BRA', 3.144], ['BASE-TRA', 0.085], ['INS-020', 98], ['INS-024', 24]] as const) {
+    const input = data.inputs.find((item: any) => item.id === id);
+    invariant(input?.trackingMode === 'exact' && Math.abs(input.stock - quantity) < 0.00001, 'Physical inventory differs: ' + id);
+  }
+  invariant(data.inputs.find((item: any) => item.id === 'LAU-27')?.trackingMode === 'untracked', 'Lauril must not require measurement');
   const sourceHash = hash({ data, raw: stableSource(raw) });
   const runId = sourceHash.slice(0, 24);
   invariant(!(await db.doc(`migrationRuns/${runId}`).get()).exists, 'Source version already migrated; use receipt verification');

@@ -10,7 +10,7 @@ const list = (name) => Array.isArray(data[name]) ? data[name] : [];
 const index = (name) => new Map(list(name).map((item) => [item.id, item]));
 
 const productStockStatus = (stock, minimumStock) => stock < 0 ? 'negative' : stock <= minimumStock ? 'low' : 'ok';
-const inputStockStatus = (stock, minimumStock, configured) => !configured ? 'untracked' : stock < 0 ? 'negative' : stock <= minimumStock ? 'low' : 'ok';
+const inputStockStatus = (stock, minimumStock, configured, trackingMode) => trackingMode === 'untracked' || !configured ? 'untracked' : stock < 0 ? 'negative' : stock <= minimumStock ? 'low' : 'ok';
 
 const ensureUnique = (name) => {
   const seen = new Set();
@@ -50,7 +50,9 @@ for (const item of list('inputs')) {
   if (!units.has(item.unitId)) errors.push(`inputs/${item.id}: unitId inválido.`);
   if (item.stock < 0) warnings.push(`inputs/${item.id}: estoque negativo ${item.stock}.`);
   if (!item.averageUnitCostCents) warnings.push(`inputs/${item.id}: custo médio ausente.`);
-  const expectedStatus = inputStockStatus(item.stock, item.minimumStock, item.minimumStockConfigured !== false);
+  if (item.trackingMode && !['exact', 'estimated', 'untracked'].includes(item.trackingMode)) errors.push(`inputs/${item.id}: modo de controle inválido.`);
+  if (item.availabilityStatus !== undefined && (typeof item.availabilityStatus !== 'string' || item.availabilityStatus.length > 240)) errors.push(`inputs/${item.id}: disponibilidade inválida.`);
+  const expectedStatus = inputStockStatus(item.stock, item.minimumStock, item.minimumStockConfigured !== false, item.trackingMode);
   if (item.stockStatus !== expectedStatus) errors.push(`inputs/${item.id}: stockStatus divergente.`);
 }
 for (const item of list('products')) {

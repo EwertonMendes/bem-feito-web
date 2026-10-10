@@ -19,7 +19,7 @@ import { CatalogImage } from '../../../../shared/media/catalog-image/catalog-ima
 import { BfNumberInput } from '../../../../shared/ui/number-input/number-input';
 
 interface ProductFormModel { collectionId: string; fragranceId: string; formatId: string; salePrice: number; additionalCost: number; minimumStock: number; active: boolean; }
-interface InputFormModel { name: string; unitId: string; trackingMode: InputTrackingMode; minimumStock: number; active: boolean; }
+interface InputFormModel { name: string; unitId: string; trackingMode: InputTrackingMode; availabilityStatus: string; minimumStock: number; active: boolean; }
 interface KitFormModel { name: string; price: number; notes: string; active: boolean; }
 interface AdditionFormModel { name: string; category: string; price: number; notes: string; active: boolean; }
 
@@ -123,7 +123,7 @@ export class CatalogEditor {
     min(p.minimumStock, 0);
   });
 
-  readonly inputModel = signal<InputFormModel>({ name: '', unitId: '', trackingMode: 'estimated', minimumStock: 0, active: true });
+  readonly inputModel = signal<InputFormModel>({ name: '', unitId: '', trackingMode: 'estimated', availabilityStatus: '', minimumStock: 0, active: true });
   readonly inputForm = form(this.inputModel, (p) => {
     required(p.name);
     required(p.unitId);
@@ -158,9 +158,9 @@ export class CatalogEditor {
   ];
   readonly inputTrackingHint = computed(() => {
     const mode = this.inputModel().trackingMode;
-    if (mode === 'exact') return 'Ideal para embalagens, frascos, caixas e outros itens contáveis. O saldo deve representar a quantidade real disponível.';
-    if (mode === 'untracked') return 'Indicado para materiais cujo saldo físico não precisa ser acompanhado, como álcool de borrifação, fitas e pequenos consumíveis. Compras e composições continuam considerando o custo.';
-    return 'Ideal para glicerina, essência, lauril, corantes e outros materiais de consumo variável. O saldo serve como referência e pode ser conferido periodicamente.';
+    if (mode === 'exact') return 'Ideal para bases glicerinadas e embalagens com contagem física. O saldo deve representar a quantidade real disponível.';
+    if (mode === 'untracked') return 'Indicado para essências, corantes e lauril: atualize a disponibilidade qualitativa sem medir o líquido. Compras e composições continuam considerando o custo.';
+    return 'Ideal para outros insumos com quantidades aproximadas conhecidas. Não exige precisão e não bloqueia a operação.';
   });
   readonly unitOptions = computed<BfSelectOption[]>(() =>
     this.references.units().map((item) => ({ value: item.id, label: item.name })),
@@ -231,7 +231,7 @@ export class CatalogEditor {
       this.productModel.set({ collectionId: '', fragranceId: '', formatId: '', salePrice: 0, additionalCost: 0, minimumStock: 0, active: true });
       this.recipe.set([]);
     } else if (kind === 'inputs') {
-      this.inputModel.set({ name: '', unitId: '', trackingMode: 'estimated', minimumStock: 0, active: true });
+      this.inputModel.set({ name: '', unitId: '', trackingMode: 'estimated', availabilityStatus: '', minimumStock: 0, active: true });
     } else if (kind === 'kits') {
       this.kitModel.set({ name: '', price: 0, notes: '', active: true });
       this.kitComponents.set([]);
@@ -262,6 +262,7 @@ export class CatalogEditor {
       name: item.name,
       unitId: item.unitId,
       trackingMode,
+      availabilityStatus: item.availabilityStatus ?? '',
       minimumStock: trackingMode === 'untracked' ? 0 : item.minimumStock,
       active: item.active,
     });
@@ -417,6 +418,7 @@ export class CatalogEditor {
       name: model.name.trim(),
       unitId: model.unitId,
       trackingMode: model.trackingMode,
+      availabilityStatus: model.trackingMode === 'exact' ? undefined : model.availabilityStatus.trim().slice(0,240) || undefined,
       stock: existing?.stock ?? 0,
       minimumStock: tracked ? model.minimumStock : 0,
       minimumStockConfigured: tracked,

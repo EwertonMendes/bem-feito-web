@@ -46,6 +46,8 @@ export interface InputItem extends AuditFields {
   minimumStock: number;
   minimumStockConfigured?: boolean;
   trackingMode?: InputTrackingMode;
+  /** Qualitative status for non-measurable liquids; never treated as a numerical balance. */
+  availabilityStatus?: string;
   stockStatus?: StockStatus;
   averageUnitCostCents: number;
   costBasisQuantity?: number;

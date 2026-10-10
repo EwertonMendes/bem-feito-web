@@ -35,7 +35,7 @@ const omitEmpty = (object) => Object.fromEntries(Object.entries(object).filter((
 const sequence = (value) => Number(text(value).match(/(\d+)$/)?.[1] ?? 0);
 const byName = (items) => new Map(items.map((item) => [lower(item.name), item.id]));
 const productStockStatus = (stock, minimumStock) => stock < 0 ? 'negative' : stock <= minimumStock ? 'low' : 'ok';
-const inputStockStatus = (stock, minimumStock, configured) => !configured ? 'untracked' : stock < 0 ? 'negative' : stock <= minimumStock ? 'low' : 'ok';
+const inputStockStatus = (stock, minimumStock, configured, trackingMode) => trackingMode === 'untracked' || !configured ? 'untracked' : stock < 0 ? 'negative' : stock <= minimumStock ? 'low' : 'ok';
 const saleAnalytics = (items) => {
   let cogsCents = 0;
   let itemsSold = 0;
@@ -111,20 +111,51 @@ const formatPrices = rows('Preços de Formato').map((row) => ({
   active: active(row.Ativo),
 }));
 
+// The private inventory review is authoritative about which inputs can be counted.
+// Multiple rows may refer to the same bottle type (e.g. two Lavanda flasks).
+const physicalReview = Array.isArray(raw.views?.['Controle Simplificado']) ? raw.views['Controle Simplificado'] : [];
+const observationMap = new Map();
+for (const observation of physicalReview) {
+  const material = lower(observation.Material);
+  // The Shopee Lauril (INS-021) is exhausted. The unmeasured Mercado Livre
+  // flask is recorded under the legacy LAU-27 item, not the Shopee purchase.
+  const id = text(observation['ID legado']) || (material === 'lauril vegetal' ? 'LAU-27' : '');
+  if (!id) continue;
+  const group = observationMap.get(id) ?? [];
+  group.push(observation);
+  observationMap.set(id, group);
+}
+const exhaustedInputs = new Set(rows('Ajustes de Estoque')
+  .filter(row => lower(row.Motivo).includes('esgotado'))
+  .map(row => text(row.Insumo_ID)).filter(Boolean));
+
 const inputs = rows('Insumos').map((row) => {
   const stock = number(row['Estoque Atual']);
   const minimumStock = number(row['Estoque Mínimo']);
   const minimumStockConfigured = row['Estoque Mínimo'] !== '' && row['Estoque Mínimo'] !== null && row['Estoque Mínimo'] !== undefined;
+  const id = text(row.Insumo_ID);
+  const observations = observationMap.get(id) ?? [];
+  const exact = observations.some(observation => lower(observation['Tipo de controle']) === 'exato');
+  const liquid = lower(row['Unidade Base']) === 'ml' || /essência|corante|lauril/i.test(text(row.Insumo));
+  const trackingMode = !physicalReview.length ? undefined
+    : exact ? 'exact' : (observations.length || liquid) ? 'untracked' : minimumStockConfigured ? 'estimated' : 'untracked';
+  const qualitative = observations
+    .filter(observation => lower(observation['Tipo de controle']) !== 'exato')
+    .map(observation => text(observation.Material) + ': ' + text(observation['Situação física']))
+    .join(' · ');
+  const availabilityStatus = qualitative || (exhaustedInputs.has(id) ? 'Esgotado' : '');
   return {
-    id: text(row.Insumo_ID),
-    code: text(row.Insumo_ID),
+    id,
+    code: id,
     active: active(row.Ativo),
     name: text(row.Insumo),
     unitId: unitIds.get(lower(row['Unidade Base'])) ?? '',
     stock,
     minimumStock,
     minimumStockConfigured,
-    stockStatus: inputStockStatus(stock, minimumStock, minimumStockConfigured),
+    ...(trackingMode ? { trackingMode } : {}),
+    ...(availabilityStatus ? { availabilityStatus: availabilityStatus.slice(0, 240) } : {}),
+    stockStatus: inputStockStatus(stock, minimumStock, minimumStockConfigured, trackingMode),
     averageUnitCostCents: cents(row['Custo Médio Unit.']),
   };
 });
@@ -159,6 +190,7 @@ const products = rows('Produtos').map((row) => {
     salePriceCents: cents(row['Preço de Venda']),
     additionalCostCents: cents(row['Custo Adicional Unit.']),
     averageUnitCostCents: cents(row['Custo Unitário']),
+    unitCostDeciCents: Math.round(number(row['Custo Unitário']) * 1000) || undefined,
     stock,
     minimumStock,
     stockStatus: productStockStatus(stock, minimumStock),

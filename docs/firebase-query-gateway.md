@@ -58,3 +58,45 @@ Cada consulta precisa ter pelo menos um filtro e um `limit`, até **4 consultas*
 - CI da `master` precisa passar antes da Action real receber acesso OIDC.
 - Consultas de teste devem confirmar `mode=query` via MCP, login do proprietário, ausência de escrita, leitura real no DEV e decriptação privada, comparando os registros à interface do sistema.
 - Aplicações de migração continuam exigindo plano, hashes, prévia, backup e autorização explícita; a query não tem caminho para usar a conta de escrita.
+
+
+## Administração DEV direta (sem PR por operação)
+
+O workflow `.github/workflows/data-admin.yml` aceita `workflow_dispatch` com `mode=direct` e
+`operation=<JSON>`; a consulta com `mode=query` permanece criptografada. As alterações
+diretas somente funcionam na `master` protegida, para o proprietário autenticado e
+com a CI da master aprovada. Usam OIDC efêmero para a identidade escritora DEV.
+Não é necessário PR, arquivo de requisição, comentário, chave de serviço ou servidor ligado.
+
+Exemplo de atualização sem alterar campos derivados:
+
+```json
+{"schemaVersion":1,"id":"patch-example-001","environment":"dev","projectId":"bem-feito-dev","action":"patch","collection":"products","documentId":"product-id","expected":{"salePriceCents":1000},"values":{"salePriceCents":1100}}
+```
+
+Outros comandos reutilizáveis: `create`, `delete` (somente registros permitidos e
+sem dependências), `adjustStock` (movimento + ajuste + contador) e `reverseProduction`
+(remove produção e movimentações e reverte somente saldos que não foram consumidos
+ou reservados posteriormente). A operação é limitada a um escopo pequeno, tem
+ID de idempotência, backup em projeto privado separado, commit atômico, auditoria e
+verificação pós-escrita. Repetir o mesmo ID não reaplica alterações.
+
+Exemplos de ajustes e reversão:
+
+```json
+{"schemaVersion":1,"id":"reverse-example-001","environment":"dev","projectId":"bem-feito-dev","action":"reverseProduction","documentId":"production-id"}
+{"schemaVersion":1,"id":"stock-example-001","environment":"dev","projectId":"bem-feito-dev","action":"adjustStock","itemType":"product","itemId":"product-id","quantityDelta":1,"reason":"Conferência de estoque","businessDate":"2026-10-10"}
+```
+
+Os parâmetros do dispatch não são criptografados: **não incluir dados pessoais
+ou segredos**. A política de campos editáveis impede alterar diretamente estoque,
+reservas, pagamentos e demais dados derivados. Operações financeiras complexas
+devem usar o fluxo da aplicação ou uma operação de negócio específica revisada.
+
+Nota: produção histórica pode não conter o custo médio anterior. A reversão
+recompõe quantidades e remove movimentos correspondentes, mas não promete
+restaurar campos sem snapshot confiável. Contadores sequenciais permanecem
+monotônicos para evitar reutilização de códigos.
+
+A administração legada de PR/preview/apply fica reservada a migrações e
+recuperações extraordinárias, não à operação cotidiana.

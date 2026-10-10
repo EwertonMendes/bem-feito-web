@@ -5,6 +5,7 @@ import { getFirestore, Timestamp, GeoPoint } from 'firebase-admin/firestore';
 import { encode, decode } from './codec.ts';
 import { hash, validateRequest } from './schema.ts';
 import { prepare, apply, snapshotRow, assertPlanCapacity } from './engine.ts';
+import { prepareDirect, validateDirectRequest } from './direct-gateway.ts';
 import type { Archive } from './storage.ts';
 import { FirestoreArchive } from './storage.ts';
 
@@ -154,52 +155,3 @@ test('archive access guard rejects excessive update privilege before a business 
   assert.equal((await db.doc('dataAdminSmoke/smoke-test').get()).data()?.value, 10);
 });
 
-test('registered 10/10 DEV test production reverts stock and deletes only its two fake records', async () => {
-  const productionId = 'vz7mI3n8Yw6f0WUQ97nO';
-  const movementId = 'KO3yZciwtXuZKTYHfs5V';
-  const productId = 'PROD-041';
-  const scope = ['productions/' + productionId, 'stockMovements/' + movementId, 'products/' + productId];
-  const req = validateRequest({ schemaVersion: 1, id: 'reverse-oct10-test', environment: 'dev',
-    projectId: 'bem-feito-dev', operation: 'revert-test-production',
-    targets: [{ collection: 'productions', id: productionId }],
-    destructive: { projectId: 'bem-feito-dev', paths: scope } });
-  const p = { code: 'PR00048', businessDate: '2026-10-10', productId, quantity: 300,
-    unitCostCents: 246, totalCostCents: 73800, costPending: false, consumptions: [],
-    items: [{ productId, quantity: 300, consumptions: [] }] };
-  const m = { itemType: 'product', itemId: productId, sourceType: 'production',
-    sourceId: productionId, businessDate: '2026-10-10', quantityDelta: 300,
-    unitCostCents: 246, totalCostCents: 73800 };
-  const product = { stock: 301, committedStock: 0, reservedPhysicalStock: 0,
-    minimumStock: 0, stockStatus: 'ok', averageUnitCostCents: 246 };
-  try {
-    await db.doc(scope[0]).set(p);
-    await db.doc(scope[1]).set(m);
-    await db.doc(scope[2]).set(product);
-    await db.doc('stockMovements/migration-adjustment-AJ00024').set({
-      itemType: 'product', itemId: productId, sourceType: 'adjustment', quantityDelta: 1 });
-    const plan = await prepare(req, db, archive);
-    assert.equal((await db.doc(scope[2]).get()).data()?.stock, 301, 'Preview must not write');
-    const result = await apply(req, plan, db, archive, { ...actor, approvedPlan: hash(plan) });
-    assert.equal(result.validation, 'readback-verified');
-    assert.equal((await db.doc(scope[0]).get()).exists, false);
-    assert.equal((await db.doc(scope[1]).get()).exists, false);
-    assert.equal((await db.doc(scope[2]).get()).data()?.stock, 1);
-    assert.equal((await db.doc('stockMovements/migration-adjustment-AJ00024').get()).exists, true);
-    assert.equal((await apply(req, plan, db, archive, { ...actor, approvedPlan: hash(plan) })).status, 'already-complete');
-  } finally {
-    await Promise.all([db.doc(scope[0]).delete(), db.doc(scope[1]).delete(), db.doc(scope[2]).delete(),
-      db.doc('stockMovements/migration-adjustment-AJ00024').delete(),
-      db.doc('dataAdminOperations/reverse-oct10-test').delete()]);
-  }
-});
-test('registered production reversal rejects PROD, unrelated IDs and unexpected scope', () => {
-  const base = { schemaVersion: 1, id: 'invalid-oct10-test', environment: 'dev',
-    projectId: 'bem-feito-dev', operation: 'revert-test-production',
-    targets: [{ collection: 'productions', id: 'vz7mI3n8Yw6f0WUQ97nO' }],
-    destructive: { projectId: 'bem-feito-dev', paths:
-      ['productions/vz7mI3n8Yw6f0WUQ97nO', 'stockMovements/KO3yZciwtXuZKTYHfs5V', 'products/PROD-041'] } };
-  assert.throws(() => validateRequest({ ...base, environment: 'prod' }), /DEV-only/);
-  assert.throws(() => validateRequest({ ...base, targets: [{ collection: 'productions', id: 'other' }] }), /Unregistered/);
-  const wrongScope = validateRequest({ ...base, destructive: { projectId: 'bem-feito-dev', paths: ['productions/vz7mI3n8Yw6f0WUQ97nO'] } });
-  assert.ok(wrongScope);
-});

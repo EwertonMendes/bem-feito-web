@@ -24,8 +24,8 @@ export async function authorizeQuery(
     'Only the actual repository owner may dispatch a private query');
   invariant(env.GATEWAY_QUERY === event.inputs.query &&
     env.GATEWAY_KEY === event.inputs.recipient_public_key, 'Untrusted query parameters changed');
-  invariant(Object.keys(event.inputs).every(k => ['mode','query','recipient_public_key','pr','path','sha','request_hash','plan_hash'].includes(k)) &&
-    !['pr','path','sha','request_hash','plan_hash'].some(k => Boolean(event.inputs[k])),
+  invariant(Object.keys(event.inputs).every(k => ['mode','query','recipient_public_key','operation','pr','path','sha','request_hash','plan_hash'].includes(k)) &&
+    !['operation','pr','path','sha','request_hash','plan_hash'].some(k => Boolean(event.inputs[k])),
     'Query mode cannot invoke administration or submit PR parameters');
   const plan = validateQueryPlan(event.inputs.query);
   validateRecipientKey(event.inputs.recipient_public_key);

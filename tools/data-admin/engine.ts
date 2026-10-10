@@ -35,58 +35,7 @@ function assertExpected(data: Payload | null, expected: Payload | null) {
   for (const [key, value] of Object.entries(expected)) invariant(hash(data[key]) === hash(value), 'Field precondition differs');
 }
 
-/**
- * Single registered correction of the isolated 10/10 DEV test production.
- * No generic business-document deletion permission is exposed. Every identity,
- * stock value, movement and dependency is validated before a protected plan is
- * archived; apply then checks document versions inside one transaction.
- */
-async function prepareTestProductionReversal(request: Request, db: Firestore): Promise<Plan> {
-  invariant(request.environment === 'dev' && request.projectId === 'bem-feito-dev', 'DEV-only correction');
-  const productionId = 'vz7mI3n8Yw6f0WUQ97nO';
-  const movementId = 'KO3yZciwtXuZKTYHfs5V';
-  const productId = 'PROD-041';
-  const productionPath = 'productions/' + productionId;
-  const movementPath = 'stockMovements/' + movementId;
-  const productPath = 'products/' + productId;
-  invariant(request.targets?.length === 1 && request.targets[0]?.collection === 'productions' &&
-    request.targets[0]?.id === productionId, 'Unregistered production target');
-  const scope = [productionPath, movementPath, productPath];
-  assertScope(request, scope);
-  const [production, movement, product] = await db.getAll(...scope.map(path => db.doc(path)));
-  invariant(production.exists && movement.exists && product.exists, 'Correction source or product missing');
-  const p = production.data()!, m = movement.data()!, item = product.data()!;
-  invariant(p.code === 'PR00048' && p.businessDate === '2026-10-10' &&
-    p.productId === productId && p.quantity === 300 && p.unitCostCents === 246 &&
-    p.totalCostCents === 73800 && p.costPending === false &&
-    Array.isArray(p.consumptions) && p.consumptions.length === 0 &&
-    Array.isArray(p.items) && p.items.length === 1 && p.items[0].productId === productId &&
-    p.items[0].quantity === 300 && Array.isArray(p.items[0].consumptions) &&
-    p.items[0].consumptions.length === 0, 'Test production no longer matches the registered correction');
-  invariant(m.itemType === 'product' && m.itemId === productId &&
-    m.sourceType === 'production' && m.sourceId === productionId &&
-    m.businessDate === '2026-10-10' && m.quantityDelta === 300 &&
-    m.totalCostCents === 73800, 'Test stock movement differs');
-  invariant(item.stock === 301 && item.committedStock === 0 && item.reservedPhysicalStock === 0 &&
-    item.averageUnitCostCents === 246 && item.minimumStock === 0 &&
-    item.stockStatus === 'ok', 'Product stock or reservations changed; manual reconciliation required');
-  // Inspect *all* current movements of this product, not just movements on 10/10.
-  // Any later sale or adjustment forces review instead of a blind rollback.
-  const history = await db.collection('stockMovements').where('itemId', '==', productId).get();
-  invariant(history.size === 2 && history.docs.some(d => d.id === movementId) &&
-    history.docs.some(d => d.id === 'migration-adjustment-AJ00024' &&
-      d.data().sourceType === 'adjustment' && d.data().quantityDelta === 1),
-    'Product movement history changed; refuse unsafe reversal');
-  const rows = [snapshotRow(production), snapshotRow(movement), snapshotRow(product)];
-  rows[0].after = encode(null);
-  rows[1].after = encode(null);
-  rows[2].after = encode({ ...item, stock: 1, stockStatus: 'ok' });
-  return { schemaVersion: 1, requestHash: requestHash(request), projectId: request.projectId,
-    environment: request.environment, operation: request.operation, scope, rows, dependencies: [] };
-}
-
 export async function prepare(request: Request, db: Firestore, archive: Archive): Promise<Plan> {
-  if (request.operation === 'revert-test-production') return prepareTestProductionReversal(request, db);
   invariant(request.operation !== 'migrate', 'Use registered migration planner');
   let rows: Row[];
   let scope: string[];

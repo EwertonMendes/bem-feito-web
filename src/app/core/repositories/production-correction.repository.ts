@@ -188,12 +188,12 @@ export class ProductionCorrectionRepository {
         if (Math.abs(delta) < 1e-6) continue;
         const stock = roundQuantity(input.stock + delta);
         impacts.push({ itemType: 'input', itemId: input.id, name: input.name, quantityDelta: delta, stockBefore: input.stock, stockAfter: stock, unitLabel: input.unitId });
-        stockChanges.push({ itemType: 'input', itemId, stock });
-        changes.push({ ref: inputSnapshots.get(itemId)!.ref, data: {
+        stockChanges.push({ itemType: 'input', itemId: inputId, stock });
+        changes.push({ ref: inputSnapshots.get(inputId)!.ref, data: {
           stock, stockStatus: stockStatusForInput({ ...input, stock }), updatedAt: serverTimestamp(), updatedBy: userId,
         } });
         const previousCost = beforeConsumption.find(c => c.inputId === inputId)?.unitCostCents;
-        movementWrites.push({ itemType: 'input', itemId, delta, unitCostCents: previousCost ?? input.averageUnitCostCents });
+        movementWrites.push({ itemType: 'input', itemId: inputId, delta, unitCostCents: previousCost ?? input.averageUnitCostCents });
       }
 
       const cancelled = draft.cancel;

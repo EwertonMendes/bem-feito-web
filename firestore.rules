@@ -243,11 +243,13 @@ service cloud.firestore {
               && data.items[0].inputId is string && data.items[0].quantity is number
               && data.items[0].amountCents is int)))
         || (name == 'productions'
-          && fields(data, ['code', 'businessDate', 'productId', 'productName', 'quantity', 'unitCostCents', 'totalCostCents', 'costPending', 'consumptions'], ['notes', 'items'])
+          && fields(data, ['code', 'businessDate', 'productId', 'productName', 'quantity', 'unitCostCents', 'totalCostCents', 'costPending', 'consumptions'], ['notes', 'items', 'status', 'correctionVersion'])
           && text(data.code) && businessDate(data) && text(data.productName)
           && (text(data.productId) || ('items' in data && data.productId == ''))
           && quantity(data.quantity) && data.quantity > 0 && money(data.unitCostCents) && money(data.totalCostCents)
           && data.costPending is bool && data.consumptions is list
+           && (!('status' in data) || data.status in ['active', 'cancelled'])
+           && (!('correctionVersion' in data) || (data.correctionVersion is int && data.correctionVersion >= 0))
           && (!('items' in data) || (data.items is list && data.items.size() > 0 && data.items.size() <= 60
             && data.items[0].productId is string && data.items[0].quantity is number)))
         || (name == 'stockAdjustments'
@@ -344,6 +346,17 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time
         && request.resource.data.updatedBy == request.auth.uid;
       allow delete: if false;
+    }
+
+    match /productionCorrections/{correctionId} {
+      allow read: if activeUser();
+      allow create: if canOperate() && auditCreate(request.resource.data)
+        && fields(request.resource.data, ['productionId', 'kind', 'businessDate', 'reason', 'before', 'after', 'impacts'], [])
+        && text(request.resource.data.productionId) && businessDate(request.resource.data)
+        && text(request.resource.data.reason) && request.resource.data.kind in ['correction', 'cancellation']
+        && request.resource.data.before is map && request.resource.data.after is map
+        && request.resource.data.impacts is list && request.resource.data.impacts.size() <= 160;
+      allow update, delete: if false;
     }
 
     match /users/{userId} {

@@ -5,7 +5,7 @@
   "projectId": "bem-feito-dev",
   "operation": "migrate",
   "migration": "legacy-sheets-v1",
-  "deploymentSha": "7c75452f0b03837465d6b414c92f67cbc6364d4c",
+  "deploymentSha": "7e6644acd1b013c10398328bf36ac17492d53932",
   "destructive": {
     "projectId": "bem-feito-dev",
     "paths": [

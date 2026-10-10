@@ -87,6 +87,7 @@ describe('DriveIntegrationService', () => {
 
     await service.load();
     expect(service.status()).toBe('ready');
+    expect(service.authorizationNeeded()).toBe(true);
 
     const connecting = service.connect();
     expect(service.connecting()).toBe(true);

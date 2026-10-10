@@ -1,3 +1,4 @@
+import { CatalogImage } from '../../../shared/media/catalog-image/catalog-image';
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
 import { CatalogReferenceStore } from '../../catalog/catalog-reference.store';
@@ -13,8 +14,10 @@ import { BfIcon } from '../../../shared/ui/icon/icon';
 import { BfDialog } from '../../../shared/ui/dialog/dialog';
 import { BfCheckbox } from '../../../shared/ui/checkbox/checkbox';
 import { BfSelect, BfSelectOption } from '../../../shared/ui/select/select';
+import { BfSelectSearch } from '../../../shared/ui/select-search/select-search';
 import { paymentMethodIcon } from '../../../shared/ui/select/payment-method-icon';
 import { BfNumberInput } from '../../../shared/ui/number-input/number-input';
+import { CatalogImageRef } from '../../../domain/models/image.model';
 interface PurchaseFormLine { id: string; inputId: string; quantity: number; amount: number; }
 
 interface ReceiptFormModel {
@@ -44,7 +47,7 @@ interface ExpenseFormModel {
 }
 @Component({
  selector: 'bf-finance-dialogs',
- imports: [FormField, BfIcon, BfDialog, BfSelect, BfCheckbox, BfNumberInput],
+ imports: [FormField, BfIcon, BfDialog, BfSelect, BfSelectSearch, CatalogImage, BfCheckbox, BfNumberInput],
  changeDetection: ChangeDetectionStrategy.OnPush,
  templateUrl: './finance-dialogs.html',
  styleUrl: './finance-dialogs.scss',
@@ -134,6 +137,11 @@ export class BfFinanceDialogs {
     { value: '', label: 'Selecione' },
     ...this.catalog.activeInputs().map((item) => ({ value: item.id, label: item.name })),
   ]);
+  readonly inputImages = computed(() => new Map(this.catalog.inputs().map(item => [item.id, item.image])));
+  inputImage(inputId: string): CatalogImageRef | undefined {
+    return this.inputImages().get(inputId);
+  }
+
   readonly selectedInput = computed(() => this.catalog.inputs().find((item) => item.id === this.model().inputId));
   readonly purchaseUnitName = computed(() => {
     const input = this.selectedInput();

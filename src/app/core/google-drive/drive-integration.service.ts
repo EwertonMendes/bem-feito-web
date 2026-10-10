@@ -56,7 +56,7 @@ export class DriveIntegrationService {
 
       const nextStatus: DriveIntegrationStatus = linked ? 'ready' : 'disconnected';
       if (status !== nextStatus) this.statusState.set(nextStatus);
-      if (!linked) this.authorizationNeededState.set(false);
+      this.authorizationNeededState.set(linked);
     });
   }
 
@@ -84,7 +84,10 @@ export class DriveIntegrationService {
       }
 
       if (!this.driveAuth.currentToken()) {
-        this.statusState.set(this.driveAuth.linked() ? 'ready' : 'disconnected');
+        const linked = this.driveAuth.linked();
+        this.statusState.set(linked ? 'ready' : 'disconnected');
+        // Token temporário expirado: pedir renovação em vez de ocultar silenciosamente as imagens.
+        this.authorizationNeededState.set(linked);
         return;
       }
 

@@ -13,6 +13,7 @@ import { BfDialog } from '../../../../shared/ui/dialog/dialog';
 import { BfSettingsEditor, ReferenceSaved } from '../../../settings/editor/settings-editor';
 import { BfIcon } from '../../../../shared/ui/icon/icon';
 import { BfSelect, BfSelectOption } from '../../../../shared/ui/select/select';
+import { BfSelectSearch } from '../../../../shared/ui/select-search/select-search';
 import { BfCheckbox } from '../../../../shared/ui/checkbox/checkbox';
 import { BfImageUpload } from '../../../../shared/ui/image-upload/image-upload';
 import { CatalogImage } from '../../../../shared/media/catalog-image/catalog-image';
@@ -25,7 +26,7 @@ interface AdditionFormModel { name: string; category: string; price: number; not
 
 @Component({
   selector: 'bf-catalog-editor',
-  imports: [FormField, BfDialog, BfIcon, BfSelect, BfCheckbox, BfImageUpload, CatalogImage, BfNumberInput, BfSettingsEditor],
+  imports: [FormField, BfDialog, BfIcon, BfSelect, BfSelectSearch, CatalogImage, BfCheckbox, BfImageUpload, CatalogImage, BfNumberInput, BfSettingsEditor],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './catalog-editor.html',
   styleUrl: './catalog-editor.scss',
@@ -174,6 +175,11 @@ export class CatalogEditor {
   readonly inputOptions = computed<BfSelectOption[]>(() =>
     this.store.inputs().map((item) => ({ value: item.id, label: item.name })),
   );
+  readonly inputImages = computed(() => new Map(this.store.inputs().map(item => [item.id, item.image])));
+  inputImage(inputId: string): CatalogImageRef | undefined {
+    return this.inputImages().get(inputId);
+  }
+
   readonly productCostPreview = computed(() => {
     if (this.kind() !== 'products') return null;
     const model = this.productModel();

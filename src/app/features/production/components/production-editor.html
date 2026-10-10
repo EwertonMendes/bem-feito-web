@@ -3,11 +3,14 @@
     <div class="bf-dialog-body">
       @if (formError()) {<p class="bf-form-error" role="alert">{{formError()}}</p>}
       <label class="bf-field"><span>Data de produção</span><input class="bf-input" type="date" [formField]="productionForm.businessDate" /></label>
+      <ng-template #productThumb let-option>
+        <bf-catalog-image [image]="productImage(option.value)" [alt]="option.label" [thumbnail]="true" />
+      </ng-template>
       <section class="production-lines">
         <div class="section-head"><strong>Sabonetes fabricados</strong><span>{{previews().units}} unidades</span></div>
         @for(line of lines(); track line.id) {
           <div class="production-line">
-            <label class="bf-field product-picker"><span>Produto</span><bf-select [value]="line.productId" (valueChange)="changeProduct(line.id,$event)" [options]="productOptions()" ariaLabel="Produto produzido" /></label>
+            <label class="bf-field product-picker"><span>Produto</span><bf-select-search [value]="line.productId" (valueChange)="changeProduct(line.id,$event)" [options]="productOptions()" [imageTemplate]="productThumb" ariaLabel="Produto produzido" /></label>
             <label class="bf-field quantity-picker"><span>Quantidade</span><bf-number-input kind="integer" [min]="1" [value]="line.quantity" (valueChange)="changeQuantity(line.id,$event)" ariaLabel="Quantidade produzida" /></label>
             <button class="bf-icon-button remove-line" type="button" [disabled]="lines().length===1" (click)="removeLine(line.id)" aria-label="Remover produto"><bf-icon name="trash" /></button>
           </div>

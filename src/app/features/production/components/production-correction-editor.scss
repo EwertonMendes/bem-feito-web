@@ -34,7 +34,7 @@
 .impact-values{text-align:right;flex:none}.impact-values strong{font-size:.91rem}.impact-values strong.negative{color:var(--danger)}.impact-values strong.positive{color:var(--brand-strong)}
 .review-reason{display:grid;gap:5px;border:1px solid var(--line);border-radius:12px;padding:12px}.review-reason strong{font-size:.82rem;overflow-wrap:anywhere}
 .correction-footer{gap:10px}
-@media(max-width:640px){.production-correction-dialog{width:calc(100vw - 16px);max-height:calc(100dvh - 24px);border-radius:16px}
+@media(max-width:640px){.production-correction-dialog{width:100vw;max-width:100vw;max-height:96dvh;border-radius:22px 22px 0 0;margin:auto 0 0}
 .correction-body{gap:13px;padding:14px 12px}.correction-line{grid-template-columns:minmax(0,1fr) 42px;gap:10px;padding:10px}
 .correction-line .product-picker{grid-column:1/-1}
 .correction-line .quantity-picker{grid-column:1}

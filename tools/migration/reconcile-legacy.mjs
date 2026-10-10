@@ -64,9 +64,12 @@ for (const row of auditRows('Reservas de Embalagem')) {
   const inputId = text(row.Insumo_ID);
   if (!saleId || !inputId) continue;
   const sale = saleMap.get(saleId), input = inputMap.get(inputId);
-  if (!sale || !input || !openSaleIds.has(saleId)) throw new Error('Reserva de embalagem não vinculada a encomenda ativa.');
   const quantity = integer(row['Reserva atual']);
-  if (!quantity || quantity > 1000000) throw new Error('Quantidade de embalagem reservada inválida.');
+  if (quantity === null || quantity > 1000000) throw new Error('Quantidade de embalagem reservada inválida.');
+  if (!sale || !input) throw new Error('Reserva de embalagem com vínculo inexistente.');
+  // Keep released historical reservations in the audit, but never reactivate them.
+  if (quantity === 0) continue;
+  if (!openSaleIds.has(saleId)) throw new Error('Reserva de embalagem não vinculada a encomenda ativa.');
   const current = sale.stockEffects.find(item => item.itemType === 'input' && item.itemId === inputId);
   if (current && current.quantityDelta !== -quantity) throw new Error('Reserva de embalagem diverge dos efeitos originais.');
   if (!current) sale.stockEffects.push({
@@ -99,7 +102,22 @@ for (const row of auditRows('Inventário 08-10')) {
   if (destination.includes('reservado')) item.reserved += qty;
   counted.set(id, item);
 }
+// The inventory audit is dated and may include reservations already delivered.
+ // Current Products physical stock is authoritative when explicitly available.
+const currentPhysical = new Set();
+for (const row of legacyRows('Produtos')) {
+  const id = text(row.Produto_ID);
+  const product = productMap.get(id);
+  if (!product || row['Estoque Físico'] === '' ||
+    row['Estoque Físico'] === null || row['Estoque Físico'] === undefined) continue;
+  const physical = integer(row['Estoque Físico']);
+  if (physical === null) throw new Error('Estoque físico atual inválido: ' + id);
+  product.stock = physical;
+  product.stockStatus = status(physical, product.minimumStock);
+  currentPhysical.add(id);
+}
 for (const [id, audit] of counted) {
+  if (currentPhysical.has(id)) continue;
   const product = productMap.get(id);
   product.stock = audit.physical;
   product.stockStatus = status(audit.physical, product.minimumStock);
@@ -118,7 +136,8 @@ for (const sale of data.sales) {
   }
 }
 for (const [id, count] of counted) {
-  productMap.get(id).reservedPhysicalStock += count.reserved;
+  // Do not resurrect reservations from older inventory when current stock is known.
+  if (!currentPhysical.has(id)) productMap.get(id).reservedPhysicalStock += count.reserved;
 }
 for (const [id, qty] of packagingReservations) inputMap.get(id).reservedPhysicalStock += qty;
 for (const entity of [...data.products, ...data.inputs]) {

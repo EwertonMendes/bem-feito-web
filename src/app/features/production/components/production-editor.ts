@@ -1,3 +1,4 @@
+import { BfLoadingButton } from '../../../shared/ui/button/loading-button';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { FormField, form, required } from '@angular/forms/signals';
 import { standardCostForProduct, trackingModeForInput } from '../../../domain/logic/costing';
@@ -19,7 +20,7 @@ interface ProductionFormModel { businessDate: string; notes: string; }
 interface PreviewConsumption extends ProductionConsumption { name: string; unit: string; mode: 'exact' | 'estimated' | 'untracked'; available: number | null; }
 @Component({
  selector: 'bf-production-editor',
- imports: [FormField, BfIcon, BfDialog, BfSelectSearch, CatalogImage, BfNumberInput],
+ imports: [BfLoadingButton, FormField, BfIcon, BfDialog, BfSelectSearch, CatalogImage, BfNumberInput],
  changeDetection: ChangeDetectionStrategy.OnPush,
  templateUrl: './production-editor.html',
  styleUrl: './production-editor.scss',
@@ -144,7 +145,7 @@ export class BfProductionEditor {
     this.saving.set(true);
     try {
       const result = await this.store.createBatch(lines.map(({ productId, quantity }) => ({ productId, quantity })), this.model().businessDate, this.model().notes);
-      if (result) { this.catalog.applyStockChanges(result.stockChanges); this.dialog().close(); }
+      if (result) { this.catalog.applyStockChanges(result.stockChanges); this.dialog().closeAfterSuccess(); }
       else this.formError.set(this.store.operationError() || 'Não foi possível registrar a produção.');
     } finally { this.saving.set(false); }
   }

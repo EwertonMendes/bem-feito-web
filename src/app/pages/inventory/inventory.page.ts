@@ -1,3 +1,4 @@
+import { BfLoadingButton } from '../../shared/ui/button/loading-button';
 import { ModalActions } from '../../core/services/modal-actions.service';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
@@ -26,7 +27,7 @@ interface AdjustmentModel {
 
 @Component({
   selector: 'bf-inventory-page',
-  imports: [FormField, BfIcon, CatalogImage, BfDialog, BfEmptyState, BfPageRefresh, BfListSkeleton, BfSkeleton, BfNumberInput],
+  imports: [BfLoadingButton, FormField, BfIcon, CatalogImage, BfDialog, BfEmptyState, BfPageRefresh, BfListSkeleton, BfSkeleton, BfNumberInput],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './inventory.page.html',
   styleUrl: './inventory.page.scss',
@@ -206,7 +207,7 @@ export class InventoryPage {
       );
       if (result) {
         this.catalog.applyStockChanges([result.stockChange]);
-        this.adjustmentDialog().close();
+        this.adjustmentDialog().closeAfterSuccess();
       } else {
         this.formError.set(this.store.operationError() || 'Não foi possível registrar o ajuste. Tente novamente.');
       }

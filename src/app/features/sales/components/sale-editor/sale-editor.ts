@@ -1,3 +1,4 @@
+import { BfLoadingButton } from '../../../../shared/ui/button/loading-button';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -84,7 +85,7 @@ interface KitAvailability {
 
 @Component({
   selector: 'bf-sale-editor',
-  imports: [FormField, BfConfirmDialog, BfDialog, BfIcon, CatalogImage, BfSelect, BfSelectSearch, BfNumberInput],
+  imports: [BfLoadingButton, FormField, BfConfirmDialog, BfDialog, BfIcon, CatalogImage, BfSelect, BfSelectSearch, BfNumberInput],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sale-editor.html',
   styleUrl: './sale-editor.scss',
@@ -374,15 +375,18 @@ export class SaleEditor {
   }
 
   clearOrder(): void {
+    if (this.submitting()) return;
     void this.confirmClearOrder();
   }
 
   requestClose(): void {
+    if (this.submitting()) return;
     void this.confirmClose();
   }
 
   onDialogCancel(event: Event): void {
     event.preventDefault();
+    if (this.submitting()) return;
     void this.confirmClose();
   }
 
@@ -516,7 +520,7 @@ export class SaleEditor {
       if (!result) return;
 
       this.catalog.applyStockChanges(result.stockChanges);
-      this.dialog().close();
+      this.dialog().closeAfterSuccess();
     } finally {
       this.submitting.set(false);
     }
@@ -592,6 +596,7 @@ export class SaleEditor {
   }
 
   private async confirmClearOrder(): Promise<void> {
+    if (this.submitting()) return;
     if (!this.hasDraftChanges()) {
       this.resetDraft();
       return;
@@ -606,10 +611,11 @@ export class SaleEditor {
       icon: 'trash',
     });
 
-    if (confirmed) this.resetDraft();
+    if (confirmed && !this.submitting()) this.resetDraft();
   }
 
   private async confirmClose(): Promise<void> {
+    if (this.submitting()) return;
     if (!this.hasDraftChanges()) {
       this.dialog().close();
       return;
@@ -624,7 +630,7 @@ export class SaleEditor {
       icon: 'alert',
     });
 
-    if (confirmed) this.dialog().close();
+    if (confirmed && !this.submitting()) this.dialog().close();
   }
 
   private focusFirstInvalidField(): void {

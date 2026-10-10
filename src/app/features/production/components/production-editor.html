@@ -1,4 +1,4 @@
-<dialog bfDialog #productionDialog="bfDialog" class="bf-dialog">
+<dialog bfDialog #productionDialog="bfDialog" class="bf-dialog" [busy]="saving()">
     <div class="bf-dialog-header"><h2>Registrar produção do dia</h2><button class="bf-icon-button" type="button" (click)="productionDialog.close()"><bf-icon name="close" /></button></div>
     <div class="bf-dialog-body">
       @if (formError()) {<p class="bf-form-error" role="alert">{{formError()}}</p>}
@@ -30,5 +30,5 @@
         <p class="preview-hint">Controlados exigem saldo. Estimados podem chegar a zero sem impedir a produção; materiais sem controle participam somente do custo.</p>
       </section>
     </div>
-    <div class="bf-dialog-footer"><button class="bf-button secondary" type="button" (click)="productionDialog.close()">Cancelar</button><button class="bf-button" type="button" [disabled]="saving()" (click)="save()">{{saving()?'Registrando...':'Confirmar produção'}}</button></div>
+    <div class="bf-dialog-footer"><button class="bf-button secondary" type="button" (click)="productionDialog.close()">Cancelar</button><button class="bf-button" type="button" [disabled]="saving()" [bfLoadingButton]="saving()" (click)="save()">{{saving()?'Registrando...':'Confirmar produção'}}</button></div>
   </dialog>

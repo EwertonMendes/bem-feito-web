@@ -1,3 +1,4 @@
+import { BfLoadingButton } from '../../../shared/ui/button/loading-button';
 import { CatalogImage } from '../../../shared/media/catalog-image/catalog-image';
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
@@ -47,7 +48,7 @@ interface ExpenseFormModel {
 }
 @Component({
  selector: 'bf-finance-dialogs',
- imports: [FormField, BfIcon, BfDialog, BfSelect, BfSelectSearch, CatalogImage, BfCheckbox, BfNumberInput],
+ imports: [BfLoadingButton, FormField, BfIcon, BfDialog, BfSelect, BfSelectSearch, CatalogImage, BfCheckbox, BfNumberInput],
  changeDetection: ChangeDetectionStrategy.OnPush,
  templateUrl: './finance-dialogs.html',
  styleUrl: './finance-dialogs.scss',
@@ -251,7 +252,7 @@ export class BfFinanceDialogs {
       const result = await this.sales.addPayment(value.saleId, value.businessDate, value.methodId, toCents(value.amount));
       if (result) {
         this.store.applyPayment(result.payment);
-        this.receiptDialog().close();
+        this.receiptDialog().closeAfterSuccess();
       } else {
         this.receiptFormError.set('Não foi possível registrar o recebimento. Revise os dados e tente novamente.');
       }
@@ -298,7 +299,7 @@ export class BfFinanceDialogs {
         const result = await this.store.createPurchaseBatch(draft);
         if (result) {
           this.catalog.applyStockChanges(result.stockChanges ?? []);
-          this.dialog().close();
+          this.dialog().closeAfterSuccess();
         } else this.expenseFormError.set(this.store.operationError() || 'Não foi possível registrar a compra.');
       } finally { this.expenseSaving.set(false); }
       return;
@@ -318,7 +319,7 @@ export class BfFinanceDialogs {
       const result = await this.store.createExpense(draft);
       if (result) {
         if (result.stockChange) this.catalog.applyStockChanges([result.stockChange]);
-        this.dialog().close();
+        this.dialog().closeAfterSuccess();
       } else {
         this.expenseFormError.set(this.store.operationError() || 'Não foi possível registrar a saída.');
       }

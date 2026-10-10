@@ -2,6 +2,7 @@
   bfDialog
   #saleDialog="bfDialog"
   class="sale-dialog"
+  [busy]="submitting()"
   (cancel)="onDialogCancel($event)"
 >
   <ng-template #productThumb let-option>
@@ -454,7 +455,7 @@
         <button
           class="bf-button confirm"
           type="button"
-          [disabled]="!cart().length || submitting()"
+          [disabled]="!cart().length || submitting()" [bfLoadingButton]="submitting()"
           (click)="submit()"
         >
           @if (submitting()) {

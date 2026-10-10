@@ -350,13 +350,15 @@ export class CatalogEditor {
 
   async save(): Promise<void> {
     if (this.saving()) return;
+    const variantCount = this.kind() === 'products' && this.bulkVariants() && !this.editingId()
+      ? this.selectedVariantFragranceIds().length : 0;
     this.saving.set(true);
     try {
       if (this.kind() === 'products') await this.saveProduct();
       else if (this.kind() === 'inputs') await this.saveInput();
       else if (this.kind() === 'kits') await this.saveKit();
       else await this.saveAddition();
-      this.toast.success('Cadastro salvo com sucesso.');
+      this.toast.success(variantCount > 0 ? variantCount + ' variações criadas com sucesso.' : 'Cadastro salvo com sucesso.');
       this.dialog().closeAfterSuccess();
     } catch (error) {
       this.toast.error(this.errors.message(error));
@@ -385,6 +387,8 @@ export class CatalogEditor {
       recipe: this.recipe().filter((item) => item.inputId && item.quantity > 0 && item.unitId),
     };
     const id = await this.store.saveProduct(product);
+    // Se a imagem falhar após salvar o cadastro, a próxima tentativa atualiza o mesmo documento.
+    this.editingId.set(id);
     await this.applyImageChange('products', id, existing?.image, (image) => this.store.setProductImage(id, image));
   }
 
@@ -415,7 +419,6 @@ export class CatalogEditor {
       recipe: this.recipe().filter(part => part.inputId && part.quantity > 0 && part.unitId),
     }));
     await this.store.createProductVariations(products);
-    this.toast.success(products.length + ' variações criadas em um único cadastro.');
   }
 
   private async saveInput(): Promise<void> {
@@ -440,6 +443,8 @@ export class CatalogEditor {
       image: existing?.image,
     };
     const id = await this.store.saveInput(input);
+    // Se a imagem falhar após salvar o cadastro, a próxima tentativa atualiza o mesmo documento.
+    this.editingId.set(id);
     await this.applyImageChange('inputs', id, existing?.image, (image) => this.store.setInputImage(id, image));
   }
 
@@ -454,6 +459,8 @@ export class CatalogEditor {
       components: this.kitComponents().filter((item) => item.formatId && item.quantity > 0),
     };
     const id = await this.store.saveKit(kit);
+    // Se a imagem falhar após salvar o cadastro, a próxima tentativa atualiza o mesmo documento.
+    this.editingId.set(id);
     await this.applyImageChange('kits', id, existing?.image, (image) => this.store.setKitImage(id, image));
   }
 
@@ -467,6 +474,8 @@ export class CatalogEditor {
       components: this.additionComponents().filter((item) => item.inputId && item.quantity > 0 && item.unitId),
     };
     const id = await this.store.saveAddition(addition);
+    // Se a imagem falhar após salvar o cadastro, a próxima tentativa atualiza o mesmo documento.
+    this.editingId.set(id);
     await this.applyImageChange('additions', id, existing?.image, (image) => this.store.setAdditionImage(id, image));
   }
 

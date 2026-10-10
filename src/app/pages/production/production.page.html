@@ -8,7 +8,7 @@
     <label class="bf-field"><span>Data</span><input class="bf-input" type="date" [value]="filterDate()" (input)="filterDate.set($any($event.target).value)" /></label>
     <label class="bf-field"><span>Produto</span><input class="bf-input" type="search" placeholder="Buscar sabonete" [value]="filterProduct()" (input)="filterProduct.set($any($event.target).value)" /></label>
     <label class="bf-field"><span>Custo</span><bf-select [value]="filterCost()" (valueChange)="changeCostFilter($event)" [options]="costFilterOptions" ariaLabel="Filtrar por custo" /></label>
-    <button class="bf-button secondary" type="button" (click)="filterDate.set('');filterProduct.set('');filterCost.set('all')">Limpar</button>
+    <button class="bf-button secondary" type="button" (click)="filterDate.set('');filterProduct.set('');filterCost.set('all')"><bf-icon name="close" /> Limpar</button>
   </div>
   @if (!store.initialized()) {
     <bf-table-skeleton [columns]="5" [rows]="7" />
@@ -33,7 +33,12 @@
       } @empty { <bf-empty-state title="Nenhuma produção registrada" description="Adicione diferentes sabonetes na produção do dia." /> }
     </div>
     @if(store.hasMore()) {
-      <div class="bf-actions"><button class="bf-button secondary" type="button" (click)="store.loadMore()">Carregar mais dias</button></div>
+      <div class="bf-actions production-load-more">
+        <button class="bf-button secondary" type="button" [disabled]="store.loadingMore() || store.loading()" [bfLoadingButton]="store.loadingMore()" (click)="store.loadMore()">
+          <bf-icon class="load-more-chevron" name="chevron-right" />
+          {{store.loadingMore() ? 'Carregando dias...' : 'Carregar mais dias'}}
+        </button>
+      </div>
     }
   }
 

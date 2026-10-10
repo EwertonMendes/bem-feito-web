@@ -13,13 +13,14 @@ import { formatCurrency } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
 import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
 import { BfDialog } from '../../shared/ui/dialog/dialog';
+import { BfLoadingButton } from '../../shared/ui/button/loading-button';
 import { BfSelect, BfSelectOption } from '../../shared/ui/select/select';
 import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
 import { BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
 interface ProductionDay { date: string; entries: Production[]; quantity: number; totalCents: number; pending: boolean; products: number; }
 @Component({
  selector: 'bf-production-page',
- imports: [BfIcon, BfDialog, BfEmptyState, BfPageRefresh, BfTableSkeleton, BfProductionEditor, ProductionCorrectionEditor, BfSelect],
+ imports: [BfIcon, BfLoadingButton, BfDialog, BfEmptyState, BfPageRefresh, BfTableSkeleton, BfProductionEditor, ProductionCorrectionEditor, BfSelect],
  changeDetection: ChangeDetectionStrategy.OnPush,
  templateUrl: './production.page.html',
  styleUrl: './production.page.scss',

@@ -60,3 +60,9 @@
 .history-snapshot small{color:var(--muted);font-weight:700}
 .history-snapshot span{font-size:.74rem;overflow-wrap:anywhere}
 @media(max-width:520px){.history-snapshot{grid-template-columns:1fr}}
+
+/* Pagination follows the grid instead of touching the last day card. */
+.production-load-more{margin-top:22px;justify-content:flex-end}
+.production-load-more .bf-button{min-height:44px;display:inline-flex;align-items:center;gap:8px}
+.production-load-more .load-more-chevron{display:inline-flex;align-items:center;justify-content:center;transform:rotate(90deg)}
+@media(max-width:640px){.production-load-more{justify-content:center;margin-top:20px}}

@@ -28,6 +28,7 @@ test('direct rejects PII, arbitrary script, raw core writes, overbroad operation
     {...patch,documentId:'../users/admin'},
     {...patch,values:{customerName:'private'},expected:{customerName:'private'}},
     {...base,action:'delete',collection:'sales',documentId:'any-sale'},
+    {...base,action:'delete',collection:'fragrances',documentId:'any-fragrance'},
     {...base,action:'reverseProduction',documentId:'production/invalid'},
     {...base,action:'create',collection:'productions',documentId:'p1',values:{quantity:300}},
     {...base,action:'adjustStock',itemType:'product',itemId:'p1',quantityDelta:0,reason:'x',businessDate:'2026-10-10'},

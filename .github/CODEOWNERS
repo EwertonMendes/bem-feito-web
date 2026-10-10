@@ -1,7 +1,0 @@
-# Administrative trust boundary. Enforce review in master branch protection.
-/.github/ @EwertonMendes
-/tools/data-admin/ @EwertonMendes
-/tools/migration/ @EwertonMendes
-/package.json @EwertonMendes
-/package-lock.json @EwertonMendes
-/operations/ @EwertonMendes

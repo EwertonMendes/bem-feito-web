@@ -1,9 +1,0 @@
-{
-  "schemaVersion": 1,
-  "id": "dev-smoke-delete-20261009-v1",
-  "environment": "dev",
-  "projectId": "bem-feito-dev",
-  "operation": "delete",
-  "changes": [{ "collection": "dataAdminSmoke", "id": "smoke-20261009", "action": "delete", "expected": { "value": 10 } }],
-  "destructive": { "projectId": "bem-feito-dev", "paths": ["dataAdminSmoke/smoke-20261009"] }
-}

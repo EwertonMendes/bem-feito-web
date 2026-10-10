@@ -1,8 +1,0 @@
-{
-  "schemaVersion": 1,
-  "id": "dev-inspect-v1",
-  "environment": "dev",
-  "projectId": "bem-feito-dev",
-  "operation": "inspect",
-  "targets": [{ "collection": "inputs", "id": "I00001" }]
-}

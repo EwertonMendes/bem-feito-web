@@ -35,6 +35,14 @@ export class FinancePage {
  readonly selectedExpense = signal<Expense | null>(null);
  readonly overdueOnly = signal(false);
  readonly tab = signal<'expenses' | 'receivables' | 'payments'>('expenses');
+ async receiveSelectedPurchase(): Promise<void> {
+   const selected = this.selectedExpense();
+   if (!selected || selected.receiptStatus !== 'pending') return;
+   const result = await this.store.receivePurchase(selected.id);
+   if (!result) return;
+   this.catalog.applyStockChanges(result.stockChanges ?? []);
+   this.selectedExpense.set(result.expense);
+ }
  readonly currency = formatCurrency;
  readonly date = formatBusinessDate;
  readonly totalReceivable = this.sales.receivableTotalCents;

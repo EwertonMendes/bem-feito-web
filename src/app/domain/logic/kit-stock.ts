@@ -8,14 +8,15 @@ export function allocateKitStock(
   if (!kit.active || !Number.isSafeInteger(count) || count < 1 || !kit.components.length) return null;
   const rules = [...kit.components].sort((a, b) => a.order - b.order);
   if (rules.some(rule => !rule.formatId || !Number.isSafeInteger(rule.quantity) || rule.quantity <= 0)) return null;
-  const available = products.filter(item => item.active && Math.floor(item.stock - (reserved.get(item.id) ?? 0)) > 0);
+  const physicalFree = (item: Product): number => Math.max(0, item.stock - (item.reservedPhysicalStock ?? Math.min(item.stock, item.committedStock ?? 0)));
+  const available = products.filter(item => item.active && Math.floor(physicalFree(item) - (reserved.get(item.id) ?? 0)) > 0);
   const matching = (rule: typeof rules[number], item: Product): boolean =>
     item.formatId === rule.formatId &&
     (!rule.collectionId || item.collectionId === rule.collectionId) &&
     (!rule.fragranceId || item.fragranceId === rule.fragranceId);
   const requirements = rules.map(rule => Math.floor(rule.quantity * count));
   const target = requirements.reduce((sum, qty) => sum + qty, 0);
-  if (!Number.isSafeInteger(target) || target > available.reduce((sum, item) => sum + Math.floor(item.stock - (reserved.get(item.id) ?? 0)), 0)) return null;
+  if (!Number.isSafeInteger(target) || target > available.reduce((sum, item) => sum + Math.floor(physicalFree(item) - (reserved.get(item.id) ?? 0)), 0)) return null;
   const source = 0, productStart = rules.length + 1, sink = productStart + available.length;
   interface Edge { to: number; reverse: number; capacity: number; }
   const graph: Edge[][] = Array.from({length: sink + 1}, () => []);
@@ -32,7 +33,7 @@ export function allocateKitStock(
     });
     if (!candidates) return null;
   }
-  available.forEach((item,j) => addEdge(productStart+j,sink,Math.floor(item.stock-(reserved.get(item.id) ?? 0))));
+  available.forEach((item,j) => addEdge(productStart+j,sink,Math.floor(physicalFree(item)-(reserved.get(item.id) ?? 0))));
   let filled = 0;
   while (filled < target) {
     const parentNode = Array(sink + 1).fill(-1) as number[], parentEdge = Array(sink+1).fill(-1) as number[];
@@ -69,9 +70,10 @@ export function allocateKitStock(
 export function availableKitCount(kit: Kit, products: readonly Product[]): number {
   if(!kit.active || !kit.components.length) return 0;
   const stock = products.filter(x=>x.active);
+  const physicallyFree = (p: Product) => Math.max(0, p.stock - (p.reservedPhysicalStock ?? Math.min(p.stock, p.committedStock ?? 0)));
   let ceiling=Number.MAX_SAFE_INTEGER;
   const totalUnits=kit.components.reduce((s,r)=>s+r.quantity,0);
-  const totalStock=stock.reduce((s,p)=>s+Math.max(0,Math.floor(p.stock)),0);
+  const totalStock=stock.reduce((s,p)=>s+Math.max(0,Math.floor(physicallyFree(p))),0);
   if(totalUnits<=0)return 0;
   ceiling=Math.floor(totalStock/totalUnits);
   for(const rule of kit.components){

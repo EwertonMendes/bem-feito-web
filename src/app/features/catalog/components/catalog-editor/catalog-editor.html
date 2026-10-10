@@ -55,6 +55,9 @@
           @if (inputModel().trackingMode !== 'untracked') {
             <label class="bf-field"><span>Estoque mínimo</span><bf-number-input kind="decimal" [decimals]="3" [formField]="inputForm.minimumStock" ariaLabel="Estoque mínimo" /></label>
           }
+          @if (inputModel().trackingMode !== 'exact') {
+            <label class="bf-field full"><span>Disponibilidade informada (sem medição obrigatória)</span><textarea class="bf-textarea" [formField]="inputForm.availabilityStatus" placeholder="Ex.: Cheio, disponível, quase acabando ou esgotado"></textarea></label>
+          }
           <bf-checkbox class="toggle" [formField]="inputForm.active" label="Insumo ativo" />
           <p class="hint full">{{inputTrackingHint()}}</p>
         </div>

@@ -28,9 +28,39 @@ export async function prepareMigration(request: Request, db: Firestore, env: any
   const raw = JSON.parse(await readFile('tools/migration/legacy-raw.json', 'utf8'));
   const data = stableSource(JSON.parse(await readFile('tools/migration/migration-data.json', 'utf8')));
   invariant(raw.spreadsheetId === env.snapshotId && data.source?.spreadsheetId === env.snapshotId, 'Snapshot source differs');
-  invariant(data.bankSnapshot?.balanceCents === 48169 && data.bankSnapshot?.ownerFundedCents === 85311 && data.bankSnapshot?.reimbursementDueCents === 0, 'Approved bank reconciliation differs');
-  for (const [name, total] of Object.entries({ sales: 25, payments: 24, productions: 45, expenses: 16 })) invariant(data[name]?.length === total, 'Approved source counts differ');
-  for (const [id, state] of [['V00024', 'in-production'], ['V00025', 'ready']]) invariant(data.sales.find((s: any) => s.id === id)?.fulfillmentStatus === state, 'Open order reconciliation differs');
+  // Business values live only in the private Drive snapshot and signed plan;
+  // no monetary amounts or customer details are hard-coded in this public repository.
+  const bank = data.bankSnapshot;
+  invariant(bank && Number.isSafeInteger(bank.balanceCents) && bank.balanceCents >= 0 &&
+    Number.isSafeInteger(bank.ownerFundedCents) && bank.ownerFundedCents >= 0 &&
+    bank.reimbursementDueCents === 0 && /^\d{4}-\d{2}-\d{2}$/.test(bank.businessDate),
+    'Bank snapshot is invalid');
+  for (const [name, total] of Object.entries({ sales: 25, payments: 25, productions: 47, expenses: 16 })) invariant(data[name]?.length === total, 'Approved source counts differ');
+  for (const [id, state] of [['V00024', 'delivered'], ['V00025', 'ready']]) invariant(data.sales.find((sale: any) => sale.id === id)?.fulfillmentStatus === state, 'Order reconciliation differs');
+  invariant(data.kits.length === 20 && data.kits.every((kit: any) => kit.active === false), 'All historical kits must be inactive');
+  const oldKitFormat = data.formats.find((format: any) => format.name === 'Kit Mini');
+  invariant(oldKitFormat && data.products.every((p: any) => p.formatId !== oldKitFormat.id || p.active === false), 'Legacy Kit Mini products must be inactive');
+  const pix = data.paymentMethods.find((method: any) => method.name.toLocaleLowerCase('pt-BR') === 'pix');
+  const katia = data.sales.find((sale: any) => sale.id === 'V00024');
+  const installments = data.payments.filter((payment: any) => payment.saleId === 'V00024' && payment.status === 'active');
+  invariant(!!pix && katia?.fulfillmentStatus === 'delivered' && katia.totalCents > 0 &&
+    katia.receivedCents === katia.totalCents && katia.balanceCents === 0 &&
+    installments.length === 2 && installments.every((payment: any) => payment.amountReceivedCents > 0 &&
+      payment.methodId === pix.id && payment.amountReceivedCents === installments[0].amountReceivedCents) &&
+    installments.reduce((sum: number, payment: any) => sum + payment.appliedCents, 0) === katia.totalCents,
+    'Settled sale and two Pix installments differ');
+  for (const id of ['M000005', 'M000006', 'M000007']) {
+    const purchase = data.expenses.find((item: any) => item.id === id);
+    invariant(purchase?.amountCents > 0 && purchase?.fundingSource === 'business' &&
+      purchase?.bankDebitCents === purchase.amountCents && purchase.paymentMethodId === pix.id,
+      'Business-funded purchase differs: ' + id);
+  }
+  for (const id of ['BASE-BRA', 'BASE-TRA', 'INS-020', 'INS-024']) {
+    const input = data.inputs.find((item: any) => item.id === id);
+    invariant(input?.trackingMode === 'exact' && Number.isFinite(input.stock) && input.stock >= 0,
+      'Physical inventory tracking differs: ' + id);
+  }
+  invariant(data.inputs.find((item: any) => item.id === 'LAU-27')?.trackingMode === 'untracked', 'Lauril must not require liquid measurement');
   const sourceHash = hash({ data, raw: stableSource(raw) });
   const runId = sourceHash.slice(0, 24);
   invariant(!(await db.doc(`migrationRuns/${runId}`).get()).exists, 'Source version already migrated; use receipt verification');

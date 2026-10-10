@@ -11,6 +11,7 @@ import { todayBusinessDate } from '../../../core/utils/date';
 import { formatCurrency, fromCents, toCents } from '../../../core/utils/money';
 import { BfIcon } from '../../../shared/ui/icon/icon';
 import { BfDialog } from '../../../shared/ui/dialog/dialog';
+import { BfCheckbox } from '../../../shared/ui/checkbox/checkbox';
 import { BfSelect, BfSelectOption } from '../../../shared/ui/select/select';
 import { paymentMethodIcon } from '../../../shared/ui/select/payment-method-icon';
 import { BfNumberInput } from '../../../shared/ui/number-input/number-input';
@@ -33,10 +34,17 @@ interface ExpenseFormModel {
   paymentMethodId: string;
   notes: string;
   link: string;
+  fundingSource: 'business' | 'ewerton' | 'maria';
+  receiptStatus: 'received' | 'pending';
+  shipping: number;
+  interest: number;
+  otherCharge: number;
+  otherDescription: string;
+  capitalizeOther: boolean;
 }
 @Component({
  selector: 'bf-finance-dialogs',
- imports: [FormField, BfIcon, BfDialog, BfSelect, BfNumberInput],
+ imports: [FormField, BfIcon, BfDialog, BfSelect, BfCheckbox, BfNumberInput],
  changeDetection: ChangeDetectionStrategy.OnPush,
  templateUrl: './finance-dialogs.html',
  styleUrl: './finance-dialogs.scss',
@@ -53,6 +61,8 @@ export class BfFinanceDialogs {
  private readonly receiptDialog = viewChild.required<BfDialog>('receiptDialog');
  readonly selectedReceiptSale = signal<Sale | null>(null);
  readonly purchaseLines = signal<PurchaseFormLine[]>([]);
+ readonly fundingOptions: BfSelectOption[] = [{value:'business',label:'Conta Bem Feito'}, {value:'ewerton',label:'Ewerton · aporte pessoal'}, {value:'maria',label:'Maria · aporte pessoal'}];
+ readonly arrivalOptions: BfSelectOption[] = [{value:'received',label:'Já chegaram'}, {value:'pending',label:'Aguardando entrega'}];
  readonly purchaseTotalCents = computed(() => this.purchaseLines().reduce((sum, item) => sum + toCents(item.amount), 0));
   newPurchaseLine(): void {
     if (this.purchaseLines().length >= 40) return;
@@ -87,6 +97,8 @@ export class BfFinanceDialogs {
     paymentMethodId: '',
     notes: '',
     link: '',
+    fundingSource: 'business', receiptStatus: 'received', shipping: 0, interest: 0,
+    otherCharge: 0, otherDescription: '', capitalizeOther: false,
   });
   readonly expenseForm = form(this.model, (p) => {
     required(p.businessDate);
@@ -158,6 +170,17 @@ export class BfFinanceDialogs {
     this.destroyRef.onDestroy(this.sales.activateReceivables());
     this.destroyRef.onDestroy(this.settings.activate());
  }
+  setFundingSource(value: string): void {
+    if (value === 'business' || value === 'ewerton' || value === 'maria') this.model.update(model => ({ ...model, fundingSource: value }));
+  }
+  setReceiptStatus(value: string): void {
+    if (value === 'received' || value === 'pending') this.model.update(model => ({ ...model, receiptStatus: value }));
+  }
+  patchCharge(field: 'shipping' | 'interest' | 'otherCharge', amount: number): void {
+    this.model.update(model => ({ ...model, [field]: Math.max(0, amount) }));
+  }
+  setOtherDescription(description: string): void { this.model.update(model => ({ ...model, otherDescription: description })); }
+  setCapitalizeOther(value: boolean): void { this.model.update(model => ({ ...model, capitalizeOther: value })); }
   changeExpenseKind(kind: ExpenseKind): void {
     this.model.update(value => ({ ...value, kind, amount: kind === 'input-purchase' ? fromCents(this.purchaseTotalCents()) : 0 }));
     if (kind === 'input-purchase' && !this.purchaseLines().length) this.newPurchaseLine();
@@ -180,6 +203,8 @@ export class BfFinanceDialogs {
       paymentMethodId: this.settings.paymentMethods().find((item) => item.active)?.id ?? '',
       notes: '',
       link: '',
+      fundingSource: 'business', receiptStatus: 'received', shipping: 0, interest: 0,
+      otherCharge: 0, otherDescription: '', capitalizeOther: false,
     });
     this.dialog().open();
   }
@@ -251,6 +276,12 @@ export class BfFinanceDialogs {
       }));
       const draft: PurchaseBatchDraft = {
         businessDate: value.businessDate, items,
+        fundingSource: value.fundingSource, receiptStatus: value.receiptStatus,
+        charges: [
+          ...(toCents(value.shipping) > 0 ? [{ kind: 'shipping' as const, amountCents: toCents(value.shipping), capitalized: true }] : []),
+          ...(toCents(value.interest) > 0 ? [{ kind: 'interest' as const, amountCents: toCents(value.interest), capitalized: false }] : []),
+          ...(toCents(value.otherCharge) > 0 ? [{ kind: 'other' as const, amountCents: toCents(value.otherCharge), capitalized: value.capitalizeOther, description: value.otherDescription.trim() || undefined }] : []),
+        ],
         paymentMethodId: value.paymentMethodId || undefined,
         notes: value.notes.trim() || undefined, link: value.link.trim() || undefined,
       };
@@ -270,6 +301,7 @@ export class BfFinanceDialogs {
       categoryId: value.categoryId || undefined,
       amountCents: toCents(value.amount),
       paymentMethodId: value.paymentMethodId || undefined,
+      fundingSource: value.fundingSource,
       notes: value.notes.trim() || undefined,
       link: value.link.trim() || undefined,
     };

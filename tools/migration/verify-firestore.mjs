@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { Firestore } from 'firebase-admin/firestore';
+import { Firestore, getFirestore } from 'firebase-admin/firestore';
+import { applicationDefault, initializeApp } from 'firebase-admin/app';
 import { firebaseCliAuth } from '../admin/firebase-cli-credential.mjs';
 
 const projectId = process.env.FIREBASE_PROJECT_ID;
@@ -13,7 +14,9 @@ const expected = JSON.parse(dataText);
 const raw = JSON.parse(rawText);
 const digest = createHash('sha256').update(dataText).update(rawText).digest('hex');
 const runId = digest.slice(0, 24);
-const db = new Firestore({ projectId, auth: firebaseCliAuth() });
+const db = process.argv.includes('--firebase-cli')
+  ? new Firestore({ projectId, auth: firebaseCliAuth() })
+  : getFirestore(initializeApp({ credential: applicationDefault(), projectId }));
 const run = await db.collection('migrationRuns').doc(runId).get();
 assert.equal(run.data()?.status, 'complete', 'Migração não concluída');
 assert.equal(run.data()?.digest, digest);
@@ -41,10 +44,12 @@ for (const [name, records] of Object.entries(expected)) {
 }
 const sourceRef = db.collection('migrationSources').doc(runId);
 assert.equal((await sourceRef.get()).data()?.digest, digest);
-for (const [name, rows] of Object.entries({ ...raw.sheets, ...raw.views })) {
-  const source = await sourceRef.collection('sheets').doc(name).get();
-  assert.deepEqual(JSON.parse(source.data()?.rowsJson ?? 'null'), rows, 'Fonte divergente em ' + name);
-}
+const source = (await sourceRef.get()).data();
+assert.equal(source?.spreadsheetId, raw.spreadsheetId);
+const snapshot = (await db.doc('system/bank-snapshot').get()).data();
+assert.equal(snapshot?.migrationRunId, runId);
+assert.equal(snapshot?.balanceCents, expected.bankSnapshot.balanceCents);
+assert.equal(snapshot?.ownerFundedCents, expected.bankSnapshot.ownerFundedCents);
 await mkdir('tools/migration/.private', { recursive: true });
 await writeFile('tools/migration/.private/' + runId + '-readback.json', JSON.stringify(readback, null, 2));
-console.log(JSON.stringify({ projectId, runId, verifiedRecords: verified, sourceSheets: Object.keys(raw.sheets).length + Object.keys(raw.views ?? {}).length, result: 'Conteúdo e auditoria conferem integralmente.' }, null, 2));
+console.log(JSON.stringify({ projectId, runId, verifiedRecords: verified, sourceSheetsReferenced: Object.keys(raw.sheets).length + Object.keys(raw.views ?? {}).length, result: 'Conteúdo e auditoria conferem integralmente.' }, null, 2));

@@ -14,6 +14,7 @@ import {
   sum,
 } from 'firebase/firestore';
 import { trackingModeForInput } from '../../domain/logic/costing';
+import { landedPurchaseCosts } from '../../domain/logic/acquisition';
 import { stockStatusForInput } from '../../domain/logic/stock-status';
 import { InputItem } from '../../domain/models/catalog.model';
 import { Expense, ExpenseDraft, PurchaseBatchDraft } from '../../domain/models/finance.model';
@@ -119,10 +120,14 @@ export class FinanceRepository {
         }
       }
 
-      const expense: Expense = { id: expenseRef.id, ...draft, code };
+      const expense: Expense = { id: expenseRef.id, ...draft, code,
+        fundingSource: draft.fundingSource ?? 'business',
+        bankDebitCents: (draft.fundingSource ?? 'business') === 'business' ? draft.amountCents : 0 };
       transaction.set(expenseRef, {
         ...draft,
         code,
+        fundingSource: expense.fundingSource,
+        bankDebitCents: expense.bankDebitCents,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         createdBy: userId,
@@ -153,7 +158,13 @@ export class FinanceRepository {
         amountCents: (current?.amountCents ?? 0) + item.amountCents,
       });
     }
-    const total = [...grouped.values()].reduce((sum, item) => sum + item.amountCents, 0);
+    const rawItems = [...grouped].map(([inputId, value]) => ({ inputId, ...value }));
+    const charges = draft.charges ?? [];
+    const landedCosts = landedPurchaseCosts(rawItems, charges);
+    const items = rawItems.map((item, index) => ({ ...item, landedCostCents: landedCosts[index]! }));
+    const extraTotal = charges.reduce((sum, charge) => sum + charge.amountCents, 0);
+    const total = rawItems.reduce((sum, item) => sum + item.amountCents, 0) + extraTotal;
+    const received = (draft.receiptStatus ?? 'received') === 'received';
     return runTransaction(this.firestore, async transaction => {
       const counterRef = doc(this.firestore, 'counters', 'expense');
       const counter = await transaction.get(counterRef);
@@ -167,16 +178,16 @@ export class FinanceRepository {
       });
       const sequence = Number(counter.data()?.['value'] ?? 0) + 1;
       const expenseRef = doc(collection(this.firestore, 'expenses'));
-      const items = [...grouped].map(([inputId, value]) => ({ inputId, ...value }));
       const stockChanges: NonNullable<ExpenseCreateResult['stockChanges']> = [];
       transaction.set(counterRef, { value: sequence, updatedAt: serverTimestamp() }, { merge: true });
       for (const { snapshot, input } of inputs) {
-        const item = grouped.get(input.id)!;
+        if (!received) continue;
+        const item = items.find(row => row.inputId === input.id)!;
         const mode = trackingModeForInput(input);
         const prevQty = Math.max(0, Number(input.costBasisQuantity ?? input.stock ?? 0));
         const prevValue = Math.max(0, Number(input.costBasisValueCents ?? Math.round(prevQty * input.averageUnitCostCents)));
         const costBasisQuantity = prevQty + item.quantity;
-        const costBasisValueCents = prevValue + item.amountCents;
+        const costBasisValueCents = prevValue + (item.landedCostCents ?? item.amountCents);
         const averageUnitCostCents = Math.round(costBasisValueCents / costBasisQuantity);
         const stock = mode === 'untracked' ? input.stock : input.stock + item.quantity;
         transaction.update(snapshot.ref, {
@@ -189,8 +200,8 @@ export class FinanceRepository {
           const movementRef = doc(collection(this.firestore, 'stockMovements'));
           transaction.set(movementRef, {
             itemType: 'input', itemId: input.id, quantityDelta: item.quantity,
-            unitCostCents: Math.round(item.amountCents / item.quantity),
-            totalCostCents: item.amountCents,
+            unitCostCents: Math.round((item.landedCostCents ?? item.amountCents) / item.quantity),
+            totalCostCents: item.landedCostCents ?? item.amountCents,
             sourceType: 'purchase', sourceId: expenseRef.id, businessDate: draft.businessDate,
             createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
             createdBy: userId, updatedBy: userId,
@@ -200,15 +211,73 @@ export class FinanceRepository {
       const expense: Expense = {
         id: expenseRef.id, code: entityCode('M', sequence, 6),
         businessDate: draft.businessDate, kind: 'input-purchase', amountCents: total,
+        bankDebitCents: (draft.fundingSource ?? 'business') === 'business' ? total : 0,
         items, notes: draft.notes, link: draft.link, paymentMethodId: draft.paymentMethodId,
+        fundingSource: draft.fundingSource ?? 'business', receiptStatus: received ? 'received' : 'pending',
+        stockApplied: received, charges,
       };
       const { id: _id, ...data } = expense;
       transaction.set(expenseRef, {
         ...data, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
         createdBy: userId, updatedBy: userId,
       } satisfies Omit<Expense, 'id'>);
-      this.revisions.touchTransaction(transaction, 'expenses', 'inventory');
+      this.revisions.touchTransaction(transaction, 'expenses', ...(received ? ['inventory'] as const : []));
       return { expense, stockChanges };
     });
   }
+
+  /** Physical receipt is separate from payment; never recharges a purchase. */
+  async receivePurchase(expenseId: string): Promise<ExpenseCreateResult> {
+    const userId = this.auth.user()?.uid;
+    if (!userId) throw new Error('Sessão inválida.');
+    return runTransaction(this.firestore, async transaction => {
+      const expenseRef = doc(this.firestore, 'expenses', expenseId);
+      const expenseSnapshot = await transaction.get(expenseRef);
+      if (!expenseSnapshot.exists()) throw new Error('Compra não encontrada.');
+      const current = { id: expenseSnapshot.id, ...expenseSnapshot.data() } as Expense;
+      if (current.kind !== 'input-purchase' || current.receiptStatus !== 'pending' || current.stockApplied !== false || !current.items?.length) {
+        throw new Error('Esta compra já foi recebida ou não possui itens.');
+      }
+      const snapshots = await Promise.all(current.items.map(item => transaction.get(doc(this.firestore, 'inputs', item.inputId))));
+      for (let index = 0; index < snapshots.length; index++) {
+        if (!snapshots[index]!.exists()) throw new Error('Insumo não encontrado.');
+        const input = snapshots[index]!.data() as InputItem;
+        if (input.unitId !== current.items[index]!.unitId) throw new Error('Unidade da compra incompatível.');
+      }
+      const stockChanges: NonNullable<ExpenseCreateResult['stockChanges']> = [];
+      for (let index = 0; index < snapshots.length; index++) {
+        const snapshot = snapshots[index]!;
+        const item = current.items[index]!;
+        const input = { id: snapshot.id, ...snapshot.data() } as InputItem;
+        const mode = trackingModeForInput(input);
+        const prevQty = Math.max(0, Number(input.costBasisQuantity ?? input.stock ?? 0));
+        const prevValue = Math.max(0, Number(input.costBasisValueCents ?? Math.round(prevQty * input.averageUnitCostCents)));
+        const costBasisQuantity = prevQty + item.quantity;
+        const landed = item.landedCostCents ?? item.amountCents;
+        const costBasisValueCents = prevValue + landed;
+        const averageUnitCostCents = Math.round(costBasisValueCents / costBasisQuantity);
+        const stock = mode === 'untracked' ? input.stock : input.stock + item.quantity;
+        transaction.update(snapshot.ref, {
+          ...(mode !== 'untracked' ? { stock, stockStatus: stockStatusForInput({ ...input, stock }) } : {}),
+          costBasisQuantity, costBasisValueCents, averageUnitCostCents,
+          updatedAt: serverTimestamp(), updatedBy: userId,
+        });
+        stockChanges.push({ itemType: 'input', itemId: input.id, stock, averageUnitCostCents });
+        if (mode !== 'untracked') {
+          const movementRef = doc(collection(this.firestore, 'stockMovements'));
+          transaction.set(movementRef, {
+            itemType: 'input', itemId: input.id, quantityDelta: item.quantity,
+            unitCostCents: Math.round(landed / item.quantity), totalCostCents: landed,
+            sourceType: 'purchase', sourceId: current.id, businessDate: current.businessDate,
+            createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+            createdBy: userId, updatedBy: userId,
+          } satisfies Omit<StockMovement, 'id'>);
+        }
+      }
+      transaction.update(expenseRef, { receiptStatus: 'received', stockApplied: true, updatedAt: serverTimestamp(), updatedBy: userId });
+      this.revisions.touchTransaction(transaction, 'expenses', 'inventory');
+      return { expense: { ...current, receiptStatus: 'received', stockApplied: true }, stockChanges };
+    });
+  }
+
 }

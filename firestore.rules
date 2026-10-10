@@ -134,17 +134,22 @@ service cloud.firestore {
           && fields(data, ['collectionId', 'formatId', 'priceCents', 'active'], [])
           && text(data.collectionId) && text(data.formatId) && money(data.priceCents) && data.active is bool)
         || (name == 'products'
-          && fields(data, ['code', 'active', 'collectionId', 'fragranceId', 'formatId', 'displayName', 'salePriceCents', 'additionalCostCents', 'averageUnitCostCents', 'stock', 'minimumStock', 'recipe'], ['image', 'stockStatus'])
+          && fields(data, ['code', 'active', 'collectionId', 'fragranceId', 'formatId', 'displayName', 'salePriceCents', 'additionalCostCents', 'averageUnitCostCents', 'stock', 'minimumStock', 'recipe'], ['image', 'stockStatus', 'committedStock', 'reservedPhysicalStock', 'unitCostDeciCents'])
           && text(data.code) && text(data.displayName) && data.active is bool
           && text(data.collectionId) && text(data.fragranceId) && text(data.formatId)
           && money(data.salePriceCents) && money(data.additionalCostCents) && money(data.averageUnitCostCents)
           && stock(data.stock) && quantity(data.minimumStock) && data.recipe is list
+           && (!('committedStock' in data) || quantity(data.committedStock))
+          && (!('reservedPhysicalStock' in data) || (quantity(data.reservedPhysicalStock) && data.reservedPhysicalStock <= data.stock))
+          && (!('unitCostDeciCents' in data) || money(data.unitCostDeciCents))
           && validProductStockStatus(data)
           && (!('image' in data) || validImage(data.image)))
         || (name == 'inputs'
-          && fields(data, ['code', 'active', 'name', 'unitId', 'stock', 'minimumStock', 'averageUnitCostCents'], ['image', 'minimumStockConfigured', 'trackingMode', 'stockStatus', 'costBasisQuantity', 'costBasisValueCents'])
+          && fields(data, ['code', 'active', 'name', 'unitId', 'stock', 'minimumStock', 'averageUnitCostCents'], ['image', 'minimumStockConfigured', 'trackingMode', 'stockStatus', 'costBasisQuantity', 'costBasisValueCents', 'committedStock', 'reservedPhysicalStock'])
           && text(data.code) && text(data.name) && text(data.unitId) && data.active is bool
           && stock(data.stock) && quantity(data.minimumStock) && money(data.averageUnitCostCents)
+           && (!('committedStock' in data) || quantity(data.committedStock))
+          && (!('reservedPhysicalStock' in data) || (quantity(data.reservedPhysicalStock) && data.reservedPhysicalStock <= data.stock))
           && (!('minimumStockConfigured' in data) || data.minimumStockConfigured is bool)
           && (!('trackingMode' in data) || data.trackingMode in ['exact', 'estimated', 'untracked'])
           && (!('costBasisQuantity' in data) || quantity(data.costBasisQuantity))
@@ -193,13 +198,16 @@ service cloud.firestore {
 
     function validOperation(name, data) {
       return (name == 'sales'
-          && fields(data, ['code', 'businessDate', 'discountCents', 'subtotalCents', 'totalCents', 'receivedCents', 'tipCents', 'balanceCents', 'paymentStatus', 'status', 'items', 'paymentIds', 'stockEffects'], ['customerName', 'dueDate', 'notes', 'cancelledAt', 'cancelledBy', 'analyticsVersion', 'cogsCents', 'itemsSold', 'missingCostItems'])
+          && fields(data, ['code', 'businessDate', 'discountCents', 'subtotalCents', 'totalCents', 'receivedCents', 'tipCents', 'balanceCents', 'paymentStatus', 'status', 'items', 'paymentIds', 'stockEffects'], ['customerName', 'dueDate', 'notes', 'cancelledAt', 'cancelledBy', 'analyticsVersion', 'cogsCents', 'itemsSold', 'missingCostItems', 'fulfillmentStatus', 'stockApplied'])
           && text(data.code) && businessDate(data)
           && money(data.discountCents) && money(data.subtotalCents) && money(data.totalCents)
           && money(data.receivedCents) && money(data.tipCents) && money(data.balanceCents)
           && data.discountCents <= data.subtotalCents && data.totalCents == data.subtotalCents - data.discountCents
           && data.receivedCents <= data.totalCents
           && data.status in ['active', 'cancelled']
+           && (!('fulfillmentStatus' in data) || data.fulfillmentStatus in ['in-production', 'ready', 'delivered'])
+           && (!('stockApplied' in data) || data.stockApplied is bool)
+          && (!('legacyUnallocatedPurchase' in data) || data.legacyUnallocatedPurchase is bool)
           && data.paymentStatus in ['paid', 'pending', 'partial', 'cancelled']
           && ((data.status == 'cancelled' && data.paymentStatus == 'cancelled' && data.balanceCents == 0)
             || (data.status == 'active' && data.balanceCents == data.totalCents - data.receivedCents
@@ -218,10 +226,18 @@ service cloud.firestore {
           && money(data.appliedCents) && money(data.tipCents)
           && data.amountReceivedCents == data.appliedCents + data.tipCents && data.status in ['active', 'reversed'])
         || (name == 'expenses'
-          && fields(data, ['code', 'businessDate', 'kind', 'amountCents'], ['categoryId', 'inputId', 'quantity', 'unitId', 'paymentMethodId', 'notes', 'link', 'items'])
+          && fields(data, ['code', 'businessDate', 'kind', 'amountCents'], ['categoryId', 'inputId', 'quantity', 'unitId', 'paymentMethodId', 'notes', 'link', 'items', 'fundingSource', 'receiptStatus', 'stockApplied', 'charges', 'bankDebitCents', 'legacyUnallocatedPurchase'])
           && text(data.code) && businessDate(data) && money(data.amountCents) && data.amountCents > 0
           && data.kind in ['input-purchase', 'operating-expense', 'equipment', 'other']
+          && (!('bankDebitCents' in data) || money(data.bankDebitCents))
+          && (!('fundingSource' in data) || data.fundingSource in ['business', 'ewerton', 'maria', 'owner-unassigned', 'unverified'])
+          && (!('receiptStatus' in data) || data.receiptStatus in ['pending', 'received'])
+          && (!('stockApplied' in data) || data.stockApplied is bool)
+          && (!('charges' in data) || (data.charges is list && data.charges.size() <= 20))
           && (data.kind != 'input-purchase'
+            || ('legacyUnallocatedPurchase' in data && data.legacyUnallocatedPurchase == true
+              && data.stockApplied == false && data.receiptStatus == 'received'
+              && !('inputId' in data) && !('items' in data))
             || (text(data.inputId) && quantity(data.quantity) && data.quantity > 0)
             || ('items' in data && data.items is list && data.items.size() > 0 && data.items.size() <= 40
               && data.items[0].inputId is string && data.items[0].quantity is number
@@ -304,6 +320,11 @@ service cloud.firestore {
       allow create: if canOperate() && validDataRevisionCreate(request.resource.data);
       allow update: if canOperate() && validDataRevisionUpdate(request.resource.data);
       allow delete: if false;
+    }
+
+    match /system/bank-snapshot {
+      allow read: if activeUser();
+      allow write: if false; // Finance reconciliation is imported through reviewed administrative tooling.
     }
 
     match /system/read-optimization {

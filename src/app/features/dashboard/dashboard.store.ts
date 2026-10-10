@@ -21,6 +21,10 @@ const EMPTY_METRICS: DashboardMetrics = {
   receivableCents: 0,
   operationalExpenseCents: 0,
   cashOutCents: 0,
+  bankSnapshotCents: null,
+  bankSnapshotDate: null,
+  ownerFundedCents: 0,
+  ordersPending: 0,
   tipsCents: 0,
   discountsCents: 0,
   overdueCents: 0,
@@ -95,6 +99,10 @@ export class DashboardStore {
   readonly receivableCents = computed(() => this.metricsState().receivableCents);
   readonly operationalExpenseCents = computed(() => this.metricsState().operationalExpenseCents);
   readonly cashOutCents = computed(() => this.metricsState().cashOutCents);
+  readonly bankSnapshotCents = computed(() => this.metricsState().bankSnapshotCents);
+  readonly bankSnapshotDate = computed(() => this.metricsState().bankSnapshotDate);
+  readonly ownerFundedCents = computed(() => this.metricsState().ownerFundedCents);
+  readonly ordersPending = computed(() => this.metricsState().ordersPending);
   readonly tipsCents = computed(() => this.metricsState().tipsCents);
   readonly discountsCents = computed(() => this.metricsState().discountsCents);
   readonly overdueCents = computed(() => this.metricsState().overdueCents);

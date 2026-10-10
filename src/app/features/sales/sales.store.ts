@@ -3,6 +3,7 @@ import { Sale, SaleDraft } from '../../domain/models/sales.model';
 import { DataRevisionService } from '../../core/firebase/data-revision.service';
 import {
   SaleCancellationResult,
+  SaleFulfillmentResult,
   SaleCreateResult,
   SalePaymentResult,
   SalePaymentReversalResult,
@@ -209,6 +210,18 @@ export class SalesStore {
       this.patchSale(result.sale);
       this.syncReceivable(result.sale, result.previousBalanceCents);
       this.toast.success('Recebimento estornado.');
+      return result;
+    } catch (error) {
+      this.toast.error(this.errors.message(error));
+      return null;
+    }
+  }
+
+  async advanceFulfillment(saleId: string, next: 'ready' | 'delivered'): Promise<SaleFulfillmentResult | null> {
+    try {
+      const result = await this.repository.advanceFulfillment(saleId, next);
+      this.patchSale(result.sale);
+      this.toast.success(next === 'ready' ? 'Encomenda pronta para retirada.' : 'Entrega registrada.');
       return result;
     } catch (error) {
       this.toast.error(this.errors.message(error));

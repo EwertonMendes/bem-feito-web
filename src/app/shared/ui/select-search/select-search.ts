@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { BfIcon } from '../icon/icon';
-import { CatalogImage } from '../../media/catalog-image/catalog-image';
+import { NgTemplateOutlet } from '@angular/common';
 import { BfSelect } from '../select/select';
 
 /**
@@ -9,7 +9,7 @@ import { BfSelect } from '../select/select';
  */
 @Component({
   selector: 'bf-select-search',
-  imports: [BfIcon, CatalogImage],
+  imports: [BfIcon, NgTemplateOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: '../select/select.html',
   styleUrl: '../select/select.scss',

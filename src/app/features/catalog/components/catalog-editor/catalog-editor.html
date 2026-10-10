@@ -1,3 +1,4 @@
+<ng-template #inputThumb let-option><bf-catalog-image [image]="inputImage(option.value)" [alt]="option.label" [thumbnail]="true" /></ng-template>
 <dialog bfDialog #dialog="bfDialog" class="bf-dialog">
     <div class="bf-dialog-header"><h2>{{ editingId() ? 'Editar' : 'Novo' }} {{ kind() === 'products' ? 'produto' : kind() === 'inputs' ? 'insumo' : kind() === 'kits' ? 'kit' : 'adicional' }}</h2><button type="button" class="bf-icon-button" (click)="dialog.close()"><bf-icon name="close" /></button></div>
     <div class="bf-dialog-body">
@@ -29,7 +30,7 @@
         }
         <section class="composition"><div class="subhead"><div><strong>Ajustes de custo deste produto</strong><small>Opcional. Os padrões de coleção, fragrância e formato são aplicados automaticamente. Use apenas para exceções deste produto.</small></div><button class="bf-button secondary" type="button" (click)="addRecipeComponent()">+ Insumo</button></div>
           @for (component of recipe(); track $index; let i = $index) {
-            <div class="component-row"><bf-select-search [value]="component.inputId" (valueChange)="patchRecipeInput(i,$event)" [options]="activeInputOptions()" ariaLabel="Insumo" /><bf-number-input kind="decimal" [decimals]="3" [min]="0" [value]="component.quantity" (valueChange)="patchRecipe(i,{quantity:$event})" ariaLabel="Quantidade do insumo" /><span class="component-unit">{{unitName(component.unitId)}}</span><button class="bf-icon-button" type="button" (click)="removeRecipe(i)"><bf-icon name="trash" /></button></div>
+            <div class="component-row"><bf-select-search [value]="component.inputId" (valueChange)="patchRecipeInput(i,$event)" [options]="activeInputOptions()" [imageTemplate]="inputThumb" ariaLabel="Insumo" /><bf-number-input kind="decimal" [decimals]="3" [min]="0" [value]="component.quantity" (valueChange)="patchRecipe(i,{quantity:$event})" ariaLabel="Quantidade do insumo" /><span class="component-unit">{{unitName(component.unitId)}}</span><button class="bf-icon-button" type="button" (click)="removeRecipe(i)"><bf-icon name="trash" /></button></div>
           } @empty { <p class="hint">Sem ajuste específico. O custo será calculado pelos padrões reutilizáveis.</p> }
         </section>
         @if(bulkVariants() && !editingId()){
@@ -72,7 +73,7 @@
         <div class="bf-grid two"><label class="bf-field"><span>Nome</span><input class="bf-input" [formField]="additionForm.name" /></label><label class="bf-field"><span>Categoria</span><input class="bf-input" [formField]="additionForm.category" /></label><label class="bf-field"><span>Preço</span><bf-number-input kind="currency" [formField]="additionForm.price" ariaLabel="Preço do adicional" /></label><bf-checkbox class="toggle" [formField]="additionForm.active" label="Adicional ativo" /><label class="bf-field full"><span>Observações</span><textarea class="bf-textarea" [formField]="additionForm.notes"></textarea></label></div>
         <section class="composition"><div class="subhead"><div><strong>Consumo de estoque</strong><small>Opcional. Use para embalagens e itens consumíveis.</small></div><button class="bf-button secondary" (click)="addAdditionComponent()">+ Insumo</button></div>
           @for (component of additionComponents(); track component.id; let i=$index) {
-            <div class="component-row"><bf-select-search [value]="component.inputId" (valueChange)="patchAdditionInput(i,$event)" [options]="inputOptions()" ariaLabel="Insumo" /><bf-number-input kind="decimal" [decimals]="3" [min]="0" [value]="component.quantity" (valueChange)="patchAdditionComponent(i,{quantity:$event})" ariaLabel="Quantidade do adicional" /><span class="component-unit">{{unitName(component.unitId)}}</span><button class="bf-icon-button" type="button" (click)="removeAdditionComponent(i)"><bf-icon name="trash" /></button></div>
+            <div class="component-row"><bf-select-search [value]="component.inputId" (valueChange)="patchAdditionInput(i,$event)" [options]="inputOptions()" [imageTemplate]="inputThumb" ariaLabel="Insumo" /><bf-number-input kind="decimal" [decimals]="3" [min]="0" [value]="component.quantity" (valueChange)="patchAdditionComponent(i,{quantity:$event})" ariaLabel="Quantidade do adicional" /><span class="component-unit">{{unitName(component.unitId)}}</span><button class="bf-icon-button" type="button" (click)="removeAdditionComponent(i)"><bf-icon name="trash" /></button></div>
           }
         </section>
       }

@@ -1,3 +1,4 @@
+<ng-template #inputThumb let-option><bf-catalog-image [image]="inputImage(option.value)" [alt]="option.label" [thumbnail]="true" /></ng-template>
   <dialog bfDialog #expenseDialog="bfDialog" class="bf-dialog">
     <div class="bf-dialog-header"><h2>Registrar saída</h2><button class="bf-icon-button" (click)="expenseDialog.close()"><bf-icon name="close" /></button></div>
     <div class="bf-dialog-body">
@@ -16,7 +17,7 @@
             <div class="purchase-title"><strong>Insumos desta compra</strong><span>Um único registro financeiro</span></div>
             @for(line of purchaseLines();track line.id) {
               <div class="purchase-line">
-                <label class="bf-field"><span>Insumo</span><bf-select-search [value]="line.inputId" (valueChange)="patchPurchaseLine(line.id,{inputId:$event})" [options]="inputOptions()" ariaLabel="Insumo comprado" /></label>
+                <label class="bf-field"><span>Insumo</span><bf-select-search [value]="line.inputId" (valueChange)="patchPurchaseLine(line.id,{inputId:$event})" [options]="inputOptions()" [imageTemplate]="inputThumb" ariaLabel="Insumo comprado" /></label>
                 <label class="bf-field"><span>Quantidade {{purchaseUnit(line.inputId)}}</span><bf-number-input kind="decimal" [decimals]="3" [min]="0" [value]="line.quantity" (valueChange)="patchPurchaseLine(line.id,{quantity:$event})" ariaLabel="Quantidade comprada" /></label>
                 <label class="bf-field"><span>Valor do item</span><bf-number-input kind="currency" [value]="line.amount" (valueChange)="patchPurchaseLine(line.id,{amount:$event})" ariaLabel="Valor deste insumo" /></label>
                 <button class="bf-icon-button purchase-remove" type="button" aria-label="Remover insumo" [disabled]="purchaseLines().length===1" (click)="removePurchaseLine(line.id)"><bf-icon name="trash" /></button>

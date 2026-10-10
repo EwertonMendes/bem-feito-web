@@ -1,3 +1,4 @@
+import { CatalogImage } from '../../../shared/media/catalog-image/catalog-image';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild, output } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
 import { CollectionDefinition, ExpenseCategory, ExpenseType, FormatDefinition, FormatPrice, FragranceDefinition, PaymentMethod, RecipeComponent, UnitDefinition } from '../../../domain/models/catalog.model';
@@ -13,6 +14,7 @@ import { BfSelect, BfSelectOption } from '../../../shared/ui/select/select';
 import { BfSelectSearch } from '../../../shared/ui/select-search/select-search';
 import { BfCheckbox } from '../../../shared/ui/checkbox/checkbox';
 import { BfNumberInput } from '../../../shared/ui/number-input/number-input';
+import { CatalogImageRef } from '../../../domain/models/image.model';
 
 export type SettingTab = 'collections' | 'fragrances' | 'formats' | 'prices' | 'units' | 'payments' | 'expenseCategories' | 'expenseTypes';
 export type ReferenceSaved = { kind: SettingTab; id: string };
@@ -25,7 +27,7 @@ interface ExpenseTypeModel extends SimpleModel { kind: ExpenseType['kind']; }
 
 @Component({
  selector: 'bf-settings-editor',
- imports: [FormField, BfIcon, BfDialog, BfSelect, BfSelectSearch, BfCheckbox, BfNumberInput],
+ imports: [FormField, BfIcon, BfDialog, BfSelect, BfSelectSearch, CatalogImage, BfCheckbox, BfNumberInput],
  changeDetection: ChangeDetectionStrategy.OnPush,
  templateUrl: './settings-editor.html',
  styleUrl: './settings-editor.scss'
@@ -69,6 +71,11 @@ export class BfSettingsEditor {
     { value: '', label: 'Selecione' },
     ...this.catalog.activeInputs().map((item) => ({ value: item.id, label: item.name })),
   ]);
+  readonly inputImages = computed(() => new Map(this.catalog.inputs().map(item => [item.id, item.image])));
+  inputImage(inputId: string): CatalogImageRef | undefined {
+    return this.inputImages().get(inputId);
+  }
+
   readonly expenseTypeOptions: readonly BfSelectOption[] = [
     { value: 'input-purchase', label: 'Compra de insumo', icon: 'purchase' },
     { value: 'operating-expense', label: 'Despesa operacional', icon: 'expense' },

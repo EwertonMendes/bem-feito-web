@@ -4,6 +4,9 @@
   class="sale-dialog"
   (cancel)="onDialogCancel($event)"
 >
+  <ng-template #productThumb let-option>
+    <bf-catalog-image [image]="productImage(option.value)" [alt]="option.label" [thumbnail]="true" />
+  </ng-template>
   <header class="sale-header">
     <div class="sale-title-group">
       <span class="sale-header-icon" aria-hidden="true"><bf-icon name="order" /></span>
@@ -249,7 +252,7 @@
                           @if(group.allocated<group.target && group.candidates.length) {
                             <bf-select-search [compact]="true" value=""
                               [ariaLabel]="'Adicionar fragrância em ' + group.label"
-                              [options]="[{value:'',label:'Adicionar outro produto'},...productSelectOptions(group.candidates)]"
+                              [options]="[{value:'',label:'Adicionar outro produto'},...productSelectOptions(group.candidates)]" [imageTemplate]="productThumb"
                               (valueChange)="addKitGroupProduct(line,group.index,$event)" />
                           }
                           @if(group.allocated<group.target) {

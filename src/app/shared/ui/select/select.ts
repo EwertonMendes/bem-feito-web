@@ -13,9 +13,9 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormValueControl } from '@angular/forms/signals';
+import { NgTemplateOutlet } from '@angular/common';
+import { TemplateRef } from '@angular/core';
 import { BfIcon, BfIconName } from '../icon/icon';
-import { CatalogImage } from '../../media/catalog-image/catalog-image';
-import { CatalogImageRef } from '../../../domain/models/image.model';
 
 export interface BfSelectOption {
   value: string;
@@ -23,8 +23,6 @@ export interface BfSelectOption {
   description?: string;
   icon?: BfIconName;
   imageSrc?: string;
-  /** Imagem privada gerenciada pelo Google Drive; carregada apenas quando visível. */
-  image?: CatalogImageRef;
   imageAlt?: string;
   disabled?: boolean;
 }
@@ -33,7 +31,7 @@ let selectSequence = 0;
 
 @Component({
   selector: 'bf-select',
-  imports: [BfIcon, CatalogImage],
+  imports: [BfIcon, NgTemplateOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './select.html',
   styleUrl: './select.scss',
@@ -47,6 +45,8 @@ export class BfSelect implements FormValueControl<string> {
 
   readonly value = model('');
   readonly options = input<readonly BfSelectOption[]>([]);
+  /** Slot genérico para miniaturas privadas ou componentes próprios da funcionalidade. */
+  readonly imageTemplate = input<TemplateRef<{ $implicit: BfSelectOption }> | null>(null);
   readonly placeholder = input('Selecione');
   readonly ariaLabel = input('Selecionar opção');
   readonly disabled = input(false);
@@ -62,11 +62,7 @@ export class BfSelect implements FormValueControl<string> {
   readonly filteredOptions = computed(() => {
     const options = this.options();
     if (!this.searchable) return options;
-    const term = normalizeSelectText(this.searchQuery());
-    if (!term) return options;
-    return options.filter(option => option.value && normalizeSelectText(
-      option.label + ' ' + (option.description ?? '')
-    ).includes(term));
+    return filterSelectOptions(options, this.searchQuery());
   });
 
   private readonly searchInput = viewChild<ElementRef<HTMLInputElement>>('searchInput');
@@ -294,4 +290,13 @@ export class BfSelect implements FormValueControl<string> {
 /** Filtro tolerante a acentos, caixa e espaços para nomes de catálogo. */
 export function normalizeSelectText(value: string): string {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
+}
+
+/** A opção vazia (placeholder) não concorre com os itens pesquisáveis. */
+export function filterSelectOptions(options: readonly BfSelectOption[], search: string): BfSelectOption[] {
+  const term = normalizeSelectText(search);
+  if (!term) return [...options];
+  return options.filter(option => Boolean(option.value) && normalizeSelectText(
+    option.label + ' ' + (option.description ?? '')
+  ).includes(term));
 }

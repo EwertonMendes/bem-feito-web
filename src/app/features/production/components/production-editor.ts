@@ -8,6 +8,8 @@ import { ProductionStore } from '../production.store';
 import { todayBusinessDate } from '../../../core/utils/date';
 import { formatCurrency } from '../../../core/utils/money';
 import { BfIcon } from '../../../shared/ui/icon/icon';
+import { CatalogImage } from '../../../shared/media/catalog-image/catalog-image';
+import { CatalogImageRef } from '../../../domain/models/image.model';
 import { BfDialog } from '../../../shared/ui/dialog/dialog';
 import { BfSelectOption } from '../../../shared/ui/select/select';
 import { BfSelectSearch } from '../../../shared/ui/select-search/select-search';
@@ -17,7 +19,7 @@ interface ProductionFormModel { businessDate: string; notes: string; }
 interface PreviewConsumption extends ProductionConsumption { name: string; unit: string; mode: 'exact' | 'estimated' | 'untracked'; available: number | null; }
 @Component({
  selector: 'bf-production-editor',
- imports: [FormField, BfIcon, BfDialog, BfSelectSearch, BfNumberInput],
+ imports: [FormField, BfIcon, BfDialog, BfSelectSearch, CatalogImage, BfNumberInput],
  changeDetection: ChangeDetectionStrategy.OnPush,
  templateUrl: './production-editor.html',
  styleUrl: './production-editor.scss',
@@ -40,10 +42,14 @@ export class BfProductionEditor {
     { value: '', label: 'Selecione um produto' },
     ...this.catalog.activeProducts().map(product => ({
       value: product.id, label: product.displayName,
-      description: 'Estoque atual: ' + product.stock, image: product.image,
-      icon: product.image ? undefined : 'product' as const,
+      description: 'Estoque atual: ' + product.stock,
     })),
   ]);
+
+  readonly productImages = computed(() => new Map(this.catalog.products().map(product => [product.id, product.image])));
+  productImage(productId: string): CatalogImageRef | undefined {
+    return this.productImages().get(productId);
+  }
 
   readonly previews = computed(() => {
     const inputMap = new Map(this.catalog.inputs().map(item => [item.id, item]));

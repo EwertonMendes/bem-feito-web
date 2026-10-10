@@ -22,8 +22,8 @@
 >
   <span class="selection">
     @if (selectedOption(); as selected) {
-      @if (selected.image) {
-        <span class="media image"><bf-catalog-image [image]="selected.image" [alt]="selected.imageAlt || selected.label" [thumbnail]="true" /></span>
+      @if (imageTemplate() && selected.value) {
+        <span class="media image"><ng-container [ngTemplateOutlet]="imageTemplate()" [ngTemplateOutletContext]="{ $implicit: selected }" /></span>
       } @else if (selected.imageSrc) {
         <span class="media image"><img [src]="selected.imageSrc" [alt]="selected.imageAlt || ''" /></span>
       } @else if (selected.icon) {
@@ -80,7 +80,7 @@
   @for (option of filteredOptions(); track option.value; let i = $index) {
     <button
       class="option"
-      [class.has-media]="!!((option.imageSrc || option.image) || option.icon)"
+      [class.has-media]="!!((imageTemplate() && option.value) || option.imageSrc || option.icon)"
       type="button"
       role="option"
       tabindex="-1"
@@ -94,8 +94,8 @@
       (mouseenter)="!option.disabled && activeIndex.set(i)"
       (click)="select(option, i)"
     >
-      @if (option.image) {
-        <span class="media image"><bf-catalog-image [image]="option.image" [alt]="option.imageAlt || option.label" [thumbnail]="true" /></span>
+      @if (imageTemplate() && option.value) {
+        <span class="media image"><ng-container [ngTemplateOutlet]="imageTemplate()" [ngTemplateOutletContext]="{ $implicit: option }" /></span>
       } @else if (option.imageSrc) {
         <span class="media image"><img [src]="option.imageSrc" [alt]="option.imageAlt || ''" /></span>
       } @else if (option.icon) {

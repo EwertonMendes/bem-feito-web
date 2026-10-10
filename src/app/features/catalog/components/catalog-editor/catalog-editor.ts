@@ -1,3 +1,4 @@
+import { CatalogImageRef } from '../../../../domain/models/image.model';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
 import { Addition, AdditionComponent, InputItem, InputTrackingMode, Kit, KitComponent, Product, RecipeComponent } from '../../../../domain/models/catalog.model';
@@ -26,7 +27,7 @@ interface AdditionFormModel { name: string; category: string; price: number; not
 
 @Component({
   selector: 'bf-catalog-editor',
-  imports: [FormField, BfDialog, BfIcon, BfSelect, BfSelectSearch, BfCheckbox, BfImageUpload, CatalogImage, BfNumberInput, BfSettingsEditor],
+  imports: [FormField, BfDialog, BfIcon, BfSelect, BfSelectSearch, CatalogImage, BfCheckbox, BfImageUpload, CatalogImage, BfNumberInput, BfSettingsEditor],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './catalog-editor.html',
   styleUrl: './catalog-editor.scss',
@@ -175,6 +176,11 @@ export class CatalogEditor {
   readonly inputOptions = computed<BfSelectOption[]>(() =>
     this.store.inputs().map((item) => ({ value: item.id, label: item.name })),
   );
+  readonly inputImages = computed(() => new Map(this.store.inputs().map(item => [item.id, item.image])));
+  inputImage(inputId: string): CatalogImageRef | undefined {
+    return this.inputImages().get(inputId);
+  }
+
   readonly productCostPreview = computed(() => {
     if (this.kind() !== 'products') return null;
     const model = this.productModel();

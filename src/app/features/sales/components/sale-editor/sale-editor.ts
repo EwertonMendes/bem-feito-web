@@ -416,12 +416,16 @@ export class SaleEditor {
     );
   }
 
+  readonly productImages = computed(() => new Map(this.catalog.products().map(product => [product.id, product.image])));
+  productImage(productId: string): CatalogImageRef | undefined {
+    return this.productImages().get(productId);
+  }
+
   productSelectOptions(products: Product[]): BfSelectOption[] {
     return products.map((product) => ({
       value: product.id,
       label: product.displayName,
       description: 'Estoque ' + product.stock,
-      image: product.image,
     }));
   }
 

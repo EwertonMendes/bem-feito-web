@@ -165,6 +165,7 @@ export class CatalogStore {
   }
 
   async saveKit(kit: Kit): Promise<string> {
+    throw new Error('Kits desativados. Venda produtos individuais e aplique descontos manuais.');
     const id = kit.id || await this.kitRepository.create(this.withoutId(kit));
     if (kit.id) await this.kitRepository.replace(kit);
     this.kitsState.update((items) => this.upsert(items, { ...kit, id }, (item) => item.name));

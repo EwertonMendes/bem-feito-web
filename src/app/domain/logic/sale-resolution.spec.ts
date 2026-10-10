@@ -62,6 +62,22 @@ describe('sale resolution', () => {
     ]);
   });
 
+  it('rejects inactive legacy kits while retaining their history in the catalog', () => {
+    const kit: Kit = {
+      id: 'k1', active: false, name: 'Kit histórico', priceCents: 1900,
+      components: [{ id: 'slot', formatId: 'round', quantity: 1, order: 1 }],
+    };
+    const draft = emptyDraft();
+    draft.lines = [{ kind: 'kit', sourceId: 'k1', quantity: 1, componentProductIds: ['p1'] }];
+    expect(() => resolveSaleDraft(draft, {
+      products: new Map([['p1', product('p1')]]),
+      kits: new Map([['k1', kit]]),
+      additions: new Map(),
+      inputs: new Map(),
+      productUnitCosts: new Map(),
+    })).toThrow('Este kit está inativo.');
+  });
+
   it('validates kit selections and aggregates product effects', () => {
     const kit: Kit = {
       id: 'k1',

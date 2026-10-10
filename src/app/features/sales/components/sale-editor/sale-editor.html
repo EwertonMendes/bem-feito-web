@@ -56,10 +56,6 @@
             <bf-icon name="product" />
             <span>Produtos</span>
           </button>
-          <button [class.active]="catalogTab()==='kits'" (click)="selectCatalogTab('kits')">
-            <bf-icon name="kit" />
-            <span>Kits</span>
-          </button>
           <button [class.active]="catalogTab()==='additions'" (click)="selectCatalogTab('additions')">
             <bf-icon name="addition" />
             <span>Adicionais</span>
@@ -147,57 +143,7 @@
           } @empty {
             <div class="picker-empty">Nenhum produto corresponde aos filtros.</div>
           }
-        } @else if (catalogTab()==='kits') {
-          @for (kit of filteredKits(); track kit.id) {
-            @let quantity = quantityInCart('kit', kit.id);
-            @let availability = kitAvailability(kit);
-            <article class="pick-card" [class.kit-unavailable]="!availability.available">
-              <div class="product-media">
-                <bf-catalog-image [image]="kit.image" [alt]="kit.name" />
-                <button
-                  class="media-add"
-                  type="button"
-                  [disabled]="!availability.available"
-                  [attr.aria-label]="'Adicionar ' + kit.name"
-                  [attr.title]="!availability.available ? availability.details.join(' • ') : null"
-                  (click)="addKit(kit)"
-                >
-                  <bf-icon name="plus" />
-                </button>
-              </div>
-
-              <div class="product-body">
-                <span class="category-chip">Kit</span>
-                <strong>{{ kit.name }}</strong>
-                <span class="product-price">{{ currency(kit.priceCents) }}</span>
-
-                @if (!availability.available) {
-                  <div
-                    class="kit-stock-warning"
-                    [attr.title]="availability.details.join(' • ')"
-                    role="status"
-                  >
-                    <bf-icon name="alert" />
-                    <span>{{ availability.message }}</span>
-                  </div>
-                }
-
-                @if (quantity > 0) {
-                  <div class="catalog-quantity" aria-label="Quantidade no pedido">
-                    <button type="button" [attr.aria-label]="'Remover um ' + kit.name" (click)="decrementCatalogItem('kit', kit.id)">
-                      <bf-icon name="minus" />
-                    </button>
-                    <span>{{ quantity }} no pedido</span>
-                    <button
-                      type="button"
-                      [disabled]="!availability.available"
-                      [attr.aria-label]="'Adicionar um ' + kit.name"
-                      (click)="addKit(kit)"
-                    >
-                      <bf-icon name="plus" />
-                    </button>
-                  </div>
-                } @else {
+        } @else {
                   <button class="add-to-order" type="button" [disabled]="!availability.available" (click)="addKit(kit)">
                     <bf-icon [name]="availability.available ? 'plus' : 'alert'" />
                     <span>{{ availability.available ? 'Adicionar' : 'Kit indisponível' }}</span>
@@ -294,35 +240,6 @@
                   <strong>{{ lineName(line) }}</strong>
                   <small>{{ currency(lineUnitPrice(line)) }} cada</small>
 
-                  @if (line.kind==='kit') {
-                    <div class="kit-config kit-config-groups">
-                      @for (group of kitAllocationGroups(line); track group.index) {
-                        <section class="kit-allocation">
-                          <div class="kit-allocation-head">
-                            <strong>{{group.label}}</strong>
-                            <span [class.kit-missing]="group.allocated!==group.target">{{group.allocated}} / {{group.target}} un.</span>
-                          </div>
-                          @for (allocation of group.allocations; track allocation.productId) {
-                            <div class="kit-allocation-row">
-                              <span>{{allocation.name}}</span>
-                              <bf-number-input kind="integer" [min]="0" [value]="allocation.quantity"
-                                [ariaLabel]="'Quantidade de ' + allocation.name"
-                                (valueChange)="changeKitGroupQuantity(line,group.index,allocation.productId,$event)" />
-                            </div>
-                          }
-                          @if(group.allocated<group.target && group.candidates.length) {
-                            <bf-select [compact]="true" value=""
-                              [ariaLabel]="'Adicionar fragrância em ' + group.label"
-                              [options]="[{value:'',label:'Adicionar outro produto'},...productSelectOptions(group.candidates)]"
-                              (valueChange)="addKitGroupProduct(line,group.index,$event)" />
-                          }
-                          @if(group.allocated<group.target) {
-                            <small class="kit-missing">Faltam {{group.target-group.allocated}} unidades</small>
-                          }
-                        </section>
-                      }
-                    </div>
-                  }
                 </div>
 
                 <div class="line-controls">
@@ -352,7 +269,7 @@
               <div class="cart-empty">
                 <span class="empty-icon"><bf-icon name="order" /></span>
                 <strong>Pedido vazio</strong>
-                <span>Escolha produtos, kits ou adicionais.</span>
+                <span>Escolha produtos ou adicionais e aplique descontos no resumo.</span>
                 <button class="back-to-catalog" type="button" (click)="mobileView.set('catalog')">
                   <bf-icon name="catalog-browse" />
                   Ver catálogo

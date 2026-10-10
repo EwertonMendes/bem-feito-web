@@ -222,6 +222,10 @@ export class CatalogEditor {
   }
 
   openNew(kind: CatalogImageEntityKind): void {
+    if (kind === 'kits') {
+      this.toast.error('Kits desativados. Cadastre produtos individuais.');
+      return;
+    }
     this.kind.set(kind);
     this.editingId.set('');
     this.bulkVariants.set(false);
@@ -269,6 +273,8 @@ export class CatalogEditor {
   }
 
   editKit(item: Kit): void {
+    this.toast.error('Kits desativados. Os cadastros históricos foram preservados.');
+    return;
     this.kind.set('kits');
     this.editingId.set(item.id);
     this.resetImageChange();
@@ -343,7 +349,7 @@ export class CatalogEditor {
     try {
       if (this.kind() === 'products') await this.saveProduct();
       else if (this.kind() === 'inputs') await this.saveInput();
-      else if (this.kind() === 'kits') await this.saveKit();
+      else if (this.kind() === 'kits') throw new Error('Kits desativados. Venda produtos individuais.');
       else await this.saveAddition();
       this.toast.success('Cadastro salvo com sucesso.');
       this.dialog().close();

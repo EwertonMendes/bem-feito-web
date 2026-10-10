@@ -65,6 +65,7 @@ export function resolveSaleDraft(
     if (line.kind === 'kit') {
       const kit = catalog.kits.get(line.sourceId);
       if (!kit) throw new Error('Kit inválido.');
+      if (!kit.active) throw new Error('Este kit está inativo. Venda os produtos separadamente.');
       const expectedSlots = kit.components.reduce((sum, component) => sum + component.quantity, 0);
       if (line.componentProductIds.length !== expectedSlots) throw new Error(`Configure todos os itens do kit ${kit.name}.`);
 

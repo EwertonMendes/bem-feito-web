@@ -243,15 +243,12 @@ export class SaleEditor {
       const product = this.catalog.activeProducts().find(item => item.id === initialProductId);
       if (product && this.canAddProduct(product)) this.addProduct(product);
     }
-    if (initialKitId) {
-      const kit = this.catalog.activeKits().find(item => item.id === initialKitId);
-      if (kit) { this.catalogTab.set('kits'); this.addKit(kit); }
-    }
+    if (initialKitId) this.toast.error('Kits foram desativados. Adicione produtos individuais.');
     this.dialog().open();
   }
 
   selectCatalogTab(tab: 'products' | 'kits' | 'additions'): void {
-    this.catalogTab.set(tab);
+    this.catalogTab.set(tab === 'kits' ? 'products' : tab);
     this.catalogCategory.set('');
   }
 
@@ -336,6 +333,8 @@ export class SaleEditor {
   }
 
   addKit(kit: Kit): void {
+    this.toast.error('Kits foram desativados. Adicione produtos individuais e informe o desconto manualmente.');
+    return;
     const availability = this.kitAvailability(kit);
 
     if (!availability.available) {
@@ -487,6 +486,11 @@ export class SaleEditor {
     if (this.saleForm().invalid()) {
       this.toast.error('Revise os campos da venda antes de continuar.');
       this.focusFirstInvalidField();
+      return;
+    }
+
+    if (this.cart().some(line => line.kind === 'kit')) {
+      this.toast.error('A venda de kits não está mais disponível.');
       return;
     }
 

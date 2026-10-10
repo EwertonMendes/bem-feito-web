@@ -1,0 +1,406 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function currentProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function activeUser() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && currentProfile().active == true
+        && currentProfile().role in ['owner', 'operator', 'viewer'];
+    }
+
+    function roleIs(role) {
+      return activeUser() && currentProfile().role == role;
+    }
+
+    function canOperate() {
+      return roleIs('owner') || roleIs('operator');
+    }
+
+    function canAdminister() {
+      return roleIs('owner');
+    }
+
+    function operationalCollection(name) {
+      return name in [
+        'collections',
+        'fragrances',
+        'formats',
+        'formatPrices',
+        'units',
+        'paymentMethods',
+        'expenseCategories',
+        'expenseTypes',
+        'inputs',
+        'products',
+        'kits',
+        'additions',
+        'sales',
+        'payments',
+        'productions',
+        'expenses',
+        'stockAdjustments',
+        'stockMovements'
+      ];
+    }
+
+    function money(value) {
+      return value is int && value >= 0 && value <= 1000000000;
+    }
+
+    function quantity(value) {
+      return value is number && value >= 0 && value <= 1000000;
+    }
+
+    function stock(value) {
+      return quantity(value);
+    }
+
+    function validCostComponents(data) {
+      return !('costComponents' in data)
+        || (data.costComponents is list && data.costComponents.size() <= 50);
+    }
+
+    function text(value) {
+      return value is string && value.size() > 0 && value.size() <= 500;
+    }
+
+    function fields(data, required, optional) {
+      return data.keys().hasAll(required)
+        && data.keys().hasOnly(required.concat(optional).concat(['createdAt', 'updatedAt', 'createdBy', 'updatedBy']));
+    }
+
+    function auditCreate(data) {
+      return data.createdAt == request.time && data.updatedAt == request.time
+        && data.createdBy == request.auth.uid && data.updatedBy == request.auth.uid;
+    }
+
+    function auditUpdate(data) {
+      return !data.diff(resource.data).affectedKeys().hasAny(['createdAt', 'createdBy'])
+        && data.updatedAt == request.time && data.updatedBy == request.auth.uid;
+    }
+
+    function validProfile(data) {
+      return fields(data, ['email', 'displayName', 'role', 'active'], ['photoURL'])
+        && text(data.email) && text(data.displayName)
+        && data.role in ['owner', 'operator', 'viewer'] && data.active is bool;
+    }
+
+    function validProductStockStatus(data) {
+      return !('stockStatus' in data)
+        || (data.stock < 0 && data.stockStatus == 'negative')
+        || (data.stock >= 0 && data.stock <= data.minimumStock && data.stockStatus == 'low')
+        || (data.stock > data.minimumStock && data.stockStatus == 'ok');
+    }
+
+    function validInputStockStatus(data) {
+      let legacyTracked = !('minimumStockConfigured' in data) || data.minimumStockConfigured == true;
+      let untracked = ('trackingMode' in data && data.trackingMode == 'untracked')
+        || (!('trackingMode' in data) && !legacyTracked);
+      return !('stockStatus' in data)
+        || (untracked && data.stockStatus == 'untracked')
+        || (!untracked && data.stock < 0 && data.stockStatus == 'negative')
+        || (!untracked && data.stock >= 0 && data.stock <= data.minimumStock && data.stockStatus == 'low')
+        || (!untracked && data.stock > data.minimumStock && data.stockStatus == 'ok');
+    }
+
+    function validCatalog(name, data) {
+      return (name == 'collections'
+          && fields(data, ['name', 'active'], ['costComponents'])
+          && text(data.name) && data.active is bool && validCostComponents(data))
+        || (name in ['units', 'paymentMethods', 'expenseCategories']
+          && fields(data, ['name', 'active'], []) && text(data.name) && data.active is bool)
+        || (name == 'fragrances'
+          && fields(data, ['name', 'active', 'collectionId'], ['costComponents'])
+          && text(data.name) && text(data.collectionId) && data.active is bool
+          && validCostComponents(data))
+        || (name == 'formats'
+          && fields(data, ['name', 'active'], ['approximateWeightGrams', 'costComponents'])
+          && text(data.name) && data.active is bool
+          && (!('approximateWeightGrams' in data) || quantity(data.approximateWeightGrams))
+          && validCostComponents(data))
+        || (name == 'expenseTypes'
+          && fields(data, ['name', 'active', 'kind'], []) && text(data.name) && data.active is bool
+          && data.kind in ['input-purchase', 'operating-expense', 'equipment', 'other'])
+        || (name == 'formatPrices'
+          && fields(data, ['collectionId', 'formatId', 'priceCents', 'active'], [])
+          && text(data.collectionId) && text(data.formatId) && money(data.priceCents) && data.active is bool)
+        || (name == 'products'
+          && fields(data, ['code', 'active', 'collectionId', 'fragranceId', 'formatId', 'displayName', 'salePriceCents', 'additionalCostCents', 'averageUnitCostCents', 'stock', 'minimumStock', 'recipe'], ['image', 'stockStatus', 'committedStock', 'reservedPhysicalStock', 'unitCostDeciCents'])
+          && text(data.code) && text(data.displayName) && data.active is bool
+          && text(data.collectionId) && text(data.fragranceId) && text(data.formatId)
+          && money(data.salePriceCents) && money(data.additionalCostCents) && money(data.averageUnitCostCents)
+          && stock(data.stock) && quantity(data.minimumStock) && data.recipe is list
+           && (!('committedStock' in data) || quantity(data.committedStock))
+          && (!('reservedPhysicalStock' in data) || (quantity(data.reservedPhysicalStock) && data.reservedPhysicalStock <= data.stock))
+          && (!('unitCostDeciCents' in data) || money(data.unitCostDeciCents))
+          && validProductStockStatus(data)
+          && (!('image' in data) || validImage(data.image)))
+        || (name == 'inputs'
+          && fields(data, ['code', 'active', 'name', 'unitId', 'stock', 'minimumStock', 'averageUnitCostCents'], ['image', 'minimumStockConfigured', 'trackingMode', 'stockStatus', 'costBasisQuantity', 'costBasisValueCents', 'committedStock', 'reservedPhysicalStock'])
+          && text(data.code) && text(data.name) && text(data.unitId) && data.active is bool
+          && stock(data.stock) && quantity(data.minimumStock) && money(data.averageUnitCostCents)
+           && (!('committedStock' in data) || quantity(data.committedStock))
+          && (!('reservedPhysicalStock' in data) || (quantity(data.reservedPhysicalStock) && data.reservedPhysicalStock <= data.stock))
+          && (!('minimumStockConfigured' in data) || data.minimumStockConfigured is bool)
+          && (!('trackingMode' in data) || data.trackingMode in ['exact', 'estimated', 'untracked'])
+          && (!('costBasisQuantity' in data) || quantity(data.costBasisQuantity))
+          && (!('costBasisValueCents' in data) || money(data.costBasisValueCents))
+          && validInputStockStatus(data)
+          && (!('image' in data) || validImage(data.image)))
+        || (name == 'kits'
+          && fields(data, ['active', 'name', 'priceCents', 'components'], ['notes', 'image'])
+          && data.active is bool && text(data.name) && money(data.priceCents) && data.components is list
+          && (!('image' in data) || validImage(data.image)))
+        || (name == 'additions'
+          && fields(data, ['active', 'name', 'category', 'priceCents', 'components'], ['notes', 'image'])
+          && data.active is bool && text(data.name) && data.category is string
+          && money(data.priceCents) && data.components is list
+          && (!('image' in data) || validImage(data.image)));
+    }
+
+    function validImage(image) {
+      return image is map
+        && image.keys().hasOnly(['provider', 'fileId', 'mimeType', 'sizeBytes', 'width', 'height', 'modifiedTime'])
+        && image.provider == 'google-drive'
+        && text(image.fileId)
+        && image.mimeType == 'image/webp'
+        && image.sizeBytes is int && image.sizeBytes > 0 && image.sizeBytes <= 3 * 1024 * 1024
+        && image.width is int && image.width > 0 && image.width <= 1200
+        && image.height is int && image.height > 0 && image.height <= 1200
+        && text(image.modifiedTime);
+    }
+
+    function validDriveIntegration(data) {
+      return fields(data, ['enabled', 'rootFolderId', 'rootFolderName', 'folders'], [])
+        && data.enabled is bool
+        && text(data.rootFolderId)
+        && text(data.rootFolderName)
+        && data.folders is map
+        && data.folders.keys().hasOnly(['products', 'inputs', 'kits', 'additions'])
+        && text(data.folders.products)
+        && text(data.folders.inputs)
+        && text(data.folders.kits)
+        && text(data.folders.additions);
+    }
+
+    function businessDate(data) {
+      return data.businessDate is string && data.businessDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    function validOperation(name, data) {
+      return (name == 'sales'
+          && fields(data, ['code', 'businessDate', 'discountCents', 'subtotalCents', 'totalCents', 'receivedCents', 'tipCents', 'balanceCents', 'paymentStatus', 'status', 'items', 'paymentIds', 'stockEffects'], ['customerName', 'dueDate', 'notes', 'cancelledAt', 'cancelledBy', 'analyticsVersion', 'cogsCents', 'itemsSold', 'missingCostItems', 'fulfillmentStatus', 'stockApplied'])
+          && text(data.code) && businessDate(data)
+          && money(data.discountCents) && money(data.subtotalCents) && money(data.totalCents)
+          && money(data.receivedCents) && money(data.tipCents) && money(data.balanceCents)
+          && data.discountCents <= data.subtotalCents && data.totalCents == data.subtotalCents - data.discountCents
+          && data.receivedCents <= data.totalCents
+          && data.status in ['active', 'cancelled']
+           && (!('fulfillmentStatus' in data) || data.fulfillmentStatus in ['in-production', 'ready', 'delivered'])
+           && (!('stockApplied' in data) || data.stockApplied is bool)
+          && (!('legacyUnallocatedPurchase' in data) || data.legacyUnallocatedPurchase is bool)
+          && data.paymentStatus in ['paid', 'pending', 'partial', 'cancelled']
+          && ((data.status == 'cancelled' && data.paymentStatus == 'cancelled' && data.balanceCents == 0)
+            || (data.status == 'active' && data.balanceCents == data.totalCents - data.receivedCents
+              && ((data.balanceCents == 0 && data.paymentStatus == 'paid')
+                || (data.balanceCents > 0 && data.receivedCents == 0 && data.paymentStatus == 'pending')
+                || (data.balanceCents > 0 && data.receivedCents > 0 && data.paymentStatus == 'partial'))))
+          && data.items is list && data.items.size() > 0 && data.paymentIds is list && data.stockEffects is list
+          && ((!(('analyticsVersion' in data) || ('cogsCents' in data) || ('itemsSold' in data) || ('missingCostItems' in data)))
+            || (data.analyticsVersion == 1 && money(data.cogsCents)
+              && data.itemsSold is int && data.itemsSold >= 0
+              && data.missingCostItems is int && data.missingCostItems >= 0)))
+        || (name == 'payments'
+          && fields(data, ['code', 'saleId', 'businessDate', 'methodId', 'amountReceivedCents', 'appliedCents', 'tipCents', 'status'], ['notes', 'reversalOf'])
+          && text(data.code) && text(data.saleId) && text(data.methodId) && businessDate(data)
+          && money(data.amountReceivedCents) && data.amountReceivedCents > 0
+          && money(data.appliedCents) && money(data.tipCents)
+          && data.amountReceivedCents == data.appliedCents + data.tipCents && data.status in ['active', 'reversed'])
+        || (name == 'expenses'
+          && fields(data, ['code', 'businessDate', 'kind', 'amountCents'], ['categoryId', 'inputId', 'quantity', 'unitId', 'paymentMethodId', 'notes', 'link', 'items', 'fundingSource', 'receiptStatus', 'stockApplied', 'charges', 'bankDebitCents', 'legacyUnallocatedPurchase'])
+          && text(data.code) && businessDate(data) && money(data.amountCents) && data.amountCents > 0
+          && data.kind in ['input-purchase', 'operating-expense', 'equipment', 'other']
+          && (!('bankDebitCents' in data) || money(data.bankDebitCents))
+          && (!('fundingSource' in data) || data.fundingSource in ['business', 'ewerton', 'maria', 'owner-unassigned', 'unverified'])
+          && (!('receiptStatus' in data) || data.receiptStatus in ['pending', 'received'])
+          && (!('stockApplied' in data) || data.stockApplied is bool)
+          && (!('charges' in data) || (data.charges is list && data.charges.size() <= 20))
+          && (data.kind != 'input-purchase'
+            || ('legacyUnallocatedPurchase' in data && data.legacyUnallocatedPurchase == true
+              && data.stockApplied == false && data.receiptStatus == 'received'
+              && !('inputId' in data) && !('items' in data))
+            || (text(data.inputId) && quantity(data.quantity) && data.quantity > 0)
+            || ('items' in data && data.items is list && data.items.size() > 0 && data.items.size() <= 40
+              && data.items[0].inputId is string && data.items[0].quantity is number
+              && data.items[0].amountCents is int)))
+        || (name == 'productions'
+          && fields(data, ['code', 'businessDate', 'productId', 'productName', 'quantity', 'unitCostCents', 'totalCostCents', 'costPending', 'consumptions'], ['notes', 'items'])
+          && text(data.code) && businessDate(data) && text(data.productName)
+          && (text(data.productId) || ('items' in data && data.productId == ''))
+          && quantity(data.quantity) && data.quantity > 0 && money(data.unitCostCents) && money(data.totalCostCents)
+          && data.costPending is bool && data.consumptions is list
+          && (!('items' in data) || (data.items is list && data.items.size() > 0 && data.items.size() <= 60
+            && data.items[0].productId is string && data.items[0].quantity is number)))
+        || (name == 'stockAdjustments'
+          && fields(data, ['code', 'businessDate', 'itemType', 'itemId', 'quantityDelta', 'reason'], [])
+          && text(data.code) && businessDate(data) && text(data.itemId) && text(data.reason)
+          && data.itemType in ['product', 'input'] && quantityDelta(data.quantityDelta))
+        || (name == 'stockMovements'
+          && fields(data, ['businessDate', 'itemType', 'itemId', 'quantityDelta', 'unitCostCents', 'totalCostCents', 'sourceType', 'sourceId'], ['reversalOf'])
+          && businessDate(data) && text(data.itemId) && text(data.sourceId)
+          && data.itemType in ['product', 'input'] && quantityDelta(data.quantityDelta)
+          && money(data.unitCostCents) && money(data.totalCostCents)
+          && data.sourceType in ['sale', 'sale-cancellation', 'production', 'purchase', 'adjustment']);
+    }
+
+
+    function validRevisionStamp(value) {
+      return value is map
+        && value.keys().hasOnly(['source', 'at'])
+        && value.source is string && value.source.size() > 0 && value.source.size() <= 100
+        && value.at is timestamp;
+    }
+
+    function validDataRevisionsShape(data) {
+      return data.keys().hasOnly(['catalog', 'references', 'settings', 'sales', 'expenses', 'payments', 'finance', 'production', 'inventory'])
+        && (!('catalog' in data) || validRevisionStamp(data.catalog))
+        && (!('references' in data) || validRevisionStamp(data.references))
+        && (!('settings' in data) || validRevisionStamp(data.settings))
+        && (!('sales' in data) || validRevisionStamp(data.sales))
+        && (!('expenses' in data) || validRevisionStamp(data.expenses))
+        && (!('payments' in data) || validRevisionStamp(data.payments))
+        && (!('finance' in data) || validRevisionStamp(data.finance))
+        && (!('production' in data) || validRevisionStamp(data.production))
+        && (!('inventory' in data) || validRevisionStamp(data.inventory));
+    }
+
+    function validDataRevisionCreate(data) {
+      return validDataRevisionsShape(data)
+        && (!('catalog' in data) || data.catalog.at == request.time)
+        && (!('references' in data) || data.references.at == request.time)
+        && (!('settings' in data) || data.settings.at == request.time)
+        && (!('sales' in data) || data.sales.at == request.time)
+        && (!('expenses' in data) || data.expenses.at == request.time)
+        && (!('payments' in data) || data.payments.at == request.time)
+        && (!('finance' in data) || data.finance.at == request.time)
+        && (!('production' in data) || data.production.at == request.time)
+        && (!('inventory' in data) || data.inventory.at == request.time);
+    }
+
+    function validDataRevisionUpdate(data) {
+      let changed = data.diff(resource.data).affectedKeys();
+      return validDataRevisionsShape(data)
+        && (!changed.hasAny(['catalog']) || data.catalog.at == request.time)
+        && (!changed.hasAny(['references']) || data.references.at == request.time)
+        && (!changed.hasAny(['settings']) || data.settings.at == request.time)
+        && (!changed.hasAny(['sales']) || data.sales.at == request.time)
+        && (!changed.hasAny(['expenses']) || data.expenses.at == request.time)
+        && (!changed.hasAny(['payments']) || data.payments.at == request.time)
+        && (!changed.hasAny(['finance']) || data.finance.at == request.time)
+        && (!changed.hasAny(['production']) || data.production.at == request.time)
+        && (!changed.hasAny(['inventory']) || data.inventory.at == request.time);
+    }
+
+    function quantityDelta(value) {
+      return value is number && value != 0 && value >= -1000000 && value <= 1000000;
+    }
+
+
+    match /system/data-revisions {
+      allow read: if activeUser();
+      allow create: if canOperate() && validDataRevisionCreate(request.resource.data);
+      allow update: if canOperate() && validDataRevisionUpdate(request.resource.data);
+      allow delete: if false;
+    }
+
+    match /system/bank-snapshot {
+      allow read: if activeUser();
+      allow write: if false; // Finance reconciliation is imported through reviewed administrative tooling.
+    }
+
+    match /system/read-optimization {
+      allow read: if activeUser();
+      allow create: if canOperate()
+        && request.resource.data.keys().hasOnly(['version', 'updatedAt', 'updatedBy'])
+        && request.resource.data.version is int
+        && request.resource.data.version >= 1
+        && request.resource.data.version <= 1000
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+      allow update: if canOperate()
+        && request.resource.data.keys().hasOnly(['version', 'updatedAt', 'updatedBy'])
+        && request.resource.data.version is int
+        && request.resource.data.version >= resource.data.version
+        && request.resource.data.version <= 1000
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if false;
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && (request.auth.uid == userId || canAdminister());
+      allow create, update: if canAdminister() && validProfile(request.resource.data);
+      allow delete: if canAdminister();
+    }
+
+    match /integrations/{integrationId} {
+      allow read: if activeUser();
+      allow create: if integrationId == 'google-drive' && canAdminister()
+        && auditCreate(request.resource.data)
+        && validDriveIntegration(request.resource.data);
+      allow update: if integrationId == 'google-drive' && canAdminister()
+        && auditUpdate(request.resource.data)
+        && validDriveIntegration(request.resource.data);
+      allow delete: if false;
+    }
+
+    match /counters/{documentId} {
+      allow read: if canOperate();
+      allow create, update: if canOperate()
+        && documentId in ['sale', 'payment', 'production', 'expense', 'stockAdjustment']
+        && request.resource.data.keys().hasOnly(['value', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy'])
+        && request.resource.data.value is int && request.resource.data.value >= 0
+        && request.resource.data.value <= 1000000000
+        && request.resource.data.updatedAt == request.time
+        && ((!exists(/databases/$(database)/documents/counters/$(documentId))
+            && request.resource.data.keys().hasOnly(['value', 'updatedAt']) && request.resource.data.value <= 500)
+          || (request.resource.data.value >= resource.data.value && request.resource.data.value <= resource.data.value + 500
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['value', 'updatedAt'])));
+      allow delete: if false;
+    }
+
+    match /migrationRuns/{documentId} {
+      allow read: if canAdminister();
+      allow write: if false;
+    }
+
+    match /migrationSources/{runId}/{document=**} {
+      allow read: if canAdminister();
+      allow write: if false;
+    }
+
+    match /{collectionName}/{documentId} {
+      allow read: if operationalCollection(collectionName) && activeUser();
+      allow create: if operationalCollection(collectionName) && canOperate()
+        && auditCreate(request.resource.data)
+        && (validCatalog(collectionName, request.resource.data) || validOperation(collectionName, request.resource.data));
+      allow update: if operationalCollection(collectionName) && canOperate()
+        && auditUpdate(request.resource.data)
+        && (validCatalog(collectionName, request.resource.data) || validOperation(collectionName, request.resource.data));
+      allow delete: if collectionName in ['collections', 'fragrances', 'formats', 'formatPrices', 'units', 'paymentMethods', 'expenseCategories', 'expenseTypes', 'inputs', 'products', 'kits', 'additions'] && canAdminister();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

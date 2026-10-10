@@ -1,0 +1,23 @@
+// Public Firebase Web config. See docs/firebase-key-security.md for the audit.
+// Never add administrative credentials or App Check debug tokens here.
+export const environment = {
+  production: false,
+  name: "development",
+  googleDrive: {
+    enabled: true,
+    clientId:
+      "312978463343-2nr1f82ne1mfjv51jbf9nl7dnt3chhhg.apps.googleusercontent.com",
+    pickerApiKey: "AIzaSyDt7lBCbkCeAV-hbZ6LGL2UJ-A9XwLfeIM",
+    cloudProjectNumber: "312978463343",
+  },
+  firebase: {
+    apiKey: "AIzaSyDphJI0zALbNQm8bYJTSI99kYgvgVyaga8",
+    authDomain: "bem-feito-dev.firebaseapp.com",
+    projectId: "bem-feito-dev",
+    storageBucket: "bem-feito-dev.firebasestorage.app",
+    messagingSenderId: "312978463343",
+    appId: "1:312978463343:web:e49e223d872b9c68374b9a",
+  },
+  useEmulators: false,
+  emulatorHost: "127.0.0.1",
+} as const;

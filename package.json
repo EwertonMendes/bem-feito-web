@@ -1,0 +1,77 @@
+{
+  "name": "bem-feito-web",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "npm@10.9.2",
+  "scripts": {
+    "security:scan": "node tools/security/check-secrets.mjs",
+    "security:audit": "npm audit",
+    "test:security": "node --test tools/tests/secret-scan.test.mjs",
+    "test:ci-config": "node --test tools/tests/ci-config.test.mjs",
+    "ng": "ng",
+    "start": "ng serve --configuration development",
+    "build": "ng build",
+    "build:dev": "ng build --configuration development",
+    "build:dev:hosting": "ng build --configuration dev-hosting",
+    "build:prod": "ng build --configuration production",
+    "test": "vitest run src",
+    "test:watch": "vitest",
+    "firebase:emulators": "npx --yes --package firebase-tools@15.32.1 firebase emulators:start",
+    "firebase:deploy:dev": "npm run build:dev:hosting && npx --yes --package firebase-tools@15.32.1 firebase deploy --project bem-feito-dev --only firestore,hosting",
+    "firebase:deploy:dev:ci": "npm run firebase:deploy:dev:firestore && npm run firebase:wait-indexes:dev && npm run firebase:verify-queries:dev && npm run firebase:deploy:dev:hosting",
+    "firebase:deploy:prod": "npx --yes --package firebase-tools@15.32.1 firebase use prod && npm run build:prod && npx --yes --package firebase-tools@15.32.1 firebase deploy --only firestore,hosting",
+    "deploy:prepare:dev": "node tools/deploy/prepare-deployment.mjs",
+    "deploy:verify:dev": "node tools/deploy/verify-deployment.mjs",
+    "migration:normalize": "node tools/migration/normalize-legacy.mjs",
+    "migration:source-reconcile": "node tools/migration/reconcile-legacy.mjs",
+    "migration:validate": "node tools/migration/validate-export.mjs",
+    "migration:reconcile": "node tools/migration/reconcile.mjs",
+    "migration:import": "node tools/migration/import-firestore.mjs",
+    "migration:verify": "node tools/migration/verify-firestore.mjs",
+    "test:migration": "node --test tools/tests/migration.test.mjs",
+    "test:transactions": "npx --yes --package firebase-tools@15.32.1 firebase emulators:exec --only firestore --project demo-bem-feito \"vitest run tools/tests/transactions.spec.ts\"",
+    "admin:user": "node tools/admin/upsert-user.mjs",
+    "test:rules": "npx --yes --package firebase-tools@15.32.1 firebase emulators:exec --only firestore --project demo-bem-feito \"node tools/tests/firestore.rules.test.mjs && node tools/tests/drive-integration.rules.test.mjs\"",
+    "test:architecture": "node --test tools/tests/architecture.test.mjs",
+    "firebase:deploy:dev:firestore": "npx --yes --package firebase-tools@15.32.1 firebase deploy --project bem-feito-dev --only firestore --non-interactive",
+    "firebase:wait-indexes:dev": "node tools/deploy/wait-for-firestore-indexes.mjs",
+    "firebase:deploy:dev:hosting": "npx --yes --package firebase-tools@15.32.1 firebase deploy --project bem-feito-dev --only hosting --non-interactive",
+    "firebase:verify-queries:dev": "node tools/deploy/verify-firestore-queries.mjs",
+    "test:data-admin": "node --experimental-strip-types --test tools/data-admin/security.test.ts tools/data-admin/query-gateway.test.ts tools/data-admin/query-gate.test.ts",
+    "check:data-admin": "tsc -p tools/data-admin/tsconfig.json",
+    "test:data-admin:emulator": "npx --yes --package firebase-tools@15.32.1 firebase emulators:exec --only firestore --project demo-bem-feito \"node --experimental-strip-types --test tools/data-admin/emulator.test.ts\""
+  },
+  "dependencies": {
+    "@angular/common": "^22.2.1",
+    "@angular/compiler": "^22.2.1",
+    "@angular/core": "^22.2.1",
+    "@angular/forms": "^22.2.1",
+    "@angular/platform-browser": "^22.2.1",
+    "@angular/router": "^22.2.1",
+    "@fontsource-variable/manrope": "^5.3.0",
+    "@lucide/angular": "^1.49.0",
+    "firebase": "^12.19.0",
+    "rxjs": "~7.8.2",
+    "tslib": "^2.8.1"
+  },
+  "devDependencies": {
+    "@angular/build": "^22.2.1",
+    "@angular/cli": "^22.2.1",
+    "@angular/compiler-cli": "^22.2.1",
+    "@firebase/rules-unit-testing": "^5.0.2",
+    "firebase-admin": "^14.5.0",
+    "typescript": "~6.0.2",
+    "vitest": "^5.0.3"
+  },
+  "engines": {
+    "node": ">=22.22.3"
+  },
+  "overrides": {
+    "@firebase/firestore": {
+      "@grpc/grpc-js": "1.14.5"
+    },
+    "gaxios": {
+      "uuid": "11.1.1"
+    }
+  }
+}

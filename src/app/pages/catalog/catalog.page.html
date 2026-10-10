@@ -1,0 +1,68 @@
+<section class="bf-page">
+  <header class="bf-page-header">
+    <div><h1>Catálogo</h1><p>Produtos, insumos e adicionais. Kits antigos são mantidos somente para consulta.</p></div>
+    <div class="bf-actions">@if (tab() !== 'kits') { <button class="bf-button" type="button" (click)="editor.openNew(tab())"><bf-icon name="plus" /> Novo</button> }</div>
+  </header>
+
+  @if (store.initialized() && store.loading()) { <bf-page-refresh /> }
+
+  <div class="toolbar">
+    <div class="bf-segments">
+      <button type="button" [class.active]="tab() === 'products'" (click)="tab.set('products')">Produtos</button>
+      <button type="button" [class.active]="tab() === 'inputs'" (click)="tab.set('inputs')">Insumos</button>
+      <button type="button" [class.active]="tab() === 'kits'" (click)="tab.set('kits')">Kits (histórico)</button>
+      <button type="button" [class.active]="tab() === 'additions'" (click)="tab.set('additions')">Adicionais</button>
+    </div>
+    <label class="search"><bf-icon name="search" /><input type="search" placeholder="Buscar" [value]="search()" (input)="search.set($any($event.target).value)" /></label>
+  </div>
+
+  @if (!store.initialized()) {
+    <div class="catalog-grid skeleton-grid" aria-busy="true" aria-label="Carregando catálogo">
+      @for (item of skeletonItems; track item) {
+        <article class="catalog-card skeleton-card">
+          <div class="skeleton-block skeleton-image"></div>
+          <div class="body">
+            <div class="skeleton-block skeleton-line short"></div>
+            <div class="skeleton-block skeleton-line"></div>
+            <div class="skeleton-block skeleton-line medium"></div>
+            <div class="skeleton-block skeleton-button"></div>
+          </div>
+        </article>
+      }
+    </div>
+  } @else if (tab() === 'products') {
+    <div class="catalog-grid">
+      @for (item of filteredProducts(); track item.id) {
+        <article class="catalog-card" [class.inactive]="!item.active">
+          <bf-catalog-image [image]="item.image" [alt]="item.displayName" />
+          <div class="body"><div class="meta"><span>{{ item.code }}</span><span class="bf-badge" [class.muted]="!item.active">{{ item.active ? 'Ativo' : 'Inativo' }}</span></div><h2>{{ item.displayName }}</h2><div class="stats"><strong>{{ currency(item.salePriceCents) }}</strong><span [class.stock-danger]="item.stock === 0">{{ item.stock > 0 ? item.stock + ' em estoque' : 'Sem estoque' }}</span></div><div class="catalog-context-actions">
+  <button bfButton class="secondary" type="button" (click)="editor.editProduct(item)">Editar</button>
+  <button bfButton class="secondary" type="button" [disabled]="!item.active" (click)="modals.openProduction(item.id)"><bf-icon name="production" /> Produzir</button>
+  <button bfButton type="button" [disabled]="!item.active || item.stock <= 0" [attr.title]="item.stock <= 0 ? 'Sem estoque disponível para venda' : null" (click)="modals.openSale(item.id)"><bf-icon name="sales" /> Vender</button>
+</div></div>
+        </article>
+      } @empty { <bf-empty-state title="Nenhum produto ainda" description="Cadastre o primeiro sabonete para começar." /> }
+    </div>
+  } @else if (tab() === 'inputs') {
+    <div class="list-grid">
+      @for (item of filteredInputs(); track item.id) {
+        <article class="list-card"><div class="input-main"><bf-catalog-image [image]="item.image" [alt]="item.name" [compact]="true" /><div><span class="code">{{ item.code }}</span><h2>{{ item.name }}</h2><p>@if(item.trackingMode==='untracked'){ {{item.availabilityStatus || 'Disponibilidade sem medição de volume'}} }@else if(item.trackingMode==='exact'){Estoque {{item.stock}}@if(item.minimumStockConfigured!==false){ · mín. {{item.minimumStock}}}}@else{Saldo aproximado {{item.stock}}@if(item.availabilityStatus){ · {{item.availabilityStatus}}}}</p></div></div><div class="row-actions"><span class="bf-badge" [class.muted]="!item.active">{{ item.active ? 'Ativo' : 'Inativo' }}</span><button class="bf-button secondary" (click)="editor.editInput(item)">Editar</button></div></article>
+      } @empty { <bf-empty-state title="Nenhum insumo" description="Cadastre matérias-primas e embalagens." /> }
+    </div>
+  } @else if (tab() === 'kits') {
+    <div class="catalog-grid">
+      @for (item of filteredKits(); track item.id) {
+        <article class="catalog-card"><bf-catalog-image [image]="item.image" [alt]="item.name" /><div class="body"><div class="meta"><span>{{ item.components.length }} regras</span><span class="bf-badge" [class.muted]="!item.active">{{ item.active ? 'Ativo' : 'Inativo' }}</span></div><h2>{{ item.name }}</h2><div class="stats"><strong>{{ currency(item.priceCents) }}</strong><span>{{ item.notes || 'Kit comercial' }}</span></div><p class="catalog-history-note">Registro histórico: kits desativados. Novas vendas usam produtos avulsos e desconto manual.</p></div></article>
+      } @empty { <bf-empty-state title="Nenhum kit" description="Não existem registros históricos de kits." /> }
+    </div>
+  } @else {
+    <div class="catalog-grid">
+      @for (item of filteredAdditions(); track item.id) {
+        <article class="catalog-card"><bf-catalog-image [image]="item.image" [alt]="item.name" /><div class="body"><div class="meta"><span>{{ item.category }}</span><span class="bf-badge" [class.muted]="!item.active">{{ item.active ? 'Ativo' : 'Inativo' }}</span></div><h2>{{ item.name }}</h2><div class="stats"><strong>{{ currency(item.priceCents) }}</strong><span>{{ item.components.length }} consumos</span></div><button class="bf-button secondary" (click)="editor.editAddition(item)">Editar</button></div></article>
+      } @empty { <bf-empty-state title="Nenhum adicional" description="Cadastre embalagens, incensos e outros extras." /> }
+    </div>
+  }
+
+    <bf-catalog-editor #editor />
+
+</section>

@@ -1,0 +1,32 @@
+<dialog
+  bfDialog
+  #dialog="bfDialog"
+  class="bf-dialog confirm-dialog"
+  (cancel)="onNativeCancel($event)"
+>
+  <div class="confirm-content">
+    <span class="confirm-icon" [class.danger]="options().tone === 'danger'" aria-hidden="true">
+      <bf-icon [name]="options().icon" />
+    </span>
+
+    <div class="confirm-copy">
+      <h2>{{ options().title }}</h2>
+      <p>{{ options().message }}</p>
+    </div>
+  </div>
+
+  <footer class="confirm-actions">
+    <button class="bf-button secondary" type="button" (click)="cancel()">
+      {{ options().cancelLabel }}
+    </button>
+    <button
+      class="bf-button"
+      [class.danger]="options().tone === 'danger'"
+      type="button"
+      autofocus
+      (click)="confirm()"
+    >
+      {{ options().confirmLabel }}
+    </button>
+  </footer>
+</dialog>

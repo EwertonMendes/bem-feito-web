@@ -1,0 +1,50 @@
+<section class="bf-page">
+  <header class="bf-page-header"><div><h1>Configurações</h1><p>Cadastros reutilizáveis de preços, custos e opções do sistema.</p></div><button class="bf-button" type="button" (click)="openNew()"><bf-icon name="plus" /> Novo</button></header>
+
+  @if (refreshing()) { <bf-page-refresh /> }
+
+  <bf-google-drive-settings-card />
+
+  <nav class="settings-nav-groups" aria-label="Seções de configurações">
+    <section class="settings-nav-section">
+      <strong><bf-icon name="product" /> Produtos e custos</strong>
+      <div class="bf-segments tabs">
+        <button [class.active]="tab()==='collections'" (click)="tab.set('collections')">Coleções</button>
+        <button [class.active]="tab()==='fragrances'" (click)="tab.set('fragrances')">Fragrâncias</button>
+        <button [class.active]="tab()==='formats'" (click)="tab.set('formats')">Formatos</button>
+        <button [class.active]="tab()==='prices'" (click)="tab.set('prices')">Preços</button>
+        <button [class.active]="tab()==='units'" (click)="tab.set('units')">Unidades</button>
+      </div>
+    </section>
+    <section class="settings-nav-section">
+      <strong><bf-icon name="payment" /> Financeiro</strong>
+      <div class="bf-segments tabs">
+        <button [class.active]="tab()==='payments'" (click)="tab.set('payments')">Pagamentos</button>
+        <button [class.active]="tab()==='expenseCategories'" (click)="tab.set('expenseCategories')">Categorias</button>
+        <button [class.active]="tab()==='expenseTypes'" (click)="tab.set('expenseTypes')">Tipos de saída</button>
+      </div>
+    </section>
+  </nav>
+
+  @if (!initialized()) {
+    <bf-table-skeleton [columns]="5" [rows]="7" />
+  } @else {
+  <div class="bf-table-wrap">
+    <table class="bf-table">
+      <thead><tr><th>Nome</th>@if(tab()==='fragrances'){<th>Coleção</th>}@if(tab()==='formats'){<th>Peso aprox.</th>}@if(tab()==='prices'){<th>Formato</th><th>Preço</th>}@if(tab()==='expenseTypes'){<th>Comportamento</th>}@if(tab()==='collections'||tab()==='fragrances'||tab()==='formats'){<th>Custo padrão</th>}<th>Status</th><th></th></tr></thead>
+      <tbody>
+        @if (tab()==='collections') { @for(item of references.collections();track item.id){<tr><td>{{item.name}}</td><td>{{costSummary(item.costComponents)}}</td><td><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></td><td><button class="bf-button secondary" (click)="editCollection(item)">Editar</button></td></tr>} }
+        @else if (tab()==='fragrances') { @for(item of references.fragrances();track item.id){<tr><td>{{item.name}}</td><td>{{collectionName(item.collectionId)}}</td><td>{{costSummary(item.costComponents)}}</td><td><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></td><td><button class="bf-button secondary" (click)="editFragrance(item)">Editar</button></td></tr>} }
+        @else if (tab()==='formats') { @for(item of references.formats();track item.id){<tr><td>{{item.name}}</td><td>{{item.approximateWeightGrams || '—'}} g</td><td>{{costSummary(item.costComponents)}}</td><td><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></td><td><button class="bf-button secondary" (click)="editFormat(item)">Editar</button></td></tr>} }
+        @else if (tab()==='prices') { @for(item of references.formatPrices();track item.id){<tr><td>{{collectionName(item.collectionId)}}</td><td>{{formatName(item.formatId)}}</td><td>R$ {{(item.priceCents/100).toFixed(2).replace('.',',')}}</td><td><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></td><td><button class="bf-button secondary" (click)="editPrice(item)">Editar</button></td></tr>} }
+        @else if (tab()==='units') { @for(item of references.units();track item.id){<tr><td>{{item.name}}</td><td><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></td><td><button class="bf-button secondary" (click)="editSimple(item)">Editar</button></td></tr>} }
+        @else if (tab()==='payments') { @for(item of settings.paymentMethods();track item.id){<tr><td>{{item.name}}</td><td><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></td><td><button class="bf-button secondary" (click)="editSimple(item)">Editar</button></td></tr>} }
+        @else if (tab()==='expenseCategories') { @for(item of settings.expenseCategories();track item.id){<tr><td>{{item.name}}</td><td><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></td><td><button class="bf-button secondary" (click)="editSimple(item)">Editar</button></td></tr>} }
+        @else { @for(item of settings.expenseTypes();track item.id){<tr><td>{{item.name}}</td><td>{{item.kind}}</td><td><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></td><td><button class="bf-button secondary" (click)="editExpenseType(item)">Editar</button></td></tr>} }
+      </tbody>
+    </table>
+  </div>
+  }
+
+  <bf-settings-editor #editor />
+</section>

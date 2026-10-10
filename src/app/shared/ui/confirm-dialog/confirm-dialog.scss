@@ -1,0 +1,92 @@
+.confirm-dialog {
+  width: min(440px, calc(100vw - 32px));
+  max-height: min(90dvh, 460px);
+}
+
+.confirm-content {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  padding: 24px 24px 18px;
+}
+
+.confirm-icon {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+}
+
+.confirm-icon.danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.confirm-icon bf-icon {
+  width: 21px;
+  height: 21px;
+}
+
+.confirm-copy {
+  min-width: 0;
+}
+
+.confirm-copy h2 {
+  margin: 2px 0 7px;
+  font-size: 1rem;
+  font-weight: 730;
+  letter-spacing: -0.025em;
+}
+
+.confirm-copy p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  padding: 14px 24px 20px;
+  border-top: 1px solid var(--line);
+}
+
+.confirm-actions .bf-button {
+  min-width: 108px;
+}
+
+@media (max-width: 480px) {
+  .confirm-dialog {
+    width: calc(100vw - 24px);
+    margin: auto;
+    border-radius: 18px;
+  }
+
+  .confirm-content {
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 12px;
+    padding: 20px 18px 16px;
+  }
+
+  .confirm-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+  }
+
+  .confirm-actions {
+    padding: 12px 18px 18px;
+  }
+
+  .confirm-actions .bf-button {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}

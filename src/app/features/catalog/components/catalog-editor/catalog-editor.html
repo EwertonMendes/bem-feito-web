@@ -1,0 +1,104 @@
+<dialog bfDialog #dialog="bfDialog" class="bf-dialog">
+    <div class="bf-dialog-header"><h2>{{ editingId() ? 'Editar' : 'Novo' }} {{ kind() === 'products' ? 'produto' : kind() === 'inputs' ? 'insumo' : kind() === 'kits' ? 'kit' : 'adicional' }}</h2><button type="button" class="bf-icon-button" (click)="dialog.close()"><bf-icon name="close" /></button></div>
+    <div class="bf-dialog-body">
+      @if (kind() === 'products') {
+        <div class="bf-grid two">
+          <label class="bf-field"><span>Preço</span><bf-number-input kind="currency" [formField]="productForm.salePrice" ariaLabel="Preço do produto" />@if(suggestedPrice()){<button class="bf-link-action" type="button" (click)="applySuggestedPrice()">Usar preço padrão: {{currency(suggestedPrice()!.priceCents)}}</button>}</label>
+          <label class="bf-field"><span>Coleção</span><bf-select [formField]="productForm.collectionId" [options]="productCollectionOptions()" ariaLabel="Coleção" /><button class="bf-link-action" type="button" (click)="openQuickReference('collection')"><bf-icon name="plus"/> Criar coleção</button></label>
+          @if(!bulkVariants() || editingId()){
+            <label class="bf-field"><span>Fragrância</span><bf-select [formField]="productForm.fragranceId" [options]="productFragranceOptions()" ariaLabel="Fragrância" /><button class="bf-link-action" type="button" (click)="openQuickReference('fragrance')"><bf-icon name="plus"/> Criar fragrância</button></label>
+          }
+          <label class="bf-field"><span>Formato</span><bf-select [formField]="productForm.formatId" [options]="productFormatOptions()" ariaLabel="Formato" /><button class="bf-link-action" type="button" (click)="openQuickReference('format')"><bf-icon name="plus"/> Criar formato</button></label>
+          <label class="bf-field"><span>Estoque mínimo</span><bf-number-input kind="integer" [formField]="productForm.minimumStock" ariaLabel="Estoque mínimo" /></label>
+          <label class="bf-field"><span>Custo adicional unitário</span><bf-number-input kind="currency" [formField]="productForm.additionalCost" ariaLabel="Custo adicional unitário" /></label>
+          <bf-checkbox class="toggle" [formField]="productForm.active" label="Produto ativo" />
+          @if(!editingId()) {
+            <bf-checkbox class="toggle full" [checked]="bulkVariants()" (checkedChange)="bulkVariants.set($event)" label="Criar várias fragrâncias deste produto de uma vez" description="Uma linha para cada fragrância, com a mesma coleção, formato e preço." />
+          }
+        </div>
+        @if(bulkVariants() && !editingId()) {
+          <section class="bulk-variants">
+            <div class="bulk-variants-head"><strong>Fragrâncias a cadastrar</strong><span>{{selectedVariantFragranceIds().length}} selecionada(s)</span></div>
+            @for(fragrance of availableFragrances();track fragrance.id){
+              <bf-checkbox
+                [checked]="selectedVariantFragranceIds().includes(fragrance.id)"
+                (checkedChange)="toggleVariantFragrance(fragrance.id,$event)"
+                [label]="fragrance.name" />
+            } @empty {<p class="hint">Cadastre uma fragrância para esta coleção antes de criar as variações.</p>}
+          </section>
+        }
+        <section class="composition"><div class="subhead"><div><strong>Ajustes de custo deste produto</strong><small>Opcional. Os padrões de coleção, fragrância e formato são aplicados automaticamente. Use apenas para exceções deste produto.</small></div><button class="bf-button secondary" type="button" (click)="addRecipeComponent()">+ Insumo</button></div>
+          @for (component of recipe(); track $index; let i = $index) {
+            <div class="component-row"><bf-select [value]="component.inputId" (valueChange)="patchRecipeInput(i,$event)" [options]="activeInputOptions()" ariaLabel="Insumo" /><bf-number-input kind="decimal" [decimals]="3" [min]="0" [value]="component.quantity" (valueChange)="patchRecipe(i,{quantity:$event})" ariaLabel="Quantidade do insumo" /><span class="component-unit">{{unitName(component.unitId)}}</span><button class="bf-icon-button" type="button" (click)="removeRecipe(i)"><bf-icon name="trash" /></button></div>
+          } @empty { <p class="hint">Sem ajuste específico. O custo será calculado pelos padrões reutilizáveis.</p> }
+        </section>
+        @if(bulkVariants() && !editingId()){
+          <section class="bulk-cost-preview">
+            <strong>Prévia de custos por fragrância</strong>
+            @for(preview of bulkCostPreviews();track preview.id){
+              <div><span>{{preview.name}}</span><strong>{{currency(preview.costCents)}} {{preview.pending?'· custo parcial':''}}</strong></div>
+            } @empty {<small>Selecione as fragrâncias para pré-visualizar o custo de cada uma.</small>}
+          </section>
+          <p class="hint">As variações são criadas sem foto e com estoque zero. Você poderá adicionar imagens e registrar a produção depois.</p>
+        } @else {
+                  <div class="product-cost-preview" [class.pending]="productCostPreview()?.costPending">
+          <span>Custo padrão atual</span>
+          <strong>{{productCostSummary()}}</strong>
+          <small>Formato + coleção + fragrância + ajustes deste produto.</small>
+        </div>
+        }
+      } @else if (kind() === 'inputs') {
+        <div class="bf-grid two">
+          <label class="bf-field"><span>Nome</span><input class="bf-input" [formField]="inputForm.name" /></label>
+          <label class="bf-field"><span>Unidade base</span><bf-select [formField]="inputForm.unitId" [options]="inputUnitOptions()" ariaLabel="Unidade base" /></label>
+          <label class="bf-field"><span>Controle de estoque</span><bf-select [formField]="inputForm.trackingMode" [options]="inputTrackingOptions" [descriptive]="true" ariaLabel="Controle de estoque" /></label>
+          @if (inputModel().trackingMode !== 'untracked') {
+            <label class="bf-field"><span>Estoque mínimo</span><bf-number-input kind="decimal" [decimals]="3" [formField]="inputForm.minimumStock" ariaLabel="Estoque mínimo" /></label>
+          }
+          @if (inputModel().trackingMode !== 'exact') {
+            <label class="bf-field full"><span>Disponibilidade informada (sem medição obrigatória)</span><textarea class="bf-textarea" [formField]="inputForm.availabilityStatus" placeholder="Ex.: Cheio, disponível, quase acabando ou esgotado"></textarea></label>
+          }
+          <bf-checkbox class="toggle" [formField]="inputForm.active" label="Insumo ativo" />
+          <p class="hint full">{{inputTrackingHint()}}</p>
+        </div>
+      } @else if (kind() === 'kits') {
+        <div class="bf-grid two"><label class="bf-field"><span>Nome</span><input class="bf-input" [formField]="kitForm.name" /></label><label class="bf-field"><span>Preço</span><bf-number-input kind="currency" [formField]="kitForm.price" ariaLabel="Preço do kit" /></label><label class="bf-field full"><span>Observações</span><textarea class="bf-textarea" [formField]="kitForm.notes"></textarea></label><bf-checkbox class="toggle" [formField]="kitForm.active" label="Kit ativo" /></div>
+        <section class="composition"><div class="subhead"><div><strong>Composição</strong><small>Deixe coleção ou fragrância em branco para o cliente escolher na venda.</small></div><button class="bf-button secondary" (click)="addKitComponent()">+ Regra</button></div>
+          @for (component of kitComponents(); track component.id; let i=$index) {
+            <div class="kit-row"><bf-select [value]="component.formatId" (valueChange)="patchKitComponent(i,{formatId:$event})" [options]="formatOptions()" ariaLabel="Formato" /><bf-number-input kind="integer" [min]="1" [value]="component.quantity" (valueChange)="patchKitComponent(i,{quantity:$event})" ariaLabel="Quantidade do kit" /><bf-select [value]="component.collectionId || ''" (valueChange)="patchKitComponent(i,{collectionId:$event || undefined,fragranceId:undefined})" [options]="kitCollectionOptions()" ariaLabel="Coleção" /><bf-select [value]="component.fragranceId || ''" (valueChange)="patchKitComponent(i,{fragranceId:$event || undefined})" [options]="kitFragranceOptions(component.collectionId)" ariaLabel="Fragrância" /><button class="bf-icon-button" (click)="removeKitComponent(i)"><bf-icon name="trash" /></button></div>
+          }
+        </section>
+      } @else {
+        <div class="bf-grid two"><label class="bf-field"><span>Nome</span><input class="bf-input" [formField]="additionForm.name" /></label><label class="bf-field"><span>Categoria</span><input class="bf-input" [formField]="additionForm.category" /></label><label class="bf-field"><span>Preço</span><bf-number-input kind="currency" [formField]="additionForm.price" ariaLabel="Preço do adicional" /></label><bf-checkbox class="toggle" [formField]="additionForm.active" label="Adicional ativo" /><label class="bf-field full"><span>Observações</span><textarea class="bf-textarea" [formField]="additionForm.notes"></textarea></label></div>
+        <section class="composition"><div class="subhead"><div><strong>Consumo de estoque</strong><small>Opcional. Use para embalagens e itens consumíveis.</small></div><button class="bf-button secondary" (click)="addAdditionComponent()">+ Insumo</button></div>
+          @for (component of additionComponents(); track component.id; let i=$index) {
+            <div class="component-row"><bf-select [value]="component.inputId" (valueChange)="patchAdditionInput(i,$event)" [options]="inputOptions()" ariaLabel="Insumo" /><bf-number-input kind="decimal" [decimals]="3" [min]="0" [value]="component.quantity" (valueChange)="patchAdditionComponent(i,{quantity:$event})" ariaLabel="Quantidade do adicional" /><span class="component-unit">{{unitName(component.unitId)}}</span><button class="bf-icon-button" type="button" (click)="removeAdditionComponent(i)"><bf-icon name="trash" /></button></div>
+          }
+        </section>
+      }
+
+      @if (imagesEnabled && !(kind()==='products' && bulkVariants() && !editingId())) {
+        <div class="image-field">
+          <bf-image-upload
+            label="Imagem"
+            [file]="imageFile()"
+            (fileChange)="imageFile.set($event)"
+            [hasCurrent]="!!currentImage()"
+            [removeCurrent]="removeImage()"
+            (removeCurrentChange)="removeImage.set($event)"
+          >
+            @if (currentImage(); as image) {
+              <bf-catalog-image
+                bfImageUploadCurrent
+                [image]="image"
+                fit="contain"
+                alt="Imagem atual do cadastro"
+              />
+            }
+          </bf-image-upload>
+        </div>
+      }
+    </div>
+    <div class="bf-dialog-footer"><button class="bf-button secondary" type="button" (click)="dialog.close()">Cancelar</button><button class="bf-button" type="button" (click)="save()">{{kind()==='products' && bulkVariants() && !editingId() ? 'Criar ' + selectedVariantFragranceIds().length + ' variações' : 'Salvar'}}</button></div>
+  </dialog>
+<bf-settings-editor #referenceEditor (saved)="onReferenceSaved($event)" />

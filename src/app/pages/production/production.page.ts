@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signa
 import { ActivatedRoute, Router } from '@angular/router';
 import { Production, ProductionItem, ProductionConsumption, ProductionCorrectionHistory } from '../../domain/models/production.model';
 import { ProductionCorrectionEditor } from '../../features/production/components/production-correction-editor';
+import { ProductionCorrectionService } from '../../features/production/production-correction.service';
 import { productionItems } from '../../domain/logic/production-correction';
 import { CatalogStore } from '../../features/catalog/catalog.store';
 import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
@@ -27,6 +28,7 @@ export class ProductionPage {
  readonly catalog = inject(CatalogStore);
  readonly references = inject(CatalogReferenceStore);
  readonly store = inject(ProductionStore);
+ readonly corrections = inject(ProductionCorrectionService);
  private readonly route = inject(ActivatedRoute);
  private readonly router = inject(Router);
  private readonly destroyRef = inject(DestroyRef);
@@ -143,7 +145,7 @@ export class ProductionPage {
     this.selectedHistory.set([]);
     this.historyLoading.set(true);
     try {
-      const history = await this.store.history(entry.id);
+      const history = await this.corrections.history(entry.id);
       if (this.historyEntryId() === entry.id) this.selectedHistory.set(history);
     } catch {
       this.historyError.set('Não foi possível consultar as correções. Tente novamente.');

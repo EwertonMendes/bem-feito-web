@@ -14,7 +14,7 @@ import { productionItems } from '../../../domain/logic/production-correction';
 import {
   Production, ProductionCorrectionDraft, ProductionCorrectionPreview, ProductionDraftItem,
 } from '../../../domain/models/production.model';
-import { ProductionStore } from '../production.store';
+import { ProductionCorrectionService } from '../production-correction.service';
 
 interface EditableLine extends ProductionDraftItem { id: string; }
 
@@ -28,7 +28,7 @@ interface EditableLine extends ProductionDraftItem { id: string; }
 export class ProductionCorrectionEditor {
   readonly catalog = inject(CatalogStore);
   readonly references = inject(CatalogReferenceStore);
-  readonly store = inject(ProductionStore);
+  readonly corrections = inject(ProductionCorrectionService);
   private readonly dialog = viewChild.required<BfDialog>('correctionDialog');
   readonly currency = formatCurrency;
   readonly production = signal<Production | null>(null);
@@ -120,7 +120,7 @@ export class ProductionCorrectionEditor {
     this.reviewingCancellation.set(cancel);
     this.reviewing.set(true);
     try {
-      const result = await this.store.previewCorrection(production.id, draft);
+      const result = await this.corrections.preview(production.id, draft);
       this.review.set(result);
       this.reviewedDraft.set(draft);
     } catch (error) {
@@ -136,13 +136,12 @@ export class ProductionCorrectionEditor {
     this.error.set('');
     this.saving.set(true);
     try {
-      const result = await this.store.correct(production.id, draft);
-      if (!result) {
-        this.error.set(this.store.operationError() || 'Não foi possível aplicar a correção.');
+      const saved = await this.corrections.apply(production.id, draft);
+      if (!saved) {
+        this.error.set(this.corrections.error() || 'Não foi possível aplicar a correção.');
         this.backAfterFailure();
         return;
       }
-      this.catalog.applyStockChanges(result.stockChanges);
       this.dialog().closeAfterSuccess();
     } finally {
       this.saving.set(false);

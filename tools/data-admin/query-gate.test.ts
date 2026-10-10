@@ -33,5 +33,7 @@ test('query dispatch requires authenticated owner and protected master', async (
   await assert.rejects(authorizeQuery(event,{...env,GATEWAY_QUERY:'different'},config,api));
   await assert.rejects(authorizeQuery({...event,sender:{...actor,id:1}},env,config,api));
   await assert.rejects(authorizeQuery({...event,inputs:{...event.inputs,pr:'10'}},env,config,api));
+  await assert.rejects(authorizeQuery({...event,inputs:{...event.inputs,operation:'bad'}},env,config,api));
+  assert.ok((await authorizeQuery({...event,inputs:{...event.inputs,operation:''}},env,config,api)).plan);
   await assert.rejects(authorizeQuery(event,env,config,async p=>p==='branches/master'?{protected:false,commit:{sha}}:api(p)));
 });

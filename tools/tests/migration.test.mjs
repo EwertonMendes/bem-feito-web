@@ -79,7 +79,7 @@ test('Reconciliation ignores already-released reservations and uses the current 
       },
       views: {
         'Reservas de Embalagem': [
-          { Venda_ID: 'past', Insumo_ID: 'pack', 'Reserva atual': 0 },
+          { Venda_ID: 'past', Insumo_ID: 'pack', 'Reserva atual': 0, 'Baixa na entrega': 3 },
           { Venda_ID: 'open', Insumo_ID: 'pack', 'Reserva atual': 1 },
         ],
         'Inventário 08-10': [
@@ -115,6 +115,16 @@ test('Reconciliation ignores already-released reservations and uses the current 
       { physical: result.inputs[0].stock, committed: result.inputs[0].committedStock, reserved: result.inputs[0].reservedPhysicalStock },
       { physical: 24, committed: 1, reserved: 1 },
     );
+    assert.deepEqual(result.sales[0].stockEffects, [{
+      itemType: 'input', itemId: 'pack', quantityDelta: -3, unitCostCents: 20,
+    }]);
+    assert.equal(result.sales[0].items[0].totalCents, 0);
+    assert.equal(result.sales[0].items[0].totalCostCents, 60);
+    assert.equal(result.sales[0].cogsCents, 60);
+    const packagingDebits = result.stockMovements.filter(item => item.sourceId === 'past' && item.itemId === 'pack');
+    assert.equal(packagingDebits.length, 1);
+    assert.equal(packagingDebits[0].quantityDelta, -3);
+    assert.equal(result.stockMovements.some(item => item.sourceId === 'open'), false);
     assert.equal(result.sales[0].fulfillmentStatus, 'delivered');
     assert.equal(result.sales[1].fulfillmentStatus, 'ready');
   } finally { await rm(dir, { recursive: true, force: true }); }

@@ -63,57 +63,7 @@ export function resolveSaleDraft(
     }
 
     if (line.kind === 'kit') {
-      const kit = catalog.kits.get(line.sourceId);
-      if (!kit || !kit.active) throw new Error('Kit inativo. Adicione os produtos individualmente e aplique o desconto manual.');
-      const expectedSlots = kit.components.reduce((sum, component) => sum + component.quantity, 0);
-      if (line.componentProductIds.length !== expectedSlots) throw new Error(`Configure todos os itens do kit ${kit.name}.`);
-
-      const components = [];
-      let cursor = 0;
-      let kitCostDeciCents = 0;
-
-      for (const component of [...kit.components].sort((a, b) => a.order - b.order)) {
-        for (let slot = 0; slot < component.quantity; slot++) {
-          const productId = line.componentProductIds[cursor++];
-          const product = productId ? catalog.products.get(productId) : undefined;
-          if (!product) throw new Error(`Seleção inválida no kit ${kit.name}.`);
-          if (product.formatId !== component.formatId) throw new Error(`Formato inválido no kit ${kit.name}.`);
-          if (component.collectionId && product.collectionId !== component.collectionId) throw new Error(`Coleção inválida no kit ${kit.name}.`);
-          if (component.fragranceId && product.fragranceId !== component.fragranceId) throw new Error(`Fragrância inválida no kit ${kit.name}.`);
-
-          const componentUnitCostCents = catalog.productUnitCosts.get(product.id) ?? product.averageUnitCostCents;
-          kitCostDeciCents += product.unitCostDeciCents ?? componentUnitCostCents * 10;
-          components.push({
-            productId: product.id,
-            name: product.displayName,
-            quantity: 1,
-            unitCostCents: componentUnitCostCents,
-          });
-          addEffect({
-            itemType: 'product',
-            itemId: product.id,
-            quantityDelta: -1,
-            unitCostCents: componentUnitCostCents,
-            ...(product.unitCostDeciCents !== undefined ? { unitCostDeciCents: product.unitCostDeciCents } : {}),
-          });
-        }
-      }
-      const kitCostCents = Math.round(kitCostDeciCents / 10);
-
-      lines.push({
-        id: createId(),
-        kind: 'kit',
-        sourceId: kit.id,
-        name: kit.name,
-        image: kit.image,
-        quantity: 1,
-        unitPriceCents: kit.priceCents,
-        unitCostCents: kitCostCents,
-        totalCents: kit.priceCents,
-        totalCostCents: kitCostCents,
-        components,
-      });
-      continue;
+      throw new Error('Kits não são vendidos. Adicione produtos individuais e aplique o desconto manual.');
     }
 
     const addition = catalog.additions.get(line.sourceId);

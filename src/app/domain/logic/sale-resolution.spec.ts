@@ -62,48 +62,23 @@ describe('sale resolution', () => {
     ]);
   });
 
-  it('validates kit selections and aggregates product effects', () => {
+  it.each([true, false])('rejects new kit sales regardless of historical active=%s', (active) => {
     const kit: Kit = {
       id: 'k1',
-      active: true,
-      name: 'Kit',
+      active,
+      name: 'Kit histórico',
       priceCents: 1900,
       components: [{ id: 'slot', formatId: 'round', quantity: 2, order: 1 }],
     };
     const draft = emptyDraft();
     draft.lines = [{ kind: 'kit', sourceId: 'k1', quantity: 1, componentProductIds: ['p1', 'p1'] }];
-
-    const resolved = resolveSaleDraft(draft, {
+    expect(() => resolveSaleDraft(draft, {
       products: new Map([['p1', product('p1')]]),
       kits: new Map([['k1', kit]]),
       additions: new Map(),
       inputs: new Map(),
       productUnitCosts: new Map([['p1', 350]]),
-    }, () => 'line-kit');
-
-    expect(resolved.lines[0]).toEqual(expect.objectContaining({ id: 'line-kit', kind: 'kit', unitCostCents: 700, totalCents: 1900 }));
-    expect(resolved.stockEffects).toEqual([
-      { itemType: 'product', itemId: 'p1', quantityDelta: -2, unitCostCents: 350 },
-    ]);
-  });
-
-  it('rejects an inactive historical kit without changing existing sale snapshots', () => {
-    const archivedKit: Kit = {
-      id: 'archived-kit',
-      active: false,
-      name: 'Kit histórico',
-      priceCents: 1000,
-      components: [{ id: 'slot', formatId: 'round', quantity: 1, order: 1 }],
-    };
-    const draft = emptyDraft();
-    draft.lines = [{ kind: 'kit', sourceId: 'archived-kit', quantity: 1, componentProductIds: ['p1'] }];
-    expect(() => resolveSaleDraft(draft, {
-      products: new Map([['p1', product('p1')]]),
-      kits: new Map([['archived-kit', archivedKit]]),
-      additions: new Map(),
-      inputs: new Map(),
-      productUnitCosts: new Map(),
-    })).toThrow('Kit inativo.');
+    })).toThrow('Kits não são vendidos.');
   });
 
   it('uses exact stock strictly and estimated stock approximately', () => {

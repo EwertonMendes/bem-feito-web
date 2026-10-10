@@ -18,7 +18,7 @@
         <article class="day-card">
           <div class="day-card-head">
             <div><span class="day-eyebrow">Produção do dia</span><h2>{{date(day.date)}}</h2></div>
-            <span class="bf-badge" [class.warning]="day.pending">{{day.pending?'Custo parcial':'Custo calculado'}}</span>
+            <span class="bf-badge" [class.warning]="day.pending" [class.muted]="!day.quantity">{{!day.quantity?'Sem produção ativa':day.pending?'Custo parcial':'Custo calculado'}}</span>
           </div>
           <div class="day-stats">
             <div><strong>{{day.quantity}}</strong><small>unidades</small></div>
@@ -38,6 +38,7 @@
   }
 
   <bf-production-editor #productionEditor />
+  <bf-production-correction-editor #correctionEditor />
 
   <dialog bfDialog #detailDialog="bfDialog" class="bf-dialog">
     <div class="bf-dialog-header"><div><h2>Produção de {{date(selectedDayDate())}}</h2><small>Todos os registros desta data reunidos</small></div><button class="bf-icon-button" type="button" (click)="detailDialog.close()"><bf-icon name="close" /></button></div>
@@ -52,9 +53,42 @@
         @for(item of detailConsumptions();track item.inputId) {
           <div class="consumption"><strong>{{inputName(item.inputId)}}</strong><div class="consumption-values"><strong>{{item.quantity}} {{unitName(item.unitId)}}</strong><small>{{currency(item.totalCostCents)}}</small></div></div>
         }
-        @for(entry of day.entries;track entry.id) {
-          @if(entry.notes){<p class="production-note"><strong>{{entry.code}}</strong> · {{entry.notes}}</p>}
-        }
+        <h3>Lançamentos deste dia</h3>
+        <div class="production-entries">
+          @for(entry of day.entries;track entry.id) {
+            <article class="production-entry">
+              <div class="entry-heading">
+                <div><strong>{{entry.code}}</strong><small>{{entry.status==='cancelled'?'Cancelado':entry.quantity+' unidades · '+itemsFor(entry).length+' produtos'}}</small></div>
+                @if(entry.status==='cancelled'){<span class="bf-badge muted">Cancelado</span>}
+              </div>
+              <div class="entry-products">
+                @for(item of itemsFor(entry);track item.productId){<span>{{item.quantity}}× {{item.productName}}</span>}
+              </div>
+              @if(entry.notes){<p class="production-note">{{entry.notes}}</p>}
+              <div class="entry-actions">
+                @if(entry.status!=='cancelled') {
+                  <button class="bf-button secondary" type="button" (click)="editEntry(entry)"><bf-icon name="pencil"/> Corrigir</button>
+                }
+                <button class="bf-button ghost" type="button" [disabled]="historyLoading()" (click)="showHistory(entry)"><bf-icon name="history"/> {{historyEntryId()===entry.id?'Ocultar histórico':'Histórico'}}</button>
+              </div>
+              @if(historyEntryId()===entry.id){
+                <div class="entry-history">
+                  @if(historyLoading()){<p class="preview-hint">Carregando histórico...</p>}
+                  @else if(historyError()){<p class="bf-form-error" role="alert">{{historyError()}}</p>}
+                  @else {
+                    @for(change of selectedHistory();track change.id) {
+                      <div class="history-row">
+                        <div><strong>{{change.kind==='cancellation'?'Lançamento cancelado':'Produção corrigida'}}</strong><small>{{historyWhen(change)}}</small></div>
+                        <span>{{historySummary(change)}}</span>
+                        <p>{{change.reason}}</p>
+                      </div>
+                    } @empty {<p class="preview-hint">Nenhuma correção registrada neste lançamento.</p>}
+                  }
+                </div>
+              }
+            </article>
+          }
+        </div>
         @if(store.hasMore()){<p class="preview-hint">Se houver mais registros históricos, use “Carregar mais dias” para completar a listagem.</p>}
       }
     </div>

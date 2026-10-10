@@ -1,6 +1,8 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Production, ProductionItem, ProductionConsumption } from '../../domain/models/production.model';
+import { Production, ProductionItem, ProductionConsumption, ProductionCorrectionHistory } from '../../domain/models/production.model';
+import { ProductionCorrectionEditor } from '../../features/production/components/production-correction-editor';
+import { productionItems } from '../../domain/logic/production-correction';
 import { CatalogStore } from '../../features/catalog/catalog.store';
 import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
 import { ProductionStore } from '../../features/production/production.store';
@@ -16,7 +18,7 @@ import { BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
 interface ProductionDay { date: string; entries: Production[]; quantity: number; totalCents: number; pending: boolean; products: number; }
 @Component({
  selector: 'bf-production-page',
- imports: [BfIcon, BfDialog, BfEmptyState, BfPageRefresh, BfTableSkeleton, BfProductionEditor, BfSelect],
+ imports: [BfIcon, BfDialog, BfEmptyState, BfPageRefresh, BfTableSkeleton, BfProductionEditor, ProductionCorrectionEditor, BfSelect],
  changeDetection: ChangeDetectionStrategy.OnPush,
  templateUrl: './production.page.html',
  styleUrl: './production.page.scss',
@@ -30,6 +32,11 @@ export class ProductionPage {
  private readonly destroyRef = inject(DestroyRef);
  private readonly productionEditor = viewChild.required<BfProductionEditor>('productionEditor');
  private readonly detailDialog = viewChild.required<BfDialog>('detailDialog');
+ private readonly correctionEditor = viewChild.required<ProductionCorrectionEditor>('correctionEditor');
+ readonly historyEntryId = signal('');
+ readonly historyLoading = signal(false);
+ readonly historyError = signal('');
+ readonly selectedHistory = signal<ProductionCorrectionHistory[]>([]);
  readonly currency = formatCurrency;
  readonly date = formatBusinessDate;
  readonly selectedDayDate = signal('');
@@ -49,13 +56,15 @@ export class ProductionPage {
         date: entry.businessDate, entries: [], quantity: 0, totalCents: 0, pending: false, products: 0,
       };
       day.entries.push(entry);
-      day.quantity += entry.quantity;
-      day.totalCents += entry.totalCostCents;
-      day.pending ||= entry.costPending;
+      if (entry.status !== 'cancelled') {
+        day.quantity += entry.quantity;
+        day.totalCents += entry.totalCostCents;
+        day.pending ||= entry.costPending;
+      }
       byDate.set(day.date, day);
     }
     for (const day of byDate.values()) day.products = new Set(
-      day.entries.flatMap(entry => this.itemsFor(entry).map(item => item.productId))
+      day.entries.filter(entry => entry.status !== 'cancelled').flatMap(entry => this.itemsFor(entry).map(item => item.productId))
     ).size;
     return [...byDate.values()].sort((a, b) => b.date.localeCompare(a.date));
   });
@@ -63,6 +72,7 @@ export class ProductionPage {
   readonly detailItems = computed(() => {
     const items = new Map<string, { productId: string; name: string; quantity: number; costCents: number; pending: boolean }>();
     for (const entry of this.selectedDay()?.entries ?? []) {
+      if (entry.status === 'cancelled') continue;
       for (const part of this.itemsFor(entry)) {
         const previous = items.get(part.productId);
         if (previous) { previous.quantity += part.quantity; previous.costCents += part.totalCostCents; previous.pending ||= part.costPending; }
@@ -74,6 +84,7 @@ export class ProductionPage {
   readonly detailConsumptions = computed(() => {
     const values = new Map<string, ProductionConsumption>();
     for (const entry of this.selectedDay()?.entries ?? []) {
+      if (entry.status === 'cancelled') continue;
       for (const part of entry.consumptions ?? []) {
         const old = values.get(part.inputId);
         if (old) { old.quantity += part.quantity; old.totalCostCents += part.totalCostCents; }
@@ -106,17 +117,50 @@ export class ProductionPage {
       }
     });
   }
-  itemsFor(entry: Production): ProductionItem[] {
-    return entry.items?.length ? entry.items : [{
-      productId: entry.productId, productName: entry.productName, quantity: entry.quantity,
-      unitCostCents: entry.unitCostCents, totalCostCents: entry.totalCostCents,
-      costPending: entry.costPending, consumptions: entry.consumptions ?? [],
-    }];
-  }
+  itemsFor(entry: Production): ProductionItem[] { return productionItems(entry); }
  open(productId = '', date = todayBusinessDate()): void { void this.productionEditor().open(productId, date); }
   showDay(date: string): void {
+    this.historyEntryId.set('');
+    this.selectedHistory.set([]);
     this.selectedDayDate.set(date);
     this.detailDialog().open();
+  }
+
+  editEntry(entry: Production): void {
+    if (entry.status === 'cancelled') return;
+    this.detailDialog().close();
+    void this.correctionEditor().open(entry);
+  }
+
+  async showHistory(entry: Production): Promise<void> {
+    if (this.historyLoading()) return;
+    if (this.historyEntryId() === entry.id) {
+      this.historyEntryId.set('');
+      return;
+    }
+    this.historyEntryId.set(entry.id);
+    this.historyError.set('');
+    this.selectedHistory.set([]);
+    this.historyLoading.set(true);
+    try {
+      const history = await this.store.history(entry.id);
+      if (this.historyEntryId() === entry.id) this.selectedHistory.set(history);
+    } catch {
+      this.historyError.set('Não foi possível consultar as correções. Tente novamente.');
+    } finally {
+      this.historyLoading.set(false);
+    }
+  }
+
+  historyWhen(entry: ProductionCorrectionHistory): string {
+    const seconds = (entry.createdAt as { seconds?: number } | undefined)?.seconds;
+    return seconds ? new Date(seconds * 1000).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'Data indisponível';
+  }
+
+  historySummary(entry: ProductionCorrectionHistory): string {
+    const before = entry.before.items.reduce((sum, item) => sum + item.quantity, 0);
+    const after = entry.kind === 'cancellation' ? 0 : entry.after.items.reduce((sum, item) => sum + item.quantity, 0);
+    return before + ' → ' + after + ' unidades';
   }
   inputName(id: string): string { return this.catalog.inputs().find(item => item.id === id)?.name ?? 'Insumo'; }
   unitName(id: string): string { return this.references.units().find(item => item.id === id)?.name ?? ''; }

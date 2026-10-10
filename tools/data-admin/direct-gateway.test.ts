@@ -18,19 +18,20 @@ test('direct gateway accepts reusable safe requests, never hard-coded production
   assert.equal(validateDirectRequest(json({...base,action:'delete',collection:'dataAdminSmoke',
     documentId:'smoke-direct'})).action,'delete');
 });
-test('direct rejects PII, arbitrary script, raw core writes, overbroad operations and unrelated projects',()=>{
+test('direct rejects invalid payloads, protected infrastructure and unrelated projects',()=>{
   for(const p of [
     {...patch,environment:'prod'}, {...patch,projectId:'another-project'},
-    {...patch,values:{stock:300},expected:{stock:0}},
-    {...patch,values:{salePriceCents:-1}},
+    {...patch,values:{stock:300},expected:{}},
+    {...patch,values:{amountCents:Infinity},expected:{amountCents:100}},
     {...patch,values:{salePriceCents:1600},expected:{salePriceCents:1000,stock:1}},
     {...patch,values:{salePriceCents:1600},expected:{salePriceCents:1500},script:'eval()'},
     {...patch,documentId:'../users/admin'},
-    {...patch,values:{customerName:'private'},expected:{customerName:'private'}},
+    {...patch,collection:'system'},
+    {...patch,values:{'__proto__': 1},expected:{}},
     {...base,action:'delete',collection:'sales',documentId:'any-sale'},
     {...base,action:'delete',collection:'fragrances',documentId:'any-fragrance'},
     {...base,action:'reverseProduction',documentId:'production/invalid'},
-    {...base,action:'create',collection:'productions',documentId:'p1',values:{quantity:300}},
+    {...base,action:'create',collection:'counters',documentId:'p1',values:{quantity:300}},
     {...base,action:'adjustStock',itemType:'product',itemId:'p1',quantityDelta:0,reason:'x',businessDate:'2026-10-10'},
   ]) assert.throws(()=>validateDirectRequest(json(p)));
 });
@@ -58,4 +59,22 @@ test('direct authorization requires trusted owner, master and exact dispatch',as
   await assert.rejects(authorizeDirect({...event,sender:{...actor,id:2}},env,config,api));
   await assert.rejects(authorizeDirect({...event,inputs:{...event.inputs,pr:'12'}},env,config,api));
   await assert.rejects(authorizeDirect(event,env,config,async p=>p==='branches/master'?{protected:false,commit:{sha}}:api(p)));
+});
+
+test('direct patch allows every business collection and field without code changes', () => {
+  const expense={...base,action:'patch',collection:'expenses',documentId:'expense-31',
+    expected:{receiptStatus:'pending',stockApplied:false},
+    values:{receiptStatus:'received',stockApplied:true}};
+  assert.equal(validateDirectRequest(json(expense)).collection,'expenses');
+  const privateCustomer={...base,action:'patch',collection:'sales',documentId:'s1',
+    expected:{customerName:'Ana'},values:{customerName:'Beatriz'}};
+  assert.equal(validateDirectRequest(json(privateCustomer)).action,'patch');
+  const stock={...base,action:'patch',collection:'products',documentId:'p1',
+    expected:{stock:1},values:{stock:2}};
+  assert.equal(validateDirectRequest(json(stock)).action,'patch');
+  const additional={...base,action:'patch',collection:'expenses',documentId:'e1',
+    expected:{},expectedAbsent:['receiptDate'],values:{receiptDate:'2026-10-10'}};
+  assert.equal(validateDirectRequest(json(additional)).expectedAbsent?.[0],'receiptDate');
+  assert.equal(validateDirectRequest(json({...base,action:'create',collection:'anyNewCollection',
+    documentId:'doc1',values:{anything:{nested:[true,12,null]}}})).action,'create');
 });

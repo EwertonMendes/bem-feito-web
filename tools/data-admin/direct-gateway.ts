@@ -4,36 +4,20 @@ import { hash, invariant, identifier, requestHash } from './schema.ts';
 import type { Request, Payload } from './schema.ts';
 import { snapshotRow, type Plan, type Row } from './engine.ts';
 
-type Value = string | number | boolean;
-type FieldKind = 'name' | 'bool' | 'money' | 'stock' | 'text';
+type Value = string | number | boolean | null | Value[] | { [key: string]: Value };
 type DirectAction = 'create' | 'patch' | 'delete' | 'reverseProduction' | 'adjustStock';
 export type DirectRequest = {
   schemaVersion: 1; id: string; environment: 'dev'; projectId: 'bem-feito-dev';
   action: DirectAction;
   collection?: string; documentId?: string;
-  expected?: Record<string, Value>; values?: Record<string, Value>;
+  expected?: Record<string, Value>; expectedAbsent?: string[]; values?: Record<string, Value>;
   itemType?: 'product' | 'input'; itemId?: string; quantityDelta?: number;
   reason?: string; businessDate?: string;
 };
 
-const FIELDS: Record<string, Record<string, FieldKind>> = {
-  collections: { name:'name', active:'bool' },
-  fragrances: { name:'name', active:'bool' },
-  formats: { name:'name', active:'bool', approximateWeightGrams:'stock' },
-  units: { name:'name', active:'bool' },
-  paymentMethods: { name:'name', active:'bool' },
-  expenseCategories: { name:'name', active:'bool' },
-  expenseTypes: { name:'name', active:'bool' },
-  formatPrices: { priceCents:'money', active:'bool' },
-  products: { displayName:'name', active:'bool', salePriceCents:'money', additionalCostCents:'money', minimumStock:'stock' },
-  inputs: { name:'name', active:'bool', minimumStock:'stock', minimumStockConfigured:'bool',
-    availabilityStatus:'name', averageUnitCostCents:'money' },
-  kits: { name:'name', active:'bool', priceCents:'money' },
-  additions: { name:'name', active:'bool', priceCents:'money', category:'name' },
-  // Synthetic end-to-end smoke only; no ordinary business document uses this namespace.
-  dataAdminSmoke: { value:'money' },
-};
-const CREATABLE = new Set(['collections','formats','units','paymentMethods','expenseCategories','dataAdminSmoke']);
+// Field names and collection names are not business allowlists. Only infrastructure
+// collections are excluded: editing them would bypass authentication/audit itself.
+const RESERVED_COLLECTIONS = new Set(['system','dataAdminOperations','migrationRuns','migrationSources','counters']);
 const DELETABLE = new Set(['dataAdminSmoke','expenseCategories']);
 const MAX_PAYLOAD = 10000;
 const props = (v: unknown, keys: string[]) => {
@@ -41,22 +25,39 @@ const props = (v: unknown, keys: string[]) => {
   invariant(Object.keys(v).every(k => keys.includes(k) && !['__proto__','prototype','constructor'].includes(k)), 'Unexpected request property');
   return v as Record<string, unknown>;
 };
-const validField = (v: unknown, kind: FieldKind) => {
-  switch (kind) {
-    case 'bool': return typeof v === 'boolean';
-    case 'name': return typeof v === 'string' && v.trim().length > 0 && v.length <= 120 &&
-      !/[\x00-\x1f]/.test(v) && !/@|\bhttps?:\/\/|(?:\+?\d[\d ()-]{8,}\d)/.test(v);
-    case 'text': return typeof v === 'string' && v.length <= 160 && !/[\x00-\x1f]/.test(v);
-    case 'money': return Number.isSafeInteger(v) && Number(v) >= 0 && Number(v) <= 1_000_000_000;
-    case 'stock': return typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1_000_000;
-  }
+const key = (name: string) => {
+  invariant(name.length > 0 && name.length <= 150 &&
+    !/[\x00-\x1f/]/.test(name) && !/^__.*__$/.test(name) &&
+    !['__proto__','prototype','constructor'].includes(name), 'Invalid field key');
 };
-const fieldValues = (c: string, value: unknown) => {
-  const obj = props(value, Object.keys(FIELDS[c] ?? {}));
-  invariant(Object.keys(obj).length > 0, 'No fields to change');
-  for (const [k, v] of Object.entries(obj))
-    invariant(validField(v,FIELDS[c]![k]!), 'Invalid field or value');
-  return obj as Record<string,Value>;
+const validateValue = (value: unknown, depth = 0): void => {
+  invariant(depth <= 10, 'Value nested too deeply');
+  if (value === null || typeof value === 'boolean') return;
+  if (typeof value === 'string') {
+    invariant(value.length <= 8000 && !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(value), 'Invalid text value');
+    return;
+  }
+  if (typeof value === 'number') {
+    invariant(Number.isFinite(value) && Math.abs(value) <= 1e12, 'Invalid numeric value');
+    return;
+  }
+  if (Array.isArray(value)) {
+    invariant(value.length <= 250, 'Array too long');
+    for (const item of value) validateValue(item, depth + 1);
+    return;
+  }
+  invariant(value !== null && typeof value === 'object', 'Unsupported value');
+  const entries = Object.entries(value);
+  invariant(entries.length <= 250, 'Map too large');
+  for (const [name, item] of entries) { key(name); validateValue(item, depth + 1); }
+};
+const fieldValues = (value: unknown, allowEmpty = false) => {
+  invariant(!!value && typeof value === 'object' && !Array.isArray(value), 'Expected fields object');
+  const entries = Object.entries(value);
+  invariant(allowEmpty || entries.length > 0, 'No fields to change');
+  invariant(entries.length <= 100, 'Too many fields');
+  for (const [name, item] of entries) { key(name); validateValue(item); }
+  return value as Record<string, Value>;
 };
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -65,7 +66,7 @@ export function validateDirectRequest(input: string): DirectRequest {
   let raw: unknown;
   try { raw = JSON.parse(input); } catch { throw Error('Invalid direct request JSON'); }
   const o = props(raw, ['schemaVersion','id','environment','projectId','action','collection','documentId',
-    'expected','values','itemType','itemId','quantityDelta','reason','businessDate']);
+    'expected','expectedAbsent','values','itemType','itemId','quantityDelta','reason','businessDate']);
   invariant(o.schemaVersion === 1 && o.environment === 'dev' && o.projectId === 'bem-feito-dev',
     'Direct administration is DEV-only');
   identifier(o.id);
@@ -73,33 +74,36 @@ export function validateDirectRequest(input: string): DirectRequest {
   invariant(['create','patch','delete','reverseProduction','adjustStock'].includes(String(o.action)), 'Unknown direct action');
   const action = o.action;
   if (['create','patch','delete'].includes(String(action))) {
-    invariant(typeof o.collection === 'string' && Object.hasOwn(FIELDS,o.collection), 'Collection not editable');
+    identifier(o.collection);
+    invariant(!RESERVED_COLLECTIONS.has(o.collection), 'Protected infrastructure collection');
     identifier(o.documentId);
     if (o.collection === 'dataAdminSmoke') invariant(String(o.documentId).startsWith('smoke-'), 'Protected test namespace');
     invariant(['itemType','itemId','quantityDelta','reason','businessDate'].every(k => o[k] === undefined), 'Unexpected stock parameters');
     if (action === 'create') {
-      invariant(CREATABLE.has(o.collection as string), 'Create requires registered catalog workflow');
-      invariant(o.expected === undefined, 'Create cannot provide preconditions');
-      const values = fieldValues(o.collection as string,o.values);
-      if (o.collection !== 'dataAdminSmoke') invariant(typeof values.name === 'string' && typeof values.active === 'boolean',
-        'Catalog creation requires name and active');
+      invariant(o.expected === undefined && o.expectedAbsent === undefined, 'Create cannot provide preconditions');
+      fieldValues(o.values);
     } else if (action === 'patch') {
-      const values = fieldValues(o.collection as string,o.values);
-      const expected = fieldValues(o.collection as string,o.expected);
-      invariant(Object.keys(values).length === Object.keys(expected).length &&
-        Object.keys(values).every(k => Object.hasOwn(expected,k)), 'Patch requires matching expected fields');
+      const values = fieldValues(o.values);
+      const expected = fieldValues(o.expected, true);
+      invariant(o.expectedAbsent === undefined || Array.isArray(o.expectedAbsent), 'Invalid missing-field preconditions');
+      const missing = (o.expectedAbsent ?? []) as unknown[];
+      invariant(missing.length <= 100 && missing.every(v => typeof v === 'string'), 'Invalid missing-field names');
+      for (const name of missing as string[]) key(name);
+      const keys = [...Object.keys(expected), ...missing as string[]];
+      invariant(keys.length === new Set(keys).size && keys.length === Object.keys(values).length &&
+        keys.every(k => Object.hasOwn(values,k)), 'Patch requires one precondition per changed field');
     } else {
       invariant(DELETABLE.has(o.collection as string), 'Business deletion requires domain-aware action');
-      invariant(o.expected === undefined && o.values === undefined, 'Delete takes no data fields');
+      invariant(o.expected === undefined && o.expectedAbsent === undefined && o.values === undefined, 'Delete takes no data fields');
     }
   } else if (action === 'reverseProduction') {
-    invariant(o.collection === undefined && o.expected === undefined && o.values === undefined &&
+    invariant(o.collection === undefined && o.expected === undefined && o.expectedAbsent === undefined && o.values === undefined &&
       o.itemType === undefined && o.itemId === undefined && o.quantityDelta === undefined &&
       o.reason === undefined && o.businessDate === undefined, 'Unexpected reversal parameters');
     identifier(o.documentId);
   } else {
     invariant(o.collection === undefined && o.documentId === undefined && o.expected === undefined &&
-      o.values === undefined, 'Stock adjustment does not accept raw field writes');
+      o.expectedAbsent === undefined && o.values === undefined, 'Stock adjustment does not accept raw field writes');
     invariant(['product','input'].includes(String(o.itemType)), 'Invalid item type');
     identifier(o.itemId);
     invariant(typeof o.quantityDelta === 'number' && Number.isFinite(o.quantityDelta) &&
@@ -149,8 +153,11 @@ async function createOrPatchOrDelete(db: Firestore,input: DirectRequest): Promis
       await noDependents(db,input.collection!,input.documentId!);
       snapshotData(row,null);
     } else {
-      for (const [key,value] of Object.entries(input.expected!))
-        invariant(hash(encode(before[key])) === hash(encode(value)), 'Field precondition differs');
+      for (const [name,value] of Object.entries(input.expected!)) {
+        invariant(Object.hasOwn(before,name), 'Expected field missing');
+        invariant(hash(encode(before[name])) === hash(encode(value)), 'Field precondition differs');
+      }
+      for (const name of input.expectedAbsent ?? []) invariant(!Object.hasOwn(before,name), 'Expected field to be absent');
       const after: Payload = { ...before, ...input.values };
       if (input.collection === 'inputs' && Object.hasOwn(input.values!,'averageUnitCostCents')) {
         const basis = Number(before.costBasisQuantity ?? before.stock ?? 0);

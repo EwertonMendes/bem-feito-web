@@ -101,3 +101,21 @@ test('stock adjustment atomically writes consistent balance, counter and movemen
     clean.delete('counters/stockAdjustment');
   }
 });
+
+test('generic expense receipt changes only the requested fields and preserves cash records',async()=>{
+  const id='direct-equipment-317';
+  const ref=tracked('expenses/'+id);
+  await ref.set({kind:'equipment',code:'M000013',amountCents:3800,bankDebitCents:3800,
+    businessDate:'2026-10-07',receiptStatus:'pending',stockApplied:false,
+    notes:'Two mini flower molds',createdBy:'original',extra:{untouched:true}});
+  await run(req({id:'direct-receipt-317',action:'patch',collection:'expenses',documentId:id,
+    expected:{receiptStatus:'pending'},values:{receiptStatus:'received'}}));
+  const after=(await ref.get()).data()!;
+  assert.equal(after.receiptStatus,'received');
+  assert.equal(after.amountCents,3800);
+  assert.equal(after.bankDebitCents,3800);
+  assert.equal(after.stockApplied,false);
+  assert.deepEqual(after.extra,{untouched:true});
+  await assert.rejects(prepareDirect(req({id:'direct-receipt-stale-317',action:'patch',collection:'expenses',
+    documentId:id,expected:{receiptStatus:'pending'},values:{receiptStatus:'received'}}),db),/precondition/i);
+});

@@ -1,3 +1,4 @@
+import { BfLoadingButton } from '../../../../shared/ui/button/loading-button';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
 import { Addition, AdditionComponent, InputItem, InputTrackingMode, Kit, KitComponent, Product, RecipeComponent } from '../../../../domain/models/catalog.model';
@@ -26,7 +27,7 @@ interface AdditionFormModel { name: string; category: string; price: number; not
 
 @Component({
   selector: 'bf-catalog-editor',
-  imports: [FormField, BfDialog, BfIcon, BfSelect, BfSelectSearch, CatalogImage, BfCheckbox, BfImageUpload, CatalogImage, BfNumberInput, BfSettingsEditor],
+  imports: [BfLoadingButton, FormField, BfDialog, BfIcon, BfSelect, BfSelectSearch, CatalogImage, BfCheckbox, BfImageUpload, CatalogImage, BfNumberInput, BfSettingsEditor],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './catalog-editor.html',
   styleUrl: './catalog-editor.scss',
@@ -99,6 +100,7 @@ export class CatalogEditor {
     if (event.kind === 'formats') this.productModel.update(model => ({ ...model, formatId: event.id }));
   }
 
+  readonly saving = signal(false);
   readonly editingId = signal('');
   readonly imageFile = signal<File | null>(null);
   readonly removeImage = signal(false);
@@ -347,15 +349,19 @@ export class CatalogEditor {
   }
 
   async save(): Promise<void> {
+    if (this.saving()) return;
+    this.saving.set(true);
     try {
       if (this.kind() === 'products') await this.saveProduct();
       else if (this.kind() === 'inputs') await this.saveInput();
       else if (this.kind() === 'kits') await this.saveKit();
       else await this.saveAddition();
       this.toast.success('Cadastro salvo com sucesso.');
-      this.dialog().close();
+      this.dialog().closeAfterSuccess();
     } catch (error) {
       this.toast.error(this.errors.message(error));
+    } finally {
+      this.saving.set(false);
     }
   }
 

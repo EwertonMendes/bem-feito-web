@@ -1,3 +1,4 @@
+import { BfLoadingButton } from '../../../shared/ui/button/loading-button';
 import { CatalogImage } from '../../../shared/media/catalog-image/catalog-image';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild, output } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
@@ -27,7 +28,7 @@ interface ExpenseTypeModel extends SimpleModel { kind: ExpenseType['kind']; }
 
 @Component({
  selector: 'bf-settings-editor',
- imports: [FormField, BfIcon, BfDialog, BfSelect, BfSelectSearch, CatalogImage, BfCheckbox, BfNumberInput],
+ imports: [BfLoadingButton, FormField, BfIcon, BfDialog, BfSelect, BfSelectSearch, CatalogImage, BfCheckbox, BfNumberInput],
  changeDetection: ChangeDetectionStrategy.OnPush,
  templateUrl: './settings-editor.html',
  styleUrl: './settings-editor.scss'
@@ -46,6 +47,7 @@ export class BfSettingsEditor {
   readonly tab = signal<SettingTab>('collections');
   readonly initialized = computed(() => this.references.initialized() && this.catalog.initialized() && this.settings.initialized());
   readonly refreshing = computed(() => this.initialized() && (this.references.loading() || this.catalog.loading() || this.settings.loading()));
+  readonly saving = signal(false);
   readonly editingId = signal('');
   readonly costComponents = signal<RecipeComponent[]>([]);
   readonly simpleModel = signal<SimpleModel>({ name: '', active: true });
@@ -217,6 +219,8 @@ export class BfSettingsEditor {
   }
 
   async save(): Promise<void> {
+    if (this.saving()) return;
+    this.saving.set(true);
     try {
       const id = this.editingId();
       let savedId = id;
@@ -235,10 +239,12 @@ export class BfSettingsEditor {
       else if (this.tab() === 'expenseCategories') await this.settings.saveExpenseCategory({ id, ...this.simpleModel() } as ExpenseCategory);
       else await this.settings.saveExpenseType({ id, ...this.expenseTypeModel() } as ExpenseType);
       this.toast.success('Configuração salva.');
-      this.dialog().close();
+      this.dialog().closeAfterSuccess();
       this.saved.emit({ kind: this.tab(), id: savedId });
     } catch (error) {
       this.toast.error(this.errors.message(error));
+    } finally {
+      this.saving.set(false);
     }
   }
 

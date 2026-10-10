@@ -1,5 +1,5 @@
 <ng-template #inputThumb let-option><bf-catalog-image [image]="inputImage(option.value)" [alt]="option.label" [thumbnail]="true" /></ng-template>
-<dialog bfDialog #editor="bfDialog" class="bf-dialog">
+<dialog bfDialog #editor="bfDialog" class="bf-dialog" [busy]="saving()">
     <div class="bf-dialog-header"><h2>{{editingId()?'Editar':'Novo cadastro'}}</h2><button class="bf-icon-button" (click)="editor.close()"><bf-icon name="close" /></button></div>
     <div class="bf-dialog-body">
       @if(tab()==='fragrances'){
@@ -30,5 +30,5 @@
         </section>
       }
     </div>
-    <div class="bf-dialog-footer"><button class="bf-button secondary" (click)="editor.close()">Cancelar</button><button class="bf-button" (click)="save()">Salvar</button></div>
+    <div class="bf-dialog-footer"><button class="bf-button secondary" (click)="editor.close()">Cancelar</button><button class="bf-button" type="button" [disabled]="saving()" [bfLoadingButton]="saving()" (click)="save()">{{saving()?'Salvando...':'Salvar'}}</button></div>
   </dialog>

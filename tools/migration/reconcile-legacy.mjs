@@ -59,24 +59,36 @@ for (const sale of data.sales) {
   }
 }
 const packagingReservations = new Map();
+const salesWithAddedPackaging = new Set();
 for (const row of auditRows('Reservas de Embalagem')) {
   const saleId = text(row.Venda_ID);
   const inputId = text(row.Insumo_ID);
   if (!saleId || !inputId) continue;
   const sale = saleMap.get(saleId), input = inputMap.get(inputId);
-  const quantity = integer(row['Reserva atual']);
-  if (quantity === null || quantity > 1000000) throw new Error('Quantidade de embalagem reservada inválida.');
   if (!sale || !input) throw new Error('Reserva de embalagem com vínculo inexistente.');
-  // Keep released historical reservations in the audit, but never reactivate them.
-  if (quantity === 0) continue;
-  if (!openSaleIds.has(saleId)) throw new Error('Reserva de embalagem não vinculada a encomenda ativa.');
+  const reserved = integer(row['Reserva atual']);
+  const delivered = integer(row['Baixa na entrega'] ?? 0);
+  if (reserved === null || delivered === null || reserved > 1000000 || delivered > 1000000)
+    throw new Error('Quantidades da reserva de embalagem inválidas.');
+  if (reserved === 0 && delivered === 0) continue;
+
+  // Only an actually delivered order may debit historical packing stock.
+  // Reserve records are immutable business history, not artificial stock adjustments.
+  if (delivered > 0 && (sale.fulfillmentStatus !== 'delivered' || reserved > 0))
+    throw new Error('Baixa de embalagem incompatível com entrega.');
+  if (reserved > 0 && !openSaleIds.has(saleId))
+    throw new Error('Reserva de embalagem não vinculada a encomenda ativa.');
+
+  const quantity = delivered || reserved;
   const current = sale.stockEffects.find(item => item.itemType === 'input' && item.itemId === inputId);
-  if (current && current.quantityDelta !== -quantity) throw new Error('Reserva de embalagem diverge dos efeitos originais.');
+  if (current && current.quantityDelta !== -quantity)
+    throw new Error('Embalagem diverge dos efeitos originais.');
   if (!current) sale.stockEffects.push({
     itemType: 'input', itemId: inputId, quantityDelta: -quantity,
     unitCostCents: input.averageUnitCostCents,
   });
-  packagingReservations.set(inputId, (packagingReservations.get(inputId) ?? 0) + quantity);
+
+  // Included packaging has zero additional revenue but retains its true cost.
   if (!sale.items.some(item => item.kind === 'addition' && item.sourceId === organza?.id)) {
     const cost = Math.round(input.averageUnitCostCents * quantity);
     sale.items.push({
@@ -86,6 +98,23 @@ for (const row of auditRows('Reservas de Embalagem')) {
       unitCostCents: input.averageUnitCostCents,
       totalCents: 0, totalCostCents: cost,
     });
+    salesWithAddedPackaging.add(sale.id);
+  }
+
+  if (delivered > 0) {
+    const movementId = 'migration-sale-' + sale.id + '-input-' + inputId;
+    const currentMovement = data.stockMovements.find(item => item.id === movementId);
+    if (currentMovement && currentMovement.quantityDelta !== -delivered)
+      throw new Error('Baixa de entrega diverge da movimentação histórica.');
+    if (!currentMovement) data.stockMovements.push({
+      id: movementId,
+      itemType: 'input', itemId: inputId, quantityDelta: -delivered,
+      unitCostCents: input.averageUnitCostCents,
+      totalCostCents: Math.round(delivered * input.averageUnitCostCents),
+      sourceType: 'sale', sourceId: sale.id, businessDate: sale.businessDate,
+    });
+  } else {
+    packagingReservations.set(inputId, (packagingReservations.get(inputId) ?? 0) + reserved);
   }
 }
 const counted = new Map();
@@ -150,7 +179,7 @@ data.stockMovements = data.stockMovements.filter(move => {
   return true;
 });
 for (const sale of data.sales) {
-  if (!openSaleIds.has(sale.id)) continue;
+  if (!openSaleIds.has(sale.id) && !salesWithAddedPackaging.has(sale.id)) continue;
   sale.cogsCents = sale.items.reduce((sum, item) => sum + item.totalCostCents, 0);
   sale.itemsSold = sale.items.reduce((sum, item) => sum + (item.kind === 'product' ? item.quantity :
     item.kind === 'kit' ? (item.components ?? []).reduce((s, part) => s + part.quantity, 0) : 0), 0);

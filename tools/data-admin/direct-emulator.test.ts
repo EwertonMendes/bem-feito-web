@@ -11,7 +11,7 @@ assert.equal(process.env.FIRESTORE_EMULATOR_HOST,'127.0.0.1:8080','Must run in i
 const app=initializeApp({projectId:'demo-bem-feito'},'direct-gateway-emulator');
 const db=getFirestore(app);
 const archive:Archive={
-  async put(prefix,value){return hash(value);},
+  async put(prefix:string,value:unknown){return hash(value);},
   async get(){throw Error('Not needed for fresh test');},
   async assertAccess(){throw Error('Not called by emulator unit tests');},
 } as any;

@@ -52,3 +52,59 @@ test('Migration fails on malformed money instead of silently converting it to ze
     assert.notEqual(run('normalize-legacy.mjs', rawPath, join(dir, 'data.json')).status, 0);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+test('Reconciliation ignores already-released reservations and uses the current physical stock', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'bem-feito-reconcile-test-'));
+  try {
+    const rawPath = join(dir, 'raw.json');
+    const dataPath = join(dir, 'data.json');
+    await writeFile(rawPath, JSON.stringify({
+      sheets: {
+        Vendas: [
+          { Venda_ID: 'past', 'Andamento da Encomenda': 'Entregue' },
+          { Venda_ID: 'open', 'Andamento da Encomenda': 'Pronto' },
+        ],
+        Produtos: [{ Produto_ID: 'product', 'Estoque Físico': 7 }],
+      },
+      views: {
+        'Reservas de Embalagem': [
+          { Venda_ID: 'past', Insumo_ID: 'pack', 'Reserva atual': 0 },
+          { Venda_ID: 'open', Insumo_ID: 'pack', 'Reserva atual': 1 },
+        ],
+        'Inventário 08-10': [
+          { Produto_ID: 'product', 'Unidades físicas': 7, Destinação: 'Livre' },
+          { Produto_ID: 'product', 'Unidades físicas': 58, Destinação: 'Reservado pedido antigo' },
+        ],
+      },
+      sourceMetadata: { bankSnapshot: { balanceCents: 0, ownerFundedCents: 0, businessDate: '2026-10-09' } },
+    }));
+    await writeFile(dataPath, JSON.stringify({
+      products: [{ id: 'product', stock: 2, minimumStock: 0 }],
+      inputs: [{ id: 'pack', stock: 24, minimumStock: 0, averageUnitCostCents: 20 }],
+      sales: [
+        { id: 'past', status: 'active', items: [], stockEffects: [] },
+        {
+          id: 'open', status: 'active',
+          items: [{ id: 'one', kind: 'product', quantity: 5, totalCostCents: 500 }],
+          stockEffects: [{ itemType: 'product', itemId: 'product', quantityDelta: -5, unitCostCents: 100 }],
+        },
+      ],
+      additions: [{ id: 'organza', name: 'Saquinho organza' }],
+      expenses: [],
+      stockMovements: [],
+    }));
+    const runResult = run('reconcile-legacy.mjs', rawPath, dataPath);
+    assert.equal(runResult.status, 0, runResult.stderr);
+    const result = JSON.parse(await readFile(dataPath, 'utf8'));
+    assert.deepEqual(
+      { physical: result.products[0].stock, committed: result.products[0].committedStock, reserved: result.products[0].reservedPhysicalStock },
+      { physical: 7, committed: 5, reserved: 5 },
+    );
+    assert.deepEqual(
+      { physical: result.inputs[0].stock, committed: result.inputs[0].committedStock, reserved: result.inputs[0].reservedPhysicalStock },
+      { physical: 24, committed: 1, reserved: 1 },
+    );
+    assert.equal(result.sales[0].fulfillmentStatus, 'delivered');
+    assert.equal(result.sales[1].fulfillmentStatus, 'ready');
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});

@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import { LucideDynamicIcon, LucidePencil } from '@lucide/angular';
 import { Production, ProductionItem, ProductionConsumption, ProductionCorrectionHistory } from '../../domain/models/production.model';
 import { ProductionCorrectionEditor } from '../../features/production/components/production-correction-editor';
 import { ProductionCorrectionService } from '../../features/production/production-correction.service';
@@ -19,7 +20,7 @@ import { BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
 interface ProductionDay { date: string; entries: Production[]; quantity: number; totalCents: number; pending: boolean; products: number; }
 @Component({
  selector: 'bf-production-page',
- imports: [BfIcon, BfDialog, BfEmptyState, BfPageRefresh, BfTableSkeleton, BfProductionEditor, ProductionCorrectionEditor, BfSelect],
+ imports: [BfIcon, BfDialog, BfEmptyState, BfPageRefresh, BfTableSkeleton, BfProductionEditor, ProductionCorrectionEditor, BfSelect, LucideDynamicIcon],
  changeDetection: ChangeDetectionStrategy.OnPush,
  templateUrl: './production.page.html',
  styleUrl: './production.page.scss',
@@ -40,6 +41,7 @@ export class ProductionPage {
  readonly historyError = signal('');
  readonly selectedHistory = signal<ProductionCorrectionHistory[]>([]);
  readonly currency = formatCurrency;
+ readonly editIcon = LucidePencil;
  readonly date = formatBusinessDate;
  readonly selectedDayDate = signal('');
  readonly filterDate = signal('');

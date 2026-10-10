@@ -43,7 +43,7 @@
 .entry-products{display:grid;gap:5px;margin:11px 0;color:var(--muted-strong);font-size:.81rem;overflow-wrap:anywhere}
 .entry-actions{justify-content:flex-start;flex-wrap:wrap;margin-top:10px}
 .entry-actions .bf-button{min-height:38px;padding:7px 12px;font-size:.78rem}
-.entry-actions bf-icon{width:15px;height:15px}
+.entry-actions bf-icon,.entry-actions svg{width:15px;height:15px;flex:none}
 .entry-history{border-top:1px solid var(--line);padding-top:10px;margin-top:12px;display:grid;gap:8px}
 .history-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;padding:10px;border-radius:10px;background:var(--surface)}
 .history-row>div{display:grid;gap:3px}.history-row small{color:var(--muted);font-size:.7rem}

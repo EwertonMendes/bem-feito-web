@@ -5,7 +5,23 @@ import { ChangeDetectionStrategy, Component, ElementRef, OnDestroy, effect, inje
   selector: 'dialog[bfDialog]',
   exportAs: 'bfDialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: '<ng-content />',
+  template: `
+    <ng-content />
+    <span class="bf-pending-live" data-bf-pending-status role="status" aria-live="polite">
+      {{ busy() ? 'Aguarde, operação em andamento.' : '' }}
+    </span>
+  `,
+  styles: [`
+    .bf-pending-live {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      clip-path: inset(50%);
+    }
+  `],
   host: {
     '(close)': 'handleNativeClose()',
     '(cancel)': 'onNativeCancel($event)',
@@ -28,7 +44,7 @@ export class BfDialog implements OnDestroy {
       const locked = this.busy();
       // Inert desativa toda a interação dos filhos sem desmontar o modal ou alterar seus dados.
       for (const child of Array.from(this.element.nativeElement.children)) {
-        if (child instanceof HTMLElement) child.inert = locked;
+        if (child instanceof HTMLElement && !child.hasAttribute('data-bf-pending-status')) child.inert = locked;
       }
     });
   }
@@ -66,7 +82,7 @@ export class BfDialog implements OnDestroy {
 
   ngOnDestroy(): void {
     for (const child of Array.from(this.element.nativeElement.children)) {
-      if (child instanceof HTMLElement) child.inert = false;
+      if (child instanceof HTMLElement && !child.hasAttribute('data-bf-pending-status')) child.inert = false;
     }
     this.releasePageScroll();
   }

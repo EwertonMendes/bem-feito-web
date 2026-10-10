@@ -1,0 +1,86 @@
+<dialog bfDialog #correctionDialog="bfDialog" class="bf-dialog production-correction-dialog" [busy]="busy()">
+  <header class="bf-dialog-header">
+    <div>
+      <h2>{{review() ? (isCancellation() ? 'Cancelar lançamento' : 'Revisar correção') : 'Corrigir produção'}}</h2>
+      <small>{{production()?.code}} · {{review() ? 'Confira os impactos antes de confirmar' : 'Altere os dados do lançamento'}}</small>
+    </div>
+    <button type="button" class="bf-icon-button" aria-label="Fechar correção" [disabled]="busy()" (click)="correctionDialog.close()"><bf-icon name="close"/></button>
+  </header>
+  <div class="bf-dialog-body correction-body">
+    @if(error()) { <p role="alert" class="bf-form-error">{{error()}}</p> }
+    @if(!review()) {
+      <div class="correction-date">
+        <label class="bf-field"><span>Data da produção</span><input type="date" class="bf-input" [value]="date()" (input)="date.set($any($event.target).value)" /></label>
+      </div>
+      <ng-template #thumb let-option><bf-catalog-image [image]="productImage(option.value)" [thumbnail]="true" [alt]="option.label"/></ng-template>
+      <div class="correction-title">
+        <strong>Sabonetes fabricados</strong><span>{{units()}} unidades</span>
+      </div>
+      <div class="correction-lines">
+        @for(line of lines(); track line.id) {
+          <div class="correction-line">
+            <label class="bf-field product-picker"><span>Sabonete</span>
+              <bf-select-search [value]="line.productId" (valueChange)="changeProduct(line.id,$event)" [options]="productOptions()" [imageTemplate]="thumb" ariaLabel="Selecionar sabonete"/>
+            </label>
+            <label class="bf-field quantity-picker"><span>Quantidade</span>
+              <bf-number-input kind="integer" [min]="1" [value]="line.quantity" (valueChange)="changeQuantity(line.id,$event)" ariaLabel="Quantidade fabricada"/>
+            </label>
+            <button type="button" class="bf-icon-button remove-product" aria-label="Remover sabonete" [disabled]="lines().length<=1" (click)="removeLine(line.id)"><bf-icon name="trash"/></button>
+          </div>
+        }
+      </div>
+      <button type="button" class="bf-button secondary" [disabled]="lines().length>=60" (click)="addLine()"><bf-icon name="plus"/> Adicionar sabonete</button>
+      <label class="bf-field"><span>Observações (opcional)</span><textarea class="bf-textarea" rows="2" [value]="notes()" (input)="notes.set($any($event.target).value)"></textarea></label>
+      <div class="reason-field">
+        <label class="bf-field"><span>Motivo da correção</span><input class="bf-input" type="text" maxlength="500" placeholder="Descreva brevemente o motivo" [value]="reason()" (input)="reason.set($any($event.target).value)"/></label>
+        <div class="reason-suggestions">
+          <button type="button" (click)="pickReason('Quantidade informada incorretamente')">Quantidade incorreta</button>
+          <button type="button" (click)="pickReason('Sabonete selecionado incorretamente')">Sabonete incorreto</button>
+          <button type="button" (click)="pickReason('Lançamento duplicado')">Duplicado</button>
+        </div>
+      </div>
+      <p class="correction-hint">A correção ajustará somente as diferenças no estoque e nos insumos, preservando o histórico.</p>
+    } @else if(review(); as plan) {
+      <div class="correction-review" [class.cancelled]="isCancellation()">
+        <div class="review-head">
+          <bf-icon [name]="isCancellation() ? 'alert' : 'check-circle'"/>
+          <div><strong>{{isCancellation() ? 'Cancelar esta produção?' : 'Confira as alterações'}}</strong>
+            <span>{{isCancellation() ? 'Os efeitos deste lançamento serão revertidos, sem apagar seu histórico.' : 'O estoque será atualizado ao confirmar.'}}</span>
+          </div>
+        </div>
+        <div class="review-summary">
+          <div><span>Quantidade</span><strong>{{plan.corrected.quantity}} un.</strong></div>
+          <div><span>Variação de custo</span><strong>{{plan.costDeltaCents>0?'+':plan.costDeltaCents<0?'-':''}}{{currency(plan.costDeltaCents < 0 ? -plan.costDeltaCents : plan.costDeltaCents)}}</strong></div>
+        </div>
+        <h3>Alterações no estoque</h3>
+        @for(impact of plan.impacts; track impact.itemType + ':' + impact.itemId) {
+          <div class="impact-line">
+            <div class="impact-label"><strong>{{impact.name}}</strong><span>{{impact.itemType==='product' ? 'Sabonete' : 'Insumo'}}</span></div>
+            <div class="impact-values">
+              <strong [class.negative]="impact.quantityDelta<0" [class.positive]="impact.quantityDelta>0">{{impact.quantityDelta>0?'+':''}}{{impact.quantityDelta}} {{impact.itemType==='product'?'un.':inputUnit(impact.unitLabel)}}</strong>
+              <span>Saldo: {{impact.stockBefore}} → {{impact.stockAfter}}</span>
+            </div>
+          </div>
+        } @empty {
+          <p class="correction-hint">Nenhuma movimentação de estoque. Apenas dados do lançamento serão corrigidos.</p>
+        }
+        <div class="review-reason"><span>Motivo registrado</span><strong>{{reviewedDraft()?.reason}}</strong></div>
+        <p class="correction-hint">Os valores foram revisados com o banco. Se algo mudar antes da confirmação, a operação será validada novamente.</p>
+      </div>
+    }
+  </div>
+  <footer class="bf-dialog-footer correction-footer">
+    @if(review()) {
+      <button class="bf-button secondary" type="button" [disabled]="busy()" (click)="back()">Voltar</button>
+      <button class="bf-button" [class.danger]="isCancellation()" type="button" [disabled]="busy()" [bfLoadingButton]="saving()" (click)="confirm()">
+        {{saving() ? 'Salvando...' : isCancellation() ? 'Confirmar cancelamento' : 'Aplicar correção'}}
+      </button>
+    } @else {
+      <button class="bf-button secondary" type="button" [disabled]="busy()" (click)="correctionDialog.close()">Fechar</button>
+      <button class="bf-button secondary cancel-production" type="button" [disabled]="busy()" [bfLoadingButton]="reviewing()" (click)="preview(true)">Cancelar lançamento</button>
+      <button class="bf-button" type="button" [disabled]="busy()" [bfLoadingButton]="reviewing()" (click)="preview(false)">
+        {{reviewing() ? 'Conferindo...' : 'Revisar impactos'}}
+      </button>
+    }
+  </footer>
+</dialog>

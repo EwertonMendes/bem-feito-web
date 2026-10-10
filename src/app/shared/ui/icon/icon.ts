@@ -38,6 +38,7 @@ import {
   LucidePackageCheck,
   LucidePackageMinus,
   LucidePackagePlus,
+  LucidePencil,
   LucidePlus,
   LucideQrCode,
   LucideReceiptText,
@@ -152,7 +153,7 @@ const ICONS = {
   tick: LucideCheck,
   upload: LucideUpload,
   more: LucideEllipsis,
-  edit: LucideWrench,
+  edit: LucidePencil,
   history: LucideClock3,
 } as const satisfies Record<BfIconName, unknown>;
 

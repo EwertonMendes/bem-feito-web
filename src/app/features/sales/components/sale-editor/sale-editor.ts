@@ -25,7 +25,6 @@ import { BfConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-di
 import { BfDialog } from '../../../../shared/ui/dialog/dialog';
 import { BfIcon } from '../../../../shared/ui/icon/icon';
 import { BfSelect, BfSelectOption } from '../../../../shared/ui/select/select';
-import { BfSelectSearch } from '../../../../shared/ui/select-search/select-search';
 import { paymentMethodIcon } from '../../../../shared/ui/select/payment-method-icon';
 import { BfNumberInput } from '../../../../shared/ui/number-input/number-input';
 
@@ -63,7 +62,7 @@ interface PaymentUi {
 
 @Component({
   selector: 'bf-sale-editor',
-  imports: [BfLoadingButton, FormField, BfConfirmDialog, BfDialog, BfIcon, CatalogImage, BfSelect, BfSelectSearch, BfNumberInput],
+  imports: [BfLoadingButton, FormField, BfConfirmDialog, BfDialog, BfIcon, CatalogImage, BfSelect, BfNumberInput],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sale-editor.html',
   styleUrl: './sale-editor.scss',

@@ -5,15 +5,13 @@
 .subhead small,.hint{color:var(--muted)}
 .component-row{display:grid;grid-template-columns:minmax(0,2fr) 130px 110px 44px;gap:8px;margin-bottom:8px}
 .component-unit{display:flex;align-items:center;padding:0 12px;min-height:42px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2);color:var(--muted-strong);font-size:.8rem}
-.kit-row{display:grid;grid-template-columns:1.2fr 80px 1.2fr 1.2fr 44px;gap:8px;margin-bottom:8px}
 .image-field{margin-top:22px}
 
 @media(max-width:720px){
   .subhead{align-items:stretch;flex-direction:column}
   .subhead .bf-button{align-self:flex-start}
 
-  .component-row,
-  .kit-row{
+  .component-row{
     padding:10px;
     border:1px solid var(--line);
     border-radius:12px;
@@ -28,21 +26,12 @@
   .component-row > button{grid-column:3;grid-row:1}
   .component-row > .component-unit{grid-column:1/-1;grid-row:2}
 
-  .kit-row{
-    grid-template-columns:minmax(0,1fr) 82px 44px;
-  }
-  .kit-row > bf-select:nth-of-type(1){grid-column:1;grid-row:1}
-  .kit-row > bf-number-input{grid-column:2;grid-row:1}
-  .kit-row > button{grid-column:3;grid-row:1}
-  .kit-row > bf-select:nth-of-type(2){grid-column:1/-1;grid-row:2}
-  .kit-row > bf-select:nth-of-type(3){grid-column:1/-1;grid-row:3}
 
   .full{grid-column:auto}
 }
 
 @media(max-width:420px){
   .component-row{grid-template-columns:minmax(0,1fr) 76px 44px}
-  .kit-row{grid-template-columns:minmax(0,1fr) 72px 44px}
   .subhead .bf-button{width:100%}
 }
 

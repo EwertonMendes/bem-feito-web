@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "migration-unit-products-20261011",
+  "environment": "dev",
+  "projectId": "bem-feito-dev",
+  "operation": "migrate",
+  "migration": "unit-products-v2",
+  "deploymentSha": "84d90844d3aafe56f659d3b1265efe5a6d6cd9f9",
+  "destructive": {
+    "projectId": "bem-feito-dev",
+    "paths": [
+      "collections",
+      "fragrances",
+      "formats",
+      "formatPrices",
+      "units",
+      "paymentMethods",
+      "expenseCategories",
+      "expenseTypes",
+      "inputs",
+      "products",
+      "kits",
+      "additions",
+      "expenses",
+      "productions",
+      "sales",
+      "payments",
+      "stockAdjustments",
+      "stockMovements",
+      "counters",
+      "migrationRuns",
+      "migrationSources",
+      "system/bank-snapshot"
+    ]
+  }
+}

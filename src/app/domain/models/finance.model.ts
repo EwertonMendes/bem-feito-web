@@ -89,3 +89,33 @@ export interface ExpenseDraft {
   paidBy?: string;
   reimbursable?: boolean;
 }
+
+/** Capital and cash movements are not sales revenue and never consume inventory. */
+export type CashMovementKind = 'contribution' | 'loan' | 'reimbursement' | 'withdrawal' | 'other-in' | 'other-out';
+
+export interface CashMovementDraft {
+  businessDate: string;
+  kind: CashMovementKind;
+  accountName: string;
+  amountCents: number;
+  partyName?: string;
+  notes?: string;
+}
+
+export interface CashMovement extends AuditFields, CashMovementDraft {
+  id: string;
+  impactCents: number;
+  status: 'active' | 'reversed';
+  reimbursable?: boolean;
+  reversalReason?: string;
+  reversedAt?: unknown;
+  reversedBy?: string;
+}
+
+export interface CashBalanceCheck extends AuditFields {
+  id: string;
+  accountName: string;
+  businessDate: string;
+  balanceCents: number;
+  note?: string;
+}

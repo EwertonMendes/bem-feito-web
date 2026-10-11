@@ -64,7 +64,8 @@ export class CashManagementRepository {
     const movement: Omit<CashMovement, 'id'> = {
       businessDate: draft.businessDate, kind: draft.kind, accountName, amountCents: draft.amountCents,
       impactCents: kind.direction === 'in' ? draft.amountCents : -draft.amountCents,
-      partyName, notes, status: 'active', reimbursable: draft.kind === 'loan',
+      ...(partyName ? { partyName } : {}), ...(notes ? { notes } : {}),
+      status: 'active', reimbursable: draft.kind === 'loan',
     };
     return runTransaction(this.db, async tx => {
       const ref = doc(collection(this.db, 'cashMovements'));

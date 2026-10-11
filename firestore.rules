@@ -350,6 +350,47 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /cashMovements/{movementId} {
+      allow read: if activeUser();
+      allow create: if canOperate() && auditCreate(request.resource.data)
+        && fields(request.resource.data,
+          ['businessDate', 'kind', 'accountName', 'amountCents', 'impactCents', 'status'],
+          ['partyName', 'notes', 'reimbursable', 'reversalReason', 'reversedAt', 'reversedBy'])
+        && businessDate(request.resource.data)
+        && text(request.resource.data.accountName) && request.resource.data.accountName.size() <= 120
+        && money(request.resource.data.amountCents) && request.resource.data.amountCents > 0
+        && request.resource.data.status == 'active'
+        && request.resource.data.kind in ['contribution', 'loan', 'reimbursement', 'withdrawal', 'other-in', 'other-out']
+        && request.resource.data.impactCents == (request.resource.data.kind in ['contribution','loan','other-in']
+          ? request.resource.data.amountCents : -request.resource.data.amountCents)
+        && (!('partyName' in request.resource.data) || (text(request.resource.data.partyName) && request.resource.data.partyName.size() <= 120))
+        && (!('notes' in request.resource.data) || text(request.resource.data.notes))
+        && (!('reimbursable' in request.resource.data) || request.resource.data.reimbursable is bool)
+        && !('reversalReason' in request.resource.data) && !('reversedAt' in request.resource.data)
+        && !('reversedBy' in request.resource.data);
+      allow update: if canOperate() && auditUpdate(request.resource.data)
+        && resource.data.status == 'active' && request.resource.data.status == 'reversed'
+        && request.resource.data.impactCents == 0
+        && request.resource.data.reversalReason is string
+        && request.resource.data.reversalReason.size() >= 4 && request.resource.data.reversalReason.size() <= 240
+        && request.resource.data.reversedAt == request.time && request.resource.data.reversedBy == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status','impactCents','reversalReason','reversedAt','reversedBy','updatedAt','updatedBy'
+        ]);
+      allow delete: if false;
+    }
+
+    match /cashBalanceChecks/{checkId} {
+      allow read: if activeUser();
+      allow create: if canOperate() && auditCreate(request.resource.data)
+        && fields(request.resource.data, ['businessDate','accountName','balanceCents'], ['note'])
+        && businessDate(request.resource.data) && text(request.resource.data.accountName)
+        && request.resource.data.accountName.size() <= 120
+        && money(request.resource.data.balanceCents)
+        && (!('note' in request.resource.data) || text(request.resource.data.note));
+      allow update, delete: if false;
+    }
+
     match /expenseCorrections/{correctionId} {
       allow read: if activeUser();
       allow create: if canOperate() && auditCreate(request.resource.data)

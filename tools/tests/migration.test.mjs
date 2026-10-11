@@ -6,6 +6,28 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const run = (script, ...args) => spawnSync(process.execPath, ['tools/migration/' + script, ...args], { encoding: 'utf8' });
+
+test('A Brazilian date from a text-formatted production cell is normalized strictly', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'bem-feito-date-test-'));
+  try {
+    const rawPath = join(dir, 'raw.json');
+    const outputPath = join(dir, 'result.json');
+    await writeFile(rawPath, JSON.stringify({ sheets: { 'Produção': [
+      { Produção_ID: 'PR99999', Data: '11/09/2026', Produto_ID: 'PROD-TEST', Produto: 'Teste', Quantidade: 1 },
+    ] } }));
+    const valid = run('normalize-legacy.mjs', rawPath, outputPath);
+    assert.equal(valid.status, 0, valid.stderr);
+    const result = JSON.parse(await readFile(outputPath, 'utf8'));
+    assert.equal(result.productions[0].businessDate, '2026-09-11');
+    await writeFile(rawPath, JSON.stringify({ sheets: { 'Produção': [
+      { Produção_ID: 'PR99999', Data: '31/02/2026', Produto_ID: 'PROD-TEST', Produto: 'Teste', Quantidade: 1 },
+    ] } }));
+    assert.notEqual(run('normalize-legacy.mjs', rawPath, outputPath).status, 0);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('Migration excludes template slots, converts Sheets dates, preserves source stocks and optional thresholds', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'bem-feito-migration-test-'));
   try {

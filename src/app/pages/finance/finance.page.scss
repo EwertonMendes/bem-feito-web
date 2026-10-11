@@ -275,7 +275,7 @@
   .finance-record-link bf-icon { display:inline-flex; }
 }
 @container finance (max-width: 760px) {
-  .summary { grid-template-columns:repeat(2,minmax(0,1fr));gap:10px; }
+  .bf-grid.three.summary { grid-template-columns:repeat(2,minmax(0,1fr));gap:10px; }
   .summary .summary-main { grid-column:1/-1; }
   .summary article { padding:14px; }
   .finance-toolbar { flex-direction:column;align-items:stretch;gap:7px; }

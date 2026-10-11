@@ -45,7 +45,6 @@ beforeEach(async () => {
       setDoc(doc(seed, 'inputs', 'i-un'), { code: 'TEST-I-UN', name: 'TEST UNTRACKED INPUT', active: true, unitId: 'u', trackingMode: 'untracked', stock: 0, minimumStock: 0, minimumStockConfigured: false, averageUnitCostCents: 0, ...audit() }),
       setDoc(doc(seed, 'products', 'p'), { code: 'TEST-P', displayName: 'TEST PRODUCT', active: true, collectionId: 'c', fragranceId: 'f', formatId: 'fmt', salePriceCents: 1000, additionalCostCents: 0, averageUnitCostCents: 100, stock: 10, minimumStock: 0, recipe: [{ inputId: 'i', unitId: 'u', quantity: 2 }, { inputId: 'i', unitId: 'u', quantity: 3 }], ...audit() }),
       setDoc(doc(seed, 'products', 'p-est'), { code: 'TEST-P-EST', displayName: 'TEST ESTIMATED PRODUCT', active: true, collectionId: 'c', fragranceId: 'f', formatId: 'fmt', salePriceCents: 3000, additionalCostCents: 0, averageUnitCostCents: 0, stock: 0, minimumStock: 0, recipe: [{ inputId: 'i-est', unitId: 'u', quantity: 10 }], ...audit() }),
-      setDoc(doc(seed, 'kits', 'k'), { active: true, name: 'TEST KIT', priceCents: 1800, components: [{ id: 'slot', formatId: 'fmt', quantity: 2, order: 1 }], ...audit() }),
       setDoc(doc(seed, 'additions', 'a'), { active: true, name: 'TEST ADDITION', category: 'TEST', priceCents: 200, components: [{ id: 'part', inputId: 'i', unitId: 'u', quantity: 1, order: 1 }], ...audit() }),
     ]);
   });

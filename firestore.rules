@@ -222,11 +222,17 @@ service cloud.firestore {
           && money(data.appliedCents) && money(data.tipCents)
           && data.amountReceivedCents == data.appliedCents + data.tipCents && data.status in ['active', 'reversed'])
         || (name == 'expenses'
-          && fields(data, ['code', 'businessDate', 'kind', 'amountCents'], ['categoryId', 'inputId', 'quantity', 'unitId', 'paymentMethodId', 'notes', 'link', 'items', 'fundingSource', 'receiptStatus', 'stockApplied', 'charges', 'bankDebitCents', 'legacyUnallocatedPurchase'])
-          && text(data.code) && businessDate(data) && money(data.amountCents) && data.amountCents > 0
+          && fields(data, ['code', 'businessDate', 'kind', 'amountCents'], ['categoryId', 'inputId', 'quantity', 'unitId', 'paymentMethodId', 'notes', 'link', 'items', 'fundingSource', 'receiptStatus', 'stockApplied', 'charges', 'bankDebitCents', 'legacyUnallocatedPurchase', 'fundingType', 'paidBy', 'reimbursable', 'status', 'cancelledAmountCents'])
+          && text(data.code) && businessDate(data) && money(data.amountCents)
+          && ((data.amountCents > 0 && (!('status' in data) || data.status == 'active'))
+              || (data.amountCents == 0 && data.status == 'cancelled' && money(data.cancelledAmountCents) && data.cancelledAmountCents > 0))
           && data.kind in ['input-purchase', 'operating-expense', 'equipment', 'other']
           && (!('bankDebitCents' in data) || money(data.bankDebitCents))
           && (!('fundingSource' in data) || data.fundingSource in ['business', 'ewerton', 'maria', 'owner-unassigned', 'unverified'])
+          && (!('fundingType' in data) || data.fundingType in ['business', 'third-party', 'unverified'])
+          && (!('paidBy' in data) || (data.paidBy is string && data.paidBy.size() > 0 && data.paidBy.size() <= 120))
+          && (!('reimbursable' in data) || data.reimbursable is bool)
+          && (!('status' in data) || data.status in ['active', 'cancelled'])
           && (!('receiptStatus' in data) || data.receiptStatus in ['pending', 'received'])
           && (!('stockApplied' in data) || data.stockApplied is bool)
           && (!('charges' in data) || (data.charges is list && data.charges.size() <= 20))
@@ -257,7 +263,7 @@ service cloud.firestore {
           && businessDate(data) && text(data.itemId) && text(data.sourceId)
           && data.itemType in ['product', 'input'] && quantityDelta(data.quantityDelta)
           && money(data.unitCostCents) && money(data.totalCostCents)
-          && data.sourceType in ['sale', 'sale-cancellation', 'production', 'purchase', 'adjustment']);
+          && data.sourceType in ['sale', 'sale-cancellation', 'production', 'purchase', 'purchase-correction', 'purchase-cancellation', 'adjustment']);
     }
 
 
@@ -342,6 +348,58 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time
         && request.resource.data.updatedBy == request.auth.uid;
       allow delete: if false;
+    }
+
+    match /cashMovements/{movementId} {
+      allow read: if activeUser();
+      allow create: if canOperate() && auditCreate(request.resource.data)
+        && fields(request.resource.data,
+          ['businessDate', 'kind', 'accountName', 'amountCents', 'impactCents', 'status'],
+          ['partyName', 'notes', 'reimbursable', 'reversalReason', 'reversedAt', 'reversedBy'])
+        && businessDate(request.resource.data)
+        && text(request.resource.data.accountName) && request.resource.data.accountName.size() <= 120
+        && money(request.resource.data.amountCents) && request.resource.data.amountCents > 0
+        && request.resource.data.status == 'active'
+        && request.resource.data.kind in ['contribution', 'loan', 'reimbursement', 'withdrawal', 'other-in', 'other-out']
+        && request.resource.data.impactCents == (request.resource.data.kind in ['contribution','loan','other-in']
+          ? request.resource.data.amountCents : -request.resource.data.amountCents)
+        && (!('partyName' in request.resource.data) || (text(request.resource.data.partyName) && request.resource.data.partyName.size() <= 120))
+        && (!('notes' in request.resource.data) || text(request.resource.data.notes))
+        && (!('reimbursable' in request.resource.data) || request.resource.data.reimbursable is bool)
+        && !('reversalReason' in request.resource.data) && !('reversedAt' in request.resource.data)
+        && !('reversedBy' in request.resource.data);
+      allow update: if canOperate() && auditUpdate(request.resource.data)
+        && resource.data.status == 'active' && request.resource.data.status == 'reversed'
+        && request.resource.data.impactCents == 0
+        && request.resource.data.reversalReason is string
+        && request.resource.data.reversalReason.size() >= 4 && request.resource.data.reversalReason.size() <= 240
+        && request.resource.data.reversedAt == request.time && request.resource.data.reversedBy == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status','impactCents','reversalReason','reversedAt','reversedBy','updatedAt','updatedBy'
+        ]);
+      allow delete: if false;
+    }
+
+    match /cashBalanceChecks/{checkId} {
+      allow read: if activeUser();
+      allow create: if canOperate() && auditCreate(request.resource.data)
+        && fields(request.resource.data, ['businessDate','accountName','balanceCents'], ['note'])
+        && businessDate(request.resource.data) && text(request.resource.data.accountName)
+        && request.resource.data.accountName.size() <= 120
+        && money(request.resource.data.balanceCents)
+        && (!('note' in request.resource.data) || text(request.resource.data.note));
+      allow update, delete: if false;
+    }
+
+    match /expenseCorrections/{correctionId} {
+      allow read: if activeUser();
+      allow create: if canOperate() && auditCreate(request.resource.data)
+        && fields(request.resource.data, ['expenseId', 'kind', 'businessDate', 'reason', 'before', 'after'], [])
+        && text(request.resource.data.expenseId) && businessDate(request.resource.data)
+        && text(request.resource.data.reason) && request.resource.data.reason.size() <= 240
+        && request.resource.data.kind in ['correction', 'cancellation']
+        && request.resource.data.before is map && request.resource.data.after is map;
+      allow update, delete: if false;
     }
 
     match /productionCorrections/{correctionId} {

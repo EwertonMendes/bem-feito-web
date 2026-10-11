@@ -1,7 +1,18 @@
 import { AuditFields } from './common.model';
 
 export type ExpenseKind = 'input-purchase' | 'operating-expense' | 'equipment' | 'other';
+/** Historical fundingSource is still readable during migration. */
 export type FundingSource = 'business' | 'ewerton' | 'maria' | 'owner-unassigned' | 'unverified';
+export type FundingType = 'business' | 'third-party' | 'unverified';
+export function fundingTypeOf(expense: Pick<Expense, 'fundingType' | 'fundingSource'>): FundingType {
+  if (expense.fundingType) return expense.fundingType;
+  if (expense.fundingSource === 'business' || !expense.fundingSource) return 'business';
+  return expense.fundingSource === 'unverified' ? 'unverified' : 'third-party';
+}
+export function fundingPartyOf(expense: Pick<Expense, 'paidBy' | 'fundingSource'>): string {
+  if (expense.paidBy) return expense.paidBy;
+  return expense.fundingSource === 'ewerton' ? 'Ewerton' : expense.fundingSource === 'maria' ? 'Maria' : '';
+}
 export type ReceiptStatus = 'pending' | 'received';
 /** Charges belong to the same purchase payment; they never create a second cash movement. */
 export interface AcquisitionCharge {
@@ -25,11 +36,16 @@ export interface PurchaseBatchDraft {
   notes?: string;
   link?: string;
   fundingSource?: FundingSource;
+  fundingType?: FundingType;
+  paidBy?: string;
+  reimbursable?: boolean;
   receiptStatus?: ReceiptStatus;
   charges?: AcquisitionCharge[];
   items: PurchaseItem[];
 }
 export interface Expense extends AuditFields {
+  status?: 'active' | 'cancelled';
+  cancelledAmountCents?: number;
   /** Consolidated itemized purchase; legacy one-input purchases remain supported. */
   items?: PurchaseItem[];
 
@@ -48,6 +64,9 @@ export interface Expense extends AuditFields {
   notes?: string;
   link?: string;
   fundingSource?: FundingSource;
+  fundingType?: FundingType;
+  paidBy?: string;
+  reimbursable?: boolean;
   receiptStatus?: ReceiptStatus;
   stockApplied?: boolean;
   legacyUnallocatedPurchase?: boolean;
@@ -66,4 +85,37 @@ export interface ExpenseDraft {
   notes?: string;
   link?: string;
   fundingSource?: FundingSource;
+  fundingType?: FundingType;
+  paidBy?: string;
+  reimbursable?: boolean;
+}
+
+/** Capital and cash movements are not sales revenue and never consume inventory. */
+export type CashMovementKind = 'contribution' | 'loan' | 'reimbursement' | 'withdrawal' | 'other-in' | 'other-out';
+
+export interface CashMovementDraft {
+  businessDate: string;
+  kind: CashMovementKind;
+  accountName: string;
+  amountCents: number;
+  partyName?: string;
+  notes?: string;
+}
+
+export interface CashMovement extends AuditFields, CashMovementDraft {
+  id: string;
+  impactCents: number;
+  status: 'active' | 'reversed';
+  reimbursable?: boolean;
+  reversalReason?: string;
+  reversedAt?: unknown;
+  reversedBy?: string;
+}
+
+export interface CashBalanceCheck extends AuditFields {
+  id: string;
+  accountName: string;
+  businessDate: string;
+  balanceCents: number;
+  note?: string;
 }

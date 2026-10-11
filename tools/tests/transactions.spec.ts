@@ -12,6 +12,8 @@ import { SalesRepository } from '../../src/app/core/repositories/sales.repositor
 import { ProductionRepository } from '../../src/app/core/repositories/production.repository';
 import { ProductionCorrectionRepository } from '../../src/app/core/repositories/production-correction.repository';
 import { FinanceRepository } from '../../src/app/core/repositories/finance.repository';
+import { ExpenseCorrectionRepository } from '../../src/app/core/repositories/expense-correction.repository';
+import { CashManagementRepository } from '../../src/app/core/repositories/cash-management.repository';
 import { InventoryRepository } from '../../src/app/core/repositories/inventory.repository';
 
 let env: RulesTestEnvironment;
@@ -21,6 +23,8 @@ let sales: SalesRepository;
 let production: ProductionRepository;
 let productionCorrection: ProductionCorrectionRepository;
 let finance: FinanceRepository;
+let corrections: ExpenseCorrectionRepository;
+let cash: CashManagementRepository;
 let inventory: InventoryRepository;
 const day = '2026-10-05';
 const audit = () => ({ createdAt: serverTimestamp(), updatedAt: serverTimestamp(), createdBy: 'operator', updatedBy: 'operator' });
@@ -78,11 +82,70 @@ beforeEach(async () => {
   production = runInInjectionContext(injector, () => new ProductionRepository());
   productionCorrection = runInInjectionContext(injector, () => new ProductionCorrectionRepository());
   finance = runInInjectionContext(injector, () => new FinanceRepository());
+  corrections = runInInjectionContext(injector, () => new ExpenseCorrectionRepository());
+  cash = runInInjectionContext(injector, () => new CashManagementRepository());
   inventory = runInInjectionContext(injector, () => new InventoryRepository());
 });
 afterAll(async () => { injector?.destroy(); await env?.cleanup(); });
 
 describe('Actual repositories against restrictive emulator rules', () => {
+  it('corrects third-party payment source without retaining the previous payer', async () => {
+    const result = await finance.createExpense({
+      businessDate: day, kind: 'operating-expense', amountCents: 500,
+      fundingType: 'third-party', paidBy: 'Terceiro Teste', reimbursable: true,
+    });
+    expect(result.expense).toMatchObject({ fundingType: 'third-party', bankDebitCents: 0 });
+    await corrections.correct(result.expense.id, {
+      businessDate: day, kind: 'operating-expense', amountCents: 700,
+      fundingType: 'business', reimbursable: false,
+    }, 'Corrigir origem do pagamento');
+    expect(await data('expenses', result.expense.id)).toMatchObject({
+      bankDebitCents: 700, amountCents: 700, fundingType: 'business', status: 'active',
+    });
+    expect(await data('expenses', result.expense.id)).not.toHaveProperty('paidBy');
+    await corrections.cancel(result.expense.id, 'Registro duplicado no teste');
+    expect(await data('expenses', result.expense.id)).toMatchObject({
+      status: 'cancelled', amountCents: 0, cancelledAmountCents: 700, bankDebitCents: 0,
+    });
+    expect(await count('expenseCorrections')).toBe(2);
+  });
+
+  it('corrects and cancels a received purchase without changing other inventory', async () => {
+    const purchase = await finance.createPurchaseBatch({
+      businessDate: day, fundingType: 'business', receiptStatus: 'received',
+      items: [{ inputId: 'i', unitId: 'u', quantity: 2, amountCents: 200 }],
+    });
+    expect(await data('inputs', 'i')).toMatchObject({ stock: 22, costBasisValueCents: 2200 });
+    await corrections.correct(purchase.expense.id, {
+      businessDate: day, fundingType: 'business', receiptStatus: 'received',
+      items: [{ inputId: 'i', unitId: 'u', quantity: 3, amountCents: 300 }],
+    }, 'Quantidade informada incorreta');
+    expect(await data('inputs', 'i')).toMatchObject({ stock: 23, costBasisValueCents: 2300 });
+    await corrections.cancel(purchase.expense.id, 'Compra de teste duplicada');
+    expect(await data('inputs', 'i')).toMatchObject({ stock: 20, costBasisValueCents: 2000 });
+    expect(await data('expenses', purchase.expense.id)).toMatchObject({
+      amountCents: 0, cancelledAmountCents: 300, bankDebitCents: 0, status: 'cancelled',
+    });
+    expect(await count('stockMovements')).toBe(3);
+    expect(await count('expenseCorrections')).toBe(2);
+  });
+
+  it('records and reverses capital independently of sales and reconciled balance references', async () => {
+    const created = await cash.createMovement({
+      kind: 'contribution', businessDate: day, amountCents: 5000,
+      accountName: 'Conta principal', partyName: 'Terceiro Teste',
+    });
+    expect(await data('cashMovements', created.id)).toMatchObject({ status: 'active', impactCents: 5000 });
+    const check = await cash.confirmBalance({ businessDate: day, accountName: 'Conta principal', balanceCents: 5800 });
+    expect(await data('cashBalanceChecks', check.id)).toMatchObject({ balanceCents: 5800 });
+    const reversed = await cash.reverseMovement(created.id, 'Lançamento repetido no teste');
+    expect(reversed.impactCents).toBe(0);
+    expect(await data('cashMovements', created.id)).toMatchObject({ status: 'reversed', impactCents: 0 });
+    await expect(cash.reverseMovement(created.id, 'Segunda tentativa')).rejects.toThrow('estornada');
+    expect(await count('sales')).toBe(0);
+    expect(await count('expenses')).toBe(0);
+  });
+
   it('keeps a future order off physical stock and releases commitments on cancellation', async () => {
     const created = await sales.create({ ...draft(), fulfillmentStatus: 'in-production', lines: [{ kind: 'product', sourceId: 'p', quantity: 50 }] });
     expect(created.sale).toMatchObject({ fulfillmentStatus: 'in-production', stockApplied: false, paymentStatus: 'pending' });

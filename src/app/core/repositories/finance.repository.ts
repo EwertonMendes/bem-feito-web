@@ -61,6 +61,7 @@ export class FinanceRepository {
       throw new Error('Selecione o insumo e informe a quantidade comprada.');
     }
 
+    const fundingType = draft.fundingType ?? (draft.fundingSource === 'unverified' ? 'unverified' : draft.fundingSource && draft.fundingSource !== 'business' ? 'third-party' : 'business');
     return runTransaction(this.firestore, async (transaction) => {
       const counterRef = doc(this.firestore, 'counters', 'expense');
       const counterSnapshot = await transaction.get(counterRef);
@@ -121,12 +122,15 @@ export class FinanceRepository {
       }
 
       const expense: Expense = { id: expenseRef.id, ...draft, code,
-        fundingSource: draft.fundingSource ?? 'business',
-        bankDebitCents: (draft.fundingSource ?? 'business') === 'business' ? draft.amountCents : 0 };
+        fundingSource: draft.fundingType ? (draft.fundingType === 'third-party' ? 'owner-unassigned' : draft.fundingType === 'unverified' ? 'unverified' : 'business') : (draft.fundingSource ?? 'business'),
+        fundingType: fundingType, paidBy: draft.paidBy?.trim() || undefined,
+        reimbursable: fundingType === 'third-party' && !!draft.reimbursable,
+        bankDebitCents: (fundingType) === 'business' ? draft.amountCents : 0 };
       transaction.set(expenseRef, {
         ...draft,
         code,
         fundingSource: expense.fundingSource,
+        fundingType: expense.fundingType, paidBy: expense.paidBy, reimbursable: expense.reimbursable,
         bankDebitCents: expense.bankDebitCents,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -165,6 +169,7 @@ export class FinanceRepository {
     const extraTotal = charges.reduce((sum, charge) => sum + charge.amountCents, 0);
     const total = rawItems.reduce((sum, item) => sum + item.amountCents, 0) + extraTotal;
     const received = (draft.receiptStatus ?? 'received') === 'received';
+    const fundingType = draft.fundingType ?? (draft.fundingSource === 'unverified' ? 'unverified' : draft.fundingSource && draft.fundingSource !== 'business' ? 'third-party' : 'business');
     return runTransaction(this.firestore, async transaction => {
       const counterRef = doc(this.firestore, 'counters', 'expense');
       const counter = await transaction.get(counterRef);
@@ -211,9 +216,12 @@ export class FinanceRepository {
       const expense: Expense = {
         id: expenseRef.id, code: entityCode('M', sequence, 6),
         businessDate: draft.businessDate, kind: 'input-purchase', amountCents: total,
-        bankDebitCents: (draft.fundingSource ?? 'business') === 'business' ? total : 0,
+        bankDebitCents: (fundingType) === 'business' ? total : 0,
         items, notes: draft.notes, link: draft.link, paymentMethodId: draft.paymentMethodId,
-        fundingSource: draft.fundingSource ?? 'business', receiptStatus: received ? 'received' : 'pending',
+        fundingSource: draft.fundingType ? (draft.fundingType === 'third-party' ? 'owner-unassigned' : draft.fundingType === 'unverified' ? 'unverified' : 'business') : (draft.fundingSource ?? 'business'),
+        fundingType: fundingType, paidBy: draft.paidBy?.trim() || undefined,
+        reimbursable: fundingType === 'third-party' && !!draft.reimbursable,
+        receiptStatus: received ? 'received' : 'pending',
         stockApplied: received, charges,
       };
       const { id: _id, ...data } = expense;

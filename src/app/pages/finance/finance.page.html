@@ -1,4 +1,4 @@
-<section class="bf-page">
+<section class="bf-page finance-layout">
   <header class="bf-page-header">
     <div><h1>Financeiro</h1><p>Compras, despesas, recebimentos e contas em aberto sem misturar fluxos diferentes.</p></div>
     <button class="bf-button" type="button" (click)="openExpense()"><bf-icon name="plus" /> Nova saída</button>
@@ -6,66 +6,242 @@
 
   @if (refreshing()) { <bf-page-refresh /> }
 
-  <div class="bf-grid three summary">
+  <div class="bf-grid three summary" aria-label="Resumo financeiro">
     @if (!summaryInitialized()) {
-      <article><bf-skeleton width="96px" height="11px" radius="5px" /><bf-skeleton width="136px" height="22px" /></article>
+      <article class="summary-main"><bf-skeleton width="96px" height="11px" radius="5px" /><bf-skeleton width="136px" height="22px" /></article>
       <article><bf-skeleton width="110px" height="11px" radius="5px" /><bf-skeleton width="124px" height="22px" /></article>
       <article><bf-skeleton width="88px" height="11px" radius="5px" /><bf-skeleton width="64px" height="22px" /></article>
     } @else {
-      <article><span>Saldo a receber</span><strong>{{currency(totalReceivable())}}</strong></article>
-      <article><span>Saídas registradas</span><strong>{{currency(totalOut())}}</strong></article>
-      <article><span>Recebimentos</span><strong>{{store.paymentCount()}}</strong></article>
+      <article class="summary-main"><span>Saldo a receber</span><strong>{{currency(totalReceivable())}}</strong><small>Vendas com pagamento pendente</small></article>
+      <article><span>Saídas registradas</span><strong>{{currency(totalOut())}}</strong><small>Histórico acumulado</small></article>
+      <article><span>Recebimentos</span><strong>{{store.paymentCount()}}</strong><small>Registros totais</small></article>
     }
   </div>
 
-  <div class="bf-segments tabs"><button [class.active]="tab()==='expenses'" (click)="selectTab('expenses')">Saídas</button><button [class.active]="tab()==='receivables'" (click)="selectTab('receivables')">A receber</button><button [class.active]="tab()==='payments'" (click)="selectTab('payments')">Recebimentos</button></div>
+  <nav class="bf-segments tabs" aria-label="Seções do financeiro">
+    <button type="button" [class.active]="tab()==='expenses'" [attr.aria-current]="tab()==='expenses'?'page':null" (click)="selectTab('expenses')"><bf-icon name="cash-out"/> <span>Saídas</span></button>
+    <button type="button" [class.active]="tab()==='receivables'" [attr.aria-current]="tab()==='receivables'?'page':null" (click)="selectTab('receivables')"><bf-icon name="receivable"/> <span>A receber</span></button>
+    <button type="button" [class.active]="tab()==='payments'" [attr.aria-current]="tab()==='payments'?'page':null" (click)="selectTab('payments')"><bf-icon name="received"/> <span>Recebimentos</span></button>
+    <button type="button" [class.active]="tab()==='cash'" [attr.aria-current]="tab()==='cash'?'page':null" (click)="selectTab('cash')"><bf-icon name="finance"/> <span>Dinheiro</span></button>
+  </nav>
+
+  @if(tab()!=='cash') {
+    <div class="finance-toolbar">
+      <form class="finance-search" (submit)="$event.preventDefault(); searchCode()" role="search">
+        <bf-icon name="search" />
+        <input type="search" [value]="searchInput()" (input)="searchInput.set($any($event.target).value)" [placeholder]="tab()==='expenses'?'Buscar M000012':tab()==='payments'?'Buscar P000025':'Buscar V00024'" [attr.aria-label]="'Buscar por código em '+(tab()==='expenses'?'saídas':tab()==='payments'?'recebimentos':'contas a receber')" autocomplete="off" spellcheck="false" />
+        @if(searchInput()){<button class="finance-search-clear" type="button" aria-label="Limpar busca" (click)="resetCodeSearch()"><bf-icon name="close"/></button>}
+        <button type="submit" class="finance-search-submit" [disabled]="searchBusy()">{{searchBusy()?'Buscando...':'Buscar'}}</button>
+      </form>
+      <span class="finance-search-hint">{{searchActive()?'Resultado da consulta ao histórico completo':'Pesquise pelo código completo em todo o histórico'}}</span>
+    </div>
+    @if(searchError()){<p class="finance-search-error" role="alert">{{searchError()}}</p>}
+    @if(searchActive()){<div class="finance-search-state" role="status">Busca aplicada <button type="button" (click)="resetCodeSearch()">Mostrar todos <bf-icon name="close"/></button></div>}
+  }
 
   @if(tab()==='expenses'){
     @if (!store.expensesInitialized()) {
       <bf-table-skeleton [columns]="6" [rows]="7" />
     } @else {
-      <div class="bf-table-wrap"><table class="bf-table"><thead><tr><th>ID</th><th>Data</th><th>Tipo</th><th>Categoria / Insumo</th><th>Valor</th><th>Forma</th><th></th></tr></thead><tbody>
-        @for(item of store.expenses();track item.id){<tr><td><strong>{{item.code}}</strong></td><td>{{date(item.businessDate)}}</td><td>{{item.kind}}</td><td>{{item.kind==='input-purchase'?purchaseDescription(item):categoryName(item.categoryId)}}</td><td>{{currency(item.amountCents)}}</td><td>{{paymentName(item.paymentMethodId || '')}}</td><td><button class="bf-button secondary" type="button" (click)="openExpenseDetails(item)">Ver</button></td></tr>} @empty {<tr><td colspan="7"><bf-empty-state title="Nenhuma saída registrada" description="Compras de insumos e despesas aparecem aqui." /></td></tr>}
-      </tbody></table></div>
-      @if (store.expenseHasMore()) { <div class="bf-actions"><button class="bf-button secondary" type="button" (click)="store.loadMoreExpenses()">Carregar mais</button></div> }
+      <div class="finance-desktop bf-table-wrap">
+        <table class="bf-table finance-table"><thead><tr><th>Descrição</th><th>Tipo</th><th>Data</th><th>Pagamento</th><th class="align-right">Valor</th><th><span class="sr-only">Ações</span></th></tr></thead><tbody>
+          @for(item of visibleExpenses(); track item.id){
+            <tr>
+              <td class="finance-description"><strong>{{expenseDescription(item)}}</strong><small>{{item.code}} @if(item.status==='cancelled'){· Cancelada}</small></td>
+              <td><span class="finance-type"><bf-icon [name]="expenseIcons[item.kind]"/>{{expenseLabels[item.kind]}}</span></td>
+              <td>{{date(item.businessDate)}}</td><td>{{paymentName(item.paymentMethodId || '')}}</td>
+              <td class="align-right finance-money">{{currency(item.status==='cancelled'?(item.cancelledAmountCents??0):item.amountCents)}}</td>
+              <td class="finance-action"><button class="bf-button secondary" type="button" (click)="openExpenseDetails(item)">Detalhes</button></td>
+            </tr>
+          } @empty {<tr><td colspan="6"><bf-empty-state title="Nenhuma saída encontrada" description="Confira o código buscado ou cadastre uma nova saída." /></td></tr>}
+        </tbody></table>
+      </div>
+      <div class="finance-record-list" aria-label="Saídas registradas">
+        @for(item of visibleExpenses(); track item.id){
+          <button class="finance-record-card" type="button" (click)="openExpenseDetails(item)" [attr.aria-label]="'Ver detalhes da saída '+item.code">
+            <span class="finance-record-top"><span class="finance-record-title">{{expenseDescription(item)}}</span><strong class="finance-record-value">{{currency(item.status==='cancelled'?(item.cancelledAmountCents??0):item.amountCents)}}</strong></span>
+            <span class="finance-record-kind"><bf-icon [name]="expenseIcons[item.kind]"/>{{expenseLabels[item.kind]}} @if(item.status==='cancelled'){<span class="finance-cancelled">Cancelada</span>}</span>
+            <span class="finance-record-bottom"><span>{{item.code}} · {{date(item.businessDate)}}<span class="finance-record-method"> · {{paymentName(item.paymentMethodId || '')}}</span></span><span class="finance-record-link">Detalhes <bf-icon name="chevron-right"/></span></span>
+          </button>
+        } @empty {<bf-empty-state title="Nenhuma saída encontrada" description="Confira o código buscado ou cadastre uma nova saída."/>}
+      </div>
+      @if (store.expenseHasMore() && !searchActive()) { <div class="bf-actions finance-more"><button class="bf-button secondary" type="button" (click)="store.loadMoreExpenses()"><bf-icon name="plus"/> Carregar mais saídas</button></div> }
     }
   } @else if(tab()==='receivables'){
     @if (!sales.receivablesInitialized()) {
       <bf-list-skeleton [rows]="6" />
     } @else {
       @if(overdueOnly()) { <div class="bf-actions"><button class="bf-button secondary" type="button" (click)="overdueOnly.set(false)">Mostrar todas as contas</button></div> }
-      <div class="receivable-list">@for(item of visibleReceivables();track item.id){<article><div><strong>{{item.customerName || 'Cliente não informado'}}</strong><span>{{item.code}} · {{date(item.businessDate)}}</span></div><div class="amount"><strong>{{currency(item.balanceCents)}}</strong><span>{{item.dueDate ? 'vence ' + date(item.dueDate) : 'sem vencimento'}}</span></div><button class="bf-button" type="button" (click)="openReceipt(item.id)">Receber</button></article>} @empty {<bf-empty-state title="Nada a receber" description="Todas as vendas estão quitadas." />}</div>
-      @if (sales.receivableHasMore()) { <div class="bf-actions"><button class="bf-button secondary" type="button" (click)="sales.loadMoreReceivables()">Carregar mais</button></div> }
+      <div class="receivable-list">@for(item of visibleReceivables();track item.id){
+        <article>
+          <div class="receivable-customer"><span class="finance-record-kind"><bf-icon name="customer"/> Cliente</span><strong>{{item.customerName || 'Cliente não informado'}}</strong><span>{{item.code}} · Pedido de {{date(item.businessDate)}}</span></div>
+          <div class="amount"><small>Saldo pendente</small><strong>{{currency(item.balanceCents)}}</strong><span>{{item.dueDate ? 'Vence em ' + date(item.dueDate) : 'Sem vencimento definido'}}</span></div>
+          <button class="bf-button" type="button" (click)="openReceipt(item.id)"><bf-icon name="received"/> Receber</button>
+        </article>
+      } @empty {<bf-empty-state title="Nada a receber" description="Nenhuma venda pendente encontrada." />}</div>
+      @if (sales.receivableHasMore() && !searchActive()) { <div class="bf-actions finance-more"><button class="bf-button secondary" type="button" (click)="sales.loadMoreReceivables()"><bf-icon name="plus"/> Carregar mais contas</button></div> }
     }
+  } @else if(tab()==='cash') {
+    <div class="cash-panel">
+      <div class="cash-panel-header">
+        <div><h2>Caixa e capital</h2><p>Aportes, empréstimos, retiradas e reembolsos ficam separados das vendas e despesas.</p></div>
+        <div class="cash-actions">
+          <button class="bf-button secondary" type="button" (click)="openCheckBalance()"><bf-icon name="check"/> Conferir saldo</button>
+          <button class="bf-button" type="button" (click)="openMovement()"><bf-icon name="plus"/> Movimentação</button>
+        </div>
+      </div>
+      @if(cashLoading() && !cashLoaded()) {
+        <bf-list-skeleton [rows]="5"/>
+      } @else {
+        <div class="cash-confirmed">
+          <div><span>Último saldo confirmado</span>
+            <strong>{{cashCheckLatest() ? currency(cashCheckLatest()!.balanceCents) : 'Aguardando conferência'}}</strong>
+            @if(cashCheckLatest()){<small>{{cashCheckLatest()!.accountName}} · {{date(cashCheckLatest()!.businessDate)}}</small>}
+          </div>
+          <p>Esta é uma conferência de saldo, não uma estimativa automática do banco. Pagamentos e despesas anteriores continuam registrados em suas operações.</p>
+        </div>
+        <div class="cash-panel-header"><h3>Movimentações avulsas</h3><button class="bf-button secondary" type="button" [disabled]="cashLoading()" (click)="loadCash()"><bf-icon name="history"/> Atualizar</button></div>
+        <div class="cash-list">
+          @for(item of capitalMovements();track item.id) {
+            <article [class.reversed]="item.status==='reversed'">
+              <span class="cash-icon"><bf-icon [name]="item.impactCents<0?'cash-out':'received'"/></span>
+              <div class="cash-line-info"><strong>{{cashMovementTypes[item.kind].label}}</strong>
+                <small>{{date(item.businessDate)}} · {{item.accountName}} @if(item.partyName){ · {{item.partyName}} }</small>
+                @if(item.notes){<small>{{item.notes}}</small>}
+                @if(item.status==='reversed'){<span class="bf-badge muted">Estornada</span>}
+              </div>
+              <strong class="cash-amount" [class.out]="item.impactCents<0">{{currency(item.amountCents)}}</strong>
+              @if(item.status==='active'){<button class="bf-button secondary" type="button" (click)="openReverseMovement(item)">Estornar</button>}
+            </article>
+          } @empty {<bf-empty-state title="Nenhuma movimentação avulsa" description="Vendas, recebimentos e compras continuam nas abas próprias. Use esta área para dinheiro que entrou ou saiu fora dessas operações."/>}
+        </div>
+      }
+    </div>
   } @else {
     @if (!store.paymentsInitialized()) {
       <bf-table-skeleton [columns]="8" [rows]="7" />
     } @else {
-      <div class="bf-table-wrap"><table class="bf-table"><thead><tr><th>ID</th><th>Data</th><th>Venda</th><th>Forma</th><th>Aplicado</th><th>Gorjeta</th><th>Status</th><th></th></tr></thead><tbody>
-        @for(item of store.payments();track item.id){<tr><td><strong>{{item.code}}</strong></td><td>{{date(item.businessDate)}}</td><td>{{item.saleId.slice(0,8)}}</td><td>{{paymentName(item.methodId)}}</td><td>{{currency(item.appliedCents)}}</td><td>{{currency(item.tipCents)}}</td><td><span class="bf-badge" [class.muted]="item.status!=='active'">{{item.status==='active'?'Ativo':'Estornado'}}</span></td><td>@if(item.status==='active'){<button class="bf-button secondary" type="button" [disabled]="!!reversingPaymentId()" [bfLoadingButton]="reversingPaymentId()===item.id" (click)="reversePayment(item.id)">{{reversingPaymentId()===item.id?'Estornando...':'Estornar'}}</button>}</td></tr>} @empty {<tr><td colspan="8"><bf-empty-state title="Nenhum recebimento" description="Pagamentos de vendas aparecem aqui." /></td></tr>}
+      <div class="finance-desktop bf-table-wrap"><table class="bf-table finance-table"><thead><tr><th>Recebimento</th><th>Venda</th><th>Data</th><th>Forma</th><th>Status</th><th class="align-right">Valor</th><th><span class="sr-only">Ações</span></th></tr></thead><tbody>
+        @for(item of visiblePayments();track item.id){
+          <tr>
+            <td class="finance-description"><strong>{{item.code}}</strong><small>@if(item.tipCents){Inclui {{currency(item.tipCents)}} de gorjeta}@else{Pagamento registrado}</small></td>
+            <td>{{item.saleId.slice(0,8)}}</td><td>{{date(item.businessDate)}}</td>
+            <td><span class="finance-type"><bf-icon [name]="paymentIcon(item.methodId)"/>{{paymentName(item.methodId)}}</span></td>
+            <td><span class="bf-badge" [class.muted]="item.status!=='active'">{{item.status==='active'?'Ativo':'Estornado'}}</span></td>
+            <td class="align-right finance-money">{{currency(item.amountReceivedCents)}}</td>
+            <td class="finance-action"><button class="bf-button secondary" type="button" (click)="openPaymentDetails(item)">Detalhes</button></td>
+          </tr>
+        } @empty {<tr><td colspan="7"><bf-empty-state title="Nenhum recebimento encontrado" description="Confira o código buscado ou consulte outro período." /></td></tr>}
       </tbody></table></div>
-      @if (store.paymentHasMore()) { <div class="bf-actions"><button class="bf-button secondary" type="button" (click)="store.loadMorePayments()">Carregar mais</button></div> }
+      <div class="finance-record-list" aria-label="Recebimentos registrados">
+        @for(item of visiblePayments();track item.id){
+          <button class="finance-record-card" type="button" (click)="openPaymentDetails(item)" [attr.aria-label]="'Ver detalhes do recebimento '+item.code">
+            <span class="finance-record-top"><span class="finance-record-title">Recebimento {{item.code}}</span><strong class="finance-record-value">{{currency(item.amountReceivedCents)}}</strong></span>
+            <span class="finance-record-kind"><bf-icon [name]="paymentIcon(item.methodId)"/>{{paymentName(item.methodId)}} @if(item.status!=='active'){<span class="finance-cancelled">Estornado</span>}</span>
+            <span class="finance-record-bottom"><span>{{date(item.businessDate)}} · Venda {{item.saleId.slice(0,8)}}</span><span class="finance-record-link">Detalhes <bf-icon name="chevron-right"/></span></span>
+          </button>
+        } @empty {<bf-empty-state title="Nenhum recebimento encontrado" description="Confira o código buscado ou consulte outro período." />}
+      </div>
+      @if (store.paymentHasMore() && !searchActive()) { <div class="bf-actions finance-more"><button class="bf-button secondary" type="button" (click)="store.loadMorePayments()"><bf-icon name="plus"/> Carregar mais recebimentos</button></div> }
     }
   }
 
-  <bf-finance-dialogs #financeDialogs />
+  <bf-finance-dialogs #financeDialogs (expenseChanged)="onExpenseChanged($event)" />
 
 </section>
+
+<dialog bfDialog #paymentDetailDialog="bfDialog" class="bf-dialog" [busy]="!!reversingPaymentId()">
+  <div class="bf-dialog-header"><h2>Detalhes do recebimento</h2><button class="bf-floating-close" type="button" (click)="paymentDetailDialog.close()" aria-label="Fechar detalhes"><bf-icon name="close"/></button></div>
+  <div class="bf-dialog-body">
+    @if(selectedPayment(); as payment){
+      <div class="receipt-balance"><span>{{payment.code}} · {{date(payment.businessDate)}}</span><strong>{{currency(payment.amountReceivedCents)}}</strong></div>
+      <div class="finance-detail-grid"><div><small>Venda vinculada</small><strong>{{payment.saleId.slice(0,8)}}</strong></div><div><small>Forma de pagamento</small><strong>{{paymentName(payment.methodId)}}</strong></div><div><small>Aplicado à venda</small><strong>{{currency(payment.appliedCents)}}</strong></div><div><small>Gorjeta</small><strong>{{currency(payment.tipCents)}}</strong></div></div>
+      <p><span class="bf-badge" [class.muted]="payment.status!=='active'">{{payment.status==='active'?'Ativo':'Estornado'}}</span></p>
+      @if(payment.notes){<p>{{payment.notes}}</p>}
+    }
+  </div>
+  <div class="bf-dialog-footer">
+    @if(selectedPayment(); as payment){@if(payment.status==='active'){
+      <button class="bf-button danger" type="button" [disabled]="!!reversingPaymentId()" [bfLoadingButton]="reversingPaymentId()===payment.id" (click)="reversePayment(payment.id)">Estornar recebimento</button>
+    }}
+    <button class="bf-button secondary" type="button" (click)="paymentDetailDialog.close()">Fechar</button>
+  </div>
+</dialog>
 
 <dialog bfDialog #expenseDetailDialog="bfDialog" class="bf-dialog" [busy]="receivingPurchase()">
   <div class="bf-dialog-header"><h2>Detalhes da saída</h2><button class="bf-floating-close" type="button" (click)="expenseDetailDialog.close()" aria-label="Fechar janela"><bf-icon name="close"/></button></div>
   <div class="bf-dialog-body">
     @if(selectedExpense();as expense){
-      <div class="receipt-balance"><span>{{expense.code}} · {{date(expense.businessDate)}}</span><strong>{{currency(expense.amountCents)}}</strong></div>
+      <div class="receipt-balance"><span>{{expense.code}} · {{date(expense.businessDate)}}</span><strong>{{currency(expense.status==='cancelled' ? (expense.cancelledAmountCents ?? 0) : expense.amountCents)}}</strong></div>
+      @if(expense.status==='cancelled'){<span class="bf-badge muted">Lançamento cancelado</span>}
       <h3>Itens registrados</h3>
       @for(item of expense.items ?? [];track item.inputId){
         <div class="purchase-detail-row"><strong>{{inputName(item.inputId)}}</strong><span>{{item.quantity}} {{purchaseUnit(item.inputId)}}</span><strong>{{currency(item.amountCents)}}</strong></div>
       } @empty {<p>{{expense.kind==='input-purchase'?inputName(expense.inputId):categoryName(expense.categoryId)}}</p>}
       @if(expense.notes){<p>{{expense.notes}}</p>}
-      <p>Origem: {{ expense.fundingSource === 'ewerton' ? 'Ewerton (aporte)' : expense.fundingSource === 'maria' ? 'Maria (aporte)' : expense.fundingSource === 'owner-unassigned' ? 'Aporte pessoal a atribuir' : expense.fundingSource === 'unverified' ? 'Origem a confirmar' : 'Conta Bem Feito' }}</p>
+      <p>Origem: {{ fundingType(expense) === 'business' ? 'Recursos do negócio' : fundingType(expense) === 'unverified' ? 'A confirmar' : 'Pago por outra pessoa' }}</p>
+      @if(fundingParty(expense)){<p>Quem pagou: {{ fundingParty(expense) }} · {{ expense.reimbursable ? 'Com reembolso' : 'Sem reembolso informado' }}</p>}
       @if(expense.charges?.length){<h3>Custos adicionais</h3>@for(charge of expense.charges ?? [];track $index){<div class="purchase-detail-row"><span>{{ charge.kind === 'shipping' ? 'Frete' : charge.kind === 'interest' ? 'Juros' : charge.description || 'Outro' }}</span><strong>{{currency(charge.amountCents)}}</strong></div>}}
       @if(expense.receiptStatus === 'pending'){<p>Compra a receber · ainda não adicionada ao estoque.</p>}
     }
   </div>
-  <div class="bf-dialog-footer">@if(selectedExpense()?.receiptStatus==='pending'){<button class="bf-button" type="button" [disabled]="receivingPurchase()" [bfLoadingButton]="receivingPurchase()" (click)="receiveSelectedPurchase()">{{receivingPurchase()?'Confirmando...':'Confirmar recebimento'}}</button>}<button class="bf-button secondary" type="button" (click)="expenseDetailDialog.close()">Fechar</button></div>
+  <div class="bf-dialog-footer">
+    @if(selectedExpense()?.status!=='cancelled'){<button class="bf-button secondary" type="button" (click)="editSelectedExpense()"><bf-icon name="details"/> Corrigir</button>
+      <button class="bf-button danger" type="button" (click)="showCancelExpense()">Cancelar lançamento</button>}
+    @if(selectedExpense()?.status!=='cancelled' && selectedExpense()?.receiptStatus==='pending'){<button class="bf-button" type="button" [disabled]="receivingPurchase()" [bfLoadingButton]="receivingPurchase()" (click)="receiveSelectedPurchase()">{{receivingPurchase()?'Confirmando...':'Confirmar recebimento'}}</button>}<button class="bf-button secondary" type="button" (click)="expenseDetailDialog.close()">Fechar</button></div>
+</dialog>
+<dialog bfDialog #expenseCancelDialog="bfDialog" class="bf-dialog" [busy]="cancellingExpense()">
+  <div class="bf-dialog-header"><div><h2>Cancelar lançamento</h2><small>{{selectedExpense()?.code}}</small></div>
+    <button class="bf-floating-close" type="button" (click)="expenseCancelDialog.close()" aria-label="Fechar"><bf-icon name="close"/></button></div>
+  <div class="bf-dialog-body">
+    <p>O lançamento ficará no histórico. O sistema irá reverter o impacto financeiro e, quando possível, os insumos recebidos. Não é permitido retirar estoque já consumido ou reservado.</p>
+    <label class="bf-field"><span>Motivo do cancelamento *</span>
+      <textarea class="bf-textarea" rows="3" maxlength="240" [value]="cancelReason()" (input)="cancelReason.set($any($event.target).value)" placeholder="Explique por que o lançamento será cancelado"></textarea>
+    </label>
+    @if(store.operationError()){<div class="bf-form-error" role="alert">{{store.operationError()}}</div>}
+  </div>
+  <div class="bf-dialog-footer"><button class="bf-button secondary" type="button" (click)="expenseCancelDialog.close()">Voltar</button>
+    <button class="bf-button danger" type="button" [disabled]="cancellingExpense() || cancelReason().trim().length<4" [bfLoadingButton]="cancellingExpense()" (click)="cancelSelectedExpense()">Confirmar cancelamento</button></div>
+</dialog>
+
+<dialog bfDialog #movementDialog="bfDialog" class="bf-dialog" [busy]="cashSaving()">
+  <div class="bf-dialog-header"><h2>Registrar movimentação</h2><button class="bf-floating-close" type="button" (click)="movementDialog.close()" aria-label="Fechar"><bf-icon name="close"/></button></div>
+  <div class="bf-dialog-body">
+    <p>Use apenas para aportes, empréstimos, retiradas e outros movimentos que não sejam uma venda ou compra já registrada.</p>
+    <div class="bf-grid two">
+      <label class="bf-field full"><span>Tipo de movimentação</span><bf-select [value]="cashDraft().kind" [options]="cashKindOptions" (valueChange)="cashDraft.update(v=>({...v,kind:$any($event)}))" ariaLabel="Tipo de movimentação"/></label>
+      <label class="bf-field"><span>Data</span><input class="bf-input" type="date" [value]="cashDraft().businessDate" (input)="cashDraft.update(v=>({...v,businessDate:$any($event.target).value}))"/></label>
+      <label class="bf-field"><span>Valor</span><bf-number-input kind="currency" [value]="cashDraft().amount" (valueChange)="cashDraft.update(v=>({...v,amount:$event}))" ariaLabel="Valor da movimentação"/></label>
+      <label class="bf-field full"><span>Conta movimentada</span><input class="bf-input" maxlength="120" [value]="cashDraft().accountName" (input)="cashDraft.update(v=>({...v,accountName:$any($event.target).value}))" placeholder="Ex.: Conta principal ou dinheiro em mãos"/></label>
+      @if(['contribution','loan','reimbursement'].includes(cashDraft().kind)){
+        <label class="bf-field full"><span>Pessoa ou organização</span><input class="bf-input" maxlength="120" [value]="cashDraft().partyName" (input)="cashDraft.update(v=>({...v,partyName:$any($event.target).value}))" placeholder="Quem forneceu ou recebeu os recursos"/></label>
+      }
+      <label class="bf-field full"><span>Observações</span><textarea class="bf-textarea" maxlength="500" rows="2" [value]="cashDraft().notes" (input)="cashDraft.update(v=>({...v,notes:$any($event.target).value}))"></textarea></label>
+    </div>
+    @if(cashError()){<div class="bf-form-error" role="alert">{{cashError()}}</div>}
+  </div>
+  <div class="bf-dialog-footer"><button class="bf-button secondary" type="button" (click)="movementDialog.close()">Voltar</button><button class="bf-button" type="button" [disabled]="cashSaving()" [bfLoadingButton]="cashSaving()" (click)="saveMovement()">Registrar</button></div>
+</dialog>
+<dialog bfDialog #checkBalanceDialog="bfDialog" class="bf-dialog" [busy]="cashSaving()">
+  <div class="bf-dialog-header"><h2>Conferir saldo</h2><button class="bf-floating-close" type="button" (click)="checkBalanceDialog.close()" aria-label="Fechar"><bf-icon name="close"/></button></div>
+  <div class="bf-dialog-body">
+    <p>Registre quanto existe realmente na conta ou em dinheiro na data da conferência. Não cria receita, despesa ou ajuste fictício. O registro anterior permanece no histórico.</p>
+    <div class="bf-grid two">
+      <label class="bf-field"><span>Data</span><input class="bf-input" type="date" [value]="cashCheckDraft().businessDate" (input)="cashCheckDraft.update(v=>({...v,businessDate:$any($event.target).value}))"/></label>
+      <label class="bf-field"><span>Saldo real</span><bf-number-input kind="currency" [value]="cashCheckDraft().balance" (valueChange)="cashCheckDraft.update(v=>({...v,balance:$event}))" ariaLabel="Saldo confirmado"/></label>
+      <label class="bf-field full"><span>Conta conferida</span><input class="bf-input" maxlength="120" [value]="cashCheckDraft().accountName" (input)="cashCheckDraft.update(v=>({...v,accountName:$any($event.target).value}))"/></label>
+      <label class="bf-field full"><span>Observações</span><textarea class="bf-textarea" maxlength="500" rows="2" [value]="cashCheckDraft().note" (input)="cashCheckDraft.update(v=>({...v,note:$any($event.target).value}))"></textarea></label>
+    </div>
+    @if(cashError()){<div class="bf-form-error" role="alert">{{cashError()}}</div>}
+  </div>
+  <div class="bf-dialog-footer"><button class="bf-button secondary" type="button" (click)="checkBalanceDialog.close()">Voltar</button><button class="bf-button" type="button" [disabled]="cashSaving()" [bfLoadingButton]="cashSaving()" (click)="saveBalanceCheck()">Confirmar saldo</button></div>
+</dialog>
+<dialog bfDialog #reverseMovementDialog="bfDialog" class="bf-dialog" [busy]="cashSaving()">
+  <div class="bf-dialog-header"><h2>Estornar movimentação</h2><button class="bf-floating-close" type="button" (click)="reverseMovementDialog.close()" aria-label="Fechar"><bf-icon name="close"/></button></div>
+  <div class="bf-dialog-body">
+    <p>O registro original permanecerá no histórico, mas deixará de compor as movimentações ativas.</p>
+    <label class="bf-field"><span>Motivo do estorno</span><textarea class="bf-textarea" rows="3" maxlength="240" [value]="cashReverseReason()" (input)="cashReverseReason.set($any($event.target).value)"></textarea></label>
+    @if(cashError()){<div class="bf-form-error" role="alert">{{cashError()}}</div>}
+  </div>
+  <div class="bf-dialog-footer"><button class="bf-button secondary" type="button" (click)="reverseMovementDialog.close()">Voltar</button><button class="bf-button danger" type="button" [disabled]="cashSaving() || cashReverseReason().trim().length<4" [bfLoadingButton]="cashSaving()" (click)="reverseCashMovement()">Estornar</button></div>
 </dialog>

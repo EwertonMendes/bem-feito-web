@@ -1,5 +1,5 @@
 import { inject, Injectable } from '@angular/core';
-import { collection, doc, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { collection, deleteField, doc, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { landedPurchaseCosts } from '../../domain/logic/acquisition';
 import { trackingModeForInput } from '../../domain/logic/costing';
 import { stockStatusForInput } from '../../domain/logic/stock-status';
@@ -96,7 +96,7 @@ export class ExpenseCorrectionRepository {
         cancelledAmountCents: current.amountCents, status: 'cancelled' } : {
           ...current, businessDate: draft!.businessDate, amountCents: total,
           paymentMethodId: draft!.paymentMethodId, fundingSource: paymentSource,
-          fundingType: source, paidBy: draft!.paidBy?.trim() || current.paidBy,
+          fundingType: source, paidBy: source === 'third-party' ? (draft!.paidBy?.trim() || current.paidBy) : undefined,
           reimbursable: source === 'third-party' && !!draft!.reimbursable,
           bankDebitCents: source === 'business' ? total : 0,
           notes: draft!.notes?.trim(), link: draft!.link?.trim(),
@@ -157,6 +157,7 @@ export class ExpenseCorrectionRepository {
       }
       const { id: _id, createdAt: _createdAt, createdBy: _createdBy, ...editable } = next;
       tx.update(expenseRef, { ...safeRecord(editable),
+        ...(!cancelling && source !== 'third-party' && current.paidBy ? { paidBy: deleteField() } : {}),
         updatedAt: serverTimestamp(), updatedBy: userId });
       const revisionRef = doc(collection(this.db, 'expenseCorrections'));
       tx.set(revisionRef, {

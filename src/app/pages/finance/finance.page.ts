@@ -7,7 +7,7 @@ import { FinanceStore } from '../../features/finance/finance.store';
 import { BfFinanceDialogs } from '../../features/finance/components/finance-dialogs';
 import { SalesStore } from '../../features/sales/sales.store';
 import { SettingsStore } from '../../features/settings/settings.store';
-import { Expense, ExpenseKind } from '../../domain/models/finance.model';
+import { Expense, ExpenseKind, fundingPartyOf, fundingTypeOf } from '../../domain/models/finance.model';
 import { todayBusinessDate, formatBusinessDate } from '../../core/utils/date';
 import { formatCurrency } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
@@ -52,6 +52,8 @@ export class FinancePage {
      this.receivingPurchase.set(false);
    }
  }
+ readonly fundingParty = fundingPartyOf;
+ readonly fundingType = fundingTypeOf;
  readonly currency = formatCurrency;
  readonly date = formatBusinessDate;
  readonly totalReceivable = this.sales.receivableTotalCents;

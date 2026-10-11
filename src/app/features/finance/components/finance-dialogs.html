@@ -29,7 +29,14 @@
         } @else {
           <label class="bf-field full"><span>Categoria</span><bf-select [formField]="expenseForm.categoryId" [options]="expenseCategoryOptions()" ariaLabel="Categoria" /></label>
         }
-        <label class="bf-field"><span>Origem do pagamento</span><bf-select [value]="model().fundingSource" (valueChange)="setFundingSource($event)" [options]="fundingOptions" ariaLabel="Origem do pagamento" /></label>
+        <label class="bf-field"><span>Origem do pagamento</span><bf-select [value]="model().fundingType" (valueChange)="setFundingSource($event)" [options]="fundingOptions" ariaLabel="Origem do pagamento" /></label>
+        @if(model().fundingType==='third-party'){
+          <label class="bf-field"><span>Quem pagou?</span><input class="bf-input" type="text" maxlength="120" autocomplete="off" [value]="model().paidBy" (input)="setPaidBy($any($event.target).value)" placeholder="Pessoa ou organização" /></label>
+          <div class="full"><bf-checkbox [checked]="model().reimbursable" (checkedChange)="setReimbursable($event)" label="O negócio deverá reembolsar esse valor" /></div>
+        }
+        @if(model().fundingType==='unverified'){
+          <p class="purchase-hint full">A origem fica pendente de confirmação. O valor não será presumido como saída do caixa.</p>
+        }
         @if(model().kind==='input-purchase'){
           <label class="bf-field"><span>Entrega dos insumos</span><bf-select [value]="model().receiptStatus" (valueChange)="setReceiptStatus($event)" [options]="arrivalOptions" ariaLabel="Entrega dos insumos" /></label>
           <label class="bf-field"><span>Frete (incorporar ao custo)</span><bf-number-input kind="currency" [value]="model().shipping" (valueChange)="patchCharge('shipping',$event)" ariaLabel="Frete" /></label>

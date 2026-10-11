@@ -82,7 +82,7 @@ export class DashboardPage {
   }
 
   @HostListener('document:keydown.escape', ['$event'])
-  onEscape(event: KeyboardEvent): void {
+  onEscape(event: Event): void {
     if (!this.customOpen()) return;
     event.preventDefault();
     this.cancelCustom();

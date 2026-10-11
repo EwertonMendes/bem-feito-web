@@ -23,8 +23,10 @@ const number = (value) => {
 };
 const date = (value) => {
   if (typeof value === 'number') return new Date(Date.UTC(1899, 11, 30) + Math.floor(value) * 86400000).toISOString().slice(0, 10);
-  const result = text(value);
-  if (!result) return '';
+  const source = text(value);
+  if (!source) return '';
+  const br = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(source);
+  const result = br ? `${br[3]}-${br[2]}-${br[1]}` : source;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(result) || new Date(result + 'T00:00:00Z').toISOString().slice(0, 10) !== result) throw new Error('Data inválida na exportação.');
   return result;
 };

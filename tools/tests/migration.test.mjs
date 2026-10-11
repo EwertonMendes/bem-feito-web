@@ -17,7 +17,8 @@ test('Migration excludes template slots, converts Sheets dates, preserves source
         { Insumo_ID: 'i', Insumo: 'TEST ONLY', 'Unidade Base': 'kg', Ativo: 'Sim', 'Estoque Inicial': 2, 'Estoque Atual': 2, 'Custo Médio Unit.': 19.475, 'Estoque Mínimo': '' },
         { Insumo_ID: 'reserved', Insumo: '', 'Unidade Base': 'un', Ativo: 'Não', 'Estoque Atual': 0 },
       ],
-      Recebimentos: [{ Pagamento_ID: 'reserved' }], Produção: [{ Produção_ID: 'reserved' }],
+      Recebimentos: [{ Pagamento_ID: 'reserved' }],
+      Produção: [{ Produção_ID: 'PR99999', Data: '11/09/2026', Produto_ID: 'PROD-TEST', Produto: 'Teste', Quantidade: 1 }],
       Produtos: [{ Produto_ID: 'reserved', Ativo: 'Não', 'Estoque Atual': 0, 'Estoque Mínimo': 3 }],
       'Compras e Despesas': [{ Mov_ID: 'e', Data: 46296.5, Tipo: 'Outro', 'Valor Total': 1.25 }],
     }}));
@@ -26,7 +27,8 @@ test('Migration excludes template slots, converts Sheets dates, preserves source
     assert.equal(data.inputs.length, 1);
     assert.equal(data.products.length, 0);
     assert.equal(data.payments.length, 0);
-    assert.equal(data.productions.length, 0);
+    assert.equal(data.productions.length, 1);
+    assert.equal(data.productions[0].businessDate, '2026-09-11');
     assert.equal(data.inputs[0].minimumStockConfigured, false);
     assert.equal(data.inputs[0].stock, 2);
     assert.equal(data.inputs[0].stockStatus, 'untracked');

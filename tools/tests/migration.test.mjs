@@ -6,6 +6,28 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const run = (script, ...args) => spawnSync(process.execPath, ['tools/migration/' + script, ...args], { encoding: 'utf8' });
+
+test('A Brazilian date from a text-formatted production cell is normalized strictly', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'bem-feito-date-test-'));
+  try {
+    const rawPath = join(dir, 'raw.json');
+    const outputPath = join(dir, 'result.json');
+    await writeFile(rawPath, JSON.stringify({ sheets: { 'Produção': [
+      { Produção_ID: 'PR99999', Data: '11/09/2026', Produto_ID: 'PROD-TEST', Produto: 'Teste', Quantidade: 1 },
+    ] } }));
+    const valid = run('normalize-legacy.mjs', rawPath, outputPath);
+    assert.equal(valid.status, 0, valid.stderr);
+    const result = JSON.parse(await readFile(outputPath, 'utf8'));
+    assert.equal(result.productions[0].businessDate, '2026-09-11');
+    await writeFile(rawPath, JSON.stringify({ sheets: { 'Produção': [
+      { Produção_ID: 'PR99999', Data: '31/02/2026', Produto_ID: 'PROD-TEST', Produto: 'Teste', Quantidade: 1 },
+    ] } }));
+    assert.notEqual(run('normalize-legacy.mjs', rawPath, outputPath).status, 0);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('Migration excludes template slots, converts Sheets dates, preserves source stocks and optional thresholds', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'bem-feito-migration-test-'));
   try {
@@ -17,8 +39,7 @@ test('Migration excludes template slots, converts Sheets dates, preserves source
         { Insumo_ID: 'i', Insumo: 'TEST ONLY', 'Unidade Base': 'kg', Ativo: 'Sim', 'Estoque Inicial': 2, 'Estoque Atual': 2, 'Custo Médio Unit.': 19.475, 'Estoque Mínimo': '' },
         { Insumo_ID: 'reserved', Insumo: '', 'Unidade Base': 'un', Ativo: 'Não', 'Estoque Atual': 0 },
       ],
-      Recebimentos: [{ Pagamento_ID: 'reserved' }],
-      Produção: [{ Produção_ID: 'PR99999', Data: '11/09/2026', Produto_ID: 'PROD-TEST', Produto: 'Teste', Quantidade: 1 }],
+      Recebimentos: [{ Pagamento_ID: 'reserved' }], Produção: [{ Produção_ID: 'reserved' }],
       Produtos: [{ Produto_ID: 'reserved', Ativo: 'Não', 'Estoque Atual': 0, 'Estoque Mínimo': 3 }],
       'Compras e Despesas': [{ Mov_ID: 'e', Data: 46296.5, Tipo: 'Outro', 'Valor Total': 1.25 }],
     }}));
@@ -27,8 +48,7 @@ test('Migration excludes template slots, converts Sheets dates, preserves source
     assert.equal(data.inputs.length, 1);
     assert.equal(data.products.length, 0);
     assert.equal(data.payments.length, 0);
-    assert.equal(data.productions.length, 1);
-    assert.equal(data.productions[0].businessDate, '2026-09-11');
+    assert.equal(data.productions.length, 0);
     assert.equal(data.inputs[0].minimumStockConfigured, false);
     assert.equal(data.inputs[0].stock, 2);
     assert.equal(data.inputs[0].stockStatus, 'untracked');

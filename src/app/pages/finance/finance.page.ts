@@ -97,11 +97,17 @@ export class FinancePage {
    other: 'other-expense',
  };
  expenseDescription(expense: Expense): string {
+   const explicit = expense.itemName?.trim();
    if (expense.kind === 'input-purchase') {
-     if (expense.items?.length === 1) return this.inputName(expense.items[0]?.inputId);
+     if (expense.items?.length === 1) {
+       const name = this.inputName(expense.items[0]?.inputId);
+       return name === '—' ? explicit || 'Insumo não identificado' : name;
+     }
      if (expense.items?.length) return `Compra de ${expense.items.length} insumos`;
-     return this.inputName(expense.inputId);
+     const name = this.inputName(expense.inputId);
+     return name === '—' ? explicit || 'Insumo não identificado' : name;
    }
+   if (explicit) return explicit;
    const category = this.categoryName(expense.categoryId);
    return category === '—' ? this.expenseLabels[expense.kind] : category;
  }
@@ -236,7 +242,7 @@ export class FinancePage {
    this.selectedExpense.set(expense);
    this.expenseDetailDialog().open();
  }
- purchaseDescription(expense: Expense): string { return expense.items?.length ? expense.items.length+' insumo(s)' : this.inputName(expense.inputId); }
+ purchaseDescription(expense: Expense): string { return expense.items?.length ? expense.items.length+' insumo(s)' : this.expenseDescription(expense); }
  purchaseUnit(inputId: string): string {
    const input = this.catalog.inputs().find(item => item.id === inputId);
    return input ? this.references.units().find(unit => unit.id === input.unitId)?.name ?? '' : '';

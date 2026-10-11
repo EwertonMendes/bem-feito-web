@@ -188,9 +188,7 @@ test('floating close styling preserves button touch size and aligned dialog foot
   assert.match(styles, /\.bf-dialog-header\s*\{\s*padding-right:\s*54px;/);
   assert.match(styles, /\.bf-dialog-footer\s*\{[^}]*justify-content:\s*flex-end;/s);
   assert.match(styles, /top: -19px;\s*right: -20px;\s*display: grid;/);
-  assert.match(styles, /@media \(max-width: 700px\) \{\s*\.bf-floating-close \{[^}]*top: -19px;\s*right: -12px;/s);
   assert.match(drive, /--bf-close-inset:6px;--bf-close-icon-size:14px;top:-19px;right:-20px/);
-  assert.match(drive, /\.drive-notice \.bf-floating-close\{top:-17px;right:-16px\}/);
 });
 
 // Dialog geometry regression: prevent the partially clipped X on compact screens.

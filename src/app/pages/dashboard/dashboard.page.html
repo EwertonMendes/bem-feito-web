@@ -12,14 +12,11 @@
               [attr.aria-pressed]="store.activePreset() === period.key" (click)="selectPreset(period.key)">{{ period.label }}</button>
           }
         </div>
-        <label class="period-compact-field">
-          <span class="visually-hidden">Período de análise</span>
-          <select class="period-select" aria-label="Período de análise" [value]="store.activePreset()" (change)="onCompactPeriodChange($any($event.target).value)">
-            @for (period of periodOptions; track period.key) { <option [value]="period.key">{{ period.label }}</option> }
-            <option value="custom">Período escolhido</option>
-          </select>
-          <bf-icon name="chevron-right" aria-hidden="true" />
-        </label>
+        <div class="period-compact-field">
+          <bf-select class="period-select" [compact]="true" [options]="compactPeriodOptions"
+            [value]="store.activePreset()" (valueChange)="onCompactPeriodChange($event)"
+            placeholder="Período escolhido" ariaLabel="Período de análise" />
+        </div>
         <div class="period-custom-anchor">
           <button #customTrigger type="button" class="period-custom-trigger" [class.active]="store.activePreset() === 'custom'"
             [attr.aria-expanded]="customOpen()" aria-haspopup="dialog" aria-controls="dashboard-period-popover"

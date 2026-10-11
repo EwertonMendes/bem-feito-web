@@ -185,38 +185,8 @@
     min-width: 0;
   }
 
-  .period-compact-field .visually-hidden {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
+  .period-select { width: 172px; }
 
-  .period-select {
-    width: 172px;
-    min-height: 36px;
-    padding: 0 32px 0 12px;
-    border: 0;
-    border-radius: 10px;
-    background: var(--surface-2);
-    color: var(--text);
-    font-size: 0.76rem;
-    font-weight: 680;
-    appearance: none;
-    cursor: pointer;
-  }
-
-  .period-compact-field bf-icon {
-    pointer-events: none;
-    position: absolute;
-    right: 10px;
-    width: 14px;
-    height: 14px;
-    color: var(--muted);
-    transform: rotate(90deg);
-  }
 }
 
 .metric-grid {
@@ -906,8 +876,9 @@
   }
 
   .period-custom-trigger {
-    width: 40px;
-    min-width: 40px;
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
     padding: 0;
   }
 

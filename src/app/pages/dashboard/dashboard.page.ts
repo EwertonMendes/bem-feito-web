@@ -4,12 +4,13 @@ import { DashboardStore } from '../../features/dashboard/dashboard.store';
 import { isValidBusinessDate, type DashboardPeriodPreset } from '../../core/utils/date';
 import { formatCurrency } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
+import { BfSelect } from '../../shared/ui/select/select';
 import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
 import { BfSkeleton } from '../../shared/ui/skeleton/skeleton';
 
 @Component({
   selector: 'bf-dashboard-page',
-  imports: [RouterLink, BfIcon, BfPageRefresh, BfSkeleton],
+  imports: [RouterLink, BfIcon, BfSelect, BfPageRefresh, BfSkeleton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './dashboard.page.html',
   styleUrl: './dashboard.page.scss',
@@ -29,6 +30,7 @@ export class DashboardPage {
     { key: 'month', label: 'Este mês' },
     { key: 'year', label: 'Este ano' },
   ];
+  readonly compactPeriodOptions = this.periodOptions.map((item) => ({ value: item.key, label: item.label }));
   readonly customOpen = signal(false);
   readonly customStart = signal('');
   readonly customEnd = signal('');
@@ -48,7 +50,6 @@ export class DashboardPage {
   onCompactPeriodChange(value: string): void {
     const option = this.periodOptions.find((item) => item.key === value);
     if (option) this.selectPreset(option.key);
-    else this.openCustom();
   }
 
   openCustom(): void {

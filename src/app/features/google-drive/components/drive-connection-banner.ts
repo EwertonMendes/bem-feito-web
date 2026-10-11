@@ -58,8 +58,10 @@ import { BfIcon } from '../../../shared/ui/icon/icon';
     .connect{white-space:nowrap;align-self:center}
     /* A compact 32px face anchored to the rounded top-right corner, not the interior. */
     .drive-notice .bf-floating-close{--bf-close-inset:6px;--bf-close-icon-size:14px;top:-19px;right:-20px}
-    @media(max-width:980px){.drive-notice{bottom:calc(94px + env(safe-area-inset-bottom));width:calc(100vw - 40px)}}
-    @media(max-width:700px){.drive-notice{width:calc(100vw - 32px);grid-template-columns:40px minmax(0,1fr);gap:10px 12px;padding:15px 16px}.drive-notice .bf-floating-close{top:-17px;right:-16px}.drive-logo{width:38px;height:34px}.connect{grid-column:2;justify-self:start}.copy{padding-right:0}}
+    /* Inside the notice on tablets/phones: neither the button nor its shadow
+       reaches the screen edge, and text/actions keep a reserved right gutter. */
+    @media(max-width:980px){.drive-notice{bottom:calc(94px + env(safe-area-inset-bottom));width:calc(100vw - 40px);padding-right:58px}.drive-notice .bf-floating-close{top:6px;right:6px}}
+    @media(max-width:700px){.drive-notice{width:calc(100vw - 32px);grid-template-columns:40px minmax(0,1fr);gap:10px 12px;padding:15px 54px 15px 16px}.drive-notice .bf-floating-close{top:5px;right:5px}.drive-logo{width:38px;height:34px}.connect{grid-column:2;justify-self:start}.copy{padding-right:0}}
   `],
 })
 export class DriveConnectionBanner {

@@ -1,0 +1,95 @@
+<dialog bfDialog #detailsDialog="bfDialog" class="bf-dialog catalog-details-dialog">
+  <div class="bf-dialog-header">
+    <div><h2>Detalhes {{kind()==='products'?'do sabonete':kind()==='inputs'?'do insumo':'do adicional'}}</h2><p>Consulta rápida, sem alterar o cadastro.</p></div>
+    <button class="bf-floating-close" type="button" aria-label="Fechar detalhes" (click)="close()"><bf-icon name="close"/></button>
+  </div>
+  <div class="bf-dialog-body">
+    @if (kind()==='products' && product(); as p) {
+      <div class="details-hero">
+        <bf-catalog-image [image]="p.image" [alt]="p.displayName" [compact]="true"/>
+        <div><span class="details-eyebrow">{{collectionName(p)}} · {{p.code}}</span>
+          <h3>{{p.displayName}}</h3>
+          <p>{{fragranceName(p)}} · {{formatName(p)}} @if(weight(p) !== null){ · ≈ {{quantity(weight(p)!)}} g}</p>
+          <span class="bf-badge" [class.muted]="!p.active">{{p.active?'Ativo':'Inativo'}}</span>
+        </div>
+      </div>
+      <div class="details-section-title">Preço e rentabilidade <small>Estimativas por unidade</small></div>
+      <div class="details-metrics">
+        <div><span>Preço de venda</span><strong>{{currency(p.salePriceCents)}}</strong></div>
+        <div><span>Custo da receita</span><strong>{{cost()?currency(cost()!.unitCostCents):'Indisponível'}}</strong>@if(cost()?.costPending){<small class="pending">Estimativa parcial</small>}</div>
+        <div><span>Lucro bruto</span><strong>{{profitability().profitCents===null?'Indisponível':currency(profitability().profitCents!)}}</strong></div>
+        <div><span>Margem bruta</span><strong>{{percent(profitability().marginPercent)}}</strong></div>
+      </div>
+      @if(!cost() || cost()?.costPending){<p class="details-alert"><bf-icon name="alert"/> Custos incompletos: confira o preço dos insumos antes de utilizar a margem para precificar.</p>}
+      <div class="details-section-title">Estoque e encomendas</div>
+      <div class="details-stock">
+        <div><span>Físico</span><strong>{{p.stock}}</strong></div>
+        <div><span>Reservado</span><strong>{{p.reservedPhysicalStock??0}}</strong></div>
+        <div><span>Livre</span><strong>{{availableStock(p)}}</strong></div>
+        <div><span>A produzir</span><strong>{{(p.committedStock??0)-(p.reservedPhysicalStock??0)>0?(p.committedStock??0)-(p.reservedPhysicalStock??0):0}}</strong></div>
+      </div>
+      <p class="details-hint">Custo estimado pela composição atual. O custo médio histórico dos sabonetes produzidos é {{currency(p.averageUnitCostCents)}} e pode ser diferente.</p>
+      <div class="details-section-title">Composição por unidade</div>
+      @if(cost(); as preview){
+        <div class="details-components">
+          @for(part of preview.components;track part.inputId+':'+part.unitId){
+            <div><span>{{inputName(part.inputId)}}<small>{{quantity(part.quantity)}} {{unitName(part.unitId)}}</small></span><strong>{{currency(part.totalCostCents)}} @if(part.unitCostCents<=0){<small class="pending">custo pendente</small>}</strong></div>
+          } @empty { <p>Receita não detalhada. Consulte a edição para cadastrar os componentes.</p> }
+          @if(p.additionalCostCents>0){<div><span>Custo adicional do produto</span><strong>{{currency(p.additionalCostCents)}}</strong></div>}
+        </div>
+      } @else {<p class="details-hint">Composição indisponível. Verifique os vínculos de insumos e unidades.</p>}
+    } @else if(kind()==='inputs' && input(); as insumo) {
+      <div class="details-hero"><bf-catalog-image [image]="insumo.image" [alt]="insumo.name" [compact]="true"/><div>
+        <span class="details-eyebrow">{{insumo.code}}</span><h3>{{insumo.name}}</h3>
+        <p>{{tracking(insumo)}} · {{unitName(insumo.unitId)}}</p>
+        <span class="bf-badge" [class.muted]="!insumo.active">{{insumo.active?'Ativo':'Inativo'}}</span>
+      </div></div>
+      <div class="details-section-title">Estoque e custo</div>
+      <div class="details-metrics">
+        <div><span>Custo médio por {{unitName(insumo.unitId)}}</span><strong>{{insumo.averageUnitCostCents>0?currency(insumo.averageUnitCostCents):'Não informado'}}</strong></div>
+        @if(insumo.trackingMode==='untracked'||insumo.minimumStockConfigured===false){
+          <div><span>Disponibilidade</span><strong>{{insumo.availabilityStatus||'Sem medição de volume'}}</strong></div>
+        } @else {
+          <div><span>{{insumo.trackingMode==='exact'?'Saldo registrado':'Saldo aproximado'}}</span><strong>{{quantity(insumo.stock)}} {{unitName(insumo.unitId)}}</strong></div>
+          <div><span>Reservado</span><strong>{{quantity(insumo.reservedPhysicalStock??0)}} {{unitName(insumo.unitId)}}</strong></div>
+          @if(insumo.minimumStockConfigured!==false){<div><span>Estoque mínimo</span><strong>{{quantity(insumo.minimumStock)}} {{unitName(insumo.unitId)}}</strong></div>}
+        }
+      </div>
+      <div class="details-section-title">Utilizado em</div>
+      <div class="details-related">
+        @for(p of usedByProducts();track p.id){<div><bf-icon name="product"/><span>{{p.displayName}}</span></div>}
+        @for(a of usedByAdditions();track a.id){<div><bf-icon name="addition"/><span>{{a.name}} <small>Adicional</small></span></div>}
+        @if(!usedByProducts().length && !usedByAdditions().length){<p class="details-hint">Nenhum produto ou adicional utiliza esse insumo em uma composição cadastrada.</p>}
+      </div>
+    } @else if(kind()==='additions' && addition(); as extra) {
+      <div class="details-hero"><bf-catalog-image [image]="extra.image" [alt]="extra.name" [compact]="true"/><div>
+        <span class="details-eyebrow">{{extra.category}}</span><h3>{{extra.name}}</h3>
+        <p>{{extra.components.length}} componente(s) de consumo</p>
+        <span class="bf-badge" [class.muted]="!extra.active">{{extra.active?'Ativo':'Inativo'}}</span>
+      </div></div>
+      <div class="details-section-title">Preço e rentabilidade <small>Por unidade do adicional</small></div>
+      <div class="details-metrics">
+        <div><span>Preço de venda</span><strong>{{currency(extra.priceCents)}}</strong></div>
+        <div><span>Custo estimado</span><strong>{{additionCost()?currency(additionCost()!.unitCostCents):'Indisponível'}}</strong>@if(additionCost()?.costPending){<small class="pending">Estimativa incompleta</small>}</div>
+        <div><span>Lucro bruto</span><strong>{{additionProfit().profitCents===null?'Indisponível':currency(additionProfit().profitCents!)}}</strong></div>
+        <div><span>Margem bruta</span><strong>{{percent(additionProfit().marginPercent)}}</strong></div>
+      </div>
+      @if(!additionCost() || additionCost()?.costPending){<p class="details-alert"><bf-icon name="alert"/> Custo incompleto: confira os componentes e o custo dos insumos antes de utilizar a margem.</p>}
+      <div class="details-section-title">Itens consumidos por venda</div>
+      <div class="details-components">
+        @for(c of additionCost()?.components??[];track c.id){
+          <div><span>{{inputName(c.inputId)}}<small>{{quantity(c.quantity)}} {{unitName(c.unitId)}}</small></span><strong>{{currency(c.totalCostCents)}}</strong></div>
+        } @empty {<p class="details-hint">Nenhum consumo configurado para este adicional.</p>}
+      </div>
+      @if(extra.notes){<div class="details-section-title">Observações</div><p class="details-hint">{{extra.notes}}</p>}
+    }
+  </div>
+  <div class="bf-dialog-footer">
+    <button class="bf-button secondary" type="button" (click)="close()">Fechar</button>
+    <button class="bf-button secondary" type="button" (click)="edit()"><bf-icon name="details"/> Editar</button>
+    @if(kind()==='products' && product(); as p){
+      <button class="bf-button secondary" type="button" [disabled]="!p.active" (click)="produce(p)"><bf-icon name="production"/> Produzir</button>
+      <button class="bf-button" type="button" [disabled]="!p.active || availableStock(p)<=0" (click)="sell(p)"><bf-icon name="sales"/> Vender</button>
+    }
+  </div>
+</dialog>

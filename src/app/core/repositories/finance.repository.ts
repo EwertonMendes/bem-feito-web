@@ -121,12 +121,15 @@ export class FinanceRepository {
       }
 
       const expense: Expense = { id: expenseRef.id, ...draft, code,
-        fundingSource: draft.fundingSource ?? 'business',
-        bankDebitCents: (draft.fundingSource ?? 'business') === 'business' ? draft.amountCents : 0 };
+        fundingSource: draft.fundingType === 'third-party' ? 'owner-unassigned' : draft.fundingType === 'unverified' ? 'unverified' : 'business',
+        fundingType: draft.fundingType ?? 'business', paidBy: draft.paidBy?.trim() || undefined,
+        reimbursable: draft.fundingType === 'third-party' && !!draft.reimbursable,
+        bankDebitCents: (draft.fundingType ?? 'business') === 'business' ? draft.amountCents : 0 };
       transaction.set(expenseRef, {
         ...draft,
         code,
         fundingSource: expense.fundingSource,
+        fundingType: expense.fundingType, paidBy: expense.paidBy, reimbursable: expense.reimbursable,
         bankDebitCents: expense.bankDebitCents,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -211,9 +214,12 @@ export class FinanceRepository {
       const expense: Expense = {
         id: expenseRef.id, code: entityCode('M', sequence, 6),
         businessDate: draft.businessDate, kind: 'input-purchase', amountCents: total,
-        bankDebitCents: (draft.fundingSource ?? 'business') === 'business' ? total : 0,
+        bankDebitCents: (draft.fundingType ?? 'business') === 'business' ? total : 0,
         items, notes: draft.notes, link: draft.link, paymentMethodId: draft.paymentMethodId,
-        fundingSource: draft.fundingSource ?? 'business', receiptStatus: received ? 'received' : 'pending',
+        fundingSource: draft.fundingType === 'third-party' ? 'owner-unassigned' : draft.fundingType === 'unverified' ? 'unverified' : 'business',
+        fundingType: draft.fundingType ?? 'business', paidBy: draft.paidBy?.trim() || undefined,
+        reimbursable: draft.fundingType === 'third-party' && !!draft.reimbursable,
+        receiptStatus: received ? 'received' : 'pending',
         stockApplied: received, charges,
       };
       const { id: _id, ...data } = expense;

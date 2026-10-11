@@ -7,7 +7,7 @@ export type Change = Target & { action: 'create' | 'update' | 'delete'; expected
 export type Request = {
   schemaVersion: 1; id: string; environment: Environment; projectId: string;
   operation: 'read' | 'inspect' | 'verify' | 'create' | 'update' | 'delete' | 'batch-update' | 'backup' | 'restore' | 'migrate';
-  targets?: Target[]; changes?: Change[]; backup?: string; migration?: 'legacy-sheets-v1';
+  targets?: Target[]; changes?: Change[]; backup?: string; migration?: 'unit-products-v2';
   deploymentSha?: string; destructive?: { projectId: string; paths: string[] };
 };
 

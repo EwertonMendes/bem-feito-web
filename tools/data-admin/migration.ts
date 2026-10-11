@@ -54,11 +54,12 @@ export async function prepareMigration(request: Request, db: Firestore, env: any
     Number.isSafeInteger(bank.ownerFundedCents) && bank.ownerFundedCents >= 0 &&
     bank.reimbursementDueCents === 0 && /^\d{4}-\d{2}-\d{2}$/.test(bank.businessDate),
     'Bank snapshot is invalid');
-  for (const [name, total] of Object.entries({ sales: 25, payments: 25, productions: 47, expenses: 16 })) invariant(data[name]?.length === total, 'Approved source counts differ');
+  for (const [name, total] of Object.entries({ sales: 25, payments: 25, productions: 48, expenses: 16 })) invariant(data[name]?.length === total, 'Approved source counts differ');
   for (const [id, state] of [['V00024', 'delivered'], ['V00025', 'ready']]) invariant(data.sales.find((sale: any) => sale.id === id)?.fulfillmentStatus === state, 'Order reconciliation differs');
-  invariant(data.kits.length === 20 && data.kits.every((kit: any) => kit.active === false), 'All historical kits must be inactive');
-  const oldKitFormat = data.formats.find((format: any) => format.name === 'Kit Mini');
-  invariant(oldKitFormat && data.products.every((p: any) => p.formatId !== oldKitFormat.id || p.active === false), 'Legacy Kit Mini products must be inactive');
+  invariant(data.kits.length === 0 && !data.formats.some((format: any) => format.name === 'Kit Mini') &&
+    !data.products.some((p: any) => String(p.displayName).includes('Kit Mini')) &&
+    data.sales.every((s: any) => s.items.every((item: any) => item.kind === 'product' || item.kind === 'addition')),
+    'Unit-product migration must not contain obsolete kit entities');
   const pix = data.paymentMethods.find((method: any) => method.name.toLocaleLowerCase('pt-BR') === 'pix');
   const katia = data.sales.find((sale: any) => sale.id === 'V00024');
   const installments = data.payments.filter((payment: any) => payment.saleId === 'V00024' && payment.status === 'active');

@@ -182,10 +182,10 @@ for (const sale of data.sales) {
   if (!openSaleIds.has(sale.id) && !salesWithAddedPackaging.has(sale.id)) continue;
   sale.cogsCents = sale.items.reduce((sum, item) => sum + item.totalCostCents, 0);
   sale.itemsSold = sale.items.reduce((sum, item) => sum + (item.kind === 'product' ? item.quantity :
-    item.kind === 'kit' ? (item.components ?? []).reduce((s, part) => s + part.quantity, 0) : 0), 0);
+    0), 0);
   sale.missingCostItems = sale.items.reduce((sum, item) =>
     sum + (item.kind === 'product' && item.totalCostCents <= 0 ? 1 : 0) +
-    (item.kind === 'kit' ? (item.components ?? []).filter(part => part.unitCostCents <= 0).length : 0), 0);
+    0, 0);
 }
 const bank = raw.sourceMetadata?.bankSnapshot;
 if (!bank || !Number.isSafeInteger(bank.balanceCents) || !Number.isSafeInteger(bank.ownerFundedCents) ||

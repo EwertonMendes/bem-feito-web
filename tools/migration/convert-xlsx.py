@@ -18,13 +18,13 @@ keys = {
     'Vendas':'Venda_ID','Itens da Venda':'Item_ID','Recebimentos':'Pagamento_ID',
     'Produção':'Produção_ID','Compras e Despesas':'Mov_ID','Produtos':'Produto_ID',
     'Insumos':'Insumo_ID','Receitas':'Receita_ID','Ajustes de Estoque':'Ajuste_ID',
-    'Kits':'Kit_ID','Itens do Kit':'Kit_Item_ID','Cadastros':'Cadastro_ID',
+    'Cadastros':'Cadastro_ID',
     'Preços de Formato':'Preço_ID','Adicionais':'Adicional_ID',
     'Itens do Adicional':'Adicional_Item_ID','Consumos da Venda':'Consumo_ID'
 }
 required = {
     'Vendas','Itens da Venda','Recebimentos','Produção','Compras e Despesas','Produtos',
-    'Insumos','Kits','Itens do Kit','Adicionais','Itens do Adicional','Cadastros','Preços de Formato'
+    'Insumos','Adicionais','Itens do Adicional','Cadastros','Preços de Formato'
 }
 if missing := required.difference(workbook.sheetnames):
     raise RuntimeError("Required source tabs missing: " + ', '.join(sorted(missing)))

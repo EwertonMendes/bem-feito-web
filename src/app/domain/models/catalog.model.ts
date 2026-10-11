@@ -55,25 +55,6 @@ export interface InputItem extends AuditFields {
   image?: CatalogImageRef;
 }
 
-export interface KitComponent {
-  id: string;
-  formatId: string;
-  quantity: number;
-  collectionId?: string;
-  fragranceId?: string;
-  order: number;
-}
-
-export interface Kit extends AuditFields {
-  id: string;
-  active: boolean;
-  name: string;
-  priceCents: number;
-  notes?: string;
-  image?: CatalogImageRef;
-  components: KitComponent[];
-}
-
 export interface AdditionComponent {
   id: string;
   inputId: string;

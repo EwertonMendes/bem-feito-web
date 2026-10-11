@@ -1,8 +1,8 @@
 import { computed, effect, inject, Injectable, signal } from '@angular/core';
 import { stockStatusForInput, stockStatusForProduct } from '../../domain/logic/stock-status';
-import { Addition, InputItem, Kit, Product } from '../../domain/models/catalog.model';
+import { Addition, InputItem, Product } from '../../domain/models/catalog.model';
 import { CatalogImageRef } from '../../domain/models/image.model';
-import { AdditionRepository, InputRepository, KitRepository, ProductRepository } from '../../core/repositories/catalog.repository';
+import { AdditionRepository, InputRepository, ProductRepository } from '../../core/repositories/catalog.repository';
 import { StockChange } from '../../core/repositories/mutation-results';
 import { ErrorService } from '../../core/services/error.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -14,7 +14,6 @@ import { catalogEntityCode } from '../../core/utils/ids';
 export class CatalogStore {
   private readonly productRepository = inject(ProductRepository);
   private readonly inputRepository = inject(InputRepository);
-  private readonly kitRepository = inject(KitRepository);
   private readonly additionRepository = inject(AdditionRepository);
   private readonly revisions = inject(DataRevisionService);
   private readonly errors = inject(ErrorService);
@@ -31,21 +30,18 @@ export class CatalogStore {
 
   private readonly productsState = signal<Product[]>([]);
   private readonly inputsState = signal<InputItem[]>([]);
-  private readonly kitsState = signal<Kit[]>([]);
   private readonly additionsState = signal<Addition[]>([]);
   private readonly loadingState = signal(false);
   private readonly initializedState = signal(false);
 
   readonly products = this.productsState.asReadonly();
   readonly inputs = this.inputsState.asReadonly();
-  readonly kits = this.kitsState.asReadonly();
   readonly additions = this.additionsState.asReadonly();
   readonly loading = this.loadingState.asReadonly();
   readonly initialized = this.initializedState.asReadonly();
 
   readonly activeProducts = computed(() => this.productsState().filter((item) => item.active));
   readonly activeInputs = computed(() => this.inputsState().filter((item) => item.active));
-  readonly activeKits = computed(() => this.kitsState().filter((item) => item.active));
   readonly activeAdditions = computed(() => this.additionsState().filter((item) => item.active));
   readonly lowStockProducts = computed(() => this.productsState().filter((item) => item.active && ['negative', 'low'].includes(stockStatusForProduct(item))));
   readonly lowStockInputs = computed(() => this.inputsState().filter((item) => item.active && ['negative', 'low'].includes(stockStatusForInput(item))));
@@ -84,16 +80,14 @@ export class CatalogStore {
       this.inventoryRequest += 1;
       this.loadingState.set(true);
       try {
-        const [products, inputs, kits, additions] = await Promise.all([
+        const [products, inputs, additions] = await Promise.all([
           this.productRepository.all(),
           this.inputRepository.all(),
-          this.kitRepository.all(),
           this.additionRepository.all(),
         ]);
         if (request !== this.catalogRequest) return;
         this.productsState.set(products.map((item) => this.normalizeProduct(item)));
         this.inputsState.set(inputs.map((item) => this.normalizeInput(item)));
-        this.kitsState.set(kits);
         this.additionsState.set(additions);
       } catch (error) {
         this.toast.error(this.errors.message(error));
@@ -164,13 +158,6 @@ export class CatalogStore {
     return id;
   }
 
-  async saveKit(kit: Kit): Promise<string> {
-    const id = kit.id || await this.kitRepository.create(this.withoutId(kit));
-    if (kit.id) await this.kitRepository.replace(kit);
-    this.kitsState.update((items) => this.upsert(items, { ...kit, id }, (item) => item.name));
-    return id;
-  }
-
   async saveAddition(addition: Addition): Promise<string> {
     const id = addition.id || await this.additionRepository.create(this.withoutId(addition));
     if (addition.id) await this.additionRepository.replace(addition);
@@ -190,14 +177,6 @@ export class CatalogStore {
     if (image) await this.inputRepository.patch(id, { image });
     else await this.inputRepository.clearField(id, 'image');
     this.inputsState.update((items) => items.map((item) =>
-      item.id === id ? this.withImage(item, image) : item
-    ));
-  }
-
-  async setKitImage(id: string, image: CatalogImageRef | null): Promise<void> {
-    if (image) await this.kitRepository.patch(id, { image });
-    else await this.kitRepository.clearField(id, 'image');
-    this.kitsState.update((items) => items.map((item) =>
       item.id === id ? this.withImage(item, image) : item
     ));
   }

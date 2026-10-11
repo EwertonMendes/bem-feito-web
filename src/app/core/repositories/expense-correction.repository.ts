@@ -165,6 +165,7 @@ export class ExpenseCorrectionRepository {
       const { id: _id, createdAt: _createdAt, createdBy: _createdBy, ...editable } = next;
       tx.update(expenseRef, { ...safeRecord(editable),
         ...(!cancelling && source !== 'third-party' && current.paidBy ? { paidBy: deleteField() } : {}),
+        ...(!cancelling && !isPurchase && current.itemName && !next.itemName ? { itemName: deleteField() } : {}),
         updatedAt: serverTimestamp(), updatedBy: userId });
       const revisionRef = doc(collection(this.db, 'expenseCorrections'));
       tx.set(revisionRef, {

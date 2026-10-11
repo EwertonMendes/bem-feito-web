@@ -48,7 +48,7 @@
     }
   }
 
-  <bf-finance-dialogs #financeDialogs />
+  <bf-finance-dialogs #financeDialogs (expenseChanged)="onExpenseChanged($event)" />
 
 </section>
 
@@ -56,7 +56,8 @@
   <div class="bf-dialog-header"><h2>Detalhes da saída</h2><button class="bf-floating-close" type="button" (click)="expenseDetailDialog.close()" aria-label="Fechar janela"><bf-icon name="close"/></button></div>
   <div class="bf-dialog-body">
     @if(selectedExpense();as expense){
-      <div class="receipt-balance"><span>{{expense.code}} · {{date(expense.businessDate)}}</span><strong>{{currency(expense.amountCents)}}</strong></div>
+      <div class="receipt-balance"><span>{{expense.code}} · {{date(expense.businessDate)}}</span><strong>{{currency(expense.status==='cancelled' ? (expense.cancelledAmountCents ?? 0) : expense.amountCents)}}</strong></div>
+      @if(expense.status==='cancelled'){<span class="bf-badge muted">Lançamento cancelado</span>}
       <h3>Itens registrados</h3>
       @for(item of expense.items ?? [];track item.inputId){
         <div class="purchase-detail-row"><strong>{{inputName(item.inputId)}}</strong><span>{{item.quantity}} {{purchaseUnit(item.inputId)}}</span><strong>{{currency(item.amountCents)}}</strong></div>
@@ -68,5 +69,21 @@
       @if(expense.receiptStatus === 'pending'){<p>Compra a receber · ainda não adicionada ao estoque.</p>}
     }
   </div>
-  <div class="bf-dialog-footer">@if(selectedExpense()?.receiptStatus==='pending'){<button class="bf-button" type="button" [disabled]="receivingPurchase()" [bfLoadingButton]="receivingPurchase()" (click)="receiveSelectedPurchase()">{{receivingPurchase()?'Confirmando...':'Confirmar recebimento'}}</button>}<button class="bf-button secondary" type="button" (click)="expenseDetailDialog.close()">Fechar</button></div>
+  <div class="bf-dialog-footer">
+    @if(selectedExpense()?.status!=='cancelled'){<button class="bf-button secondary" type="button" (click)="editSelectedExpense()"><bf-icon name="details"/> Corrigir</button>
+      <button class="bf-button danger" type="button" (click)="showCancelExpense()">Cancelar lançamento</button>}
+    @if(selectedExpense()?.status!=='cancelled' && selectedExpense()?.receiptStatus==='pending'){<button class="bf-button" type="button" [disabled]="receivingPurchase()" [bfLoadingButton]="receivingPurchase()" (click)="receiveSelectedPurchase()">{{receivingPurchase()?'Confirmando...':'Confirmar recebimento'}}</button>}<button class="bf-button secondary" type="button" (click)="expenseDetailDialog.close()">Fechar</button></div>
+</dialog>
+<dialog bfDialog #expenseCancelDialog="bfDialog" class="bf-dialog" [busy]="cancellingExpense()">
+  <div class="bf-dialog-header"><div><h2>Cancelar lançamento</h2><small>{{selectedExpense()?.code}}</small></div>
+    <button class="bf-floating-close" type="button" (click)="expenseCancelDialog.close()" aria-label="Fechar"><bf-icon name="close"/></button></div>
+  <div class="bf-dialog-body">
+    <p>O lançamento ficará no histórico. O sistema irá reverter o impacto financeiro e, quando possível, os insumos recebidos. Não é permitido retirar estoque já consumido ou reservado.</p>
+    <label class="bf-field"><span>Motivo do cancelamento *</span>
+      <textarea class="bf-textarea" rows="3" maxlength="240" [value]="cancelReason()" (input)="cancelReason.set($any($event.target).value)" placeholder="Explique por que o lançamento será cancelado"></textarea>
+    </label>
+    @if(store.operationError()){<div class="bf-form-error" role="alert">{{store.operationError()}}</div>}
+  </div>
+  <div class="bf-dialog-footer"><button class="bf-button secondary" type="button" (click)="expenseCancelDialog.close()">Voltar</button>
+    <button class="bf-button danger" type="button" [disabled]="cancellingExpense() || cancelReason().trim().length<4" [bfLoadingButton]="cancellingExpense()" (click)="cancelSelectedExpense()">Confirmar cancelamento</button></div>
 </dialog>

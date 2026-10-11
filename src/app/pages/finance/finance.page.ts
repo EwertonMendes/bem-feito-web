@@ -1,3 +1,4 @@
+import { ExpenseCreateResult } from '../../core/repositories/mutation-results';
 import { BfLoadingButton } from '../../shared/ui/button/loading-button';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -33,7 +34,10 @@ export class FinancePage {
  private readonly destroyRef = inject(DestroyRef);
  private readonly dialogs = viewChild.required<BfFinanceDialogs>('financeDialogs');
  private readonly expenseDetailDialog = viewChild.required<BfDialog>('expenseDetailDialog');
+ private readonly expenseCancelDialog = viewChild.required<BfDialog>('expenseCancelDialog');
  readonly selectedExpense = signal<Expense | null>(null);
+ readonly cancelReason = signal('');
+ readonly cancellingExpense = signal(false);
  readonly receivingPurchase = signal(false);
  readonly reversingPaymentId = signal('');
  readonly overdueOnly = signal(false);
@@ -90,6 +94,34 @@ export class FinancePage {
          else if (shortcut === 'compra' || shortcut === '1') this.openExpense(shortcut === 'compra' ? 'input-purchase' : 'operating-expense');
        });
    }
+ }
+ onExpenseChanged(result: ExpenseCreateResult): void {
+   this.catalog.applyStockChanges(result.stockChanges ?? []);
+   this.selectedExpense.set(result.expense);
+ }
+ editSelectedExpense(): void {
+   const expense = this.selectedExpense();
+   if (!expense || expense.status === 'cancelled') return;
+   this.expenseDetailDialog().close();
+   void this.dialogs().openEditExpense(expense);
+ }
+ showCancelExpense(): void {
+   if (!this.selectedExpense() || this.selectedExpense()?.status === 'cancelled') return;
+   this.cancelReason.set('');
+   this.expenseDetailDialog().close();
+   this.expenseCancelDialog().open();
+ }
+ async cancelSelectedExpense(): Promise<void> {
+   const expense = this.selectedExpense();
+   if (!expense || this.cancellingExpense()) return;
+   this.cancellingExpense.set(true);
+   try {
+     const result = await this.store.cancelExpense(expense.id, this.cancelReason());
+     if (!result) return;
+     this.catalog.applyStockChanges(result.stockChanges ?? []);
+     this.selectedExpense.set(result.expense);
+     this.expenseCancelDialog().closeAfterSuccess();
+   } finally { this.cancellingExpense.set(false); }
  }
  openExpenseDetails(expense: Expense): void {
    if (this.receivingPurchase()) return;

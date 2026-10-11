@@ -3,6 +3,7 @@ import { PurchaseBatchDraft, Expense, ExpenseDraft } from '../../domain/models/f
 import { Payment } from '../../domain/models/sales.model';
 import { DataRevisionService } from '../../core/firebase/data-revision.service';
 import { FinanceRepository } from '../../core/repositories/finance.repository';
+import { ExpenseCorrectionRepository } from '../../core/repositories/expense-correction.repository';
 import { ExpenseCreateResult } from '../../core/repositories/mutation-results';
 import { BusinessDateCursor, compareBusinessDateDesc } from '../../core/repositories/pagination';
 import { SalesRepository } from '../../core/repositories/sales.repository';
@@ -15,6 +16,7 @@ const PAGE_SIZE = 40;
 @Injectable({ providedIn: 'root' })
 export class FinanceStore {
   private readonly financeRepository = inject(FinanceRepository);
+  private readonly corrections = inject(ExpenseCorrectionRepository);
   private readonly salesRepository = inject(SalesRepository);
   private readonly revisions = inject(DataRevisionService);
   private readonly toast = inject(ToastService);
@@ -234,6 +236,38 @@ export class FinanceStore {
       this.toast.success('Materiais recebidos e estoque atualizado.');
       return result;
     } catch (error) { this.toast.error(this.errors.message(error)); return null; }
+  }
+
+  async correctExpense(id: string, draft: PurchaseBatchDraft | ExpenseDraft, reason: string): Promise<ExpenseCreateResult | null> {
+    this.operationErrorState.set('');
+    try {
+      const result = await this.corrections.correct(id, draft, reason);
+      if (this.expensesGate.isLoaded) this.expensesState.update(items =>
+        items.map(item => item.id === id ? result.expense : item).sort(compareBusinessDateDesc));
+      await this.loadExpenseSummary(true);
+      this.toast.success('Lançamento corrigido e histórico preservado.');
+      return result;
+    } catch (error) {
+      this.operationErrorState.set(this.errors.message(error));
+      this.toast.error(this.operationErrorState());
+      return null;
+    }
+  }
+
+  async cancelExpense(id: string, reason: string): Promise<ExpenseCreateResult | null> {
+    this.operationErrorState.set('');
+    try {
+      const result = await this.corrections.cancel(id, reason);
+      if (this.expensesGate.isLoaded) this.expensesState.update(items =>
+        items.map(item => item.id === id ? result.expense : item));
+      await this.loadExpenseSummary(true);
+      this.toast.success('Lançamento cancelado com estorno e auditoria.');
+      return result;
+    } catch (error) {
+      this.operationErrorState.set(this.errors.message(error));
+      this.toast.error(this.operationErrorState());
+      return null;
+    }
   }
 
   applyPayments(payments: readonly Payment[]): void {

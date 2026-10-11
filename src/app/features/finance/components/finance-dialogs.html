@@ -1,13 +1,14 @@
 <ng-template #inputThumb let-option><bf-catalog-image [image]="inputImage(option.value)" [alt]="option.label" [thumbnail]="true" /></ng-template>
   <dialog bfDialog #expenseDialog="bfDialog" class="bf-dialog" [busy]="expenseSaving()">
-    <div class="bf-dialog-header"><h2>Registrar saída</h2><button class="bf-floating-close" (click)="expenseDialog.close()" type="button" aria-label="Fechar janela"><bf-icon name="close" /></button></div>
+    <div class="bf-dialog-header"><h2>{{ editingExpense() ? 'Corrigir lançamento' : 'Registrar saída' }}</h2><button class="bf-floating-close" (click)="expenseDialog.close()" type="button" aria-label="Fechar janela"><bf-icon name="close" /></button></div>
     <div class="bf-dialog-body">
-      <div class="kind-grid">
+      @if(!editingExpense()){<div class="kind-grid">
         <button type="button" [class.active]="model().kind==='input-purchase'" (click)="changeExpenseKind('input-purchase')">Compra de insumo</button>
         <button type="button" [class.active]="model().kind==='operating-expense'" (click)="changeExpenseKind('operating-expense')">Despesa</button>
         <button type="button" [class.active]="model().kind==='equipment'" (click)="changeExpenseKind('equipment')">Equipamento</button>
         <button type="button" [class.active]="model().kind==='other'" (click)="changeExpenseKind('other')">Outro</button>
       </div>
+      }
       @if(expenseFormError()){<div class="bf-form-error" role="alert">{{expenseFormError()}}</div>}
       <div class="bf-grid two" data-form="expense">
         <label class="bf-field" [attr.data-invalid]="expenseSubmitted() && expenseErrors().businessDate ? 'true' : null"><span>Data</span><input class="bf-input" type="date" [class.invalid]="expenseSubmitted() && !!expenseErrors().businessDate" [formField]="expenseForm.businessDate" />@if(expenseSubmitted() && expenseErrors().businessDate){<small class="bf-field-error">{{expenseErrors().businessDate}}</small>}</label>
@@ -38,7 +39,7 @@
           <p class="purchase-hint full">A origem fica pendente de confirmação. O valor não será presumido como saída do caixa.</p>
         }
         @if(model().kind==='input-purchase'){
-          <label class="bf-field"><span>Entrega dos insumos</span><bf-select [value]="model().receiptStatus" (valueChange)="setReceiptStatus($event)" [options]="arrivalOptions" ariaLabel="Entrega dos insumos" /></label>
+          @if(!editingExpense()){<label class="bf-field"><span>Entrega dos insumos</span><bf-select [value]="model().receiptStatus" (valueChange)="setReceiptStatus($event)" [options]="arrivalOptions" ariaLabel="Entrega dos insumos" /></label>}
           <label class="bf-field"><span>Frete (incorporar ao custo)</span><bf-number-input kind="currency" [value]="model().shipping" (valueChange)="patchCharge('shipping',$event)" ariaLabel="Frete" /></label>
           <label class="bf-field"><span>Juros do parcelamento</span><bf-number-input kind="currency" [value]="model().interest" (valueChange)="patchCharge('interest',$event)" ariaLabel="Juros" /></label>
           <label class="bf-field"><span>Outros custos de aquisição</span><bf-number-input kind="currency" [value]="model().otherCharge" (valueChange)="patchCharge('otherCharge',$event)" ariaLabel="Outros custos" /></label>
@@ -49,9 +50,10 @@
         <label class="bf-field"><span>Forma de pagamento</span><bf-select [formField]="expenseForm.paymentMethodId" [options]="optionalPaymentMethodOptions()" ariaLabel="Forma de pagamento" /></label>
         <label class="bf-field"><span>Link / comprovante</span><input class="bf-input" type="url" [formField]="expenseForm.link" /></label>
         <label class="bf-field full"><span>Observações</span><textarea class="bf-textarea" [formField]="expenseForm.notes"></textarea></label>
+        @if(editingExpense()){<label class="bf-field full"><span>Motivo da correção *</span><textarea class="bf-textarea" maxlength="240" rows="2" [value]="revisionReason()" (input)="revisionReason.set($any($event.target).value)" placeholder="O que foi corrigido? (mínimo 4 caracteres)"></textarea></label>}
       </div>
     </div>
-    <div class="bf-dialog-footer"><button class="bf-button secondary" (click)="expenseDialog.close()">Cancelar</button><button class="bf-button" [disabled]="expenseSaving()" [bfLoadingButton]="expenseSaving()" (click)="save()">{{expenseSaving()?'Registrando...':'Registrar'}}</button></div>
+    <div class="bf-dialog-footer"><button class="bf-button secondary" (click)="expenseDialog.close()">Cancelar</button><button class="bf-button" [disabled]="expenseSaving()" [bfLoadingButton]="expenseSaving()" (click)="save()">{{expenseSaving()?'Salvando...':editingExpense()?'Salvar correção':'Registrar'}}</button></div>
   </dialog>
 
   <dialog bfDialog #receiptDialog="bfDialog" class="bf-dialog" [busy]="receiptSaving()">

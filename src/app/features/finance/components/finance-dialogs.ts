@@ -1,6 +1,6 @@
 import { BfLoadingButton } from '../../../shared/ui/button/loading-button';
 import { CatalogImage } from '../../../shared/media/catalog-image/catalog-image';
-import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, inject, output, signal, viewChild } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
 import { CatalogReferenceStore } from '../../catalog/catalog-reference.store';
 import { CatalogStore } from '../../catalog/catalog.store';
@@ -8,7 +8,8 @@ import { FinanceStore } from '../finance.store';
 import { SalesStore } from '../../sales/sales.store';
 import { SettingsStore } from '../../settings/settings.store';
 import { Sale } from '../../../domain/models/sales.model';
-import { ExpenseDraft, ExpenseKind, PurchaseBatchDraft, FundingType } from '../../../domain/models/finance.model';
+import { Expense, ExpenseDraft, ExpenseKind, PurchaseBatchDraft, FundingType, fundingTypeOf, fundingPartyOf } from '../../../domain/models/finance.model';
+import { ExpenseCreateResult } from '../../../core/repositories/mutation-results';
 import { todayBusinessDate } from '../../../core/utils/date';
 import { formatCurrency, fromCents, toCents } from '../../../core/utils/money';
 import { BfIcon } from '../../../shared/ui/icon/icon';
@@ -67,6 +68,9 @@ export class BfFinanceDialogs {
  private readonly receiptDialog = viewChild.required<BfDialog>('receiptDialog');
  readonly selectedReceiptSale = signal<Sale | null>(null);
  readonly purchaseLines = signal<PurchaseFormLine[]>([]);
+ readonly editingExpense = signal<Expense | null>(null);
+ readonly revisionReason = signal('');
+ readonly expenseChanged = output<ExpenseCreateResult>();
  readonly fundingOptions: BfSelectOption[] = [{value:'business',label:'Recursos do negócio'}, {value:'third-party',label:'Pago por outra pessoa'}, {value:'unverified',label:'Origem a confirmar'}];
  readonly arrivalOptions: BfSelectOption[] = [{value:'received',label:'Já chegaram'}, {value:'pending',label:'Aguardando entrega'}];
  readonly purchaseTotalCents = computed(() => this.purchaseLines().reduce((sum, item) => sum + toCents(item.amount), 0));
@@ -201,6 +205,8 @@ export class BfFinanceDialogs {
   }
 
   async openExpense(kind: ExpenseKind = 'operating-expense'): Promise<void> {
+    this.editingExpense.set(null);
+    this.revisionReason.set('');
     await Promise.all([this.catalog.load(), this.references.load(), this.settings.load()]);
     this.purchaseLines.set([]);
     if (kind === 'input-purchase') this.newPurchaseLine();
@@ -221,6 +227,31 @@ export class BfFinanceDialogs {
       otherCharge: 0, otherDescription: '', capitalizeOther: false,
     });
     this.dialog().open();
+  }
+
+  async openEditExpense(expense: Expense): Promise<void> {
+    if (expense.status === 'cancelled') return;
+    await this.openExpense(expense.kind);
+    this.editingExpense.set(expense);
+    const charges = expense.charges ?? [];
+    const items = expense.items?.length ? expense.items :
+      expense.inputId && expense.quantity ? [{ inputId: expense.inputId, quantity: expense.quantity, amountCents: expense.amountCents }] : [];
+    this.purchaseLines.set(items.map(item => ({
+      id: crypto.randomUUID(), inputId: item.inputId, quantity: item.quantity, amount: fromCents(item.amountCents),
+    })));
+    this.model.update(model => ({
+      ...model, businessDate: expense.businessDate, kind: expense.kind,
+      categoryId: expense.categoryId ?? '', amount: fromCents(expense.kind === 'input-purchase'
+        ? items.reduce((sum, item) => sum + item.amountCents, 0) : expense.amountCents),
+      paymentMethodId: expense.paymentMethodId ?? '', notes: expense.notes ?? '', link: expense.link ?? '',
+      fundingType: fundingTypeOf(expense), paidBy: fundingPartyOf(expense),
+      reimbursable: expense.reimbursable ?? false, receiptStatus: expense.receiptStatus ?? 'received',
+      shipping: fromCents(charges.filter(c => c.kind === 'shipping').reduce((sum,c)=>sum+c.amountCents,0)),
+      interest: fromCents(charges.filter(c => c.kind === 'interest').reduce((sum,c)=>sum+c.amountCents,0)),
+      otherCharge: fromCents(charges.filter(c => c.kind === 'other').reduce((sum,c)=>sum+c.amountCents,0)),
+      otherDescription: charges.find(c=>c.kind==='other')?.description ?? '',
+      capitalizeOther: !!charges.find(c=>c.kind==='other')?.capitalized,
+    }));
   }
 
   async openReceipt(saleId: string): Promise<void> {
@@ -307,9 +338,13 @@ export class BfFinanceDialogs {
       };
       this.expenseSaving.set(true);
       try {
-        const result = await this.store.createPurchaseBatch(draft);
+        const original = this.editingExpense();
+        const result = original
+          ? await this.store.correctExpense(original.id, draft, this.revisionReason())
+          : await this.store.createPurchaseBatch(draft);
         if (result) {
           this.catalog.applyStockChanges(result.stockChanges ?? []);
+          if (this.editingExpense()) this.expenseChanged.emit(result);
           this.dialog().closeAfterSuccess();
         } else this.expenseFormError.set(this.store.operationError() || 'Não foi possível registrar a compra.');
       } finally { this.expenseSaving.set(false); }
@@ -328,9 +363,13 @@ export class BfFinanceDialogs {
     };
     this.expenseSaving.set(true);
     try {
-      const result = await this.store.createExpense(draft);
+      const original = this.editingExpense();
+      const result = original
+        ? await this.store.correctExpense(original.id, draft, this.revisionReason())
+        : await this.store.createExpense(draft);
       if (result) {
         if (result.stockChange) this.catalog.applyStockChanges([result.stockChange]);
+        if (this.editingExpense()) this.expenseChanged.emit(result);
         this.dialog().closeAfterSuccess();
       } else {
         this.expenseFormError.set(this.store.operationError() || 'Não foi possível registrar a saída.');

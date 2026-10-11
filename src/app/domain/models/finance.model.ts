@@ -44,6 +44,8 @@ export interface PurchaseBatchDraft {
   items: PurchaseItem[];
 }
 export interface Expense extends AuditFields {
+  status?: 'active' | 'cancelled';
+  cancelledAmountCents?: number;
   /** Consolidated itemized purchase; legacy one-input purchases remain supported. */
   items?: PurchaseItem[];
 

@@ -155,7 +155,8 @@ export class ExpenseCorrectionRepository {
           tx.set(moveRef, operation.movement);
         }
       }
-      tx.update(expenseRef, { ...safeRecord(next),
+      const { id: _id, createdAt: _createdAt, createdBy: _createdBy, ...editable } = next;
+      tx.update(expenseRef, { ...safeRecord(editable),
         updatedAt: serverTimestamp(), updatedBy: userId });
       const revisionRef = doc(collection(this.db, 'expenseCorrections'));
       tx.set(revisionRef, {

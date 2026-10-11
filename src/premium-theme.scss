@@ -16,11 +16,16 @@
   --atelier-inner: rgba(255, 255, 255, .36);
   --atelier-frame: rgba(104, 127, 94, .13);
   --atelier-sidebar: #fffcf7;
-  --atelier-page-leaves: url('/assets/atelier/page-leaves-light.webp');
-  --atelier-side-leaves: url('/assets/atelier/side-leaves-light.webp');
-  --atelier-card-leaves: url('/assets/atelier/card-leaves-sage.webp');
-  --atelier-card-warm: url('/assets/atelier/card-leaves-blush.webp');
-  --atelier-card-wave: url('/assets/atelier/card-wave-light.webp');
+  /* One immutable asset URL per ornament in both themes (no image replacement flash). */
+  --atelier-page-leaves: url('/assets/atelier/page-ambient.webp');
+  --atelier-side-leaves: url('/assets/atelier/side-sprig.webp');
+  --atelier-card-leaves: url('/assets/atelier/card-flourish.webp');
+  --atelier-card-warm: url('/assets/atelier/card-flourish.webp');
+  --atelier-card-wave: url('/assets/atelier/card-wave.webp');
+  --atelier-page-opacity: .16;
+  --atelier-sidebar-opacity: .09;
+  --atelier-card-opacity: .16;
+  --atelier-wave-opacity: .15;
 }
 
 :root[data-theme='dark'] {
@@ -38,15 +43,15 @@
   --atelier-inner: rgba(242, 228, 204, .02);
   --atelier-frame: rgba(163, 181, 140, .14);
   --atelier-sidebar: #2e2823;
-  --atelier-page-leaves: url('/assets/atelier/page-leaves-dark.webp');
-  --atelier-side-leaves: url('/assets/atelier/side-leaves-dark.webp');
-  --atelier-card-leaves: url('/assets/atelier/page-leaves-dark.webp');
-  --atelier-card-warm: url('/assets/atelier/card-leaves-blush.webp');
-  --atelier-card-wave: url('/assets/atelier/card-wave-dark.webp');
+  /* The image URLs are intentionally inherited from :root and never change. */
+  --atelier-page-opacity: .20;
+  --atelier-sidebar-opacity: .12;
+  --atelier-card-opacity: .15;
+  --atelier-wave-opacity: .14;
 }
 
-/* The decorative layer is fixed to the viewport: lists remain lightweight regardless
-   of scroll height. Content and dialogs always paint over it. */
+/* Botanical Atelier v2: ambient CSS first, restrained and high-resolution accents second.
+   The same decoded image remains mounted while only colors/opacity change on theme toggle. */
 .content {
   position: relative;
   isolation: isolate;
@@ -58,15 +63,25 @@
   inset: 0 0 0 var(--sidebar);
   z-index: -1;
   pointer-events: none;
-  background-image:
-    var(--atelier-page-leaves),
-    var(--atelier-side-leaves),
-    radial-gradient(ellipse at 87% 5%, var(--atelier-blush), transparent 47%),
-    radial-gradient(ellipse at 7% 94%, var(--atelier-glow), transparent 58%),
-    linear-gradient(132deg, color-mix(in srgb, var(--bg) 92%, var(--surface)), var(--bg));
-  background-position: top right, bottom left, center, center, center;
-  background-size: clamp(230px, 27vw, 480px), clamp(200px, 25vw, 410px), cover, cover, cover;
-  background-repeat: no-repeat;
+  background:
+    radial-gradient(ellipse 70% 58% at 3% 97%, var(--atelier-glow), transparent 74%),
+    radial-gradient(ellipse 60% 52% at 92% -18%, var(--atelier-blush), transparent 73%),
+    linear-gradient(145deg,
+      color-mix(in srgb, var(--bg) 91%, var(--surface)),
+      var(--bg) 56%,
+      color-mix(in srgb, var(--bg) 96%, var(--brand-soft)));
+}
+.content::after {
+  content: '';
+  position: fixed;
+  bottom: 0;
+  left: var(--sidebar);
+  width: clamp(240px, 25vw, 370px);
+  aspect-ratio: 3 / 4;
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--atelier-page-opacity);
+  background: var(--atelier-page-leaves) left bottom / contain no-repeat;
 }
 
 /* The sidebar contains only passive decor; navigation always wins the hit test. */
@@ -82,12 +97,11 @@ html .shell .sidebar::before {
   content: '';
   position: absolute;
   inset: auto 0 0;
-  height: min(49vh, 400px);
+  height: min(30vh, 250px);
   pointer-events: none;
-  opacity: .22;
-  background: var(--atelier-side-leaves) bottom left / min(290px, 115%) auto no-repeat;
+  opacity: var(--atelier-sidebar-opacity);
+  background: var(--atelier-side-leaves) bottom left / min(170px, 76%) auto no-repeat;
 }
-html[data-theme='dark'] .shell .sidebar::before { opacity: .31; }
 .sidebar > * { position: relative; z-index: 1; }
 .sidebar .brand {
   border-radius: 20px;
@@ -145,7 +159,7 @@ html[data-theme='dark'] .shell .sidebar::before { opacity: .31; }
   right: -7%;
   bottom: -38%;
   z-index: -1;
-  opacity: .42;
+  opacity: var(--atelier-wave-opacity);
   pointer-events: none;
   background: var(--atelier-card-wave) center right / contain no-repeat;
 }
@@ -173,7 +187,7 @@ html[data-theme='dark'] .shell .sidebar::before { opacity: .31; }
   width: 43%;
   height: 125%;
   z-index: -1;
-  opacity: .28;
+  opacity: var(--atelier-card-opacity);
   pointer-events: none;
   background: var(--atelier-card-leaves) bottom right / contain no-repeat;
 }
@@ -246,7 +260,8 @@ html[data-theme='dark'] .shell .sidebar::before { opacity: .31; }
 .bf-dialog { background: var(--surface); }
 
 @media (max-width: 980px) {
-  .content::before { left: 0; background-size: 300px, 260px, cover, cover, cover; }
+  .content::before { left: 0; }
+  .content::after { left: 0; width: clamp(210px, 35vw, 310px); }
   .mobile-nav {
     background: color-mix(in srgb, var(--surface) 96%, transparent);
     border-color: color-mix(in srgb, var(--brand) 16%, var(--line));
@@ -254,13 +269,9 @@ html[data-theme='dark'] .shell .sidebar::before { opacity: .31; }
   }
 }
 @media (max-width: 640px) {
-  .content::before {
-    background-size: 190px, 185px, cover, cover, cover;
-    background-position: top right, left bottom, center, center, center;
-    opacity: .62;
-  }
-  .content .dashboard-page .metric-card::after { opacity: .23; }
-  .content .dashboard-page .financial-card::after { opacity: .17; }
+  .content::after { width: min(185px, 50vw); opacity: .09; }
+  .content .dashboard-page .metric-card::after { opacity: .10; }
+  .content .dashboard-page .financial-card::after { opacity: .10; }
   .content .stock-card, .content .list-card, .content .day-card, .content .sales-page .sale-mobile-card { box-shadow: var(--shadow-sm); }
 }
 @media (prefers-reduced-motion: reduce) {

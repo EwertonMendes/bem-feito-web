@@ -56,10 +56,10 @@ import { BfIcon } from '../../../shared/ui/icon/icon';
     .drive-logo{display:block;width:42px;height:38px;object-fit:contain;align-self:center}
     .copy{display:grid;gap:3px;min-width:0;padding-right:2px}.copy strong{font-size:.9rem}.copy span{font-size:.78rem;line-height:1.4;color:var(--muted)}
     .connect{white-space:nowrap;align-self:center}
-    /* Small 32px face, full 44px touch target; shifted inward from card edge. */
-    .drive-notice .bf-floating-close{--bf-close-inset:6px;--bf-close-icon-size:14px;top:-16px;right:0}
+    /* A compact 32px face anchored to the rounded top-right corner, not the interior. */
+    .drive-notice .bf-floating-close{--bf-close-inset:6px;--bf-close-icon-size:14px;top:-19px;right:-20px}
     @media(max-width:980px){.drive-notice{bottom:calc(94px + env(safe-area-inset-bottom));width:calc(100vw - 40px)}}
-    @media(max-width:700px){.drive-notice{width:calc(100vw - 32px);grid-template-columns:40px minmax(0,1fr);gap:10px 12px;padding:15px 16px}.drive-logo{width:38px;height:34px}.connect{grid-column:2;justify-self:start}.copy{padding-right:0}}
+    @media(max-width:700px){.drive-notice{width:calc(100vw - 32px);grid-template-columns:40px minmax(0,1fr);gap:10px 12px;padding:15px 16px}.drive-notice .bf-floating-close{top:-17px;right:-16px}.drive-logo{width:38px;height:34px}.connect{grid-column:2;justify-self:start}.copy{padding-right:0}}
   `],
 })
 export class DriveConnectionBanner {

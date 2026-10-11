@@ -509,8 +509,9 @@ a { color: inherit; }
   --bf-close-icon-size: 17px;
   position: absolute;
   z-index: 10;
-  top: -14px;
-  right: -8px;
+  /* 44px hit target centered on the top-right card corner (2px inset, 3px below). */
+  top: -19px;
+  right: -20px;
   display: grid;
   place-items: center;
   width: 44px;
@@ -581,8 +582,9 @@ a { color: inherit; }
 
 @media (max-width: 700px) {
   .bf-floating-close {
-    top: -14px;
-    right: -2px;
+    /* Preserve the 44px hit target within the 14px viewport gutter. */
+    top: -19px;
+    right: -12px;
   }
 }
 

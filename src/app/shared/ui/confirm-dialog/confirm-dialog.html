@@ -4,6 +4,9 @@
   class="bf-dialog confirm-dialog"
   (cancel)="onNativeCancel($event)"
 >
+  <button class="bf-floating-close" type="button" aria-label="Fechar confirmação" (click)="cancel()">
+    <bf-icon name="close" />
+  </button>
   <div class="confirm-content">
     <span class="confirm-icon" [class.danger]="options().tone === 'danger'" aria-hidden="true">
       <bf-icon [name]="options().icon" />

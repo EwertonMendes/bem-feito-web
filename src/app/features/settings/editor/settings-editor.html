@@ -1,6 +1,6 @@
 <ng-template #inputThumb let-option><bf-catalog-image [image]="inputImage(option.value)" [alt]="option.label" [thumbnail]="true" /></ng-template>
 <dialog bfDialog #editor="bfDialog" class="bf-dialog" [busy]="saving()">
-    <div class="bf-dialog-header"><h2>{{editingId()?'Editar':'Novo cadastro'}}</h2><button class="bf-icon-button" (click)="editor.close()"><bf-icon name="close" /></button></div>
+    <div class="bf-dialog-header"><h2>{{editingId()?'Editar':'Novo cadastro'}}</h2><button class="bf-floating-close" (click)="editor.close()" type="button" aria-label="Fechar janela"><bf-icon name="close" /></button></div>
     <div class="bf-dialog-body">
       @if(tab()==='fragrances'){
         <div class="bf-grid two"><label class="bf-field"><span>Nome</span><input class="bf-input" [formField]="fragranceForm.name" /></label><label class="bf-field"><span>Coleção</span><bf-select [formField]="fragranceForm.collectionId" [options]="collectionOptions()" ariaLabel="Coleção" /></label><bf-checkbox class="toggle" [formField]="fragranceForm.active" label="Ativo" /></div>

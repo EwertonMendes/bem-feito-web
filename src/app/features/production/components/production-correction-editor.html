@@ -4,7 +4,7 @@
       <h2>{{review() ? (isCancellation() ? 'Cancelar lançamento' : 'Revisar correção') : 'Corrigir produção'}}</h2>
       <small>{{production()?.code}} · {{review() ? 'Confira os impactos antes de confirmar' : 'Altere os dados do lançamento'}}</small>
     </div>
-    <button type="button" class="bf-icon-button" aria-label="Fechar correção" [disabled]="busy()" (click)="correctionDialog.close()"><bf-icon name="close"/></button>
+    <button type="button" class="bf-floating-close" aria-label="Fechar correção" [disabled]="busy()" (click)="correctionDialog.close()"><bf-icon name="close"/></button>
   </header>
   <div class="bf-dialog-body correction-body">
     @if(error()) { <p role="alert" class="bf-form-error">{{error()}}</p> }

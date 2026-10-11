@@ -88,7 +88,7 @@ export function validateRequest(value: unknown): Request {
     invariant(value.targets === undefined && value.changes === undefined && value.migration === undefined && value.deploymentSha === undefined, 'Incompatible restore fields');
   } else if (op === 'migrate') {
     invariant(value.environment === 'dev' && value.projectId === 'bem-feito-dev', 'Migration is DEV only');
-    invariant(value.migration === 'legacy-sheets-v1', 'Unknown registered migration'); sha(value.deploymentSha);
+    invariant(value.migration === 'unit-products-v2', 'Unknown registered migration'); sha(value.deploymentSha);
     invariant(value.changes === undefined && value.targets === undefined && value.backup === undefined, 'Migration accepts no code or custom data');
   } else {
     invariant(Array.isArray(value.changes) && value.changes.length > 0 && value.changes.length <= 200, 'Expected 1..200 changes');

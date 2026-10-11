@@ -140,6 +140,7 @@ export class SalesRepository {
       const saleCounterSnapshot = await transaction.get(saleCounterRef);
 
       const productLineIds = draft.lines.filter((line) => line.kind === 'product').map((line) => line.sourceId);
+      const additionIds = draft.lines.filter((line) => line.kind === 'addition').map((line) => line.sourceId);
       const productIds = [...new Set(productLineIds)];
 
       const productSnapshots = new Map<string, DocumentSnapshot>();
@@ -154,6 +155,8 @@ export class SalesRepository {
         if (!product.active) throw new Error(`${product.displayName} está inativo.`);
         products.set(id, product);
       }
+      const additions = new Map<string, Addition>();
+      const additionInputIds = new Set<string>();
       for (const [id, snapshot] of additionSnapshots) {
         if (!snapshot.exists()) throw new Error('Um adicional da venda não existe mais.');
         const addition = { id, ...snapshot.data() } as Addition;

@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, HostListener, computed, inject, signal, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DashboardStore } from '../../features/dashboard/dashboard.store';
+import { isValidBusinessDate, type DashboardPeriodPreset } from '../../core/utils/date';
 import { formatCurrency } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
 import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
@@ -20,6 +21,78 @@ export class DashboardPage {
   readonly skeletonFour = [1, 2, 3, 4];
   readonly skeletonThree = [1, 2, 3];
   readonly skeletonMonths = Array.from({ length: 12 }, (_, index) => index);
+
+  readonly periodOptions: { key: DashboardPeriodPreset; label: string }[] = [
+    { key: 'today', label: 'Hoje' },
+    { key: 'last7', label: '7 dias' },
+    { key: 'last30', label: '30 dias' },
+    { key: 'month', label: 'Este mês' },
+    { key: 'year', label: 'Este ano' },
+  ];
+  readonly customOpen = signal(false);
+  readonly customStart = signal('');
+  readonly customEnd = signal('');
+  readonly customValid = computed(() =>
+    isValidBusinessDate(this.customStart()) &&
+    isValidBusinessDate(this.customEnd()) &&
+    this.customStart() <= this.customEnd()
+  );
+  private readonly periodControls = viewChild<ElementRef<HTMLElement>>('periodControls');
+  private readonly customTrigger = viewChild<ElementRef<HTMLButtonElement>>('customTrigger');
+
+  selectPreset(preset: DashboardPeriodPreset): void {
+    this.customOpen.set(false);
+    void this.store.selectPreset(preset);
+  }
+
+  onCompactPeriodChange(value: string): void {
+    const option = this.periodOptions.find((item) => item.key === value);
+    if (option) this.selectPreset(option.key);
+    else this.openCustom();
+  }
+
+  openCustom(): void {
+    this.customStart.set(this.store.startDate());
+    this.customEnd.set(this.store.endDate());
+    this.customOpen.set(true);
+  }
+
+  toggleCustom(): void {
+    if (this.customOpen()) this.closeCustom();
+    else this.openCustom();
+  }
+
+  closeCustom(): void {
+    this.customOpen.set(false);
+  }
+
+  applyCustom(): void {
+    if (!this.customValid()) return;
+    const start = this.customStart();
+    const end = this.customEnd();
+    this.closeCustom();
+    void this.store.setDateRange(start, end);
+    this.customTrigger()?.nativeElement.focus();
+  }
+
+  cancelCustom(): void {
+    this.closeCustom();
+    this.customTrigger()?.nativeElement.focus();
+  }
+
+  @HostListener('document:keydown.escape', ['$event'])
+  onEscape(event: KeyboardEvent): void {
+    if (!this.customOpen()) return;
+    event.preventDefault();
+    this.cancelCustom();
+  }
+
+  @HostListener('document:pointerdown', ['$event'])
+  onOutsidePointer(event: PointerEvent): void {
+    if (!this.customOpen() || this.periodControls()?.nativeElement.contains(event.target as Node)) return;
+    this.closeCustom();
+  }
+
 
   readonly chartCeiling = computed(() => {
     const max = Math.max(0, ...this.store.monthlyRevenue().map((item) => item.valueCents));

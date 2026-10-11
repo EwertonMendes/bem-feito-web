@@ -46,6 +46,37 @@ export function currentMonthBusinessDateRange(referenceDate = new Date()): Busin
   return businessMonthDateRange(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate);
 }
 
+
+export type DashboardPeriodPreset = 'today' | 'last7' | 'last30' | 'month' | 'year';
+
+/** Inclusive business-date ranges. Seven days means today plus the previous six days. */
+export function dashboardPresetDateRange(
+  preset: DashboardPeriodPreset,
+  referenceDate = new Date(),
+): BusinessDateRange {
+  const endDate = formatLocalBusinessDate(referenceDate);
+  if (preset === 'today') return { startDate: endDate, endDate };
+  if (preset === 'month') return currentMonthBusinessDateRange(referenceDate);
+  if (preset === 'year') {
+    return { startDate: formatLocalBusinessDate(new Date(referenceDate.getFullYear(), 0, 1)), endDate };
+  }
+  const start = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate(), 12);
+  start.setDate(start.getDate() - (preset === 'last7' ? 6 : 29));
+  return { startDate: formatLocalBusinessDate(start), endDate };
+}
+
+/** Dates from native input[type=date] must be real calendar dates before querying Firestore. */
+export function isValidBusinessDate(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (year < 1900 || month < 1 || month > 12 || day < 1 || day > 31) return false;
+  const parsed = new Date(year, month - 1, day, 12);
+  return parsed.getFullYear() === year && parsed.getMonth() + 1 === month && parsed.getDate() === day;
+}
+
 export function formatBusinessDate(value?: string): string {
   if (!value) return '—';
   const [year, month, day] = value.split('-');

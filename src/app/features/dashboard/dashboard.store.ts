@@ -11,7 +11,11 @@ import {
 import {
   businessMonthDateRange,
   currentMonthBusinessDateRange,
+  dashboardPresetDateRange,
+  formatBusinessDate,
+  isValidBusinessDate,
   todayBusinessDate,
+  type DashboardPeriodPreset,
 } from '../../core/utils/date';
 
 const EMPTY_METRICS: DashboardMetrics = {
@@ -66,6 +70,8 @@ export class DashboardStore {
 
   readonly startDate = signal(this.initialPeriod.startDate);
   readonly endDate = signal(this.initialPeriod.endDate);
+  readonly activePreset = signal<DashboardPeriodPreset | 'custom'>('month');
+  readonly selectedRangeLabel = computed(() => `${formatBusinessDate(this.startDate())} – ${formatBusinessDate(this.endDate())}`);
   private readonly loadingState = signal(false);
   readonly loading = this.loadingState.asReadonly();
   readonly initialized = this.initializedState.asReadonly();
@@ -181,27 +187,36 @@ export class DashboardStore {
     }
   }
 
-  async setStartDate(value: string): Promise<void> {
-    if (!value || value === this.startDate()) return;
-    this.startDate.set(value);
-    await this.safeRefreshPeriod();
-  }
-
-  async setEndDate(value: string): Promise<void> {
-    if (!value || value === this.endDate()) return;
+  /** A single period change triggers one metrics refresh; year bars only refresh on year changes. */
+  async setDateRange(
+    startDate: string,
+    endDate: string,
+    selection: DashboardPeriodPreset | 'custom' = 'custom',
+  ): Promise<void> {
+    if (!isValidBusinessDate(startDate) || !isValidBusinessDate(endDate) || startDate > endDate) return;
+    this.activePreset.set(selection);
+    if (startDate === this.startDate() && endDate === this.endDate()) return;
     const previousYear = this.chartYear();
-    this.endDate.set(value);
+    this.startDate.set(startDate);
+    this.endDate.set(endDate);
     await Promise.all([
       this.safeRefreshPeriod(),
       previousYear === this.chartYear() ? Promise.resolve() : this.safeRefreshYear(),
     ]);
   }
 
+  async selectPreset(preset: DashboardPeriodPreset): Promise<void> {
+    const range = dashboardPresetDateRange(preset);
+    await this.setDateRange(range.startDate, range.endDate, preset);
+  }
+
   async selectMonth(monthIndex: number): Promise<void> {
     const range = businessMonthDateRange(this.chartYear(), monthIndex);
-    this.startDate.set(range.startDate);
-    this.endDate.set(range.endDate);
-    await this.safeRefreshPeriod();
+    const currentMonth = currentMonthBusinessDateRange();
+    const selection = range.startDate === currentMonth.startDate && range.endDate === currentMonth.endDate
+      ? 'month'
+      : 'custom';
+    await this.setDateRange(range.startDate, range.endDate, selection);
   }
 
   private scheduleRefresh(): void {

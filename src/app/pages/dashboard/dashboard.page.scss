@@ -6,27 +6,217 @@
   align-items: center;
 }
 
-.period {
+.period-toolbar {
+  display: grid;
+  justify-items: end;
+  gap: 5px;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.period-controls {
+  position: relative;
+  z-index: 5;
   display: flex;
-  gap: 10px;
-  padding: 12px;
+  align-items: center;
+  gap: 5px;
+  padding: 5px;
   border: 1px solid var(--line);
-  border-radius: 17px;
+  border-radius: 15px;
   background: var(--surface);
   box-shadow: var(--shadow-sm);
+  min-width: 0;
 }
 
-.period .bf-field {
-  min-width: 158px;
+.period-shortcuts {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
-.period .bf-field > span {
-  padding-left: 2px;
+.period-chip,
+.period-custom-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 0 10px;
+  background: transparent;
+  color: var(--muted-strong);
+  white-space: nowrap;
+  font-size: 0.74rem;
+  font-weight: 680;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
 }
 
-.period .bf-input {
+.period-chip:hover,
+.period-custom-trigger:hover {
+  color: var(--brand-strong);
+  background: color-mix(in srgb, var(--brand-soft) 70%, transparent);
+}
+
+.period-chip.active,
+.period-custom-trigger.active {
+  color: var(--brand-strong);
+  background: var(--brand-soft);
+}
+
+.period-custom-anchor { position: relative; }
+
+.period-custom-trigger {
+  border-color: var(--line);
+  padding: 0 11px;
+  color: var(--brand-strong);
+}
+
+.period-custom-trigger bf-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.period-caption {
+  color: var(--muted);
+  font-size: 0.67rem;
+  font-weight: 560;
+  padding-right: 5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.period-compact-field { display: none; }
+
+.period-popover {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 30;
+  width: min(330px, calc(100vw - 32px));
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  background: var(--surface-elevated);
+  box-shadow: var(--shadow-dialog);
+  color: var(--text);
+}
+
+.period-popover form { display: grid; gap: 16px; }
+
+.period-popover-head,
+.period-popover-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.period-popover-head strong {
+  font-size: 0.86rem;
+  font-weight: 710;
+}
+
+.period-close {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--muted);
+  background: transparent;
+}
+
+.period-close:hover { background: var(--surface-2); }
+.period-close bf-icon { width: 16px; height: 16px; }
+
+.period-date-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.period-date-fields .bf-field { min-width: 0; }
+.period-date-fields .bf-input {
+  min-width: 0;
   min-height: 42px;
-  background: color-mix(in srgb, var(--surface-2) 48%, var(--surface));
+  padding: 0 8px;
+  font-size: 0.78rem;
+  background: color-mix(in srgb, var(--surface-2) 46%, var(--surface));
+}
+
+.period-error {
+  margin: -7px 0 0 !important;
+  color: var(--danger) !important;
+  font-size: 0.72rem !important;
+}
+
+.period-popover-actions { justify-content: flex-end; }
+
+.period-cancel,
+.period-apply {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-weight: 690;
+  font-size: 0.78rem;
+  background: var(--surface);
+  color: var(--muted-strong);
+}
+
+.period-apply {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--brand-contrast);
+}
+
+.period-apply:disabled { opacity: 0.45; cursor: not-allowed; }
+.period-cancel:hover { background: var(--surface-2); }
+.period-apply:hover:not(:disabled) { background: var(--brand-hover); }
+
+@media (max-width: 1450px) {
+  .period-shortcuts { display: none; }
+
+  .period-compact-field {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .period-compact-field .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .period-select {
+    width: 172px;
+    min-height: 36px;
+    padding: 0 32px 0 12px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 0.76rem;
+    font-weight: 680;
+    appearance: none;
+    cursor: pointer;
+  }
+
+  .period-compact-field bf-icon {
+    pointer-events: none;
+    position: absolute;
+    right: 10px;
+    width: 14px;
+    height: 14px;
+    color: var(--muted);
+    transform: rotate(90deg);
+  }
 }
 
 .metric-grid {
@@ -588,15 +778,6 @@
     gap: 18px;
   }
 
-  .period {
-    gap: 8px;
-    padding: 10px;
-  }
-
-  .period .bf-field {
-    min-width: 132px;
-  }
-
   .metric-card {
     gap: 10px;
     padding-left: 13px;
@@ -679,14 +860,15 @@
     align-items: stretch;
   }
 
-  .period {
-    width: 100%;
-  }
+  .period-toolbar,
+  .period-controls { width: 100%; }
 
-  .period .bf-field {
-    flex: 1;
-    min-width: 0;
-  }
+  .period-toolbar { justify-items: stretch; }
+  .period-controls { justify-content: space-between; }
+
+  .period-compact-field { flex: 1; }
+  .period-select { width: 100%; }
+  .period-caption { padding-left: 5px; }
 
   .financial-strip {
     grid-template-columns: 1fr;
@@ -723,11 +905,13 @@
     padding: 17px;
   }
 
-  .period {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    padding: 10px;
+  .period-custom-trigger {
+    width: 40px;
+    min-width: 40px;
+    padding: 0;
   }
+
+  .period-custom-trigger span { display: none; }
 
   .dashboard-panel {
     padding: 17px;

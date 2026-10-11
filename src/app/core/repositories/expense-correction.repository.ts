@@ -73,6 +73,12 @@ export class ExpenseCorrectionRepository {
         if (isPurchase !== ('items' in draft) || (!isPurchase && 'kind' in draft && current.kind !== draft.kind))
           throw new Error('Não é permitido trocar o tipo de um lançamento. Cancele e registre outro.');
       }
+      if (!cancelling && current.kind === 'equipment' &&
+          (!(draft as ExpenseDraft).itemName?.trim() || (draft as ExpenseDraft).itemName!.trim().length > 160))
+        throw new Error('Informe o nome do equipamento (até 160 caracteres).');
+      if (!cancelling && !isPurchase && (draft as ExpenseDraft).itemName &&
+          (draft as ExpenseDraft).itemName!.trim().length > 160)
+        throw new Error('Descrição muito longa.');
       const purchaseDraft = !cancelling && isPurchase ? draft as PurchaseBatchDraft : null;
       const oldItems = isPurchase && current.stockApplied !== false ? itemsFor(current) : [];
       if (isPurchase && current.stockApplied !== false && !oldItems.length)

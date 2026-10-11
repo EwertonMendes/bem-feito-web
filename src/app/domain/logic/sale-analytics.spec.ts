@@ -3,7 +3,7 @@ import { summarizeSaleItems } from './sale-analytics';
 import { SaleLineSnapshot } from '../models/sales.model';
 
 describe('summarizeSaleItems', () => {
-  it('preserves dashboard semantics for products, kits and additions', () => {
+  it('preserves dashboard semantics for products and additions', () => {
     const items: SaleLineSnapshot[] = [
       {
         id: 'p',
@@ -16,21 +16,7 @@ describe('summarizeSaleItems', () => {
         totalCents: 2000,
         totalCostCents: 200,
       },
-      {
-        id: 'k',
-        kind: 'kit',
-        sourceId: 'k',
-        name: 'Kit',
-        quantity: 1,
-        unitPriceCents: 1800,
-        unitCostCents: 100,
-        totalCents: 1800,
-        totalCostCents: 100,
-        components: [
-          { productId: 'a', name: 'A', quantity: 1, unitCostCents: 100 },
-          { productId: 'b', name: 'B', quantity: 2, unitCostCents: 0 },
-        ],
-      },
+
       {
         id: 'a',
         kind: 'addition',
@@ -46,9 +32,9 @@ describe('summarizeSaleItems', () => {
 
     expect(summarizeSaleItems(items)).toEqual({
       analyticsVersion: 1,
-      cogsCents: 300,
-      itemsSold: 5,
-      missingCostItems: 1,
+      cogsCents: 200,
+      itemsSold: 2,
+      missingCostItems: 0,
     });
   });
 

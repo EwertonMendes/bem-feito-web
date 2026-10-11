@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Addition, InputItem, Kit, Product } from '../models/catalog.model';
+import { Addition, InputItem, Product } from '../models/catalog.model';
 import { SaleDraft } from '../models/sales.model';
 import { resolveSaleDraft } from './sale-resolution';
 
@@ -44,7 +44,6 @@ describe('sale resolution', () => {
     draft.lines = [{ kind: 'product', sourceId: 'p1', quantity: 2 }];
     const resolved = resolveSaleDraft(draft, {
       products: new Map([['p1', product('p1')]]),
-      kits: new Map(),
       additions: new Map(),
       inputs: new Map(),
       productUnitCosts: new Map([['p1', 350]]),
@@ -62,24 +61,6 @@ describe('sale resolution', () => {
     ]);
   });
 
-  it.each([true, false])('rejects new kit sales regardless of historical active=%s', (active) => {
-    const kit: Kit = {
-      id: 'k1',
-      active,
-      name: 'Kit histórico',
-      priceCents: 1900,
-      components: [{ id: 'slot', formatId: 'round', quantity: 2, order: 1 }],
-    };
-    const draft = emptyDraft();
-    draft.lines = [{ kind: 'kit', sourceId: 'k1', quantity: 1, componentProductIds: ['p1', 'p1'] }];
-    expect(() => resolveSaleDraft(draft, {
-      products: new Map([['p1', product('p1')]]),
-      kits: new Map([['k1', kit]]),
-      additions: new Map(),
-      inputs: new Map(),
-      productUnitCosts: new Map([['p1', 350]]),
-    })).toThrow('Kits não são vendidos.');
-  });
 
   it('uses exact stock strictly and estimated stock approximately', () => {
     const addition: Addition = {
@@ -95,7 +76,6 @@ describe('sale resolution', () => {
 
     const exact = resolveSaleDraft(draft, {
       products: new Map(),
-      kits: new Map(),
       additions: new Map([['a1', addition]]),
       inputs: new Map([['i1', input('i1', 10, 'exact')]]),
       productUnitCosts: new Map(),
@@ -106,7 +86,6 @@ describe('sale resolution', () => {
 
     const estimated = resolveSaleDraft(draft, {
       products: new Map(),
-      kits: new Map(),
       additions: new Map([['a1', addition]]),
       inputs: new Map([['i1', input('i1', 1, 'estimated')]]),
       productUnitCosts: new Map(),
@@ -130,7 +109,6 @@ describe('sale resolution', () => {
     draft.lines = [{ kind: 'addition', sourceId: 'a2', quantity: 2 }];
     const resolved = resolveSaleDraft(draft, {
       products: new Map(),
-      kits: new Map(),
       additions: new Map([['a2', addition]]),
       inputs: new Map([['i2', input('i2', 1, 'estimated')]]),
       productUnitCosts: new Map(),
@@ -145,7 +123,6 @@ describe('sale resolution', () => {
     draft.lines = [{ kind: 'product', sourceId: 'p1', quantity: 2 }];
     expect(() => resolveSaleDraft(draft, {
       products: new Map([['p1', product('p1', 1)]]),
-      kits: new Map(),
       additions: new Map(),
       inputs: new Map(),
       productUnitCosts: new Map([['p1', 350]]),
@@ -158,7 +135,6 @@ describe('sale resolution', () => {
     draft.lines = [{ kind: 'product', sourceId: 'p1', quantity: 1 }];
     const resolved = resolveSaleDraft(draft, {
       products: new Map([['p1', product('p1')]]),
-      kits: new Map(),
       additions: new Map(),
       inputs: new Map(),
       productUnitCosts: new Map([['p1', 350]]),

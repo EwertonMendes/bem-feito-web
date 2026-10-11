@@ -98,7 +98,7 @@ export class FinancePage {
  };
  expenseDescription(expense: Expense): string {
    if (expense.kind === 'input-purchase') {
-     if (expense.items?.length === 1) return this.inputName(expense.items[0].inputId);
+     if (expense.items?.length === 1) return this.inputName(expense.items[0]?.inputId);
      if (expense.items?.length) return `Compra de ${expense.items.length} insumos`;
      return this.inputName(expense.inputId);
    }
@@ -204,6 +204,7 @@ export class FinancePage {
  onExpenseChanged(result: ExpenseCreateResult): void {
    this.catalog.applyStockChanges(result.stockChanges ?? []);
    this.selectedExpense.set(result.expense);
+   this.expenseMatches.update(items => items.map(item => item.id===result.expense.id ? result.expense : item));
  }
  editSelectedExpense(): void {
    const expense = this.selectedExpense();
@@ -226,6 +227,7 @@ export class FinancePage {
      if (!result) return;
      this.catalog.applyStockChanges(result.stockChanges ?? []);
      this.selectedExpense.set(result.expense);
+     this.expenseMatches.update(items => items.map(item => item.id===result.expense.id ? result.expense : item));
      this.expenseCancelDialog().closeAfterSuccess();
    } finally { this.cancellingExpense.set(false); }
  }
@@ -255,7 +257,11 @@ export class FinancePage {
    this.reversingPaymentId.set(paymentId);
    try {
      const result = await this.sales.reversePayment(paymentId);
-     if (result) this.store.applyPaymentReversal(result.payment);
+     if (result) {
+       this.store.applyPaymentReversal(result.payment);
+       this.paymentMatches.update(items => items.map(item => item.id===result.payment.id ? result.payment : item));
+       if (this.selectedPayment()?.id===result.payment.id) this.selectedPayment.set(result.payment);
+     }
    } finally {
      this.reversingPaymentId.set('');
    }

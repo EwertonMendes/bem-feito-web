@@ -121,7 +121,7 @@
           <h2>{{ sale.code }}</h2>
           <small>{{ date(sale.businessDate) }} · {{ sale.customerName || 'Sem cliente' }}</small>
         </div>
-        <button class="bf-icon-button" type="button" aria-label="Fechar detalhes" (click)="detailDialog.close()"><bf-icon name="close" /></button>
+        <button class="bf-floating-close" type="button" aria-label="Fechar detalhes" (click)="detailDialog.close()"><bf-icon name="close" /></button>
       </div>
       <div class="bf-dialog-body">
         <div class="detail-total"><span>Total · {{ fulfillmentLabel(sale) }}</span><strong>{{ currency(sale.totalCents) }}</strong></div>

@@ -1,6 +1,6 @@
 <ng-template #inputThumb let-option><bf-catalog-image [image]="inputImage(option.value)" [alt]="option.label" [thumbnail]="true" /></ng-template>
 <dialog bfDialog #dialog="bfDialog" class="bf-dialog" [busy]="saving()">
-    <div class="bf-dialog-header"><h2>{{ editingId() ? 'Editar' : 'Novo' }} {{ kind() === 'products' ? 'produto' : kind() === 'inputs' ? 'insumo' : kind() === 'kits' ? 'kit' : 'adicional' }}</h2><button type="button" class="bf-icon-button" (click)="dialog.close()"><bf-icon name="close" /></button></div>
+    <div class="bf-dialog-header"><h2>{{ editingId() ? 'Editar' : 'Novo' }} {{ kind() === 'products' ? 'produto' : kind() === 'inputs' ? 'insumo' : kind() === 'kits' ? 'kit' : 'adicional' }}</h2><button type="button" class="bf-floating-close" (click)="dialog.close()" aria-label="Fechar janela"><bf-icon name="close" /></button></div>
     <div class="bf-dialog-body">
       @if (kind() === 'products') {
         <div class="bf-grid two">

@@ -502,13 +502,81 @@ a { color: inherit; }
   line-height: 1.5;
 }
 
+/* Shared floating close control — modal frames and transient notices.
+   Absolute positioning intentionally overlaps the outer card border. */
+.bf-floating-close {
+  position: absolute;
+  z-index: 10;
+  top: -19px;
+  right: -17px;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  min-height: 46px;
+  padding: 0;
+  appearance: none;
+  border: 1px solid color-mix(in srgb, var(--brand) 26%, var(--line));
+  border-radius: 50%;
+  background: var(--surface-elevated);
+  color: var(--muted-strong);
+  box-shadow: 0 0 0 3px var(--surface), 0 10px 26px rgba(17, 13, 10, 0.22),
+    inset 0 1px 0 color-mix(in srgb, white 25%, transparent);
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease,
+    color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.bf-floating-close bf-icon {
+  width: 19px;
+  height: 19px;
+}
+
+.bf-floating-close:hover:not(:disabled) {
+  background: var(--brand-soft);
+  border-color: var(--brand);
+  color: var(--brand-strong);
+  box-shadow: 0 0 0 3px var(--surface), 0 13px 29px rgba(17, 13, 10, 0.25);
+  transform: translateY(-2px) scale(1.04);
+}
+
+.bf-floating-close:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.bf-floating-close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bf-floating-close:focus-visible {
+  outline: 3px solid var(--brand);
+  outline-offset: 4px;
+}
+
+@media (max-width: 700px) {
+  .bf-floating-close {
+    top: -18px;
+    right: -7px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bf-floating-close { transition: none; }
+}
+
 .bf-dialog {
   width: min(760px, calc(100vw - 32px));
   max-height: min(88dvh, 880px);
   border: 1px solid var(--line);
   border-radius: 22px;
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
   background: var(--surface);
   color: var(--text);
   box-shadow: var(--shadow-dialog);
@@ -534,7 +602,7 @@ a { color: inherit; }
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 19px 21px;
+  padding: 19px 64px 19px 21px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -617,16 +685,21 @@ a { color: inherit; }
   }
 
   .bf-dialog {
-    width: 100vw;
+    /* Keep a physical top and side margin for the floating close on phones. */
+    width: calc(100vw - 28px);
     max-width: none;
-    max-height: 96dvh;
-    margin: auto 0 0;
-    border-radius: 22px 22px 0 0;
+    max-height: calc(100dvh - 52px - env(safe-area-inset-bottom));
+    margin: auto auto max(12px, env(safe-area-inset-bottom));
+    border-radius: 22px;
   }
 
   .bf-dialog-header,
   .bf-dialog-footer {
     padding: 16px;
+  }
+
+  .bf-dialog-header {
+    padding-right: 58px;
   }
 
   .bf-dialog-body {

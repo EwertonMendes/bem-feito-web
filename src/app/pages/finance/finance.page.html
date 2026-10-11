@@ -53,7 +53,7 @@
 </section>
 
 <dialog bfDialog #expenseDetailDialog="bfDialog" class="bf-dialog" [busy]="receivingPurchase()">
-  <div class="bf-dialog-header"><h2>Detalhes da saída</h2><button class="bf-icon-button" type="button" (click)="expenseDetailDialog.close()"><bf-icon name="close"/></button></div>
+  <div class="bf-dialog-header"><h2>Detalhes da saída</h2><button class="bf-floating-close" type="button" (click)="expenseDetailDialog.close()" aria-label="Fechar janela"><bf-icon name="close"/></button></div>
   <div class="bf-dialog-body">
     @if(selectedExpense();as expense){
       <div class="receipt-balance"><span>{{expense.code}} · {{date(expense.businessDate)}}</span><strong>{{currency(expense.amountCents)}}</strong></div>

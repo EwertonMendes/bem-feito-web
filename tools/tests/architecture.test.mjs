@@ -210,3 +210,24 @@ test('close buttons remain within viewport on compact dialogs and Drive notice',
   assert.match(drive, /@media\(max-width:700px\)\{\.drive-notice\{[^}]*padding:15px 54px 15px 16px\}\.drive-notice \.bf-floating-close\{top:5px;right:5px\}/);
   assert.match(confirm, /@media \(max-width: 980px\)[\s\S]*?\.confirm-content\s*\{\s*padding-right: 68px;/);
 });
+
+
+test('catalog follows sales in sidebar and replaces inventory in mobile primary navigation', () => {
+  const shell = readFileSync(resolve(appRoot, 'layout/app-shell/app-shell.ts'), 'utf8');
+  const definition = shell.match(/readonly nav: NavItem\[\] = \[([\s\S]*?)\n  \];/)?.[1];
+  assert.ok(definition, 'Navigation definition must exist');
+  const items = [...definition.matchAll(/\{\s*label:\s*'([^']+)'[^}]*?path:\s*'([^']+)'[^}]*?mobilePlacement:\s*'(primary|more)'[^}]*?\}/g)]
+    .map(([, label, path, mobilePlacement]) => ({ label, path, mobilePlacement }));
+
+  assert.deepEqual(items.map((item) => item.path), [
+    '/dashboard', '/vendas', '/catalogo', '/producao',
+    '/estoque', '/financeiro', '/configuracoes',
+  ]);
+  assert.deepEqual(items.filter((item) => item.mobilePlacement === 'primary').map((item) => item.path), [
+    '/dashboard', '/vendas', '/catalogo',
+  ]);
+  assert.ok(items.find((item) => item.path === '/estoque')?.mobilePlacement === 'more');
+  assert.match(shell, /mobilePrimaryStart = this\.mobilePrimaryNav\.slice\(0, 2\)/);
+  assert.match(shell, /mobilePrimaryEnd = this\.mobilePrimaryNav\.slice\(2\)/);
+  assert.match(shell, /mobileMoreNav = this\.nav\.filter\(\(item\) => item\.mobilePlacement === 'more'\)/);
+});

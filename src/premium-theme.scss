@@ -1,0 +1,179 @@
+/* Bem Feito — Botanical line-art decoration only.
+   UI components, typography, layout, data, interaction and theme colors are unchanged.
+   The exact same SVG paths are used in both themes; CSS supplies the color. */
+:root {
+  --botanical-glow-sage: rgba(145, 164, 131, .115);
+  --botanical-glow-sand: rgba(205, 175, 145, .10);
+  --botanical-ink: rgba(97, 120, 89, .47);
+  --botanical-ink-soft: rgba(157, 137, 100, .34);
+  --botanical-side-ink: rgba(92, 120, 85, .48);
+  --botanical-card-ink: rgba(112, 145, 106, .24);
+  --botanical-card-warm: rgba(172, 139, 104, .20);
+}
+:root[data-theme='dark'] {
+  --botanical-glow-sage: rgba(103, 123, 87, .13);
+  --botanical-glow-sand: rgba(168, 123, 93, .075);
+  --botanical-ink: rgba(174, 192, 153, .48);
+  --botanical-ink-soft: rgba(199, 175, 134, .38);
+  --botanical-side-ink: rgba(177, 199, 163, .48);
+  --botanical-card-ink: rgba(172, 194, 157, .23);
+  --botanical-card-warm: rgba(212, 177, 133, .20);
+}
+
+/* Atmospheric canvas. Decor is entirely behind functional UI. */
+.content {
+  isolation: isolate;
+  background:
+    radial-gradient(ellipse 68% 50% at 88% 0%, var(--botanical-glow-sand), transparent 78%),
+    radial-gradient(ellipse 66% 52% at 1% 100%, var(--botanical-glow-sage), transparent 79%),
+    var(--bg);
+}
+.content::before,
+.content::after {
+  content: '';
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(130deg, var(--botanical-ink), var(--botanical-ink-soft));
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+/* Each branch's base crosses the outside edge of its vector canvas. */
+.content::before {
+  top: 0;
+  right: 0;
+  width: clamp(275px, 30vw, 440px);
+  aspect-ratio: 440 / 240;
+  -webkit-mask: url('/assets/botanical-line/hero-top.svg') right top / contain no-repeat;
+  mask: url('/assets/botanical-line/hero-top.svg') right top / contain no-repeat;
+}
+.content::after {
+  right: 0;
+  bottom: 0;
+  width: clamp(230px, 24vw, 350px);
+  aspect-ratio: 350 / 265;
+  -webkit-mask: url('/assets/botanical-line/footer-right.svg') right bottom / contain no-repeat;
+  mask: url('/assets/botanical-line/footer-right.svg') right bottom / contain no-repeat;
+}
+
+/* The sidebar branch occupies ONLY the free vertical band below Settings
+   and above Theme/Logout/Profile. It grows from the actual left border. */
+.shell .sidebar::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 194px;
+  width: min(190px, 84%);
+  height: clamp(0px, calc(100dvh - 692px), 192px);
+  pointer-events: none;
+  background: var(--botanical-side-ink);
+  -webkit-mask: url('/assets/botanical-line/sidebar-edge.svg') left bottom / contain no-repeat;
+  mask: url('/assets/botanical-line/sidebar-edge.svg') left bottom / contain no-repeat;
+}
+.shell .sidebar > * { position: relative; z-index: 1; }
+@media (min-width: 981px) and (max-height: 790px) {
+  /* Never squeeze this ornament behind navigation and footer controls. */
+  .shell .sidebar::before { display: none; }
+}
+
+/* Additional low-contrast branch on the bottom-left of the Dashboard only.
+   Other screens retain the global edge composition without card decorations. */
+.content .dashboard-page {
+  position: relative;
+  isolation: isolate;
+}
+.content .dashboard-page::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 0;
+  bottom: 0;
+  width: clamp(220px, 22vw, 335px);
+  aspect-ratio: 335 / 265;
+  pointer-events: none;
+  background: linear-gradient(55deg, var(--botanical-ink), var(--botanical-ink-soft));
+  -webkit-mask: url('/assets/botanical-line/footer-left.svg') left bottom / contain no-repeat;
+  mask: url('/assets/botanical-line/footer-left.svg') left bottom / contain no-repeat;
+}
+
+/* Editorial ornaments inside Dashboard cards. Each grows from a physical card
+   edge, never overlays the functional content layer, and cannot receive clicks. */
+.content .dashboard-page .metric-grid > .metric-card,
+.content .dashboard-page .financial-card,
+.content .dashboard-page .chart-panel,
+.content .dashboard-page .alerts {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.content .dashboard-page .metric-grid > .metric-card::after,
+.content .dashboard-page .financial-card::after,
+.content .dashboard-page .chart-panel::after,
+.content .dashboard-page .alerts::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(150deg, var(--botanical-card-ink), var(--botanical-card-warm));
+  -webkit-mask: url('/assets/botanical-line/card-edge.svg') right bottom / contain no-repeat;
+  mask: url('/assets/botanical-line/card-edge.svg') right bottom / contain no-repeat;
+}
+.content .dashboard-page .metric-grid > .metric-card::after {
+  right: 0;
+  bottom: 0;
+  width: min(132px, 37%);
+  aspect-ratio: 146 / 110;
+}
+.content .dashboard-page .metric-grid > .metric-card:nth-child(3)::after,
+.content .dashboard-page .financial-card:nth-child(2)::after {
+  background: var(--botanical-card-warm);
+}
+.content .dashboard-page .financial-card::after {
+  right: 0;
+  bottom: 0;
+  width: min(110px, 32%);
+  aspect-ratio: 146 / 110;
+}
+/* Secondary panels receive a single restrained edge accent, away from labels. */
+.content .dashboard-page .chart-panel::after {
+  left: 0;
+  bottom: 0;
+  width: 94px;
+  aspect-ratio: 146 / 110;
+  opacity: .36;
+  transform: scaleX(-1);
+}
+.content .dashboard-page .alerts::after {
+  right: 0;
+  top: 0;
+  width: 105px;
+  aspect-ratio: 146 / 110;
+  opacity: .40;
+  transform: scaleY(-1);
+}
+.content .dashboard-page .metric-grid > .metric-card > *,
+.content .dashboard-page .financial-card > *,
+.content .dashboard-page .chart-panel > *,
+.content .dashboard-page .alerts > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Tablet: draw recognizable branches at the actual viewport edges, not as
+   tiny, partially clipped desktop vectors. Dashboard cards keep their accents. */
+@media (max-width: 980px) {
+  .content::before { width: clamp(210px, 30vw, 280px); }
+  .content::after { width: clamp(175px, 26vw, 235px); bottom: 78px; }
+  .content .dashboard-page::before { width: clamp(185px, 30vw, 250px); }
+}
+@media (max-width: 640px) {
+  .content::before { top: 0; right: 0; width: clamp(170px, 50vw, 235px); }
+  .content::after { right: 0; bottom: calc(78px + env(safe-area-inset-bottom)); width: clamp(152px, 45vw, 200px); }
+  .content .dashboard-page::before { width: min(215px, 59vw); opacity: .77; }
+  .content .dashboard-page .metric-grid > .metric-card::after { width: 116px; opacity: 1; }
+  .content .dashboard-page .financial-card::after { width: 105px; }
+  .content .dashboard-page .chart-panel::after { width: 78px; opacity: .28; }
+  .content .dashboard-page .alerts::after { width: 85px; opacity: .32; }
+}

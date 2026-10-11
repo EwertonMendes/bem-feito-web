@@ -66,7 +66,7 @@
                 @if(item.notes){<small>{{item.notes}}</small>}
                 @if(item.status==='reversed'){<span class="bf-badge muted">Estornada</span>}
               </div>
-              <strong class="cash-amount" [class.out]="item.impactCents<0">{{currency(item.status==='reversed'?item.amountCents:Math.abs(item.impactCents))}}</strong>
+              <strong class="cash-amount" [class.out]="item.impactCents<0">{{currency(item.amountCents)}}</strong>
               @if(item.status==='active'){<button class="bf-button secondary" type="button" (click)="openReverseMovement(item)">Estornar</button>}
             </article>
           } @empty {<bf-empty-state title="Nenhuma movimentação avulsa" description="Vendas, recebimentos e compras continuam nas abas próprias. Use esta área para dinheiro que entrou ou saiu fora dessas operações."/>}

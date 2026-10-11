@@ -1,3 +1,6 @@
+import { FinanceCodeSearchRepository } from '../../core/repositories/finance-code-search.repository';
+import { Payment, Sale } from '../../domain/models/sales.model';
+import { BfIconName } from '../../shared/ui/icon/icon';
 import { ExpenseCreateResult } from '../../core/repositories/mutation-results';
 import { BfLoadingButton } from '../../shared/ui/button/loading-button';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
@@ -36,6 +39,7 @@ export class FinancePage {
  readonly sales = inject(SalesStore);
  readonly settings = inject(SettingsStore);
  private readonly cashRepo = inject(CashManagementRepository);
+ private readonly codeSearch = inject(FinanceCodeSearchRepository);
  private readonly toast = inject(ToastService);
  private readonly errors = inject(ErrorService);
  readonly capitalMovements = signal<CashMovement[]>([]);
@@ -68,6 +72,81 @@ export class FinancePage {
  readonly reversingPaymentId = signal('');
  readonly overdueOnly = signal(false);
  readonly tab = signal<'expenses' | 'receivables' | 'payments' | 'cash'>('expenses');
+ readonly searchInput = signal('');
+ readonly searchBusy = signal(false);
+ readonly searchError = signal('');
+ private readonly searchedTab = signal<'expenses' | 'receivables' | 'payments' | null>(null);
+ private readonly expenseMatches = signal<Expense[]>([]);
+ private readonly paymentMatches = signal<Payment[]>([]);
+ private readonly receivableMatches = signal<Sale[]>([]);
+ readonly searchActive = computed(() => this.searchedTab() === this.tab());
+ readonly visibleExpenses = computed(() => this.searchActive() ? this.expenseMatches() : this.store.expenses());
+ readonly visiblePayments = computed(() => this.searchActive() ? this.paymentMatches() : this.store.payments());
+ readonly selectedPayment = signal<Payment | null>(null);
+ private readonly paymentDetailDialog = viewChild.required<BfDialog>('paymentDetailDialog');
+ readonly expenseLabels: Record<ExpenseKind, string> = {
+   'input-purchase': 'Compra de insumos',
+   'operating-expense': 'Despesa operacional',
+   equipment: 'Equipamento',
+   other: 'Outra saída',
+ };
+ readonly expenseIcons: Record<ExpenseKind, BfIconName> = {
+   'input-purchase': 'purchase',
+   'operating-expense': 'expense',
+   equipment: 'equipment',
+   other: 'other-expense',
+ };
+ expenseDescription(expense: Expense): string {
+   if (expense.kind === 'input-purchase') {
+     if (expense.items?.length === 1) return this.inputName(expense.items[0].inputId);
+     if (expense.items?.length) return `Compra de ${expense.items.length} insumos`;
+     return this.inputName(expense.inputId);
+   }
+   const category = this.categoryName(expense.categoryId);
+   return category === '—' ? this.expenseLabels[expense.kind] : category;
+ }
+ paymentIcon(methodId: string): BfIconName {
+   const name = this.paymentName(methodId).toLowerCase();
+   if (name.includes('pix')) return 'qr-code';
+   if (name.includes('dinheiro') || name.includes('espécie')) return 'banknote';
+   if (name.includes('cartão')) return 'card';
+   return 'payment-other';
+ }
+ openPaymentDetails(payment: Payment): void {
+   this.selectedPayment.set(payment);
+   this.paymentDetailDialog().open();
+ }
+ resetCodeSearch(): void {
+   this.searchedTab.set(null);
+   this.searchInput.set('');
+   this.searchError.set('');
+ }
+ async searchCode(): Promise<void> {
+   const tab = this.tab();
+   if (tab === 'cash' || this.searchBusy()) return;
+   const term = this.searchInput().trim().toUpperCase();
+   if (!term) { this.resetCodeSearch(); return; }
+   if (!/^[MPV][0-9]{3,8}$/.test(term)) {
+     this.searchError.set('Informe um código completo, como M000012, V00024 ou P000025.');
+     return;
+   }
+   const prefix = tab === 'expenses' ? 'M' : tab === 'payments' ? 'P' : 'V';
+   if (!term.startsWith(prefix)) {
+     this.searchError.set(`Nesta aba, o código deve começar com ${prefix}.`);
+     return;
+   }
+   this.searchBusy.set(true);
+   this.searchError.set('');
+   try {
+     if (tab === 'expenses') this.expenseMatches.set(await this.codeSearch.expenses(term));
+     else if (tab === 'payments') this.paymentMatches.set(await this.codeSearch.payments(term));
+     else this.receivableMatches.set(await this.codeSearch.receivables(term));
+     this.searchedTab.set(tab);
+   } catch(error) {
+     this.searchError.set(this.errors.message(error));
+   } finally { this.searchBusy.set(false); }
+ }
+
  async receiveSelectedPurchase(): Promise<void> {
    if (this.receivingPurchase()) return;
    const selected = this.selectedExpense();
@@ -93,8 +172,9 @@ export class FinancePage {
    this.store.summaryLoading() || this.store.expensesLoading() || this.store.paymentsLoading() ||
    this.sales.receivablesLoading() || this.sales.receivableSummaryLoading()
  ));
- readonly visibleReceivables = computed(() => this.sales.openSales().filter(sale =>
-   !this.overdueOnly() || (!!sale.dueDate && sale.dueDate < todayBusinessDate())));
+ readonly visibleReceivables = computed(() =>
+   (this.searchActive() ? this.receivableMatches() : this.sales.openSales()).filter(sale =>
+     !this.overdueOnly() || (!!sale.dueDate && sale.dueDate < todayBusinessDate())));
  constructor() {
    const params = this.route.snapshot.queryParamMap;
    const tab = params.get('tab');
@@ -162,6 +242,7 @@ export class FinancePage {
  openExpense(kind: ExpenseKind = 'operating-expense'): void { void this.dialogs().openExpense(kind); }
  openReceipt(saleId: string): void { void this.dialogs().openReceipt(saleId); }
  async selectTab(tab: 'expenses' | 'receivables' | 'payments' | 'cash'): Promise<void> {
+   if (this.tab() !== tab) this.resetCodeSearch();
    this.tab.set(tab);
    if (tab === 'cash') await this.loadCash();
    if (tab === 'payments') await this.store.loadPayments();

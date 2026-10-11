@@ -5,7 +5,7 @@
   "projectId": "bem-feito-dev",
   "operation": "migrate",
   "migration": "unit-products-v2",
-  "deploymentSha": "84d90844d3aafe56f659d3b1265efe5a6d6cd9f9",
+  "deploymentSha": "d80df941e7279f3bb071fcd33557e50b716fb79c",
   "destructive": {
     "projectId": "bem-feito-dev",
     "paths": [

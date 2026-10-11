@@ -100,6 +100,7 @@ export class ExpenseCorrectionRepository {
           reimbursable: source === 'third-party' && !!draft!.reimbursable,
           bankDebitCents: source === 'business' ? total : 0,
           notes: draft!.notes?.trim(), link: draft!.link?.trim(),
+          ...(!isPurchase ? { itemName: (draft as ExpenseDraft).itemName?.trim() || undefined } : {}),
           ...(isPurchase ? { items: newItems, charges, receiptStatus: current.receiptStatus,
             stockApplied: current.stockApplied } : { categoryId: (draft as ExpenseDraft).categoryId }),
           status: 'active',

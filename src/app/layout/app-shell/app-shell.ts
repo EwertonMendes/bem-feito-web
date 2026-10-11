@@ -106,10 +106,10 @@ export class AppShell {
   readonly nav: NavItem[] = [
     { label: 'Dashboard', mobileLabel: 'Início', path: '/dashboard', icon: 'dashboard', mobilePlacement: 'primary' },
     { label: 'Vendas', path: '/vendas', icon: 'sales', mobilePlacement: 'primary' },
+    { label: 'Catálogo', path: '/catalogo', icon: 'catalog', mobilePlacement: 'primary' },
     { label: 'Produção', path: '/producao', icon: 'production', mobilePlacement: 'more' },
-    { label: 'Estoque', path: '/estoque', icon: 'inventory', mobilePlacement: 'primary' },
+    { label: 'Estoque', path: '/estoque', icon: 'inventory', mobilePlacement: 'more' },
     { label: 'Financeiro', path: '/financeiro', icon: 'finance', mobilePlacement: 'more' },
-    { label: 'Catálogo', path: '/catalogo', icon: 'catalog', mobilePlacement: 'more' },
     { label: 'Configurações', path: '/configuracoes', icon: 'settings', mobilePlacement: 'more' },
   ];
 

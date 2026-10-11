@@ -134,13 +134,7 @@
           <h3>Itens</h3>
           @for (item of sale.items; track item.id) {
             <div class="sale-detail-line"><span>{{ item.quantity }}× {{ item.name }}</span><strong>{{ currency(item.totalCents) }}</strong></div>
-            @if (item.kind==='kit' && item.components?.length) {
-              <div class="sale-kit-components">
-                @for(part of item.components;track $index){
-                  <span>{{part.quantity}}× {{part.name}}</span>
-                }
-              </div>
-            }
+
           }
         </section>
         @if (sale.notes) { <p class="notes">{{ sale.notes }}</p> }

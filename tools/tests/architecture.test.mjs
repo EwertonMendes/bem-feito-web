@@ -203,7 +203,7 @@ test('close buttons remain within viewport on compact dialogs and Drive notice',
   assert.match(responsiveClose, /\.bf-dialog \.bf-floating-close,\s*\.sale-dialog \.bf-floating-close\s*\{\s*top: 10px;\s*right: 12px;/);
   assert.match(responsiveClose, /@media \(max-width: 480px\)/);
   assert.match(responsiveClose, /\.bf-dialog \.bf-floating-close,\s*\.sale-dialog \.bf-floating-close\s*\{\s*top: 8px;\s*right: 8px;/);
-  assert.match(responsiveClose, /\.bf-dialog-header\s*\{\s*padding-right: 68px;/);
+  assert.match(responsiveClose, /\.bf-dialog \.bf-dialog-header\s*\{\s*padding-right: 68px;/);
   assert.match(sale, /width: min\(1420px, calc\(100vw - 64px\)\)/);
   assert.match(sale, /\.sale-header\s*\{\s*height: 68px;\s*padding: 0 68px 0 16px;/);
   assert.match(drive, /@media\(max-width:980px\)\{\.drive-notice\{[^}]*padding-right:58px\}\.drive-notice \.bf-floating-close\{top:6px;right:6px\}/);

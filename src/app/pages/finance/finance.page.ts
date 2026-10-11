@@ -8,7 +8,13 @@ import { FinanceStore } from '../../features/finance/finance.store';
 import { BfFinanceDialogs } from '../../features/finance/components/finance-dialogs';
 import { SalesStore } from '../../features/sales/sales.store';
 import { SettingsStore } from '../../features/settings/settings.store';
-import { Expense, ExpenseKind, fundingPartyOf, fundingTypeOf } from '../../domain/models/finance.model';
+import { CashBalanceCheck, CashMovement, CashMovementKind, Expense, ExpenseKind, fundingPartyOf, fundingTypeOf } from '../../domain/models/finance.model';
+import { CashManagementRepository, CASH_MOVEMENT_TYPES } from '../../core/repositories/cash-management.repository';
+import { toCents } from '../../core/utils/money';
+import { BfNumberInput } from '../../shared/ui/number-input/number-input';
+import { BfSelect, BfSelectOption } from '../../shared/ui/select/select';
+import { ToastService } from '../../core/services/toast.service';
+import { ErrorService } from '../../core/services/error.service';
 import { todayBusinessDate, formatBusinessDate } from '../../core/utils/date';
 import { formatCurrency } from '../../core/utils/money';
 import { BfIcon } from '../../shared/ui/icon/icon';
@@ -18,7 +24,7 @@ import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
 import { BfListSkeleton, BfSkeleton, BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
 @Component({
  selector: 'bf-finance-page',
- imports: [BfLoadingButton, BfIcon, BfDialog, BfEmptyState, BfPageRefresh, BfListSkeleton, BfSkeleton, BfTableSkeleton, BfFinanceDialogs],
+ imports: [BfLoadingButton, BfIcon, BfDialog, BfEmptyState, BfPageRefresh, BfListSkeleton, BfSkeleton, BfTableSkeleton, BfFinanceDialogs, BfNumberInput, BfSelect],
  changeDetection: ChangeDetectionStrategy.OnPush,
  templateUrl: './finance.page.html',
  styleUrl: './finance.page.scss',
@@ -29,6 +35,26 @@ export class FinancePage {
  readonly store = inject(FinanceStore);
  readonly sales = inject(SalesStore);
  readonly settings = inject(SettingsStore);
+ private readonly cashRepo = inject(CashManagementRepository);
+ private readonly toast = inject(ToastService);
+ private readonly errors = inject(ErrorService);
+ readonly capitalMovements = signal<CashMovement[]>([]);
+ readonly cashChecks = signal<CashBalanceCheck[]>([]);
+ readonly legacyCashCheck = signal<CashBalanceCheck | null>(null);
+ readonly cashLoading = signal(false);
+ readonly cashLoaded = signal(false);
+ readonly cashSaving = signal(false);
+ readonly cashError = signal('');
+ readonly cashSelected = signal<CashMovement | null>(null);
+ readonly cashReverseReason = signal('');
+ readonly cashCheckLatest = computed(() => this.cashChecks()[0] ?? this.legacyCashCheck());
+ readonly cashMovementTypes = CASH_MOVEMENT_TYPES;
+ readonly cashKindOptions: BfSelectOption[] = Object.entries(CASH_MOVEMENT_TYPES).map(([value, definition]) => ({value, label: definition.label}));
+ readonly cashDraft = signal({kind: 'contribution' as CashMovementKind, businessDate: todayBusinessDate(), accountName: 'Conta principal', partyName: '', amount: 0, notes: ''});
+ readonly cashCheckDraft = signal({businessDate: todayBusinessDate(), accountName: 'Conta principal', balance: 0, note: ''});
+ private readonly movementDialog = viewChild.required<BfDialog>('movementDialog');
+ private readonly checkBalanceDialog = viewChild.required<BfDialog>('checkBalanceDialog');
+ private readonly reverseMovementDialog = viewChild.required<BfDialog>('reverseMovementDialog');
  private readonly route = inject(ActivatedRoute);
  private readonly router = inject(Router);
  private readonly destroyRef = inject(DestroyRef);
@@ -41,7 +67,7 @@ export class FinancePage {
  readonly receivingPurchase = signal(false);
  readonly reversingPaymentId = signal('');
  readonly overdueOnly = signal(false);
- readonly tab = signal<'expenses' | 'receivables' | 'payments'>('expenses');
+ readonly tab = signal<'expenses' | 'receivables' | 'payments' | 'cash'>('expenses');
  async receiveSelectedPurchase(): Promise<void> {
    if (this.receivingPurchase()) return;
    const selected = this.selectedExpense();
@@ -72,7 +98,7 @@ export class FinancePage {
  constructor() {
    const params = this.route.snapshot.queryParamMap;
    const tab = params.get('tab');
-   if (tab === 'receivables' || tab === 'payments') this.tab.set(tab);
+   if (tab === 'receivables' || tab === 'payments' || tab === 'cash') this.tab.set(tab);
    this.overdueOnly.set(params.get('status') === 'overdue');
    this.destroyRef.onDestroy(this.catalog.activate());
    this.destroyRef.onDestroy(this.references.activate());
@@ -135,8 +161,9 @@ export class FinancePage {
  }
  openExpense(kind: ExpenseKind = 'operating-expense'): void { void this.dialogs().openExpense(kind); }
  openReceipt(saleId: string): void { void this.dialogs().openReceipt(saleId); }
- async selectTab(tab: 'expenses' | 'receivables' | 'payments'): Promise<void> {
+ async selectTab(tab: 'expenses' | 'receivables' | 'payments' | 'cash'): Promise<void> {
    this.tab.set(tab);
+   if (tab === 'cash') await this.loadCash();
    if (tab === 'payments') await this.store.loadPayments();
    if (tab === 'expenses') await this.store.loadExpenses();
    if (tab === 'receivables') await Promise.all([this.sales.loadReceivables(), this.sales.loadReceivableSummary()]);
@@ -151,6 +178,78 @@ export class FinancePage {
    } finally {
      this.reversingPaymentId.set('');
    }
+ }
+ async loadCash(): Promise<void> {
+   if (this.cashLoading()) return;
+   this.cashLoading.set(true);
+   try {
+     const [movements, checks, legacy] = await Promise.all([
+       this.cashRepo.movements(), this.cashRepo.balanceChecks(), this.cashRepo.legacyBalance(),
+     ]);
+     this.capitalMovements.set(movements);
+     this.cashChecks.set(checks);
+     this.legacyCashCheck.set(legacy);
+     this.cashLoaded.set(true);
+   } catch (error) { this.toast.error(this.errors.message(error)); }
+   finally { this.cashLoading.set(false); }
+ }
+ openMovement(): void {
+   this.cashError.set('');
+   this.cashDraft.set({kind:'contribution',businessDate:todayBusinessDate(), accountName:'Conta principal',partyName:'',amount:0,notes:''});
+   this.movementDialog().open();
+ }
+ openCheckBalance(): void {
+   this.cashError.set('');
+   this.cashCheckDraft.set({businessDate:todayBusinessDate(),accountName:'Conta principal',balance:0,note:''});
+   this.checkBalanceDialog().open();
+ }
+ async saveMovement(): Promise<void> {
+   if (this.cashSaving()) return;
+   this.cashSaving.set(true);
+   this.cashError.set('');
+   try {
+     const value = this.cashDraft();
+     const result = await this.cashRepo.createMovement({...value,amountCents:toCents(value.amount)});
+     this.capitalMovements.update(items => [result,...items]);
+     this.movementDialog().closeAfterSuccess();
+     this.toast.success('Movimentação registrada sem alterar o faturamento.');
+   } catch (error) { this.cashError.set(this.errors.message(error)); }
+   finally { this.cashSaving.set(false); }
+ }
+ openReverseMovement(item: CashMovement): void {
+   if(item.status==='reversed')return;
+   this.cashSelected.set(item);
+   this.cashReverseReason.set('');
+   this.cashError.set('');
+   this.reverseMovementDialog().open();
+ }
+ async reverseCashMovement(): Promise<void> {
+   const selected = this.cashSelected();
+   if (!selected || this.cashSaving()) return;
+   this.cashSaving.set(true);
+   this.cashError.set('');
+   try {
+     const changed = await this.cashRepo.reverseMovement(selected.id,this.cashReverseReason());
+     this.capitalMovements.update(items=>items.map(item=>item.id===changed.id?changed:item));
+     this.reverseMovementDialog().closeAfterSuccess();
+     this.toast.success('Movimentação estornada com motivo registrado.');
+   } catch(error) { this.cashError.set(this.errors.message(error)); }
+   finally { this.cashSaving.set(false); }
+ }
+ async saveBalanceCheck(): Promise<void> {
+   if (this.cashSaving()) return;
+   this.cashSaving.set(true);
+   this.cashError.set('');
+   try {
+     const value = this.cashCheckDraft();
+     const result = await this.cashRepo.confirmBalance({
+       businessDate:value.businessDate,accountName:value.accountName,balanceCents:toCents(value.balance), note:value.note,
+     });
+     this.cashChecks.update(items => [result,...items].sort((a,b)=>b.businessDate.localeCompare(a.businessDate)));
+     this.checkBalanceDialog().closeAfterSuccess();
+     this.toast.success('Saldo conferido e histórico preservado.');
+   } catch(error) { this.cashError.set(this.errors.message(error)); }
+   finally { this.cashSaving.set(false); }
  }
  paymentName(id: string): string { return this.settings.paymentMethods().find(x => x.id === id)?.name ?? 'Outro'; }
  categoryName(id?: string): string { return id ? this.settings.expenseCategories().find(x => x.id === id)?.name ?? '—' : '—'; }

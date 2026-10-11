@@ -1,10 +1,9 @@
 import { trackingModeForInput } from './costing';
-import { Addition, InputItem, Kit, Product } from '../models/catalog.model';
+import { Addition, InputItem, Product } from '../models/catalog.model';
 import { SaleDraft, SaleLineSnapshot, StockEffect } from '../models/sales.model';
 
 export interface SaleResolutionCatalog {
   products: ReadonlyMap<string, Product>;
-  kits: ReadonlyMap<string, Kit>;
   additions: ReadonlyMap<string, Addition>;
   inputs: ReadonlyMap<string, InputItem>;
   productUnitCosts: ReadonlyMap<string, number>;
@@ -62,9 +61,6 @@ export function resolveSaleDraft(
       continue;
     }
 
-    if (line.kind === 'kit') {
-      throw new Error('Kits não são vendidos. Adicione produtos individuais e aplique o desconto manual.');
-    }
 
     const addition = catalog.additions.get(line.sourceId);
     if (!addition) throw new Error('Adicional inválido.');

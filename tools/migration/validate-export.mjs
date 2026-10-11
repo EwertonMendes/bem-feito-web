@@ -67,13 +67,7 @@ for (const item of list('products')) {
     if (!units.has(component.unitId)) errors.push(`products/${item.id}: receita referencia unidade inexistente ${component.unitId}.`);
   }
 }
-for (const kit of list('kits')) {
-  for (const component of kit.components ?? []) {
-    if (!formats.has(component.formatId)) errors.push(`kits/${kit.id}: formato inexistente ${component.formatId}.`);
-    if (component.collectionId && !collections.has(component.collectionId)) errors.push(`kits/${kit.id}: coleção inexistente ${component.collectionId}.`);
-    if (component.fragranceId && !fragrances.has(component.fragranceId)) errors.push(`kits/${kit.id}: fragrância inexistente ${component.fragranceId}.`);
-  }
-}
+if (kits.size !== 0) errors.push('A coleção kits deve estar vazia.');
 for (const addition of list('additions')) {
   for (const component of addition.components ?? []) {
     if (!inputs.has(component.inputId)) errors.push(`additions/${addition.id}: insumo inexistente ${component.inputId}.`);
@@ -86,8 +80,8 @@ for (const sale of list('sales')) {
   const itemTotal = (sale.items ?? []).reduce((sum, item) => sum + Number(item.totalCents ?? 0), 0);
   if (itemTotal !== sale.subtotalCents) warnings.push(`sales/${sale.id}: subtotal armazenado ${sale.subtotalCents} difere dos itens ${itemTotal}.`);
   for (const item of sale.items ?? []) {
+    if (item.kind !== 'product' && item.kind !== 'addition') errors.push(`sales/${sale.id}: tipo de item legado.`);
     if (item.kind === 'product' && !products.has(item.sourceId)) warnings.push(`sales/${sale.id}: produto histórico ${item.sourceId} não está no catálogo atual.`);
-    if (item.kind === 'kit' && !kits.has(item.sourceId)) warnings.push(`sales/${sale.id}: kit histórico ${item.sourceId} não está no catálogo atual.`);
     if (item.kind === 'addition' && !additions.has(item.sourceId)) warnings.push(`sales/${sale.id}: adicional histórico ${item.sourceId} não está no catálogo atual.`);
   }
 }
@@ -111,10 +105,6 @@ const expectedSaleAnalytics = (items) => {
     if (item.kind === 'product') {
       itemsSold += item.quantity;
       if (item.totalCostCents <= 0) missingCostItems++;
-    } else if (item.kind === 'kit') {
-      const components = item.components ?? [];
-      itemsSold += components.reduce((sum, component) => sum + component.quantity, 0);
-      missingCostItems += components.filter((component) => component.unitCostCents <= 0).length;
     }
   }
   return { analyticsVersion: 1, cogsCents, itemsSold, missingCostItems };
@@ -137,9 +127,6 @@ for (const product of list('products')) {
   for (const component of product.recipe ?? []) {
     if (!positive(component.quantity) || inputs.get(component.inputId)?.unitId !== component.unitId) errors.push(`products/${product.id}: consumo/unidade inválido.`);
   }
-}
-for (const kit of list('kits')) for (const component of kit.components ?? []) {
-  if (!Number.isSafeInteger(component.quantity) || component.quantity <= 0 || component.quantity > 1000000) errors.push(`kits/${kit.id}: quantidade inválida.`);
 }
 for (const addition of list('additions')) for (const component of addition.components ?? []) {
   if (!positive(component.quantity) || inputs.get(component.inputId)?.unitId !== component.unitId) errors.push(`additions/${addition.id}: consumo/unidade inválido.`);

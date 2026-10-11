@@ -1,4 +1,4 @@
-export type CatalogImageEntityKind = 'products' | 'inputs' | 'kits' | 'additions';
+export type CatalogImageEntityKind = 'products' | 'inputs' | 'additions';
 
 export interface CatalogImageRef {
   provider: 'google-drive';

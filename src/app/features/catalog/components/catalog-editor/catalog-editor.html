@@ -1,6 +1,6 @@
 <ng-template #inputThumb let-option><bf-catalog-image [image]="inputImage(option.value)" [alt]="option.label" [thumbnail]="true" /></ng-template>
 <dialog bfDialog #dialog="bfDialog" class="bf-dialog" [busy]="saving()">
-    <div class="bf-dialog-header"><h2>{{ editingId() ? 'Editar' : 'Novo' }} {{ kind() === 'products' ? 'produto' : kind() === 'inputs' ? 'insumo' : kind() === 'kits' ? 'kit' : 'adicional' }}</h2><button type="button" class="bf-floating-close" (click)="dialog.close()" aria-label="Fechar janela"><bf-icon name="close" /></button></div>
+    <div class="bf-dialog-header"><h2>{{ editingId() ? 'Editar' : 'Novo' }} {{ kind() === 'products' ? 'produto' : kind() === 'inputs' ? 'insumo' : 'adicional' }}</h2><button type="button" class="bf-floating-close" (click)="dialog.close()" aria-label="Fechar janela"><bf-icon name="close" /></button></div>
     <div class="bf-dialog-body">
       @if (kind() === 'products') {
         <div class="bf-grid two">
@@ -62,13 +62,6 @@
           <bf-checkbox class="toggle" [formField]="inputForm.active" label="Insumo ativo" />
           <p class="hint full">{{inputTrackingHint()}}</p>
         </div>
-      } @else if (kind() === 'kits') {
-        <div class="bf-grid two"><label class="bf-field"><span>Nome</span><input class="bf-input" [formField]="kitForm.name" /></label><label class="bf-field"><span>Preço</span><bf-number-input kind="currency" [formField]="kitForm.price" ariaLabel="Preço do kit" /></label><label class="bf-field full"><span>Observações</span><textarea class="bf-textarea" [formField]="kitForm.notes"></textarea></label><bf-checkbox class="toggle" [formField]="kitForm.active" label="Kit ativo" /></div>
-        <section class="composition"><div class="subhead"><div><strong>Composição</strong><small>Deixe coleção ou fragrância em branco para o cliente escolher na venda.</small></div><button class="bf-button secondary" (click)="addKitComponent()">+ Regra</button></div>
-          @for (component of kitComponents(); track component.id; let i=$index) {
-            <div class="kit-row"><bf-select [value]="component.formatId" (valueChange)="patchKitComponent(i,{formatId:$event})" [options]="formatOptions()" ariaLabel="Formato" /><bf-number-input kind="integer" [min]="1" [value]="component.quantity" (valueChange)="patchKitComponent(i,{quantity:$event})" ariaLabel="Quantidade do kit" /><bf-select [value]="component.collectionId || ''" (valueChange)="patchKitComponent(i,{collectionId:$event || undefined,fragranceId:undefined})" [options]="kitCollectionOptions()" ariaLabel="Coleção" /><bf-select-search [value]="component.fragranceId || ''" (valueChange)="patchKitComponent(i,{fragranceId:$event || undefined})" [options]="kitFragranceOptions(component.collectionId)" ariaLabel="Fragrância" /><button class="bf-icon-button" (click)="removeKitComponent(i)"><bf-icon name="trash" /></button></div>
-          }
-        </section>
       } @else {
         <div class="bf-grid two"><label class="bf-field"><span>Nome</span><input class="bf-input" [formField]="additionForm.name" /></label><label class="bf-field"><span>Categoria</span><input class="bf-input" [formField]="additionForm.category" /></label><label class="bf-field"><span>Preço</span><bf-number-input kind="currency" [formField]="additionForm.price" ariaLabel="Preço do adicional" /></label><bf-checkbox class="toggle" [formField]="additionForm.active" label="Adicional ativo" /><label class="bf-field full"><span>Observações</span><textarea class="bf-textarea" [formField]="additionForm.notes"></textarea></label></div>
         <section class="composition"><div class="subhead"><div><strong>Consumo de estoque</strong><small>Opcional. Use para embalagens e itens consumíveis.</small></div><button class="bf-button secondary" (click)="addAdditionComponent()">+ Insumo</button></div>

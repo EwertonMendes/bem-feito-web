@@ -23,11 +23,6 @@ export function summarizeSaleItems(items: readonly SaleLineSnapshot[]): SaleAnal
       continue;
     }
 
-    if (item.kind === 'kit') {
-      const components = item.components ?? [];
-      itemsSold += components.reduce((sum, component) => sum + component.quantity, 0);
-      missingCostItems += components.filter((component) => component.unitCostCents <= 0).length;
-    }
   }
 
   return {

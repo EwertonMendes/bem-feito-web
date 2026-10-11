@@ -1,7 +1,7 @@
 import { BfLoadingButton } from '../../../../shared/ui/button/loading-button';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
-import { Addition, AdditionComponent, InputItem, InputTrackingMode, Kit, KitComponent, Product, RecipeComponent } from '../../../../domain/models/catalog.model';
+import { Addition, AdditionComponent, InputItem, InputTrackingMode, Product, RecipeComponent } from '../../../../domain/models/catalog.model';
 import { standardCostForProduct, trackingModeForInput } from '../../../../domain/logic/costing';
 import { CatalogImageEntityKind, CatalogImageRef } from '../../../../domain/models/image.model';
 import { ErrorService } from '../../../../core/services/error.service';
@@ -22,7 +22,6 @@ import { BfNumberInput } from '../../../../shared/ui/number-input/number-input';
 
 interface ProductFormModel { collectionId: string; fragranceId: string; formatId: string; salePrice: number; additionalCost: number; minimumStock: number; active: boolean; }
 interface InputFormModel { name: string; unitId: string; trackingMode: InputTrackingMode; availabilityStatus: string; minimumStock: number; active: boolean; }
-interface KitFormModel { name: string; price: number; notes: string; active: boolean; }
 interface AdditionFormModel { name: string; category: string; price: number; notes: string; active: boolean; }
 
 @Component({
@@ -105,7 +104,6 @@ export class CatalogEditor {
   readonly imageFile = signal<File | null>(null);
   readonly removeImage = signal(false);
   readonly recipe = signal<RecipeComponent[]>([]);
-  readonly kitComponents = signal<KitComponent[]>([]);
   readonly additionComponents = signal<AdditionComponent[]>([]);
 
   readonly currentImage = computed<CatalogImageRef | undefined>(() => {
@@ -113,7 +111,6 @@ export class CatalogEditor {
     if (!id) return undefined;
     if (this.kind() === 'products') return this.store.products().find((item) => item.id === id)?.image;
     if (this.kind() === 'inputs') return this.store.inputs().find((item) => item.id === id)?.image;
-    if (this.kind() === 'kits') return this.store.kits().find((item) => item.id === id)?.image;
     return this.store.additions().find((item) => item.id === id)?.image;
   });
 
@@ -133,8 +130,6 @@ export class CatalogEditor {
     min(p.minimumStock, 0);
   });
 
-  readonly kitModel = signal<KitFormModel>({ name: '', price: 0, notes: '', active: true });
-  readonly kitForm = form(this.kitModel, (p) => { required(p.name); min(p.price, 0); });
   readonly additionModel = signal<AdditionFormModel>({ name: '', category: 'Embalagem', price: 0, notes: '', active: true });
   readonly additionForm = form(this.additionModel, (p) => { required(p.name); required(p.category); min(p.price, 0); });
   readonly availableFragrances = computed(() => this.references.fragrances().filter((item) => item.active && (!this.productModel().collectionId || item.collectionId === this.productModel().collectionId)));
@@ -210,20 +205,6 @@ export class CatalogEditor {
       : this.currency(preview.unitCostCents);
   });
 
-  readonly kitCollectionOptions = computed<BfSelectOption[]>(() => [
-    { value: '', label: 'Qualquer coleção' },
-    ...this.references.collections().map((item) => ({ value: item.id, label: item.name })),
-  ]);
-
-  kitFragranceOptions(collectionId?: string): BfSelectOption[] {
-    return [
-      { value: '', label: 'Cliente escolhe' },
-      ...this.references.fragrances()
-        .filter((fragrance) => !collectionId || fragrance.collectionId === collectionId)
-        .map((fragrance) => ({ value: fragrance.id, label: fragrance.name })),
-    ];
-  }
-
   constructor() {
     this.destroyRef.onDestroy(this.references.activate());
     void Promise.all([this.store.load(), this.references.load()]);
@@ -240,9 +221,6 @@ export class CatalogEditor {
       this.recipe.set([]);
     } else if (kind === 'inputs') {
       this.inputModel.set({ name: '', unitId: '', trackingMode: 'estimated', availabilityStatus: '', minimumStock: 0, active: true });
-    } else if (kind === 'kits') {
-      this.kitModel.set({ name: '', price: 0, notes: '', active: true });
-      this.kitComponents.set([]);
     } else {
       this.additionModel.set({ name: '', category: 'Embalagem', price: 0, notes: '', active: true });
       this.additionComponents.set([]);
@@ -277,15 +255,6 @@ export class CatalogEditor {
     this.dialog().open();
   }
 
-  editKit(item: Kit): void {
-    this.kind.set('kits');
-    this.editingId.set(item.id);
-    this.resetImageChange();
-    this.kitModel.set({ name: item.name, price: fromCents(item.priceCents), notes: item.notes ?? '', active: item.active });
-    this.kitComponents.set(item.components.map((component) => ({ ...component })));
-    this.dialog().open();
-  }
-
   editAddition(item: Addition): void {
     this.kind.set('additions');
     this.editingId.set(item.id);
@@ -311,19 +280,6 @@ export class CatalogEditor {
 
   removeRecipe(index: number): void {
     this.recipe.update((items) => items.filter((_, i) => i !== index));
-  }
-
-  addKitComponent(): void {
-    const format = this.references.formats().find((item) => item.active);
-    if (format) this.kitComponents.update((items) => [...items, { id: crypto.randomUUID(), formatId: format.id, quantity: 1, order: items.length + 1 }]);
-  }
-
-  patchKitComponent(index: number, patch: Partial<KitComponent>): void {
-    this.kitComponents.update((items) => items.map((item, i) => i === index ? { ...item, ...patch } : item));
-  }
-
-  removeKitComponent(index: number): void {
-    this.kitComponents.update((items) => items.filter((_, i) => i !== index).map((item, i) => ({ ...item, order: i + 1 })));
   }
 
   addAdditionComponent(): void {
@@ -356,7 +312,6 @@ export class CatalogEditor {
     try {
       if (this.kind() === 'products') await this.saveProduct();
       else if (this.kind() === 'inputs') await this.saveInput();
-      else if (this.kind() === 'kits') await this.saveKit();
       else await this.saveAddition();
       this.toast.success(variantCount > 0 ? variantCount + ' variações criadas com sucesso.' : 'Cadastro salvo com sucesso.');
       this.dialog().closeAfterSuccess();
@@ -446,22 +401,6 @@ export class CatalogEditor {
     // Se a imagem falhar após salvar o cadastro, a próxima tentativa atualiza o mesmo documento.
     this.editingId.set(id);
     await this.applyImageChange('inputs', id, existing?.image, (image) => this.store.setInputImage(id, image));
-  }
-
-  private async saveKit(): Promise<void> {
-    if (this.kitForm().invalid()) throw new Error('Revise os campos obrigatórios.');
-    if (!this.kitComponents().length) throw new Error('Adicione pelo menos um componente ao kit.');
-    const model = this.kitModel();
-    const existing = this.store.kits().find((item) => item.id === this.editingId());
-    const kit: Kit = {
-      id: existing?.id ?? '', active: model.active, name: model.name.trim(), priceCents: toCents(model.price),
-      notes: model.notes.trim() || undefined, image: existing?.image,
-      components: this.kitComponents().filter((item) => item.formatId && item.quantity > 0),
-    };
-    const id = await this.store.saveKit(kit);
-    // Se a imagem falhar após salvar o cadastro, a próxima tentativa atualiza o mesmo documento.
-    this.editingId.set(id);
-    await this.applyImageChange('kits', id, existing?.image, (image) => this.store.setKitImage(id, image));
   }
 
   private async saveAddition(): Promise<void> {

@@ -169,7 +169,7 @@ export class AppShell {
 
   async openModal(request: ModalRequest): Promise<void> {
     this.closeMobilePanel();
-    if (request.kind === 'sale') await (await this.getSaleEditor()).open(request.productId, request.kitId);
+    if (request.kind === 'sale') await (await this.getSaleEditor()).open(request.productId);
     if (request.kind === 'production') await (await this.getProductionEditor()).open(request.productId, request.date);
     if (request.kind === 'expense') await (await this.getFinanceDialogs()).openExpense(request.expenseKind);
     if (request.kind === 'receipt') await (await this.getFinanceDialogs()).openReceipt(request.saleId);

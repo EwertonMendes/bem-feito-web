@@ -41,7 +41,6 @@ service cloud.firestore {
         'expenseTypes',
         'inputs',
         'products',
-        'kits',
         'additions',
         'sales',
         'payments',
@@ -156,10 +155,7 @@ service cloud.firestore {
           && (!('costBasisValueCents' in data) || money(data.costBasisValueCents))
           && validInputStockStatus(data)
           && (!('image' in data) || validImage(data.image)))
-        || (name == 'kits'
-          && fields(data, ['active', 'name', 'priceCents', 'components'], ['notes', 'image'])
-          && data.active is bool && text(data.name) && money(data.priceCents) && data.components is list
-          && (!('image' in data) || validImage(data.image)))
+
         || (name == 'additions'
           && fields(data, ['active', 'name', 'category', 'priceCents', 'components'], ['notes', 'image'])
           && data.active is bool && text(data.name) && data.category is string
@@ -409,7 +405,7 @@ service cloud.firestore {
       allow update: if operationalCollection(collectionName) && canOperate()
         && auditUpdate(request.resource.data)
         && (validCatalog(collectionName, request.resource.data) || validOperation(collectionName, request.resource.data));
-      allow delete: if collectionName in ['collections', 'fragrances', 'formats', 'formatPrices', 'units', 'paymentMethods', 'expenseCategories', 'expenseTypes', 'inputs', 'products', 'kits', 'additions'] && canAdminister();
+      allow delete: if collectionName in ['collections', 'fragrances', 'formats', 'formatPrices', 'units', 'paymentMethods', 'expenseCategories', 'expenseTypes', 'inputs', 'products', 'additions'] && canAdminister();
     }
 
     match /{document=**} {

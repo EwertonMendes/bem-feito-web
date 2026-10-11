@@ -10,8 +10,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
-import { Addition, Kit, Product } from '../../../../domain/models/catalog.model';
-import { allocateKitStock } from '../../../../domain/logic/kit-stock';
+import { Addition, Product } from '../../../../domain/models/catalog.model';
 import { CatalogImageRef } from '../../../../domain/models/image.model';
 import { PaymentDraft, SaleDraft, SaleDraftLine } from '../../../../domain/models/sales.model';
 import { ToastService } from '../../../../core/services/toast.service';
@@ -26,7 +25,6 @@ import { BfConfirmDialog } from '../../../../shared/ui/confirm-dialog/confirm-di
 import { BfDialog } from '../../../../shared/ui/dialog/dialog';
 import { BfIcon } from '../../../../shared/ui/icon/icon';
 import { BfSelect, BfSelectOption } from '../../../../shared/ui/select/select';
-import { BfSelectSearch } from '../../../../shared/ui/select-search/select-search';
 import { paymentMethodIcon } from '../../../../shared/ui/select/payment-method-icon';
 import { BfNumberInput } from '../../../../shared/ui/number-input/number-input';
 
@@ -45,14 +43,6 @@ interface ProductCartLine {
   quantity: number;
 }
 
-interface KitCartLine {
-  key: string;
-  kind: 'kit';
-  sourceId: string;
-  quantity: 1;
-  componentProductIds: string[];
-}
-
 interface AdditionCartLine {
   key: string;
   kind: 'addition';
@@ -60,7 +50,7 @@ interface AdditionCartLine {
   quantity: number;
 }
 
-type CartLine = ProductCartLine | KitCartLine | AdditionCartLine;
+type CartLine = ProductCartLine | AdditionCartLine;
 type CatalogKind = CartLine['kind'];
 type MobileView = 'catalog' | 'order';
 
@@ -70,22 +60,9 @@ interface PaymentUi {
   amount: number;
 }
 
-interface KitSlot {
-  index: number;
-  label: string;
-  candidates: Product[];
-}
-
-interface KitAvailability {
-  available: boolean;
-  message: string;
-  details: string[];
-  productIds: string[];
-}
-
 @Component({
   selector: 'bf-sale-editor',
-  imports: [BfLoadingButton, FormField, BfConfirmDialog, BfDialog, BfIcon, CatalogImage, BfSelect, BfSelectSearch, BfNumberInput],
+  imports: [BfLoadingButton, FormField, BfConfirmDialog, BfDialog, BfIcon, CatalogImage, BfSelect, BfNumberInput],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sale-editor.html',
   styleUrl: './sale-editor.scss',
@@ -127,12 +104,6 @@ export class SaleEditor {
     );
   });
 
-  readonly filteredKits = computed(() => {
-    const term = this.normalizedSearch();
-    return this.catalog.activeKits().filter((kit) =>
-      !term || kit.name.toLocaleLowerCase('pt-BR').includes(term)
-    );
-  });
 
   readonly filteredAdditions = computed(() => {
     const term = this.normalizedSearch();
@@ -143,11 +114,6 @@ export class SaleEditor {
     );
   });
 
-  readonly kitAvailabilityById = computed(() =>
-    new Map(
-      this.catalog.activeKits().map((kit) => [kit.id, this.planKit(kit)] as const)
-    )
-  );
 
   readonly categoryOptions = computed<BfSelectOption[]>(() => {
     const all = { value: '', label: 'Todas as categorias' };
@@ -233,7 +199,7 @@ export class SaleEditor {
     this.destroyRef.onDestroy(this.settings.activate());
   }
 
-  async open(initialProductId?: string, _initialKitId?: string): Promise<void> {
+  async open(initialProductId?: string): Promise<void> {
     await Promise.all([
       this.catalog.load(),
       this.references.load(),
@@ -329,25 +295,7 @@ export class SaleEditor {
     });
   }
 
-  kitAvailability(kit: Kit): KitAvailability {
-    return this.kitAvailabilityById().get(kit.id) ?? this.planKit(kit);
-  }
-
-  addKit(_kit: Kit): void {
-    this.toast.error('Kits desativados. Adicione os produtos individualmente e aplique o desconto manual.');
-  }
-
   changeQuantity(line: CartLine, delta: number): void {
-    if (line.kind === 'kit') {
-      if (delta < 0) {
-        this.removeLine(line.key);
-      } else {
-        const kit = this.catalog.kits().find((item) => item.id === line.sourceId);
-        if (kit) this.addKit(kit);
-      }
-      return;
-    }
-
     const next = line.quantity + delta;
 
     if (next <= 0) {
@@ -395,42 +343,6 @@ export class SaleEditor {
     if (target instanceof HTMLDetailsElement) {
       this.detailsExpanded.set(target.open);
     }
-  }
-
-  kitSlots(line: KitCartLine): KitSlot[] {
-    const kit = this.catalog.kits().find((item) => item.id === line.sourceId);
-    return kit ? this.buildKitSlots(kit, line.key) : [];
-  }
-
-  changeKitSelection(line: KitCartLine, index: number, productId: string): void {
-    const ids = [...line.componentProductIds];
-    ids[index] = productId;
-
-    if (!this.selectionFitsStock(ids, line.key)) {
-      this.toast.error('Não há estoque suficiente para usar essa combinação no kit.');
-      return;
-    }
-
-    this.cart.update((items) =>
-      items.map((item) =>
-        item.key === line.key && item.kind === 'kit'
-          ? { ...item, componentProductIds: ids }
-          : item
-      )
-    );
-  }
-
-  readonly productImages = computed(() => new Map(this.catalog.products().map(product => [product.id, product.image])));
-  productImage(productId: string): CatalogImageRef | undefined {
-    return this.productImages().get(productId);
-  }
-
-  productSelectOptions(products: Product[]): BfSelectOption[] {
-    return products.map((product) => ({
-      value: product.id,
-      label: product.displayName,
-      description: 'Estoque ' + product.stock,
-    }));
   }
 
   addPayment(): void {
@@ -531,9 +443,6 @@ export class SaleEditor {
       return this.catalog.products().find((item) => item.id === line.sourceId)?.displayName ?? 'Produto';
     }
 
-    if (line.kind === 'kit') {
-      return this.catalog.kits().find((item) => item.id === line.sourceId)?.name ?? 'Kit';
-    }
 
     return this.catalog.additions().find((item) => item.id === line.sourceId)?.name ?? 'Adicional';
   }
@@ -543,9 +452,6 @@ export class SaleEditor {
       return this.catalog.products().find((item) => item.id === line.sourceId)?.image;
     }
 
-    if (line.kind === 'kit') {
-      return this.catalog.kits().find((item) => item.id === line.sourceId)?.image;
-    }
 
     return this.catalog.additions().find((item) => item.id === line.sourceId)?.image;
   }
@@ -555,9 +461,6 @@ export class SaleEditor {
       return this.catalog.products().find((item) => item.id === line.sourceId)?.salePriceCents ?? 0;
     }
 
-    if (line.kind === 'kit') {
-      return this.catalog.kits().find((item) => item.id === line.sourceId)?.priceCents ?? 0;
-    }
 
     return this.catalog.additions().find((item) => item.id === line.sourceId)?.priceCents ?? 0;
   }
@@ -651,153 +554,6 @@ export class SaleEditor {
     return this.lineUnitPrice(line) * line.quantity;
   }
 
-  private buildKitSlots(kit: Kit, excludeLineKey?: string): KitSlot[] {
-    const slots: KitSlot[] = [];
-    const reserved = this.reservedProductQuantities(excludeLineKey);
-    let index = 0;
-
-    for (const component of [...kit.components].sort((a, b) => a.order - b.order)) {
-      const candidates = this.matchingProducts(component).filter(
-        (product) => product.stock - (reserved.get(product.id) ?? 0) > 0
-      );
-
-      const formatName = this.references.formats()
-        .find((item) => item.id === component.formatId)?.name ?? 'Item';
-
-      for (let slot = 0; slot < component.quantity; slot++) {
-        slots.push({
-          index,
-          label: formatName + ' ' + (slot + 1),
-          candidates,
-        });
-        index++;
-      }
-    }
-
-    return slots;
-  }
-
-  /**
-   * Bipartite-capacity matching: O(slots × candidate edges), avoiding exponential
-   * backtracking when kits contain dozens or hundreds of units.
-   */
-  private planKit(kit: Kit): KitAvailability {
-    if (this.fulfillmentStatus() === 'in-production') {
-      const productIds: string[] = [];
-      for (const requirement of [...kit.components].sort((a, b) => a.order - b.order)) {
-        const product = this.matchingProducts(requirement)[0];
-        if (!product) return { available: false, message: 'Cadastre uma variação deste sabonete', details: [], productIds: [] };
-        productIds.push(...Array(requirement.quantity).fill(product.id));
-      }
-      return { available: true, message: 'Sob encomenda', details: [], productIds };
-    }
-    const reserved = this.reservedProductQuantities();
-    const capacities = new Map(this.catalog.activeProducts().map(product => [
-      product.id, Math.max(0, product.stock - (reserved.get(product.id) ?? 0)),
-    ]));
-    const productIds = allocateKitStock(kit, this.catalog.activeProducts(), 1, reserved);
-    if (productIds) return { available: true, message: 'Disponível', details: [], productIds };
-    const shortages = [...kit.components].map(component => {
-      const count = this.matchingProducts(component).reduce((sum, product) =>
-        sum + (capacities.get(product.id) ?? 0), 0);
-      return count < component.quantity
-        ? (component.quantity - count) + '× ' + this.kitRequirementLabel(component) : '';
-    }).filter(Boolean);
-    const details = shortages.length ? shortages : ['Estoque insuficiente para combinar os itens do kit.'];
-    return { available: false, message: details.slice(0,2).join(' · '), details, productIds: [] };
-  }
-
-  /** An allocation group is a commercial requirement (format/collection/fragrance). */
-  kitAllocationGroups(line: KitCartLine): Array<{
-    index: number; label: string; target: number; allocated: number;
-    allocations: Array<{ productId: string; name: string; quantity: number }>;
-    candidates: Product[];
-  }> {
-    const kit = this.catalog.kits().find(item => item.id === line.sourceId);
-    if (!kit) return [];
-    let cursor = 0;
-    return [...kit.components].sort((a, b) => a.order - b.order).map((component, index) => {
-      const tally = new Map<string, number>();
-      for (const productId of line.componentProductIds.slice(cursor, cursor + component.quantity)) {
-        if (productId) tally.set(productId, (tally.get(productId) ?? 0) + 1);
-      }
-      cursor += component.quantity;
-      return {
-        index, label: this.kitRequirementLabel(component), target: component.quantity,
-        allocated: [...tally.values()].reduce((sum, count) => sum + count, 0),
-        allocations: [...tally].map(([productId, quantity]) => ({
-          productId, quantity, name: this.catalog.products().find(item => item.id === productId)?.displayName ?? 'Produto',
-        })),
-        candidates: this.matchingProducts(component).filter(product => !tally.has(product.id)),
-      };
-    });
-  }
-
-  private allocationRange(kit: Kit, index: number): { start: number; length: number } | null {
-    const components = [...kit.components].sort((a, b) => a.order - b.order);
-    const selected = components[index];
-    if (!selected) return null;
-    return { start: components.slice(0, index).reduce((sum, item) => sum + item.quantity, 0), length: selected.quantity };
-  }
-
-  changeKitGroupQuantity(line: KitCartLine, index: number, productId: string, quantity: number): void {
-    const kit = this.catalog.kits().find(item => item.id === line.sourceId);
-    if (!kit || !Number.isSafeInteger(quantity) || quantity < 0) return;
-    const range = this.allocationRange(kit, index);
-    if (!range) return;
-    const ids = [...line.componentProductIds];
-    const previous = ids.slice(range.start, range.start + range.length);
-    const others = previous.filter(id => id && id !== productId);
-    if (quantity + others.length > range.length) {
-      this.toast.error('O total ultrapassa as unidades previstas para este grupo.');
-      return;
-    }
-    const replacement = [
-      ...Array<string>(quantity).fill(productId),
-      ...others,
-      ...Array<string>(range.length - quantity - others.length).fill(''),
-    ];
-    ids.splice(range.start, range.length, ...replacement);
-    const reserved = this.reservedProductQuantities(line.key);
-    const counts = new Map<string, number>();
-    ids.forEach(id => { if (id) counts.set(id, (counts.get(id) ?? 0) + 1); });
-    for (const [id, count] of counts) {
-      if (this.fulfillmentStatus() === 'in-production') continue;
-      const candidate = this.catalog.products().find(item => item.id === id);
-      const stock = (candidate?.stock ?? 0) - (candidate?.reservedPhysicalStock ?? Math.min(candidate?.stock ?? 0, candidate?.committedStock ?? 0));
-      if (count > stock - (reserved.get(id) ?? 0)) {
-        this.toast.error('Estoque insuficiente para essa distribuição.');
-        return;
-      }
-    }
-    this.cart.update(items => items.map(item => item.key === line.key && item.kind === 'kit'
-      ? { ...item, componentProductIds: ids } : item));
-  }
-
-  addKitGroupProduct(line: KitCartLine, index: number, productId: string): void {
-    if (productId) this.changeKitGroupQuantity(line, index, productId, 1);
-  }
-
-  private matchingProducts(component: Kit['components'][number]): Product[] {
-    return this.catalog.activeProducts().filter((product) =>
-      product.formatId === component.formatId &&
-      (!component.collectionId || product.collectionId === component.collectionId) &&
-      (!component.fragranceId || product.fragranceId === component.fragranceId)
-    );
-  }
-
-  private kitRequirementLabel(component: Kit['components'][number]): string {
-    const format = this.references.formats().find((item) => item.id === component.formatId)?.name ?? 'Item';
-    const fragrance = component.fragranceId
-      ? this.references.fragrances().find((item) => item.id === component.fragranceId)?.name
-      : undefined;
-    const collection = component.collectionId
-      ? this.references.collections().find((item) => item.id === component.collectionId)?.name
-      : undefined;
-
-    return [format, fragrance ?? collection].filter(Boolean).join(' · ');
-  }
-
   private reservedProductQuantities(excludeLineKey?: string): Map<string, number> {
     const reserved = new Map<string, number>();
 
@@ -810,8 +566,6 @@ export class SaleEditor {
 
       if (line.kind === 'product') {
         reserve(line.sourceId, line.quantity);
-      } else if (line.kind === 'kit') {
-        line.componentProductIds.forEach((productId) => reserve(productId, 1));
       }
     }
 
@@ -824,22 +578,6 @@ export class SaleEditor {
     return Math.max(0, product.stock - (product.reservedPhysicalStock ?? Math.min(product.stock, product.committedStock ?? 0)) - (this.reservedProductQuantities().get(productId) ?? 0));
   }
 
-  private selectionFitsStock(productIds: string[], excludeLineKey: string): boolean {
-    if (this.fulfillmentStatus() === 'in-production') return true;
-    const reserved = this.reservedProductQuantities(excludeLineKey);
-    const selected = new Map<string, number>();
-
-    for (const productId of productIds) {
-      selected.set(productId, (selected.get(productId) ?? 0) + 1);
-    }
-
-    return [...selected].every(([productId, quantity]) => {
-      const product = this.catalog.products().find((item) => item.id === productId);
-      if (!product) return false;
-      return quantity <= Math.max(0, product.stock - (reserved.get(productId) ?? 0));
-    });
-  }
-
   private toDraftLine(line: CartLine): SaleDraftLine {
     if (line.kind === 'product') {
       return {
@@ -849,14 +587,6 @@ export class SaleEditor {
       };
     }
 
-    if (line.kind === 'kit') {
-      return {
-        kind: 'kit',
-        sourceId: line.sourceId,
-        quantity: 1,
-        componentProductIds: line.componentProductIds,
-      };
-    }
 
     return {
       kind: 'addition',

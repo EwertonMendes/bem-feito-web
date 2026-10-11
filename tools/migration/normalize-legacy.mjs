@@ -10,7 +10,7 @@ const identityFields = {
   Vendas: ['Data', 'Cliente'], 'Itens da Venda': ['Venda_ID', 'Produto'], Recebimentos: ['Venda_ID', 'Data'],
   Produção: ['Produto_ID', 'Data'], 'Compras e Despesas': ['Tipo', 'Data'], Produtos: ['Nome de Exibição', 'Coleção'],
   Insumos: ['Insumo'], Receitas: ['Produto_ID', 'Insumo_ID'], 'Ajustes de Estoque': ['Tipo', 'Data'],
-  Kits: ['Nome'], 'Itens do Kit': ['Kit_ID'], Cadastros: ['Tipo', 'Nome'], 'Preços de Formato': ['Coleção', 'Formato'],
+  Cadastros: ['Tipo', 'Nome'], 'Preços de Formato': ['Coleção', 'Formato'],
   Adicionais: ['Nome'], 'Itens do Adicional': ['Adicional_ID'], 'Consumos da Venda': ['Venda_ID'],
 };
 const rows = (name) => (Array.isArray(sheets[name]) ? sheets[name] : []).filter((row) =>
@@ -45,10 +45,6 @@ const saleAnalytics = (items) => {
     if (item.kind === 'product') {
       itemsSold += item.quantity;
       if (item.totalCostCents <= 0) missingCostItems++;
-    } else if (item.kind === 'kit') {
-      const components = item.components ?? [];
-      itemsSold += components.reduce((sum, component) => sum + component.quantity, 0);
-      missingCostItems += components.filter((component) => component.unitCostCents <= 0).length;
     }
   }
   return { analyticsVersion: 1, cogsCents, itemsSold, missingCostItems };
@@ -199,31 +195,8 @@ const products = rows('Produtos').map((row) => {
 });
 const productById = new Map(products.map((item) => [item.id, item]));
 
-const kitComponents = new Map();
-for (const row of rows('Itens do Kit')) {
-  const kitId = text(row.Kit_ID);
-  if (!kitId) continue;
-  const list = kitComponents.get(kitId) ?? [];
-  list.push(omitEmpty({
-    id: text(row.Kit_Item_ID),
-    formatId: formatIds.get(lower(row.Formato)) ?? '',
-    quantity: number(row.Quantidade),
-    collectionId: collectionIds.get(lower(row.Coleção)) || undefined,
-    fragranceId: fragranceId(row['Fragrância fixa'], row.Coleção) || undefined,
-    order: number(row.Ordem),
-  }));
-  kitComponents.set(kitId, list);
-}
-
-const kits = rows('Kits').map((row) => omitEmpty({
-  id: text(row.Kit_ID),
-  active: active(row.Ativo),
-  name: text(row.Nome),
-  priceCents: cents(row.Preço),
-  notes: text(row.Observações) || undefined,
-  components: (kitComponents.get(text(row.Kit_ID)) ?? []).sort((a, b) => a.order - b.order),
-}));
-const kitById = new Map(kits.map((item) => [item.id, item]));
+// The retired kits collection is explicitly empty in the replacement snapshot.
+const kits = [];
 
 const additionComponents = new Map();
 for (const row of rows('Itens do Adicional')) {
@@ -360,15 +333,6 @@ const sales = [];
 for (const row of rows('Vendas')) {
   const saleId = text(row.Venda_ID);
   const sourceItems = saleItemsBySale.get(saleId) ?? [];
-  const groups = new Map();
-  for (const item of sourceItems) {
-    const group = text(item.Grupo);
-    if (!group) continue;
-    const list = groups.get(group) ?? [];
-    list.push(item);
-    groups.set(group, list);
-  }
-
   const saleLines = [];
   const stockEffects = new Map();
   const addEffect = (itemType, itemId, quantityDelta, unitCostCents) => {
@@ -386,35 +350,8 @@ for (const row of rows('Vendas')) {
   for (const item of sourceItems) {
     const lineType = text(item['Tipo de Linha']) || 'Produto';
 
-    if (lineType === 'Componente') {
-      addEffect('product', text(item.Produto_ID), -number(item.Quantidade), cents(item['Custo Unit.']));
-      continue;
-    }
-
-    if (lineType === 'Kit') {
-      const kitId = text(item.Kit_ID);
-      const components = (groups.get(text(item.Grupo)) ?? [])
-        .filter((component) => text(component['Tipo de Linha']) === 'Componente')
-        .map((component) => ({
-          productId: text(component.Produto_ID),
-          name: text(component.Produto),
-          quantity: number(component.Quantidade),
-          unitCostCents: cents(component['Custo Unit.']),
-        }));
-      const totalCostCents = components.reduce((sum, component) => sum + component.unitCostCents * component.quantity, 0);
-      saleLines.push({
-        id: text(item.Item_ID),
-        kind: 'kit',
-        sourceId: kitId,
-        name: kitById.get(kitId)?.name ?? text(item.Produto).replace(/^Kit · /, ''),
-        quantity: number(item.Quantidade) || 1,
-        unitPriceCents: cents(item['Preço Aplicado']),
-        unitCostCents: totalCostCents,
-        totalCents: cents(item['Total Item']),
-        totalCostCents,
-        components,
-      });
-      continue;
+    if (lineType === 'Kit' || lineType === 'Componente' || text(item.Kit_ID)) {
+      throw new Error('Snapshot contém item de kit descontinuado; não aplicar reconstrução.');
     }
 
     if (lineType === 'Adicional') {

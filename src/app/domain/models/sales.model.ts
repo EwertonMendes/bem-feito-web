@@ -5,15 +5,7 @@ export type SaleStatus = 'active' | 'cancelled';
 /** Commercial fulfillment is independent from payment and cancellation. */
 export type FulfillmentStatus = 'in-production' | 'ready' | 'delivered';
 export type PaymentStatus = 'paid' | 'pending' | 'partial' | 'cancelled';
-export type SaleLineKind = 'product' | 'kit' | 'addition';
-
-export interface SaleResolvedComponent {
-  productId: string;
-  name: string;
-  quantity: number;
-  unitCostCents: number;
-  unitCostDeciCents?: number;
-}
+export type SaleLineKind = 'product' | 'addition';
 
 export interface SaleLineSnapshot {
   id: string;
@@ -26,7 +18,6 @@ export interface SaleLineSnapshot {
   unitCostCents: number;
   totalCents: number;
   totalCostCents: number;
-  components?: SaleResolvedComponent[];
 }
 
 export interface StockEffect {
@@ -88,20 +79,13 @@ export interface ProductSaleDraftLine {
   manualUnitPriceCents?: number;
 }
 
-export interface KitSaleDraftLine {
-  kind: 'kit';
-  sourceId: string;
-  quantity: 1;
-  componentProductIds: string[];
-}
-
 export interface AdditionSaleDraftLine {
   kind: 'addition';
   sourceId: string;
   quantity: number;
 }
 
-export type SaleDraftLine = ProductSaleDraftLine | KitSaleDraftLine | AdditionSaleDraftLine;
+export type SaleDraftLine = ProductSaleDraftLine | AdditionSaleDraftLine;
 
 export interface PaymentDraft {
   methodId: string;

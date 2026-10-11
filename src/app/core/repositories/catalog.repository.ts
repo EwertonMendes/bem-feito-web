@@ -6,7 +6,7 @@ import { catalogEntityCode } from '../utils/ids';
 import { stockStatusForProduct } from '../../domain/logic/stock-status';
 import {
   Addition, CollectionDefinition, FormatDefinition, FormatPrice, FragranceDefinition,
-  InputItem, Kit, Product, UnitDefinition,
+  InputItem, Product, UnitDefinition,
 } from '../../domain/models/catalog.model';
 import { FirestoreRepository } from '../firebase/firestore.repository';
 
@@ -54,12 +54,6 @@ export class ProductRepository extends FirestoreRepository<Product> {
 export class InputRepository extends FirestoreRepository<InputItem> {
   constructor() { super('inputs', 'catalog'); }
   all(): Promise<InputItem[]> { return this.list([orderBy('name')]); }
-}
-
-@Injectable({ providedIn: 'root' })
-export class KitRepository extends FirestoreRepository<Kit> {
-  constructor() { super('kits', 'catalog'); }
-  all(): Promise<Kit[]> { return this.list([orderBy('name')]); }
 }
 
 @Injectable({ providedIn: 'root' })

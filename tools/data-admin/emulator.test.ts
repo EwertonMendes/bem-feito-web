@@ -112,7 +112,7 @@ test('relationship is checked again atomically after preview', async () => {
 });
 test('registered replacement can commit and restore more than 500 documents atomically', async () => {
   const paths = Array.from({ length: 600 }, (_, i) => `dataAdminSmoke/smoke-bulk-${i}`);
-  const req = validateRequest({ schemaVersion: 1, id: 'bulk-replacement', environment: 'dev', projectId: 'bem-feito-dev', operation: 'migrate', migration: 'legacy-sheets-v1', deploymentSha: 'a'.repeat(40), destructive: { projectId: 'bem-feito-dev', paths: ['dataAdminSmoke'] } });
+  const req = validateRequest({ schemaVersion: 1, id: 'bulk-replacement', environment: 'dev', projectId: 'bem-feito-dev', operation: 'migrate', migration: 'unit-products-v2', deploymentSha: 'a'.repeat(40), destructive: { projectId: 'bem-feito-dev', paths: ['dataAdminSmoke'] } });
   const snapshots = await db.getAll(...paths.map(p => db.doc(p)));
   const plan = { schemaVersion: 1 as const, requestHash: hash(req), projectId: req.projectId, environment: req.environment, operation: req.operation, scope: ['dataAdminSmoke'], rows: snapshots.map(s => ({ ...snapshotRow(s), after: encode({ value: 42 }) })), dependencies: [] };
   // Include the existing test document to exercise root-set concurrency protection.

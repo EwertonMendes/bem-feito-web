@@ -20,7 +20,7 @@ import {
 import { summarizeSaleItems } from '../../domain/logic/sale-analytics';
 import { productCostComponents, standardCostForProduct } from '../../domain/logic/costing';
 import { productStockStatus, stockStatusForInput } from '../../domain/logic/stock-status';
-import { Addition, CollectionDefinition, FormatDefinition, FragranceDefinition, InputItem, Kit, Product } from '../../domain/models/catalog.model';
+import { Addition, CollectionDefinition, FormatDefinition, FragranceDefinition, InputItem, Product } from '../../domain/models/catalog.model';
 import { StockMovement } from '../../domain/models/inventory.model';
 import { Payment, Sale, SaleDraft } from '../../domain/models/sales.model';
 import { resolveSaleDraft } from '../../domain/logic/sale-resolution';
@@ -140,17 +140,11 @@ export class SalesRepository {
       const saleCounterSnapshot = await transaction.get(saleCounterRef);
 
       const productLineIds = draft.lines.filter((line) => line.kind === 'product').map((line) => line.sourceId);
-      const kitIds = draft.lines.filter((line) => line.kind === 'kit').map((line) => line.sourceId);
       const additionIds = draft.lines.filter((line) => line.kind === 'addition').map((line) => line.sourceId);
-      const kitProductIds = draft.lines.filter((line) => line.kind === 'kit').flatMap((line) => line.componentProductIds);
-      const productIds = [...new Set([...productLineIds, ...kitProductIds])];
+      const productIds = [...new Set(productLineIds)];
 
       const productSnapshots = new Map<string, DocumentSnapshot>();
       for (const id of productIds) productSnapshots.set(id, await transaction.get(doc(this.firestore, 'products', id)));
-
-      const kitSnapshots = new Map<string, DocumentSnapshot>();
-      for (const id of [...new Set(kitIds)]) kitSnapshots.set(id, await transaction.get(doc(this.firestore, 'kits', id)));
-
       const additionSnapshots = new Map<string, DocumentSnapshot>();
       for (const id of [...new Set(additionIds)]) additionSnapshots.set(id, await transaction.get(doc(this.firestore, 'additions', id)));
 
@@ -161,15 +155,6 @@ export class SalesRepository {
         if (!product.active) throw new Error(`${product.displayName} está inativo.`);
         products.set(id, product);
       }
-
-      const kits = new Map<string, Kit>();
-      for (const [id, snapshot] of kitSnapshots) {
-        if (!snapshot.exists()) throw new Error('Um kit da venda não existe mais.');
-        const kit = { id, ...snapshot.data() } as Kit;
-        if (!kit.active) throw new Error(`${kit.name} está inativo.`);
-        kits.set(id, kit);
-      }
-
       const additions = new Map<string, Addition>();
       const additionInputIds = new Set<string>();
       for (const [id, snapshot] of additionSnapshots) {
@@ -231,7 +216,6 @@ export class SalesRepository {
 
       const { lines, stockEffects, subtotalCents, discountCents, totalCents } = resolveSaleDraft(draft, {
         products,
-        kits,
         additions,
         inputs,
         productUnitCosts,

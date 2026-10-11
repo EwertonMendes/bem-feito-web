@@ -156,13 +156,13 @@ try {
     formatPrices: { collectionId: 'c', formatId: 'fmt', priceCents: 1000, active: true },
     inputs: { ...named, code: 'I1', unitId: 'u', stock: 10, minimumStock: 1, averageUnitCostCents: 100 },
     products: product,
-    kits: { ...named, priceCents: 1000, components: [] },
     additions: { ...named, category: 'fixture', priceCents: 100, components: [] },
     expenses: { code: 'M1', businessDate: '2026-10-05', kind: 'input-purchase', inputId: 'i', quantity: 2, amountCents: 1000 },
     productions: { code: 'PR1', businessDate: '2026-10-05', productId: 'p1', productName: 'Fixture', quantity: 1, unitCostCents: 100, totalCostCents: 100, costPending: false, consumptions: [] },
     stockAdjustments: { code: 'AJ1', businessDate: '2026-10-05', itemType: 'product', itemId: 'p1', quantityDelta: 1, reason: 'Fixture' },
     stockMovements: { businessDate: '2026-10-05', itemType: 'product', itemId: 'p1', quantityDelta: 1, unitCostCents: 100, totalCostCents: 100, sourceType: 'adjustment', sourceId: 'a1' },
   };
+  await deny(setDoc(doc(operator, 'kits', 'retired'), { ...named, priceCents: 1000, components: [], ...audit('operator') }));
   for (const [collection, payload] of Object.entries(fixtures)) {
     await pass(setDoc(doc(operator, collection, 'schema-fixture'), { ...payload, ...audit('operator') }));
     await deny(setDoc(doc(operator, collection, 'bad-schema'), { ...payload, unexpected: true, ...audit('operator') }));

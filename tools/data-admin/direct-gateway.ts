@@ -17,7 +17,7 @@ export type DirectRequest = {
 
 // Field names and collection names are not business allowlists. Only infrastructure
 // collections are excluded: editing them would bypass authentication/audit itself.
-const RESERVED_COLLECTIONS = new Set(['system','dataAdminOperations','migrationRuns','migrationSources','counters']);
+const RESERVED_COLLECTIONS = new Set(['system','dataAdminOperations','migrationRuns','migrationSources','counters','kits']);
 const DELETABLE = new Set(['dataAdminSmoke','expenseCategories']);
 const MAX_PAYLOAD = 10000;
 const props = (v: unknown, keys: string[]) => {

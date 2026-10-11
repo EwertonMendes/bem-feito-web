@@ -344,39 +344,9 @@
   letter-spacing: -0.025em;
 }
 
-.kit-stock-warning {
-  min-width: 0;
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  padding: 7px 8px;
-  border: 1px solid color-mix(in srgb, var(--warning) 18%, var(--line));
-  border-radius: 9px;
-  background: var(--warning-soft);
-  color: var(--warning);
-  font-size: 0.62rem;
-  font-weight: 650;
-  line-height: 1.35;
-}
 
-.kit-stock-warning bf-icon {
-  width: 14px;
-  height: 14px;
-  flex: 0 0 auto;
-  margin-top: 1px;
-}
 
-.kit-stock-warning span {
-  min-width: 0;
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
 
-.pick-card.kit-unavailable .product-media {
-  opacity: 0.82;
-}
 
 .add-to-order,
 .catalog-quantity {
@@ -721,32 +691,9 @@
   font-size: 0.69rem;
 }
 
-.kit-config {
-  display: grid;
-  gap: 6px;
-  margin-top: 8px;
-}
 
-.kit-config label {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 74px minmax(0, 1fr);
-  gap: 6px;
-  align-items: center;
-}
 
-.kit-config label > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--muted);
-  font-size: 0.61rem;
-}
 
-.kit-config bf-select {
-  min-width: 0;
-  width: 100%;
-}
 
 .panel-section {
   margin-top: 16px;
@@ -1338,10 +1285,6 @@
     min-width: 0;
   }
 
-  .kit-config label {
-    grid-template-columns: 1fr;
-    gap: 3px;
-  }
 
   .payment-row {
     grid-template-columns: minmax(0, 1fr) 102px 40px;

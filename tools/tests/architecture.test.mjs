@@ -192,3 +192,23 @@ test('floating close styling preserves button touch size and aligned dialog foot
   assert.match(drive, /--bf-close-inset:6px;--bf-close-icon-size:14px;top:-19px;right:-20px/);
   assert.match(drive, /\.drive-notice \.bf-floating-close\{top:-17px;right:-16px\}/);
 });
+
+// Dialog geometry regression: prevent the partially clipped X on compact screens.
+test('close buttons remain within viewport on compact dialogs and Drive notice', () => {
+  const styles = readFileSync(resolve('src/styles.scss'), 'utf8');
+  const sale = readFileSync(resolve(appRoot, 'features/sales/components/sale-editor/sale-editor.scss'), 'utf8');
+  const drive = readFileSync(resolve(appRoot, 'features/google-drive/components/drive-connection-banner.ts'), 'utf8');
+  const confirm = readFileSync(resolve(appRoot, 'shared/ui/confirm-dialog/confirm-dialog.scss'), 'utf8');
+
+  const responsiveClose = styles.slice(styles.indexOf('/* Compact dialogs keep'), styles.indexOf('@media (prefers-reduced-motion: reduce)', styles.indexOf('/* Compact dialogs keep')));
+  assert.match(responsiveClose, /@media \(max-width: 980px\)/);
+  assert.match(responsiveClose, /\.bf-dialog \.bf-floating-close,\s*\.sale-dialog \.bf-floating-close\s*\{\s*top: 10px;\s*right: 12px;/);
+  assert.match(responsiveClose, /@media \(max-width: 480px\)/);
+  assert.match(responsiveClose, /\.bf-dialog \.bf-floating-close,\s*\.sale-dialog \.bf-floating-close\s*\{\s*top: 8px;\s*right: 8px;/);
+  assert.match(responsiveClose, /\.bf-dialog-header\s*\{\s*padding-right: 68px;/);
+  assert.match(sale, /width: min\(1420px, calc\(100vw - 64px\)\)/);
+  assert.match(sale, /\.sale-header\s*\{\s*height: 68px;\s*padding: 0 68px 0 16px;/);
+  assert.match(drive, /@media\(max-width:980px\)\{\.drive-notice\{[^}]*padding-right:58px\}\.drive-notice \.bf-floating-close\{top:6px;right:6px\}/);
+  assert.match(drive, /@media\(max-width:700px\)\{\.drive-notice\{[^}]*padding:15px 54px 15px 16px\}\.drive-notice \.bf-floating-close\{top:5px;right:5px\}/);
+  assert.match(confirm, /@media \(max-width: 980px\)[\s\S]*?\.confirm-content\s*\{\s*padding-right: 68px;/);
+});

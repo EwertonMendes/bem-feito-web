@@ -1,5 +1,6 @@
 .sale-dialog {
-  width: min(1420px, calc(100vw - 32px));
+  /* At desktop sizes the protruding close needs its own viewport gutter. */
+  width: min(1420px, calc(100vw - 64px));
   height: min(900px, calc(100dvh - 60px));
   max-width: none;
   max-height: none;
@@ -1048,7 +1049,7 @@
 
   .sale-header {
     height: 68px;
-    padding: 0 54px 0 16px;
+    padding: 0 68px 0 16px;
   }
 
   .sale-header-icon {

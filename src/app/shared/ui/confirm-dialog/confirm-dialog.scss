@@ -50,6 +50,13 @@
   line-height: 1.55;
 }
 
+/* Headerless confirmation dialogs also reserve space for the internal close. */
+@media (max-width: 980px) {
+  .confirm-content {
+    padding-right: 68px;
+  }
+}
+
 .confirm-actions {
   display: flex;
   justify-content: flex-end;
@@ -72,7 +79,7 @@
   .confirm-content {
     grid-template-columns: 40px minmax(0, 1fr);
     gap: 12px;
-    padding: 20px 18px 16px;
+    padding: 20px 64px 16px 18px;
   }
 
   .confirm-icon {

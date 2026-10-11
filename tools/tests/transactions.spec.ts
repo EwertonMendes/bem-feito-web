@@ -89,6 +89,29 @@ beforeEach(async () => {
 afterAll(async () => { injector?.destroy(); await env?.cleanup(); });
 
 describe('Actual repositories against restrictive emulator rules', () => {
+  it('requires a specific equipment name and preserves it across audited corrections', async () => {
+    await expect(finance.createExpense({
+      businessDate: day, kind: 'equipment', amountCents: 2790,
+    })).rejects.toThrow('nome do equipamento');
+    const created = await finance.createExpense({
+      businessDate: day, kind: 'equipment', amountCents: 2790,
+      itemName: 'Molde silicone floral 90 g',
+    });
+    expect(await data('expenses', created.expense.id)).toMatchObject({
+      itemName: 'Molde silicone floral 90 g', amountCents: 2790, kind: 'equipment',
+    });
+    const corrected = await corrections.correct(created.expense.id, {
+      businessDate: day, kind: 'equipment', amountCents: 2790,
+      itemName: 'Molde floral com seis cavidades',
+    }, 'Corrigir descrição do equipamento');
+    expect(corrected.expense.itemName).toBe('Molde floral com seis cavidades');
+    expect(await data('expenses', created.expense.id)).toMatchObject({
+      itemName: 'Molde floral com seis cavidades', amountCents: 2790,
+    });
+    expect(await count('expenseCorrections')).toBe(1);
+    expect(await count('stockMovements')).toBe(0);
+  });
+
   it('corrects third-party payment source without retaining the previous payer', async () => {
     const result = await finance.createExpense({
       businessDate: day, kind: 'operating-expense', amountCents: 500,

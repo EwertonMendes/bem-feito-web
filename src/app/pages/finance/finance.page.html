@@ -177,7 +177,7 @@
       <h3>Itens registrados</h3>
       @for(item of expense.items ?? [];track item.inputId){
         <div class="purchase-detail-row"><strong>{{inputName(item.inputId)}}</strong><span>{{item.quantity}} {{purchaseUnit(item.inputId)}}</span><strong>{{currency(item.amountCents)}}</strong></div>
-      } @empty {<p>{{expense.kind==='input-purchase'?inputName(expense.inputId):categoryName(expense.categoryId)}}</p>}
+      } @empty {<p><strong>{{expenseDescription(expense)}}</strong> @if(expense.kind==='equipment' && expense.quantity){ · {{expense.quantity}} unidade(s) }</p>}
       @if(expense.notes){<p>{{expense.notes}}</p>}
       <p>Origem: {{ fundingType(expense) === 'business' ? 'Recursos do negócio' : fundingType(expense) === 'unverified' ? 'A confirmar' : 'Pago por outra pessoa' }}</p>
       @if(fundingParty(expense)){<p>Quem pagou: {{ fundingParty(expense) }} · {{ expense.reimbursable ? 'Com reembolso' : 'Sem reembolso informado' }}</p>}

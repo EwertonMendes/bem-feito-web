@@ -29,6 +29,7 @@
           </section>
         } @else {
           <label class="bf-field full"><span>Categoria</span><bf-select [formField]="expenseForm.categoryId" [options]="expenseCategoryOptions()" ariaLabel="Categoria" /></label>
+          <label class="bf-field full" [attr.data-invalid]="expenseSubmitted() && expenseErrors().itemName ? 'true' : null"><span>{{model().kind==='equipment'?'Nome do equipamento *':'Descrição da saída (opcional)'}}</span><input class="bf-input" type="text" [formField]="expenseForm.itemName" [placeholder]="model().kind==='equipment'?'Ex.: Molde silicone floral ou balança de precisão':'Ex.: Transporte para buscar materiais'" />@if(expenseSubmitted() && expenseErrors().itemName){<small class="bf-field-error">{{expenseErrors().itemName}}</small>}</label>
         }
         <label class="bf-field"><span>Origem do pagamento</span><bf-select [value]="model().fundingType" (valueChange)="setFundingSource($event)" [options]="fundingOptions" ariaLabel="Origem do pagamento" /></label>
         @if(model().fundingType==='third-party'){

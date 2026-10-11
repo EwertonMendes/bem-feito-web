@@ -57,6 +57,10 @@ export class FinanceRepository {
     if (!userId) throw new Error('Sessão inválida.');
     if (!draft.businessDate) throw new Error('Informe a data.');
     if (!Number.isFinite(draft.amountCents) || draft.amountCents <= 0) throw new Error('Informe um valor válido.');
+    if (draft.kind === 'equipment' && (!draft.itemName?.trim() || draft.itemName.trim().length > 160))
+      throw new Error('Informe o nome do equipamento (até 160 caracteres).');
+    if (draft.itemName && draft.itemName.trim().length > 160)
+      throw new Error('Descrição muito longa.');
     if (draft.kind === 'input-purchase' && (!draft.inputId || !draft.quantity || draft.quantity <= 0)) {
       throw new Error('Selecione o insumo e informe a quantidade comprada.');
     }
@@ -121,13 +125,14 @@ export class FinanceRepository {
         }
       }
 
-      const expense: Expense = { id: expenseRef.id, ...draft, code,
+      const expense: Expense = { id: expenseRef.id, ...draft, ...(draft.itemName?.trim() ? { itemName: draft.itemName.trim() } : {}), code,
         fundingSource: draft.fundingType ? (draft.fundingType === 'third-party' ? 'owner-unassigned' : draft.fundingType === 'unverified' ? 'unverified' : 'business') : (draft.fundingSource ?? 'business'),
         fundingType: fundingType, paidBy: draft.paidBy?.trim() || undefined,
         reimbursable: fundingType === 'third-party' && !!draft.reimbursable,
         bankDebitCents: (fundingType) === 'business' ? draft.amountCents : 0 };
       transaction.set(expenseRef, {
         ...draft,
+        ...(draft.itemName?.trim() ? { itemName: draft.itemName.trim() } : {}),
         code,
         fundingSource: expense.fundingSource,
         fundingType: expense.fundingType, paidBy: expense.paidBy, reimbursable: expense.reimbursable,

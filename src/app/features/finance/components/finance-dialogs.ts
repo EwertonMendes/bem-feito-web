@@ -33,6 +33,7 @@ interface ExpenseFormModel {
   businessDate: string;
   kind: ExpenseKind;
   categoryId: string;
+  itemName: string;
   inputId: string;
   quantity: number;
   amount: number;
@@ -101,6 +102,7 @@ export class BfFinanceDialogs {
     businessDate: todayBusinessDate(),
     kind: 'operating-expense',
     categoryId: '',
+    itemName: '',
     inputId: '',
     quantity: 1,
     amount: 0,
@@ -120,6 +122,7 @@ export class BfFinanceDialogs {
     return {
       businessDate: value.businessDate ? '' : 'Informe a data.',
       amount: Number.isFinite(value.amount) && value.amount > 0 ? '' : 'Informe um valor maior que zero.',
+      itemName: value.kind === 'equipment' && (!value.itemName.trim() || value.itemName.trim().length > 160) ? 'Informe o nome do equipamento (até 160 caracteres).' : '',
       inputId: '',
       quantity: '',
     };
@@ -217,6 +220,7 @@ export class BfFinanceDialogs {
       businessDate: todayBusinessDate(),
       kind,
       categoryId: this.settings.expenseCategories().find((item) => item.active)?.id ?? '',
+      itemName: '',
       inputId: this.catalog.activeInputs()[0]?.id ?? '',
       quantity: 1,
       amount: 0,
@@ -241,7 +245,7 @@ export class BfFinanceDialogs {
     })));
     this.model.update(model => ({
       ...model, businessDate: expense.businessDate, kind: expense.kind,
-      categoryId: expense.categoryId ?? '', amount: fromCents(expense.kind === 'input-purchase'
+      categoryId: expense.categoryId ?? '', itemName: expense.itemName ?? '', amount: fromCents(expense.kind === 'input-purchase'
         ? items.reduce((sum, item) => sum + item.amountCents, 0) : expense.amountCents),
       paymentMethodId: expense.paymentMethodId ?? '', notes: expense.notes ?? '', link: expense.link ?? '',
       fundingType: fundingTypeOf(expense), paidBy: fundingPartyOf(expense),
@@ -354,6 +358,7 @@ export class BfFinanceDialogs {
       businessDate: value.businessDate,
       kind: value.kind,
       categoryId: value.categoryId || undefined,
+      itemName: value.itemName.trim() || undefined,
       amountCents: toCents(value.amount),
       paymentMethodId: value.paymentMethodId || undefined,
       fundingType: value.fundingType, paidBy: value.fundingType === 'third-party' ? value.paidBy.trim() : undefined,

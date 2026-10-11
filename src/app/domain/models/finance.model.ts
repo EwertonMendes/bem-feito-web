@@ -54,6 +54,8 @@ export interface Expense extends AuditFields {
   businessDate: string;
   kind: ExpenseKind;
   categoryId?: string;
+  /** Purchased item name, independent from the category. */
+  itemName?: string;
   inputId?: string;
   quantity?: number;
   unitId?: string;
@@ -77,6 +79,7 @@ export interface ExpenseDraft {
   businessDate: string;
   kind: ExpenseKind;
   categoryId?: string;
+  itemName?: string;
   inputId?: string;
   quantity?: number;
   unitId?: string;

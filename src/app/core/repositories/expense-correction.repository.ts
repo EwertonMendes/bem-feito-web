@@ -73,6 +73,12 @@ export class ExpenseCorrectionRepository {
         if (isPurchase !== ('items' in draft) || (!isPurchase && 'kind' in draft && current.kind !== draft.kind))
           throw new Error('Não é permitido trocar o tipo de um lançamento. Cancele e registre outro.');
       }
+      if (!cancelling && current.kind === 'equipment' &&
+          (!(draft as ExpenseDraft).itemName?.trim() || (draft as ExpenseDraft).itemName!.trim().length > 160))
+        throw new Error('Informe o nome do equipamento (até 160 caracteres).');
+      if (!cancelling && !isPurchase && (draft as ExpenseDraft).itemName &&
+          (draft as ExpenseDraft).itemName!.trim().length > 160)
+        throw new Error('Descrição muito longa.');
       const purchaseDraft = !cancelling && isPurchase ? draft as PurchaseBatchDraft : null;
       const oldItems = isPurchase && current.stockApplied !== false ? itemsFor(current) : [];
       if (isPurchase && current.stockApplied !== false && !oldItems.length)
@@ -100,6 +106,7 @@ export class ExpenseCorrectionRepository {
           reimbursable: source === 'third-party' && !!draft!.reimbursable,
           bankDebitCents: source === 'business' ? total : 0,
           notes: draft!.notes?.trim(), link: draft!.link?.trim(),
+          ...(!isPurchase ? { itemName: (draft as ExpenseDraft).itemName?.trim() || undefined } : {}),
           ...(isPurchase ? { items: newItems, charges, receiptStatus: current.receiptStatus,
             stockApplied: current.stockApplied } : { categoryId: (draft as ExpenseDraft).categoryId }),
           status: 'active',
@@ -158,6 +165,7 @@ export class ExpenseCorrectionRepository {
       const { id: _id, createdAt: _createdAt, createdBy: _createdBy, ...editable } = next;
       tx.update(expenseRef, { ...safeRecord(editable),
         ...(!cancelling && source !== 'third-party' && current.paidBy ? { paidBy: deleteField() } : {}),
+        ...(!cancelling && !isPurchase && current.itemName && !next.itemName ? { itemName: deleteField() } : {}),
         updatedAt: serverTimestamp(), updatedBy: userId });
       const revisionRef = doc(collection(this.db, 'expenseCorrections'));
       tx.set(revisionRef, {

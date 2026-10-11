@@ -274,6 +274,7 @@ const expenses = rows('Compras e Despesas').map((row) => {
     businessDate: date(row.Data),
     kind,
     categoryId: expenseCategoryIds.get(lower(row.Categoria)) || undefined,
+    itemName: (text(row.Insumo) || (kind === 'equipment' ? text(row.Descrição) : '')) || undefined,
     inputId: text(row.Insumo_ID) || undefined,
     quantity: number(row.Quantidade) || undefined,
     unitId: unitIds.get(lower(row.Unidade)) || undefined,

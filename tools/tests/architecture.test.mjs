@@ -177,3 +177,15 @@ test('shared image upload owns native file input rendering', () => {
     `Native file inputs outside shared image upload:\n${violations.join('\n')}`,
   );
 });
+
+test('floating close styling preserves button touch size and aligned dialog footer', () => {
+  const styles = readFileSync(resolve('src/styles.scss'), 'utf8');
+  const drive = readFileSync(resolve(appRoot, 'features/google-drive/components/drive-connection-banner.ts'), 'utf8');
+  assert.match(styles, /\.bf-floating-close\s*\{[^}]*width:\s*44px;[^}]*height:\s*44px;/s);
+  assert.match(styles, /\.bf-floating-close::before\s*\{/);
+  assert.match(styles, /\.bf-floating-close:focus-visible::before\s*\{/);
+  assert.match(styles, /\.bf-dialog-header,\s*\.bf-dialog-footer\s*\{[^}]*padding:\s*19px 21px;/s);
+  assert.match(styles, /\.bf-dialog-header\s*\{\s*padding-right:\s*54px;/);
+  assert.match(styles, /\.bf-dialog-footer\s*\{[^}]*justify-content:\s*flex-end;/s);
+  assert.match(drive, /--bf-close-inset:6px;--bf-close-icon-size:14px;top:-16px;right:0/);
+});

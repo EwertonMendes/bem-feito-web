@@ -17,15 +17,13 @@
   --atelier-frame: rgba(104, 127, 94, .13);
   --atelier-sidebar: #fffcf7;
   /* One immutable asset URL per ornament in both themes (no image replacement flash). */
-  --atelier-page-leaves: url('/assets/atelier/page-ambient.webp');
-  --atelier-side-leaves: url('/assets/atelier/side-sprig.webp');
-  --atelier-card-leaves: url('/assets/atelier/card-flourish.webp');
-  --atelier-card-warm: url('/assets/atelier/card-flourish.webp');
-  --atelier-card-wave: url('/assets/atelier/card-wave.webp');
-  --atelier-page-opacity: .16;
-  --atelier-sidebar-opacity: .09;
-  --atelier-card-opacity: .16;
-  --atelier-wave-opacity: .15;
+  /* Shared URLs in both themes; never replace bitmap on theme change. */
+  --atelier-page-leaves: url('/assets/atelier/page-atmosphere.webp');
+  --atelier-side-leaves: url('/assets/atelier/sidebar-atmosphere.webp');
+  --atelier-card-leaves: url('/assets/atelier/featured-accent.webp');
+  --atelier-page-opacity: .065;
+  --atelier-sidebar-opacity: .085;
+  --atelier-card-opacity: .095;
 }
 
 :root[data-theme='dark'] {
@@ -44,14 +42,14 @@
   --atelier-frame: rgba(163, 181, 140, .14);
   --atelier-sidebar: #2e2823;
   /* The image URLs are intentionally inherited from :root and never change. */
-  --atelier-page-opacity: .20;
-  --atelier-sidebar-opacity: .12;
-  --atelier-card-opacity: .15;
-  --atelier-wave-opacity: .14;
+  --atelier-page-opacity: .085;
+  --atelier-sidebar-opacity: .095;
+  --atelier-card-opacity: .085;
 }
 
-/* Botanical Atelier v2: ambient CSS first, restrained and high-resolution accents second.
-   The same decoded image remains mounted while only colors/opacity change on theme toggle. */
+/* Botanical Atelier v3: surfaces and ambient lighting create depth.
+   A single low-contrast vignette is used away from the sidebar seam.
+   Ornaments are static, never swapped while changing between light and dark. */
 .content {
   position: relative;
   isolation: isolate;
@@ -64,24 +62,26 @@
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 70% 58% at 3% 97%, var(--atelier-glow), transparent 74%),
-    radial-gradient(ellipse 60% 52% at 92% -18%, var(--atelier-blush), transparent 73%),
-    linear-gradient(145deg,
-      color-mix(in srgb, var(--bg) 91%, var(--surface)),
-      var(--bg) 56%,
-      color-mix(in srgb, var(--bg) 96%, var(--brand-soft)));
+    radial-gradient(ellipse 68% 60% at 8% 94%, var(--atelier-glow), transparent 78%),
+    radial-gradient(ellipse 68% 50% at 83% 2%, var(--atelier-blush), transparent 77%),
+    linear-gradient(130deg,
+      color-mix(in srgb, var(--bg) 91%, var(--surface)) 0%,
+      var(--bg) 52%,
+      color-mix(in srgb, var(--bg) 94%, var(--brand-soft)) 100%);
 }
 .content::after {
   content: '';
   position: fixed;
-  bottom: 0;
-  left: var(--sidebar);
-  width: clamp(240px, 25vw, 370px);
-  aspect-ratio: 3 / 4;
+  right: clamp(18px, 2.3vw, 40px);
+  bottom: 18px;
+  width: clamp(180px, 19vw, 310px);
+  aspect-ratio: 1080 / 1330;
   z-index: -1;
   pointer-events: none;
   opacity: var(--atelier-page-opacity);
-  background: var(--atelier-page-leaves) left bottom / contain no-repeat;
+  background: var(--atelier-page-leaves) center / contain no-repeat;
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 32%, transparent 96%);
+  mask-image: radial-gradient(ellipse at center, #000 32%, transparent 96%);
 }
 
 /* The sidebar contains only passive decor; navigation always wins the hit test. */
@@ -96,11 +96,13 @@ html .shell .sidebar {
 html .shell .sidebar::before {
   content: '';
   position: absolute;
-  inset: auto 0 0;
-  height: min(30vh, 250px);
+  inset: auto 12px 16px;
+  height: min(25vh, 190px);
   pointer-events: none;
   opacity: var(--atelier-sidebar-opacity);
-  background: var(--atelier-side-leaves) bottom left / min(170px, 76%) auto no-repeat;
+  background: var(--atelier-side-leaves) center bottom / contain no-repeat;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 25%, #000 72%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 25%, #000 72%, transparent);
 }
 .sidebar > * { position: relative; z-index: 1; }
 .sidebar .brand {
@@ -151,17 +153,20 @@ html .shell .sidebar::before {
   background: linear-gradient(133deg, color-mix(in srgb, var(--surface) 91%, var(--brand-soft)), var(--surface) 70%);
   isolation: isolate;
 }
-.content .dashboard-page .metric-card::after {
+/* One featured KPI only: no repeated ornament on every card. */
+.content .dashboard-page .metric-grid > .metric-card.tint-sage::after {
   content: '';
   position: absolute;
-  width: 68%;
-  height: 85%;
-  right: -7%;
-  bottom: -38%;
+  right: 8px;
+  bottom: 4px;
+  width: min(31%, 138px);
+  height: 84%;
   z-index: -1;
-  opacity: var(--atelier-wave-opacity);
+  opacity: var(--atelier-card-opacity);
   pointer-events: none;
-  background: var(--atelier-card-wave) center right / contain no-repeat;
+  background: var(--atelier-card-leaves) right bottom / contain no-repeat;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 42%);
+  mask-image: linear-gradient(90deg, transparent, #000 42%);
 }
 .content .dashboard-page .metric-card.tint-sage {
   background: linear-gradient(125deg,
@@ -180,21 +185,9 @@ html .shell .sidebar::before {
   overflow: hidden;
   background: linear-gradient(117deg, color-mix(in srgb, var(--brand-soft) 54%, var(--surface)), var(--surface) 85%);
 }
-.content .dashboard-page .financial-card::after {
-  content: '';
-  position: absolute;
-  inset: auto -3% -37% auto;
-  width: 43%;
-  height: 125%;
-  z-index: -1;
-  opacity: var(--atelier-card-opacity);
-  pointer-events: none;
-  background: var(--atelier-card-leaves) bottom right / contain no-repeat;
-}
 .content .dashboard-page .financial-card:has(.financial-icon.sand) {
   background: linear-gradient(115deg, color-mix(in srgb, var(--sand-soft) 60%, var(--surface)), var(--surface) 84%);
 }
-.content .dashboard-page .financial-card:has(.financial-icon.sand)::after { background-image: var(--atelier-card-warm); }
 .content .dashboard-page .dashboard-panel {
   background: color-mix(in srgb, var(--surface) 97%, var(--surface-3));
 }
@@ -261,7 +254,7 @@ html .shell .sidebar::before {
 
 @media (max-width: 980px) {
   .content::before { left: 0; }
-  .content::after { left: 0; width: clamp(210px, 35vw, 310px); }
+  .content::after { right: 16px; width: clamp(170px, 25vw, 250px); }
   .mobile-nav {
     background: color-mix(in srgb, var(--surface) 96%, transparent);
     border-color: color-mix(in srgb, var(--brand) 16%, var(--line));
@@ -269,9 +262,8 @@ html .shell .sidebar::before {
   }
 }
 @media (max-width: 640px) {
-  .content::after { width: min(185px, 50vw); opacity: .09; }
-  .content .dashboard-page .metric-card::after { opacity: .10; }
-  .content .dashboard-page .financial-card::after { opacity: .10; }
+  .content::after { right: 12px; bottom: 92px; width: min(154px, 43vw); opacity: .045; }
+  .content .dashboard-page .metric-grid > .metric-card.tint-sage::after { opacity: .06; }
   .content .stock-card, .content .list-card, .content .day-card, .content .sales-page .sale-mobile-card { box-shadow: var(--shadow-sm); }
 }
 @media (prefers-reduced-motion: reduce) {

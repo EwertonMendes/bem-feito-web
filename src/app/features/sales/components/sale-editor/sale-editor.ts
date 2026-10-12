@@ -41,6 +41,7 @@ interface ProductCartLine {
   kind: 'product';
   sourceId: string;
   quantity: number;
+  manualUnitPriceCents?: number;
 }
 
 interface AdditionCartLine {
@@ -447,6 +448,22 @@ export class SaleEditor {
     return this.catalog.additions().find((item) => item.id === line.sourceId)?.name ?? 'Adicional';
   }
 
+  setLinePrice(line: CartLine, price: number): void {
+    if (line.kind !== 'product' || !Number.isFinite(price) || price < 0) return;
+    const cents = toCents(price);
+    if (!Number.isSafeInteger(cents)) return;
+    this.cart.update(items => items.map(item => item.key === line.key ? { ...item, manualUnitPriceCents: cents } : item));
+  }
+
+  restoreLinePrice(line: CartLine): void {
+    if (line.kind !== 'product') return;
+    this.cart.update(items => items.map(item => {
+      if (item.key !== line.key || item.kind !== 'product') return item;
+      const { manualUnitPriceCents: _ignored, ...original } = item;
+      return original;
+    }));
+  }
+
   lineImage(line: CartLine): CatalogImageRef | undefined {
     if (line.kind === 'product') {
       return this.catalog.products().find((item) => item.id === line.sourceId)?.image;
@@ -458,7 +475,7 @@ export class SaleEditor {
 
   lineUnitPrice(line: CartLine): number {
     if (line.kind === 'product') {
-      return this.catalog.products().find((item) => item.id === line.sourceId)?.salePriceCents ?? 0;
+      return line.manualUnitPriceCents ?? this.catalog.products().find((item) => item.id === line.sourceId)?.salePriceCents ?? 0;
     }
 
 
@@ -584,6 +601,7 @@ export class SaleEditor {
         kind: 'product',
         sourceId: line.sourceId,
         quantity: line.quantity,
+        ...(line.manualUnitPriceCents !== undefined ? {manualUnitPriceCents: line.manualUnitPriceCents} : {}),
       };
     }
 

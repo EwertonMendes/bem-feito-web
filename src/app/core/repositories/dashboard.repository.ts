@@ -78,6 +78,10 @@ export class DashboardRepository {
       where('businessDate', '<=', endDate),
     );
     const ownerFunding = query(collection(this.firestore, 'expenses'), where('fundingType', '==', 'third-party'));
+    // Until historical fundingSource-only documents have been migrated, include only
+    // records without fundingType: never double-count a normalized third-party expense.
+    const legacyFunding = query(collection(this.firestore,'expenses'),
+      where('fundingSource','in',['ewerton','maria','owner-unassigned']));
     const pendingOrders = query(collection(this.firestore, 'sales'), where('status', '==', 'active'), where('fulfillmentStatus', 'in', ['in-production', 'ready']));
     const operatingExpensesInPeriod = query(
       collection(this.firestore, 'expenses'),
@@ -106,6 +110,7 @@ export class DashboardRepository {
       stockAlerts,
       cashCheck,
       ownerFunded,
+      legacyFunded,
       pendingCount,
     ] = await Promise.all([
       getAggregateFromServer(salesInPeriod, {
@@ -140,6 +145,7 @@ export class DashboardRepository {
       this.stockAlerts(),
       this.cash.latestBalanceCheck(),
       getAggregateFromServer(ownerFunding, { value: sum('amountCents') }),
+      getDocs(legacyFunding),
       getAggregateFromServer(pendingOrders, { value: count() }),
     ]);
 
@@ -185,7 +191,12 @@ export class DashboardRepository {
       cashOutCents: Number(expensesData.cashOutCents ?? 0),
       bankSnapshotCents: cashCheck?.balanceCents ?? null,
       bankSnapshotDate: cashCheck?.businessDate ?? null,
-      ownerFundedCents: Number(ownerFunded.data().value ?? 0),
+      ownerFundedCents: Number(ownerFunded.data().value ?? 0) +
+        legacyFunded.docs.reduce((total,row) => {
+          const expense = row.data();
+          return total + (!expense['fundingType'] && expense['status'] !== 'cancelled'
+            ? Number(expense['amountCents'] ?? 0) : 0);
+        },0),
       ordersPending: Number(pendingCount.data().value ?? 0),
       tipsCents: Number(paymentsData.tipsCents ?? 0),
       discountsCents: Number(salesData.discountsCents ?? 0),

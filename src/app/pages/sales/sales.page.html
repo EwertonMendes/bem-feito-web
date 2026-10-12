@@ -122,7 +122,16 @@
     }
   } @else {
     <div class="empty-sales">
-      <bf-empty-state title="Nenhuma venda encontrada" description="Experimente outra pesquisa ou revise os filtros." />
+      @if(historyActive() && historyHasMore()){
+        <bf-empty-state title="Nenhuma correspondência nesta parte do histórico" description="Há registros mais antigos para pesquisar. Continue a busca para verificar todas as páginas." />
+        <div class="bf-actions">
+          <button class="bf-button secondary" type="button" [disabled]="historicalBusy()" (click)="loadMoreHistory()">
+            {{historicalBusy()?'Pesquisando...':'Continuar buscando no histórico'}}
+          </button>
+        </div>
+      } @else {
+        <bf-empty-state title="Nenhuma venda encontrada" description="Experimente outra pesquisa ou revise os filtros." />
+      }
     </div>
   }
 

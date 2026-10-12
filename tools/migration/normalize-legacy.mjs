@@ -32,6 +32,15 @@ const date = (value) => {
 };
 const cents = (value) => Math.round(number(value) * 100);
 const active = (value) => text(value).toLowerCase() === 'sim';
+const customerSearchKey = (value) => text(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').replace(/\s+/g,' ').trim();
+const customerPrefixes = (value) => {
+  const normalized = customerSearchKey(value);
+  const result = new Set();
+  for (const word of [normalized,...normalized.split(' ')].filter(Boolean))
+    for (let length=2;length<=Math.min(word.length,60);length++)result.add(word.slice(0,length));
+  return [...result].slice(0,280);
+};
+
 const lower = (value) => text(value).toLocaleLowerCase('pt-BR');
 const omitEmpty = (object) => Object.fromEntries(Object.entries(object).filter(([, value]) => value !== '' && value !== undefined && value !== null));
 const sequence = (value) => Number(text(value).match(/(\d+)$/)?.[1] ?? 0);
@@ -369,6 +378,9 @@ for (const row of rows('Vendas')) {
         unitCostCents: cents(item['Custo Unit.']),
         totalCents: cents(item['Total Item']),
         totalCostCents: cents(item['Custo Total']),
+        stockEffects: (consumptionsBySale.get(saleId) ?? [])
+          .filter(c => text(c.Origem_ID) === text(item.Adicional_ID) && text(c.Origem) === 'Adicional')
+          .map(c => ({itemType:'input',itemId:text(c.Insumo_ID),quantityDelta:-number(c.Quantidade),unitCostCents:cents(c['Custo Unit.'])})),
       });
       continue;
     }
@@ -384,6 +396,10 @@ for (const row of rows('Vendas')) {
       unitCostCents: cents(item['Custo Unit.']),
       totalCents: cents(item['Total Item']),
       totalCostCents: cents(item['Custo Total']),
+      collectionId: productById.get(productId)?.collectionId,
+      fragranceId: productById.get(productId)?.fragranceId,
+      formatId: productById.get(productId)?.formatId,
+      stockEffects:[{itemType:'product',itemId:productId,quantityDelta:-number(item.Quantidade),unitCostCents:cents(item['Custo Unit.'])}],
     });
     addEffect('product', productId, -number(item.Quantidade), cents(item['Custo Unit.']));
   }
@@ -403,6 +419,9 @@ for (const row of rows('Vendas')) {
     code: saleId,
     businessDate: date(row.Data),
     customerName: text(row.Cliente) || undefined,
+    customerSearchKey: customerSearchKey(row.Cliente) || undefined,
+    customerSearchPrefixes: customerPrefixes(row.Cliente),
+    productIds: [...new Set(saleLines.filter(item=>item.kind==='product').map(item=>item.sourceId))],
     dueDate: date(row.Vencimento) || undefined,
     discountCents: cents(row.Desconto),
     subtotalCents: cents(row['Total dos Itens']),

@@ -16,6 +16,8 @@ export interface AdvancedSaleDraft {
   lines:AdvancedSaleLineDraft[];
   discountCents:number;
   reason:string;
+  /** Explicit acknowledgement of the physical stock correction on delivered sales. */
+  stockReconciliationConfirmed?:boolean;
 }
 export interface AdvancedSaleCatalog {
   products:ReadonlyMap<string,Product>;

@@ -62,6 +62,8 @@ export class SalesPage {
   readonly pendingAction = signal<'ready' | 'delivered' | 'cancel' | 'allocate' | 'correct' | 'correct-items' | null>(null);
   readonly editingDetails = signal(false);
   readonly editingItems = signal(false);
+  readonly openingItemEditor = signal(false);
+  private readonly editBaseline = signal<Sale | null>(null);
   readonly advancedChanges=signal<AdvancedSaleLineDraft[]>([]);
   readonly newLineKind=signal<'product'|'addition'>('product');
   readonly newLineSource=signal('');
@@ -76,7 +78,7 @@ export class SalesPage {
   readonly advancedStockConfirmed=signal(false);
   readonly correctionSignature=signal('');
   readonly correctionPreview=computed(()=>{
-    const sale=this.selectedSale();
+    const sale=this.editBaseline();
     if(!sale||!this.editingItems())return null;
     try{
       const catalog={
@@ -195,18 +197,40 @@ export class SalesPage {
     this.selectedSnapshot.set(sale);
     this.editingDetails.set(false);
     this.editingItems.set(false);
+    this.editBaseline.set(null);
     this.metadataDraft.set({customerName:sale.customerName??'',dueDate:sale.dueDate??'',notes:sale.notes??'',reason:''});
     this.detailDialog().open();
   }
 
-  openItemCorrection(sale:Sale):void {
-    this.editingDetails.set(false);this.editingItems.set(true);
-    this.advancedChanges.set(sale.items.map(i=>({id:i.id,kind:i.kind,sourceId:i.sourceId,
-      quantity:i.quantity,unitPriceCents:i.unitPriceCents})));
-    this.correctionDiscountCents.set(sale.discountCents);
-    this.correctionReason.set('');this.advancedStockConfirmed.set(false);
-    this.correctionSignature.set(saleCorrectionSignature(sale));
-    this.newLineSource.set('');this.newLineKind.set('product');
+  async openItemCorrection(sale:Sale):Promise<void> {
+    if(this.pendingAction() || this.openingItemEditor())return;
+    this.openingItemEditor.set(true);
+    try{
+      const current=await this.repository.findByIdFromServer(sale.id);
+      if(!current || current.status!=='active'){
+        this.toast.error('A venda não está mais disponível para edição.');
+        return;
+      }
+      // Keep the immutable editor base independent from the list-store refresh.
+      this.editBaseline.set(current);
+      this.selectedSnapshot.set(current);
+      this.editingDetails.set(false);
+      this.advancedChanges.set(current.items.map(i=>({
+        id:i.id,kind:i.kind,sourceId:i.sourceId,
+        quantity:i.quantity,unitPriceCents:i.unitPriceCents,
+      })));
+      this.correctionDiscountCents.set(current.discountCents);
+      this.correctionReason.set('');
+      this.advancedStockConfirmed.set(false);
+      this.correctionSignature.set(saleCorrectionSignature(current));
+      this.newLineSource.set('');
+      this.newLineKind.set('product');
+      this.editingItems.set(true);
+    }catch(error){
+      this.toast.error(this.errors.message(error));
+    }finally{
+      this.openingItemEditor.set(false);
+    }
   }
   readonly Math=Math;
   hasProductLines(sale:Sale):boolean {return sale.items.length>0;}
@@ -237,7 +261,7 @@ export class SalesPage {
   }
   async correctSelectedItems():Promise<void>{
     if(this.pendingAction())return;
-    const sale=this.selectedSale(),preview=this.correctionPreview();
+    const sale=this.editBaseline(),preview=this.correctionPreview();
     if(!sale||!preview?.value||this.correctionReason().trim().length<4)return;
     this.pendingAction.set('correct-items');
     try{
@@ -250,6 +274,7 @@ export class SalesPage {
         this.catalog.applyStockChanges(result.stockChanges);
         this.selectedSnapshot.set(result.sale);
         this.editingItems.set(false);
+        this.editBaseline.set(null);
       }
     }finally{this.pendingAction.set(null);}
   }

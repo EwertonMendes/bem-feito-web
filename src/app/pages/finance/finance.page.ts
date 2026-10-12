@@ -1,5 +1,6 @@
 import { FinanceCodeSearchRepository } from '../../core/repositories/finance-code-search.repository';
 import { FinanceRepository } from '../../core/repositories/finance.repository';
+import { PageResult } from '../../core/repositories/pagination';
 import { SalesRepository } from '../../core/repositories/sales.repository';
 import { downloadCsv, exportCents } from '../../core/utils/csv-export';
 import { Payment, Sale } from '../../domain/models/sales.model';
@@ -161,7 +162,7 @@ export class FinancePage {
      let cursor:{businessDate:string;id:string}|null=null;
      let complete=false;
      for(let i=0;i<1000;i++){
-       const page=kind==='expenses' ? await this.exportExpenses.expensePage(100,cursor)
+       const page: PageResult<Expense|Payment|Sale> = kind==='expenses' ? await this.exportExpenses.expensePage(100,cursor)
          : kind==='payments' ? await this.exportSales.paymentPage(100,cursor)
          : await this.exportSales.receivablePage(100,cursor);
        for(const entry of page.items){

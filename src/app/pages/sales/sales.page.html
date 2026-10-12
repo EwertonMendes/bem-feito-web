@@ -175,9 +175,26 @@
             } @empty {<p class="order-progress-legacy">Esta encomenda não possui sabonetes acabados.</p>}
           </section>
         }
-        @if (sale.notes) { <p class="notes">{{ sale.notes }}</p> }
+        @if (sale.notes && !editingDetails()) { <p class="notes">{{ sale.notes }}</p> }
+        @if(editingDetails()){
+          <section class="sale-metadata-editor">
+            <h3><bf-icon name="details"/> Corrigir dados da venda</h3>
+            <p>Este ajuste não altera produtos, estoque ou pagamentos. O motivo fica salvo no histórico.</p>
+            <div class="sale-metadata-grid">
+              <label>Cliente<input class="bf-input" type="text" maxlength="120" [value]="metadataDraft().customerName" (input)="patchMetadata('customerName',$any($event.target).value)"/></label>
+              <label>Vencimento<input class="bf-input" type="date" [value]="metadataDraft().dueDate" (input)="patchMetadata('dueDate',$any($event.target).value)"/></label>
+              <label class="wide">Observações<textarea class="bf-textarea" maxlength="500" [value]="metadataDraft().notes" (input)="patchMetadata('notes',$any($event.target).value)"></textarea></label>
+              <label class="wide">Motivo da correção <em>*</em><textarea class="bf-textarea" maxlength="240" placeholder="Descreva o que estava incorreto" [value]="metadataDraft().reason" (input)="patchMetadata('reason',$any($event.target).value)"></textarea></label>
+            </div>
+            <div class="sale-metadata-actions">
+              <button type="button" class="bf-button secondary" [disabled]="!!pendingAction()" (click)="editingDetails.set(false)">Cancelar</button>
+              <button type="button" class="bf-button" [disabled]="!!pendingAction() || metadataDraft().reason.trim().length < 4" (click)="saveMetadata()">Salvar correção</button>
+            </div>
+          </section>
+        }
       </div>
       <div class="bf-dialog-footer">
+        @if(sale.status==='active' && !editingDetails()) { <button class="bf-button secondary" type="button" [disabled]="!!pendingAction()" (click)="editingDetails.set(true)"><bf-icon name="details"/> Corrigir dados</button> }
         @if (sale.status==='active' && sale.balanceCents>0){<button class="bf-button" type="button" (click)="modals.openReceipt(sale.id)"><bf-icon name="payment"/> Receber</button>}
         @if (sale.status==='active' && sale.fulfillmentStatus==='in-production'){<button class="bf-button" type="button" [disabled]="!!pendingAction()" [bfLoadingButton]="pendingAction()==='ready'" (click)="advanceSelected('ready')">{{pendingAction()==='ready'?'Atualizando...':'Marcar pronta'}}</button>}
         @if (sale.status==='active' && sale.fulfillmentStatus==='ready'){<button class="bf-button" type="button" [disabled]="!!pendingAction()" [bfLoadingButton]="pendingAction()==='delivered'" (click)="advanceSelected('delivered')">{{pendingAction()==='delivered'?'Atualizando...':'Entregar / retirar'}}</button>}

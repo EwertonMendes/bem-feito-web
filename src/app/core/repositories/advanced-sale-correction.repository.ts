@@ -50,6 +50,8 @@ export class AdvancedSaleCorrectionRepository {
       }
       const catalog:AdvancedSaleCatalog={products,additions,inputs};
       const plan=planAdvancedSaleEdit(current,draft,catalog);
+      if(current.stockApplied!==false && plan.inventoryDeltas.length && !draft.stockReconciliationConfirmed)
+        throw new Error('Confirme que a correção corresponde ao estoque físico antes de salvar.');
       if(plan.totalCents===current.totalCents&&plan.discountCents===current.discountCents
         &&JSON.stringify(plan.items)===JSON.stringify(current.items))
         throw new Error('Nenhuma alteração identificada.');

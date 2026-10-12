@@ -89,6 +89,8 @@ try {
   await mobile.locator('.mobile-card-button').first().click();
   await mobile.getByRole('button',{name:/Editar venda/}).click();
   await mobile.locator('.advanced-item-row').first().waitFor({timeout:20000});
+  const editorBox=await mobile.locator('.advanced-item-row').first().boundingBox();
+  if(!editorBox || editorBox.y>550)throw Error('Edit form is hidden below unrelated sale details: '+JSON.stringify(editorBox));
   await noOverflow(mobile,'mobile-sale-editor');
   await mobile.screenshot({path:out+'/mobile-sale-editor.png'});
   await small.close();

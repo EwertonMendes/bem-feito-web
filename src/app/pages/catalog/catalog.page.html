@@ -10,9 +10,9 @@
       <button type="button" [class.active]="tab()==='inputs'" [attr.aria-current]="tab()==='inputs'?'page':null" (click)="selectTab('inputs')"><bf-icon name="inventory"/> Insumos</button>
       <button type="button" [class.active]="tab()==='additions'" [attr.aria-current]="tab()==='additions'?'page':null" (click)="selectTab('additions')"><bf-icon name="addition"/> Adicionais</button>
     </nav>
-    <label class="catalog-search"><bf-icon name="search"/><input type="search" autocomplete="off" spellcheck="false" [placeholder]="tab()==='products'?'Ex.: Massageador Éros, Patinha G':tab()==='inputs'?'Buscar insumo por nome ou código':'Buscar adicional ou categoria'" [value]="search()" (input)="search.set($any($event.target).value)" aria-label="Buscar itens do catálogo" />
-      @if(search()){<button type="button" aria-label="Limpar pesquisa" (click)="search.set('')"><bf-icon name="close"/></button>}
-    </label>
+    <bf-search-field class="catalog-search" [value]="search()" (valueChange)="search.set($event)"
+      [placeholder]="tab()==='products'?'Ex.: Massageador Éros, Patinha G':tab()==='inputs'?'Buscar insumo por nome ou código':'Buscar adicional ou categoria'"
+      [ariaLabel]="'Buscar '+(tab()==='products'?'sabonetes':tab()==='inputs'?'insumos':'adicionais')"/>
   </div>
   <div class="catalog-controls">
     <button type="button" class="bf-button secondary filters-toggle" [attr.aria-expanded]="showFilters()" (click)="showFilters.set(!showFilters())">

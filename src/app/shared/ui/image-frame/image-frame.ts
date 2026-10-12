@@ -5,6 +5,7 @@ import { BfIcon } from '../icon/icon';
   selector: 'bf-image-frame',
   imports: [BfIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '[class.bf-image-contain]': "fit() === 'contain'" },
   template: `
     <div class="frame" [class.compact]="compact()" [class.thumbnail]="thumbnail()" [class.contain]="fit() === 'contain'" [attr.aria-busy]="loading()">
       @if (src()) {
@@ -17,7 +18,7 @@ import { BfIcon } from '../icon/icon';
     </div>
   `,
   styles: [`
-    :host{display:block;min-width:0;min-height:0}.frame{position:relative;aspect-ratio:4/3;border-radius:14px;display:grid;place-items:center;overflow:hidden;background:linear-gradient(145deg,var(--surface-2),var(--brand-soft));color:var(--muted)}
+    :host{display:block;min-width:0;min-height:0}:host(.bf-image-contain){width:100%;height:100%}.frame{position:relative;aspect-ratio:4/3;border-radius:14px;display:grid;place-items:center;overflow:hidden;background:linear-gradient(145deg,var(--surface-2),var(--brand-soft));color:var(--muted)}
     .frame.compact{width:48px;height:48px;aspect-ratio:1;border-radius:12px}.frame.thumbnail{width:100%;height:100%;aspect-ratio:1;border-radius:inherit}.frame img{width:100%;height:100%;object-fit:cover}.frame.contain{width:100%;height:100%;aspect-ratio:auto}.frame.contain img{position:absolute;inset:5px;width:calc(100% - 10px);height:calc(100% - 10px);min-width:0;min-height:0;max-width:none;max-height:none;object-fit:contain!important;object-position:center}.frame bf-icon{width:28px;height:28px}
     .skeleton{position:absolute;inset:0;background:linear-gradient(100deg,var(--surface-2) 20%,color-mix(in srgb,var(--surface-2) 70%,white) 38%,var(--surface-2) 56%);background-size:220% 100%;animation:image-loading 1.15s ease-in-out infinite}
     @keyframes image-loading{from{background-position:120% 0}to{background-position:-100% 0}}@media(prefers-reduced-motion:reduce){.skeleton{animation:none}}

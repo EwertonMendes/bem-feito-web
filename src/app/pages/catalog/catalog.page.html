@@ -87,7 +87,7 @@
               <div class="catalog-meta"><span>{{item.code}}</span><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></div>
               <h2>{{item.name}}</h2><p class="catalog-subtitle">{{inputMode(item)}}</p>
               <div class="catalog-stats"><strong>{{item.averageUnitCostCents>0?currency(item.averageUnitCostCents):'Custo pendente'}}</strong>
-                <span>@if(item.trackingMode==='untracked'||item.minimumStockConfigured===false){{{item.availabilityStatus||'Sem medição'}}}@else{Saldo {{item.stock}}}</span>
+                <span>@if(item.trackingMode==='untracked'||item.minimumStockConfigured===false){ {{item.availabilityStatus||'Sem medição'}} } @else {Saldo {{item.stock}}}</span>
               </div>
               <span class="catalog-details-cta">Ver detalhes <bf-icon name="chevron-right"/></span>
             </div>

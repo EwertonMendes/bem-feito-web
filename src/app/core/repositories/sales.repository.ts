@@ -30,6 +30,7 @@ import { DataRevisionService } from '../firebase/data-revision.service';
 import { FIRESTORE } from '../firebase/firebase.providers';
 import { todayBusinessDate } from '../utils/date';
 import { entityCode } from '../utils/ids';
+import { normalizeCustomerSearch } from '../utils/customer-search';
 import { allocatePayments, paymentStatus } from '../utils/sale-calculations';
 import {
   SaleCancellationResult,
@@ -50,6 +51,28 @@ export class SalesRepository {
   async findById(id: string): Promise<Sale | null> {
     const snapshot = await getDoc(doc(this.firestore, 'sales', id));
     return snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as Sale) : null;
+  }
+
+  /** Indexed, bounded search across all history rather than only loaded pages. */
+  async searchHistorical(raw: string): Promise<Sale[]> {
+    const text = raw.trim();
+    if (text.length < 2 || text.length > 120) return [];
+    const normalized = normalizeCustomerSearch(text);
+    const code = /^v\\d{1,6}$/i.test(text)
+      ? 'V' + text.slice(1).padStart(5,'0') : null;
+    const sales = collection(this.firestore, 'sales');
+    const snapshots = await Promise.all(code
+      ? [getDocs(query(sales,where('code','==',code),limit(1)))]
+      : [
+        getDocs(query(sales,where('customerSearchKey','>=',normalized),
+          where('customerSearchKey','<=',normalized+'\\uf8ff'),limit(40))),
+        getDocs(query(sales,where('customerName','==',text),limit(40))),
+      ]);
+    const result = new Map<string,Sale>();
+    for(const snapshot of snapshots){
+      for(const document of snapshot.docs) result.set(document.id,{id:document.id,...document.data()} as Sale);
+    }
+    return [...result.values()].sort((a,b)=>b.businessDate.localeCompare(a.businessDate));
   }
 
   async page(pageSize = 40, cursor?: BusinessDateCursor | null): Promise<PageResult<Sale>> {
@@ -326,6 +349,7 @@ export class SalesRepository {
         code: entityCode('V', saleSequence, 5),
         businessDate: draft.businessDate,
         customerName: draft.customerName?.trim() || undefined,
+        ...(draft.customerName?.trim() ? {customerSearchKey:normalizeCustomerSearch(draft.customerName)} : {}),
         dueDate: draft.dueDate || undefined,
         discountCents,
         subtotalCents,
@@ -349,6 +373,7 @@ export class SalesRepository {
         code: sale.code,
         businessDate: sale.businessDate,
         customerName: sale.customerName,
+        ...(sale.customerSearchKey ? {customerSearchKey: sale.customerSearchKey} : {}),
         dueDate: sale.dueDate,
         discountCents,
         subtotalCents,

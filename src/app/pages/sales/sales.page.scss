@@ -389,3 +389,6 @@
 .sale-correction-error{display:flex;gap:8px;align-items:start;padding:12px;border-radius:10px;background:var(--warning-soft);color:var(--warning);font-size:.76rem}
 .sale-correction-error bf-icon{display:inline-flex;flex:none}
 @media(max-width:560px){.sale-item-correction-row{grid-template-columns:repeat(2,minmax(0,1fr))}.sale-item-correction-row>strong{grid-column:1/-1}.sale-correction-preview{grid-template-columns:1fr}}
+
+.sales-header-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:flex-end}
+@media(max-width:540px){.sales-header-actions{width:100%}.sales-header-actions button{flex:1;min-width:0}}

@@ -11,6 +11,7 @@ import { CatalogStore } from '../../features/catalog/catalog.store';
 import { InventoryStore } from '../../features/inventory/inventory.store';
 import { todayBusinessDate, formatBusinessDate } from '../../core/utils/date';
 import { formatCurrency } from '../../core/utils/money';
+import { downloadCsv, exportCents } from '../../core/utils/csv-export';
 import { BfIcon } from '../../shared/ui/icon/icon';
 import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
 import { BfDialog } from '../../shared/ui/dialog/dialog';
@@ -56,10 +57,30 @@ export class InventoryPage {
     required(p.reason);
     required(p.businessDate);
   });
+  exportInventory(): void {
+    if(!this.initialized())return;
+    if(this.tab()==='product'){
+      downloadCsv('bem-feito-estoque-sabonetes.csv',
+        ['Código','Sabonete','Físico','Reservado físico','Livre','A produzir','Mínimo','Preço (R$)','Custo médio (R$)'],
+        this.catalog.products().map(p=>[
+          p.code,p.displayName,p.stock,p.reservedPhysicalStock??0,this.availableStock(p),
+          Math.max(0,(p.committedStock??0)-(p.reservedPhysicalStock??0)),
+          p.minimumStock,exportCents(p.salePriceCents),exportCents(p.averageUnitCostCents)]));
+    }else{
+      downloadCsv('bem-feito-estoque-insumos.csv',
+        ['Código','Insumo','Tipo de controle','Físico','Reservado','Livre','Mínimo','Custo médio (R$)'],
+        this.catalog.inputs().map(i=>[
+          i.code,i.name,this.inputMode(i),i.stock,i.reservedPhysicalStock??0,
+          this.inputFreeStock(i),i.minimumStock,exportCents(i.averageUnitCostCents)]));
+    }
+  }
   readonly currency = formatCurrency;
   availableStock(item: Product): number {
     const reserved = item.reservedPhysicalStock ?? Math.min(item.stock, item.committedStock ?? 0);
     return Math.max(0, item.stock - reserved);
+  }
+  inputFreeStock(input: InputItem): number {
+    return Math.max(0, input.stock - (input.reservedPhysicalStock ?? 0));
   }
   readonly date = formatBusinessDate;
   readonly filteredProducts = computed(() => {

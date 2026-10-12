@@ -23,12 +23,14 @@ import { productStockStatus, stockStatusForInput } from '../../domain/logic/stoc
 import { Addition, CollectionDefinition, FormatDefinition, FragranceDefinition, InputItem, Product } from '../../domain/models/catalog.model';
 import { StockMovement } from '../../domain/models/inventory.model';
 import { Payment, Sale, SaleDraft } from '../../domain/models/sales.model';
+import { allocatedQuantity, validatedAllocation } from '../../domain/logic/order-progress';
 import { resolveSaleDraft } from '../../domain/logic/sale-resolution';
 import { AuthService } from '../auth/auth.service';
 import { DataRevisionService } from '../firebase/data-revision.service';
 import { FIRESTORE } from '../firebase/firebase.providers';
 import { todayBusinessDate } from '../utils/date';
 import { entityCode } from '../utils/ids';
+import { normalizeCustomerSearch } from '../utils/customer-search';
 import { allocatePayments, paymentStatus } from '../utils/sale-calculations';
 import {
   SaleCancellationResult,
@@ -49,6 +51,28 @@ export class SalesRepository {
   async findById(id: string): Promise<Sale | null> {
     const snapshot = await getDoc(doc(this.firestore, 'sales', id));
     return snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as Sale) : null;
+  }
+
+  /** Indexed, bounded search across all history rather than only loaded pages. */
+  async searchHistorical(raw: string): Promise<Sale[]> {
+    const text = raw.trim();
+    if (text.length < 2 || text.length > 120) return [];
+    const normalized = normalizeCustomerSearch(text);
+    const code = /^v\d{1,6}$/i.test(text)
+      ? 'V' + text.slice(1).padStart(5,'0') : null;
+    const sales = collection(this.firestore, 'sales');
+    const snapshots = await Promise.all(code
+      ? [getDocs(query(sales,where('code','==',code),limit(1)))]
+      : [
+        getDocs(query(sales,where('customerSearchKey','>=',normalized),
+          where('customerSearchKey','<=',normalized+'\uf8ff'),limit(40))),
+        getDocs(query(sales,where('customerName','==',text),limit(40))),
+      ]);
+    const result = new Map<string,Sale>();
+    for(const snapshot of snapshots){
+      for(const document of snapshot.docs) result.set(document.id,{id:document.id,...document.data()} as Sale);
+    }
+    return [...result.values()].sort((a,b)=>b.businessDate.localeCompare(a.businessDate));
   }
 
   async page(pageSize = 40, cursor?: BusinessDateCursor | null): Promise<PageResult<Sale>> {
@@ -292,8 +316,13 @@ export class SalesRepository {
           : stockStatusForInput({ ...(entity as InputItem), stock });
 
         const physicalAllocation = draft.fulfillmentStatus === 'ready' ? required : 0;
+        const explicitCounters = isReservation && effect.itemType === 'product' ? {
+          explicitCommittedStock: (entity as Product).explicitCommittedStock === undefined
+            ? required : (entity as Product).explicitCommittedStock! + required,
+          explicitAllocatedStock: ((entity as Product).explicitAllocatedStock ?? 0) + physicalAllocation,
+        } : {};
         transaction.update(targetRef, { stock, stockStatus,
-          ...(isReservation ? { committedStock: committedStock + required, reservedPhysicalStock: reservedPhysicalStock + physicalAllocation } : {}),
+          ...(isReservation ? { committedStock: committedStock + required, reservedPhysicalStock: reservedPhysicalStock + physicalAllocation, ...explicitCounters } : {}),
           updatedAt: serverTimestamp(), updatedBy: userId });
         stockChanges.push({ itemType: effect.itemType, itemId: effect.itemId, stock, ...(isReservation ? { committedStock: committedStock + required, reservedPhysicalStock: reservedPhysicalStock + physicalAllocation } : {}) });
         if (isReservation) continue;
@@ -315,11 +344,17 @@ export class SalesRepository {
         } satisfies Omit<StockMovement, 'id'>);
       }
 
+      const orderAllocations = draft.fulfillmentStatus === 'in-production' || draft.fulfillmentStatus === 'ready'
+        ? lines.filter(line => line.kind === 'product').map(line => ({
+            lineId: line.id, productId: line.sourceId,
+            quantity: draft.fulfillmentStatus === 'ready' ? line.quantity : 0,
+          })) : undefined;
       const sale: Sale = {
         id: saleRef.id,
         code: entityCode('V', saleSequence, 5),
         businessDate: draft.businessDate,
         customerName: draft.customerName?.trim() || undefined,
+        ...(draft.customerName?.trim() ? {customerSearchKey:normalizeCustomerSearch(draft.customerName)} : {}),
         dueDate: draft.dueDate || undefined,
         discountCents,
         subtotalCents,
@@ -333,6 +368,7 @@ export class SalesRepository {
         items: lines,
         paymentIds,
         stockEffects,
+        ...(orderAllocations ? { orderAllocations } : {}),
         fulfillmentStatus: draft.fulfillmentStatus ?? 'delivered',
         stockApplied: draft.fulfillmentStatus !== 'ready' && draft.fulfillmentStatus !== 'in-production',
         ...analytics,
@@ -342,6 +378,7 @@ export class SalesRepository {
         code: sale.code,
         businessDate: sale.businessDate,
         customerName: sale.customerName,
+        ...(sale.customerSearchKey ? {customerSearchKey: sale.customerSearchKey} : {}),
         dueDate: sale.dueDate,
         discountCents,
         subtotalCents,
@@ -357,6 +394,7 @@ export class SalesRepository {
         items: lines,
         paymentIds,
         stockEffects,
+        ...(orderAllocations ? { orderAllocations } : {}),
         ...analytics,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -507,6 +545,51 @@ export class SalesRepository {
 
 
   /** Advance fulfillment without changing financial settlement. */
+  /** Allocate newly available physical stock to a specific open order line. */
+  async allocateOrderLine(saleId: string, lineId: string, quantity: number): Promise<SaleFulfillmentResult> {
+    const userId = this.auth.user()?.uid;
+    if (!userId) throw new Error('Sessão inválida.');
+    return runTransaction(this.firestore, async tx => {
+      const saleRef = doc(this.firestore, 'sales', saleId);
+      const snapshot = await tx.get(saleRef);
+      if (!snapshot.exists()) throw new Error('Encomenda não encontrada.');
+      const sale = {id:snapshot.id,...snapshot.data()} as Sale;
+      if (sale.status !== 'active' || sale.stockApplied !== false || sale.fulfillmentStatus !== 'in-production')
+        throw new Error('Apenas encomendas em produção podem receber alocações.');
+      if (!sale.orderAllocations) throw new Error('Encomenda anterior ao controle individual: concilie antes de reservar.');
+      const line = sale.items.find(item => item.id === lineId && item.kind === 'product');
+      if (!line) throw new Error('Sabonete não encontrado nesta encomenda.');
+      const current = allocatedQuantity(sale.orderAllocations, line);
+      const next = validatedAllocation(line, current, quantity);
+      const productRef = doc(this.firestore, 'products', line.sourceId);
+      const productSnapshot = await tx.get(productRef);
+      if (!productSnapshot.exists()) throw new Error('Produto não encontrado no estoque.');
+      const product = {id:productSnapshot.id,...productSnapshot.data()} as Product;
+      const reserved = product.reservedPhysicalStock ?? Math.min(product.stock, product.committedStock ?? 0);
+      if (product.stock - reserved < quantity) throw new Error('Não há sabonetes livres suficientes para esta encomenda.');
+      const allocations = sale.orderAllocations.map(a => a.lineId === line.id ? {...a,quantity:next} : a);
+      const allocatedExplicit = product.explicitAllocatedStock ?? 0;
+      const committedExplicit = product.explicitCommittedStock ?? 0;
+      if (allocatedExplicit + quantity > committedExplicit)
+        throw new Error('Os compromissos da encomenda estão inconsistentes.');
+      tx.update(productRef, {
+        reservedPhysicalStock: reserved + quantity, explicitAllocatedStock: allocatedExplicit + quantity,
+        updatedAt: serverTimestamp(), updatedBy:userId,
+      });
+      tx.update(saleRef, { orderAllocations: allocations,
+        updatedAt: serverTimestamp(), updatedBy:userId });
+      const history = doc(collection(this.firestore, 'orderAllocationHistory'));
+      tx.set(history, { saleId, lineId, productId: line.sourceId, businessDate: todayBusinessDate(),
+        quantityAdded: quantity, before: current, after: next,
+        createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+        createdBy: userId, updatedBy: userId });
+      this.revisions.touchTransaction(tx,'sales','inventory');
+      return {sale:{...sale,orderAllocations:allocations},
+        stockChanges:[{itemType:'product' as const,itemId:product.id,stock:product.stock,
+          committedStock:product.committedStock??0,reservedPhysicalStock:reserved+quantity}]};
+    });
+  }
+
   async advanceFulfillment(saleId: string, next: 'ready' | 'delivered'): Promise<SaleFulfillmentResult> {
     const userId = this.auth.user()?.uid;
     if (!userId) throw new Error('Sessão inválida.');
@@ -520,6 +603,12 @@ export class SalesRepository {
       const previous = current.fulfillmentStatus ?? 'delivered';
       if (next === 'ready' && previous !== 'in-production') throw new Error('A encomenda não está em produção.');
       if (next === 'delivered' && previous !== 'ready') throw new Error('Marque a encomenda como pronta antes da entrega.');
+      if (current.orderAllocations && next === 'ready') {
+        for (const item of current.items.filter(line => line.kind === 'product')) {
+          if (allocatedQuantity(current.orderAllocations, item) !== item.quantity)
+            throw new Error('Ainda faltam unidades alocadas a esta encomenda. Confira os itens.');
+        }
+      }
 
       const refs = new Map<string, DocumentSnapshot>();
       for (const effect of current.stockEffects) {
@@ -537,6 +626,8 @@ export class SalesRepository {
         const physicallyReserved = Number(snapshot.data()['reservedPhysicalStock'] ?? Math.min(physical, committed));
         if (required < 0 || committed < required) throw new Error('Reserva inconsistente. É necessária conciliação.');
         if (next === 'ready') {
+          // Physical stock was already reserved on this exact order by allocateOrderLine.
+          if (current.orderAllocations && effect.itemType === 'product') continue;
           if (physical < committed) throw new Error('Ainda faltam unidades para concluir esta encomenda.');
           // Allocate currently free physical units, but never exceed total active demand.
           if (physicallyReserved < committed) {
@@ -556,7 +647,15 @@ export class SalesRepository {
         const stockStatus = effect.itemType === 'product'
           ? productStockStatus(stock, (entity as Product).minimumStock)
           : stockStatusForInput({ ...(entity as InputItem), stock });
-        transaction.update(snapshot.ref, { stock, committedStock, reservedPhysicalStock, stockStatus, updatedAt: serverTimestamp(), updatedBy: userId });
+        const tracked = current.orderAllocations && effect.itemType === 'product';
+        const explicitCounters = tracked ? {
+          explicitCommittedStock: (entity as Product).explicitCommittedStock! - required,
+          explicitAllocatedStock: (entity as Product).explicitAllocatedStock! - required,
+        } : {};
+        if (tracked && (explicitCounters.explicitCommittedStock! < 0 || explicitCounters.explicitAllocatedStock! < 0))
+          throw new Error('Contadores de encomendas inconsistentes.');
+        transaction.update(snapshot.ref, { stock, committedStock, reservedPhysicalStock, stockStatus,
+          ...explicitCounters, updatedAt: serverTimestamp(), updatedBy: userId });
         changes.push({ itemType: effect.itemType, itemId: effect.itemId, stock, committedStock, reservedPhysicalStock });
         const movementRef = doc(collection(this.firestore, 'stockMovements'));
         transaction.set(movementRef, {
@@ -612,18 +711,39 @@ export class SalesRepository {
           ? Math.max(0, Number(snapshot.data()['committedStock'] ?? 0) + effect.quantityDelta)
           : Number(snapshot.data()['committedStock'] ?? 0);
         const originallyReserved = Number(snapshot.data()['reservedPhysicalStock'] ?? Math.min(Number(snapshot.data()['committedStock'] ?? 0), Number(snapshot.data()['stock'] ?? 0)));
+        const allocatedHere = currentSale.orderAllocations && effect.itemType === 'product'
+          ? currentSale.orderAllocations.filter(item => item.productId === effect.itemId)
+            .reduce((total, item) => total + item.quantity, 0) : null;
+        const allocatedExplicit = effect.itemType === 'product'
+          ? (entity as Product).explicitAllocatedStock ?? 0 : 0;
+        const committedExplicit = effect.itemType === 'product'
+          ? (entity as Product).explicitCommittedStock ?? 0 : 0;
         const reservedPhysicalStock = currentSale.stockApplied === false
-          ? Math.min(originallyReserved, committedStock)
+          ? allocatedHere !== null ? originallyReserved - allocatedHere
+            : effect.itemType === 'product'
+              ? allocatedExplicit + Math.min(Math.max(0, originallyReserved - allocatedExplicit),
+                  Math.max(0, committedStock - committedExplicit))
+              : Math.min(originallyReserved, committedStock)
           : originallyReserved;
+        if (reservedPhysicalStock < 0 || reservedPhysicalStock > committedStock)
+          throw new Error('Reserva global inconsistente com a encomenda. Faça a conciliação.');
         const stockStatus = effect.itemType === 'product'
           ? productStockStatus(stock, (entity as Product).minimumStock)
           : stockStatusForInput({ ...(entity as InputItem), stock });
 
+        const tracked = currentSale.stockApplied === false && currentSale.orderAllocations && effect.itemType === 'product';
+        const trackedCounters = tracked ? {
+          explicitCommittedStock: (entity as Product).explicitCommittedStock! + effect.quantityDelta,
+          explicitAllocatedStock: (entity as Product).explicitAllocatedStock! - (allocatedHere ?? 0),
+        } : {};
+        if (tracked && (trackedCounters.explicitCommittedStock! < 0 || trackedCounters.explicitAllocatedStock! < 0))
+          throw new Error('Contadores de encomendas inconsistentes.');
         transaction.update(snapshot.ref, {
           stock,
           stockStatus,
           committedStock,
           reservedPhysicalStock,
+          ...trackedCounters,
           updatedAt: serverTimestamp(),
           updatedBy: userId,
         });

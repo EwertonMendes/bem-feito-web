@@ -314,3 +314,12 @@
 @media (prefers-reduced-motion:reduce) {
   .finance-record-card,.finance-search { transition:none; }
 }
+
+
+.finance-header-actions{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-wrap:wrap}
+.finance-header-actions button{display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.finance-header-actions bf-icon{display:inline-flex}
+@container finance (max-width:580px){
+  .finance-header-actions{width:100%}
+  .finance-header-actions button{flex:1;min-width:0}
+}

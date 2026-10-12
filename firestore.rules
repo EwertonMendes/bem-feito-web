@@ -133,13 +133,18 @@ service cloud.firestore {
           && fields(data, ['collectionId', 'formatId', 'priceCents', 'active'], [])
           && text(data.collectionId) && text(data.formatId) && money(data.priceCents) && data.active is bool)
         || (name == 'products'
-          && fields(data, ['code', 'active', 'collectionId', 'fragranceId', 'formatId', 'displayName', 'salePriceCents', 'additionalCostCents', 'averageUnitCostCents', 'stock', 'minimumStock', 'recipe'], ['image', 'stockStatus', 'committedStock', 'reservedPhysicalStock', 'unitCostDeciCents'])
+          && fields(data, ['code', 'active', 'collectionId', 'fragranceId', 'formatId', 'displayName', 'salePriceCents', 'additionalCostCents', 'averageUnitCostCents', 'stock', 'minimumStock', 'recipe'], ['image', 'stockStatus', 'committedStock', 'reservedPhysicalStock', 'explicitCommittedStock', 'explicitAllocatedStock', 'unitCostDeciCents'])
           && text(data.code) && text(data.displayName) && data.active is bool
           && text(data.collectionId) && text(data.fragranceId) && text(data.formatId)
           && money(data.salePriceCents) && money(data.additionalCostCents) && money(data.averageUnitCostCents)
           && stock(data.stock) && quantity(data.minimumStock) && data.recipe is list
            && (!('committedStock' in data) || quantity(data.committedStock))
           && (!('reservedPhysicalStock' in data) || (quantity(data.reservedPhysicalStock) && data.reservedPhysicalStock <= data.stock))
+          && (!('explicitCommittedStock' in data) || (quantity(data.explicitCommittedStock)
+            && data.explicitCommittedStock <= data.committedStock))
+          && (!('explicitAllocatedStock' in data) || (quantity(data.explicitAllocatedStock)
+            && data.explicitAllocatedStock <= data.reservedPhysicalStock
+            && data.explicitAllocatedStock <= data.explicitCommittedStock))
           && (!('unitCostDeciCents' in data) || money(data.unitCostDeciCents))
           && validProductStockStatus(data)
           && (!('image' in data) || validImage(data.image)))
@@ -194,7 +199,7 @@ service cloud.firestore {
 
     function validOperation(name, data) {
       return (name == 'sales'
-          && fields(data, ['code', 'businessDate', 'discountCents', 'subtotalCents', 'totalCents', 'receivedCents', 'tipCents', 'balanceCents', 'paymentStatus', 'status', 'items', 'paymentIds', 'stockEffects'], ['customerName', 'dueDate', 'notes', 'cancelledAt', 'cancelledBy', 'analyticsVersion', 'cogsCents', 'itemsSold', 'missingCostItems', 'fulfillmentStatus', 'stockApplied'])
+          && fields(data, ['code', 'businessDate', 'discountCents', 'subtotalCents', 'totalCents', 'receivedCents', 'tipCents', 'balanceCents', 'paymentStatus', 'status', 'items', 'paymentIds', 'stockEffects'], ['customerName', 'customerSearchKey', 'dueDate', 'notes', 'cancelledAt', 'cancelledBy', 'analyticsVersion', 'cogsCents', 'itemsSold', 'missingCostItems', 'fulfillmentStatus', 'stockApplied', 'orderAllocations'])
           && text(data.code) && businessDate(data)
           && money(data.discountCents) && money(data.subtotalCents) && money(data.totalCents)
           && money(data.receivedCents) && money(data.tipCents) && money(data.balanceCents)
@@ -211,6 +216,7 @@ service cloud.firestore {
                 || (data.balanceCents > 0 && data.receivedCents == 0 && data.paymentStatus == 'pending')
                 || (data.balanceCents > 0 && data.receivedCents > 0 && data.paymentStatus == 'partial'))))
           && data.items is list && data.items.size() > 0 && data.paymentIds is list && data.stockEffects is list
+           && (!('orderAllocations' in data) || (data.orderAllocations is list && data.orderAllocations.size() <= 120))
           && ((!(('analyticsVersion' in data) || ('cogsCents' in data) || ('itemsSold' in data) || ('missingCostItems' in data)))
             || (data.analyticsVersion == 1 && money(data.cogsCents)
               && data.itemsSold is int && data.itemsSold >= 0
@@ -264,7 +270,7 @@ service cloud.firestore {
           && businessDate(data) && text(data.itemId) && text(data.sourceId)
           && data.itemType in ['product', 'input'] && quantityDelta(data.quantityDelta)
           && money(data.unitCostCents) && money(data.totalCostCents)
-          && data.sourceType in ['sale', 'sale-cancellation', 'production', 'purchase', 'purchase-correction', 'purchase-cancellation', 'adjustment']);
+          && data.sourceType in ['sale', 'sale-correction', 'sale-cancellation', 'production', 'purchase', 'purchase-correction', 'purchase-cancellation', 'adjustment']);
     }
 
 
@@ -400,6 +406,31 @@ service cloud.firestore {
         && text(request.resource.data.reason) && request.resource.data.reason.size() <= 240
         && request.resource.data.kind in ['correction', 'cancellation']
         && request.resource.data.before is map && request.resource.data.after is map;
+      allow update, delete: if false;
+    }
+
+    match /saleCorrections/{correctionId} {
+      allow read: if activeUser();
+      allow create: if canOperate() && auditCreate(request.resource.data)
+        && fields(request.resource.data,
+          ['saleId','businessDate','reason','before','after'], ['kind'])
+        && text(request.resource.data.saleId) && businessDate(request.resource.data)
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() >= 4 && request.resource.data.reason.size() <= 240
+        && request.resource.data.before is map && request.resource.data.after is map;
+      allow update, delete: if false;
+    }
+
+    match /orderAllocationHistory/{eventId} {
+      allow read: if activeUser();
+      allow create: if canOperate() && auditCreate(request.resource.data)
+        && fields(request.resource.data,
+          ['saleId','lineId','productId','businessDate','quantityAdded','before','after'], [])
+        && text(request.resource.data.saleId) && text(request.resource.data.lineId)
+        && text(request.resource.data.productId) && businessDate(request.resource.data)
+        && request.resource.data.quantityAdded is int && request.resource.data.quantityAdded > 0
+        && request.resource.data.before is int && request.resource.data.before >= 0
+        && request.resource.data.after == request.resource.data.before + request.resource.data.quantityAdded;
       allow update, delete: if false;
     }
 

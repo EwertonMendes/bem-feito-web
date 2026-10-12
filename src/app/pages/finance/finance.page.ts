@@ -1,4 +1,8 @@
 import { FinanceCodeSearchRepository } from '../../core/repositories/finance-code-search.repository';
+import { FinanceRepository } from '../../core/repositories/finance.repository';
+import { PageResult } from '../../core/repositories/pagination';
+import { SalesRepository } from '../../core/repositories/sales.repository';
+import { downloadCsv, exportCents } from '../../core/utils/csv-export';
 import { Payment, Sale } from '../../domain/models/sales.model';
 import { BfIconName } from '../../shared/ui/icon/icon';
 import { ExpenseCreateResult } from '../../core/repositories/mutation-results';
@@ -39,6 +43,9 @@ export class FinancePage {
  readonly sales = inject(SalesStore);
  readonly settings = inject(SettingsStore);
  private readonly cashRepo = inject(CashManagementRepository);
+ private readonly exportExpenses = inject(FinanceRepository);
+ private readonly exportSales = inject(SalesRepository);
+ readonly exporting = signal(false);
  private readonly codeSearch = inject(FinanceCodeSearchRepository);
  private readonly toast = inject(ToastService);
  private readonly errors = inject(ErrorService);
@@ -127,6 +134,69 @@ export class FinancePage {
    this.searchInput.set('');
    this.searchError.set('');
  }
+ async exportFinanceCsv(): Promise<void> {
+   if(this.exporting())return;
+   const kind=this.tab();
+   this.exporting.set(true);
+   try {
+     const rows:(string|number)[][]=[];
+     if(kind==='cash'){
+       let cursor:{businessDate:string;id:string}|null=null;
+       let complete=false;
+       for(let i=0;i<1000;i++){
+         const page=await this.cashRepo.movementPage(100,cursor);
+         for(const item of page.items){
+           rows.push([item.businessDate,item.accountName,item.kind,item.partyName??'',
+             item.status,exportCents(item.amountCents),exportCents(item.impactCents),item.notes??'']);
+         }
+         if(!page.hasMore){complete=true;break;}
+         if(!page.nextCursor)throw new Error('Paginação incompleta: exportação interrompida.');
+         cursor=page.nextCursor;
+       }
+       if(!complete)throw new Error('Limite seguro da exportação atingido.');
+       downloadCsv('bem-feito-caixa-movimentacoes.csv',
+         ['Data','Conta','Tipo','Parte','Situação','Valor (R$)','Impacto (R$)','Observações'],rows);
+       this.toast.success('Movimentações de caixa exportadas.');
+       return;
+     }
+     let cursor:{businessDate:string;id:string}|null=null;
+     let complete=false;
+     for(let i=0;i<1000;i++){
+       const page: PageResult<Expense|Payment|Sale> = kind==='expenses' ? await this.exportExpenses.expensePage(100,cursor)
+         : kind==='payments' ? await this.exportSales.paymentPage(100,cursor)
+         : await this.exportSales.receivablePage(100,cursor);
+       for(const entry of page.items){
+         if(kind==='expenses'){
+           const x=entry as Expense;
+           rows.push([x.code,x.businessDate,x.itemName??this.expenseDescription(x),x.kind,
+             x.status??'active',exportCents(x.amountCents),exportCents(x.bankDebitCents??0),
+             x.fundingType??'',x.paidBy??'']);
+         }else if(kind==='payments'){
+           const x=entry as Payment;
+           rows.push([x.code,x.businessDate,x.saleId,x.methodId,x.status,
+             exportCents(x.appliedCents),exportCents(x.amountReceivedCents),exportCents(x.tipCents)]);
+         }else{
+           const x=entry as Sale;
+           rows.push([x.code,x.businessDate,x.customerName??'',x.paymentStatus,x.dueDate??'',
+             exportCents(x.totalCents),exportCents(x.receivedCents),exportCents(x.balanceCents)]);
+         }
+       }
+       if(!page.hasMore){complete=true;break;}
+       if(!page.nextCursor)throw new Error('Paginação incompleta: exportação interrompida.');
+       cursor=page.nextCursor;
+     }
+     if(!complete)throw new Error('Limite seguro da exportação atingido.');
+     const headers=kind==='expenses'
+       ? ['Código','Data','Descrição','Tipo','Situação','Valor (R$)','Débito em conta (R$)','Origem','Pago por']
+       : kind==='payments'
+       ? ['Código','Data','Venda','Forma','Situação','Aplicado (R$)','Recebido (R$)','Gorjeta (R$)']
+       : ['Código','Data','Cliente','Situação','Vencimento','Total (R$)','Recebido (R$)','Saldo (R$)'];
+     downloadCsv('bem-feito-'+kind+'.csv',headers,rows);
+     this.toast.success('CSV financeiro gerado com o histórico consultado.');
+   }catch(error){this.toast.error(this.errors.message(error));}
+   finally{this.exporting.set(false);}
+ }
+
  async searchCode(): Promise<void> {
    const tab = this.tab();
    if (tab === 'cash' || this.searchBusy()) return;

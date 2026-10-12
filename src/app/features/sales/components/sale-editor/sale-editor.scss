@@ -1373,3 +1373,10 @@
 
 }
 
+
+
+.sale-line-price{display:flex;align-items:end;gap:8px;min-width:0;margin-top:7px}
+.sale-line-price label{display:grid;gap:4px;font-size:.7rem;color:var(--muted);min-width:0;max-width:145px}
+.sale-line-price bf-number-input{min-width:0}
+.restore-line-price{font:inherit;font-size:.72rem;border:0;border-radius:8px;background:var(--surface-2);color:var(--brand-strong);padding:7px 9px;cursor:pointer}
+.restore-line-price:focus-visible{outline:2px solid var(--brand);outline-offset:2px}

@@ -14,6 +14,7 @@ import { ProductionCorrectionRepository } from '../../src/app/core/repositories/
 import { FinanceRepository } from '../../src/app/core/repositories/finance.repository';
 import { ExpenseCorrectionRepository } from '../../src/app/core/repositories/expense-correction.repository';
 import { CashManagementRepository } from '../../src/app/core/repositories/cash-management.repository';
+import { SaleCorrectionRepository } from '../../src/app/core/repositories/sale-correction.repository';
 import { InventoryRepository } from '../../src/app/core/repositories/inventory.repository';
 
 let env: RulesTestEnvironment;
@@ -25,6 +26,7 @@ let productionCorrection: ProductionCorrectionRepository;
 let finance: FinanceRepository;
 let corrections: ExpenseCorrectionRepository;
 let cash: CashManagementRepository;
+let saleCorrections: SaleCorrectionRepository;
 let inventory: InventoryRepository;
 const day = '2026-10-05';
 const audit = () => ({ createdAt: serverTimestamp(), updatedAt: serverTimestamp(), createdBy: 'operator', updatedBy: 'operator' });
@@ -84,11 +86,80 @@ beforeEach(async () => {
   finance = runInInjectionContext(injector, () => new FinanceRepository());
   corrections = runInInjectionContext(injector, () => new ExpenseCorrectionRepository());
   cash = runInInjectionContext(injector, () => new CashManagementRepository());
+  saleCorrections = runInInjectionContext(injector, () => new SaleCorrectionRepository());
   inventory = runInInjectionContext(injector, () => new InventoryRepository());
 });
 afterAll(async () => { injector?.destroy(); await env?.cleanup(); });
 
 describe('Actual repositories against restrictive emulator rules', () => {
+  it('atomically corrects sold soap quantity and price while preserving historic costs', async () => {
+    const created=await sales.create({...draft(),lines:[{kind:'product',sourceId:'p',quantity:2}]});
+    const sale=created.sale;
+    const {saleCorrectionSignature}=await import('../../src/app/domain/logic/sale-correction');
+    const result=await saleCorrections.correctProductLines(sale.id,{
+      expectedSignature:saleCorrectionSignature(sale),
+      lines:[{lineId:sale.items[0]!.id,quantity:3,unitPriceCents:900}],
+      discountCents:100,reason:'Corrigir quantidades e preço',
+    });
+    expect(result.sale).toMatchObject({totalCents:2600,balanceCents:2600,discountCents:100});
+    expect(result.sale.items[0]).toMatchObject({quantity:3,unitPriceCents:900});
+    expect(await data('products','p')).toMatchObject({stock:7});
+    expect(await count('saleCorrections')).toBe(1);
+    expect(await count('stockMovements')).toBe(2);
+    await expect(saleCorrections.correctProductLines(sale.id,{
+      expectedSignature:saleCorrectionSignature(sale),
+      lines:[{lineId:sale.items[0]!.id,quantity:2,unitPriceCents:1000}],
+      discountCents:0,reason:'Tentar revisão antiga',
+    })).rejects.toThrow('mudou');
+  });
+
+  it('rejects corrections without physical free stock and rolls back changes', async () => {
+    const created=await sales.create({...draft(),lines:[{kind:'product',sourceId:'p',quantity:2}]});
+    const {saleCorrectionSignature}=await import('../../src/app/domain/logic/sale-correction');
+    await expect(saleCorrections.correctProductLines(created.sale.id,{
+      expectedSignature:saleCorrectionSignature(created.sale),
+      lines:[{lineId:created.sale.items[0]!.id,quantity:50,unitPriceCents:1000}],
+      discountCents:0,reason:'Quantidade errada',
+    })).rejects.toThrow('Estoque livre');
+    expect(await data('products','p')).toMatchObject({stock:8});
+    expect(await data('sales',created.sale.id)).toMatchObject({totalCents:2000});
+    expect(await count('saleCorrections')).toBe(0);
+  });
+
+  it('does not allow edited total smaller than applied payments', async () => {
+    const created=await sales.create({...draft(),lines:[{kind:'product',sourceId:'p',quantity:2}],
+      payments:[{methodId:'pix',amountReceivedCents:1500}]});
+    const {saleCorrectionSignature}=await import('../../src/app/domain/logic/sale-correction');
+    await expect(saleCorrections.correctProductLines(created.sale.id,{
+      expectedSignature:saleCorrectionSignature(created.sale),
+      lines:[{lineId:created.sale.items[0]!.id,quantity:1,unitPriceCents:100}],
+      discountCents:0,reason:'Preço corrigido',
+    })).rejects.toThrow('pagamentos');
+    expect(await data('products','p')).toMatchObject({stock:8});
+    expect(await count('saleCorrections')).toBe(0);
+  });
+
+  it('audits a customer correction without touching inventory, totals or payments', async () => {
+    const created=await sales.create(draft());
+    const beforeStock=(await data('products','p'))?.['stock'];
+    const corrected=await saleCorrections.correctMetadata(created.sale.id,{
+      customerName:'Cliente Atualizado',dueDate:'2026-10-20',notes:'Retirada combinada',
+      reason:'Cliente informou nome errado',
+    });
+    expect(corrected.customerName).toBe('Cliente Atualizado');
+    expect(await data('sales',created.sale.id)).toMatchObject({
+      customerName:'Cliente Atualizado',customerSearchKey:'cliente atualizado',
+      dueDate:'2026-10-20',notes:'Retirada combinada',
+      totalCents:1000,
+    });
+    expect((await data('products','p'))?.['stock']).toBe(beforeStock);
+    expect(await count('saleCorrections')).toBe(1);
+    await expect(saleCorrections.correctMetadata(created.sale.id,{
+      customerName:'Cliente Atualizado',dueDate:'2026-10-20',notes:'Retirada combinada',reason:'Repetição',
+    })).rejects.toThrow('Nenhuma alteração');
+  });
+
+
   it('requires a specific equipment name and preserves it across audited corrections', async () => {
     await expect(finance.createExpense({
       businessDate: day, kind: 'equipment', amountCents: 2790,
@@ -183,10 +254,46 @@ describe('Actual repositories against restrictive emulator rules', () => {
     const created = await sales.create({ ...draft(), fulfillmentStatus: 'in-production',
       lines: [{ kind: 'product', sourceId: 'p', quantity: 2 }] });
     expect(await data('products', 'p')).toMatchObject({ stock: 10, committedStock: 2, reservedPhysicalStock: 0 });
+    await expect(sales.advanceFulfillment(created.sale.id, 'ready')).rejects.toThrow('alocadas');
+    await sales.allocateOrderLine(created.sale.id, created.sale.items[0]!.id, 2);
+    expect(await count('orderAllocationHistory')).toBe(1);
+    await expect(sales.allocateOrderLine(created.sale.id, created.sale.items[0]!.id, 1)).rejects.toThrow();
     await sales.advanceFulfillment(created.sale.id, 'ready');
     expect(await data('products', 'p')).toMatchObject({ stock: 10, committedStock: 2, reservedPhysicalStock: 2 });
     await sales.advanceFulfillment(created.sale.id, 'delivered');
     expect(await data('products', 'p')).toMatchObject({ stock: 8, committedStock: 0, reservedPhysicalStock: 0 });
+  });
+
+  it('does not automatically consume tracked-order reservations when producing', async () => {
+    const created=await sales.create({...draft(),fulfillmentStatus:'in-production',
+      lines:[{kind:'product',sourceId:'p',quantity:13}]});
+    expect(await data('products','p')).toMatchObject({committedStock:13,
+      explicitCommittedStock:13,explicitAllocatedStock:0,reservedPhysicalStock:0});
+    await production.create('p',4,day);
+    expect(await data('products','p')).toMatchObject({stock:14,
+      committedStock:13,reservedPhysicalStock:0});
+    await sales.allocateOrderLine(created.sale.id,created.sale.items[0]!.id,4);
+    expect(await data('products','p')).toMatchObject({reservedPhysicalStock:4,explicitAllocatedStock:4});
+    await sales.cancel(created.sale.id);
+    expect(await data('products','p')).toMatchObject({stock:14,committedStock:0,
+      explicitCommittedStock:0,explicitAllocatedStock:0,reservedPhysicalStock:0});
+  });
+
+  it('keeps legacy automatic reservation without assigning units to a tracked order', async () => {
+    await env.withSecurityRulesDisabled(async context => {
+      await setDoc(doc(context.firestore(),'products','p'),
+        {stock:0,committedStock:2,reservedPhysicalStock:0},{merge:true});
+    });
+    const tracked=await sales.create({...draft(),fulfillmentStatus:'in-production',
+      lines:[{kind:'product',sourceId:'p',quantity:3}]});
+    await production.create('p',4,day);
+    expect(await data('products','p')).toMatchObject({stock:4,committedStock:5,
+      explicitCommittedStock:3,reservedPhysicalStock:2,explicitAllocatedStock:0});
+    await sales.allocateOrderLine(tracked.sale.id,tracked.sale.items[0]!.id,2);
+    expect(await data('products','p')).toMatchObject({reservedPhysicalStock:4,explicitAllocatedStock:2});
+    await sales.cancel(tracked.sale.id);
+    expect(await data('products','p')).toMatchObject({stock:4,committedStock:2,
+      explicitCommittedStock:0,reservedPhysicalStock:2,explicitAllocatedStock:0});
   });
 
   it('reserves ready stock and only decrements inventory at physical delivery', async () => {
@@ -463,7 +570,7 @@ describe('Actual repositories against restrictive emulator rules', () => {
     const backfill = runInInjectionContext(injector, () => new ReadOptimizationBackfillService());
     await expect(backfill.ensure()).resolves.toBeUndefined();
 
-    expect(await data('system', 'read-optimization')).toMatchObject({ version: 1, updatedBy: 'operator' });
+    expect(await data('system', 'read-optimization')).toMatchObject({ version: 2, updatedBy: 'operator' });
     expect(await data('products', 'p')).toMatchObject({ stockStatus: 'ok' });
     expect(await data('inputs', 'i')).toMatchObject({ stockStatus: 'ok' });
     for (let index = 0; index < 10; index += 1) {

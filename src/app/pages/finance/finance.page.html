@@ -1,7 +1,11 @@
 <section class="bf-page finance-layout">
   <header class="bf-page-header">
     <div><h1>Financeiro</h1><p>Compras, despesas, recebimentos e contas em aberto sem misturar fluxos diferentes.</p></div>
-    <button class="bf-button" type="button" (click)="openExpense()"><bf-icon name="plus" /> Nova saída</button>
+    <div class="finance-header-actions">
+      <button class="bf-button secondary" type="button" [disabled]="exporting()"
+        (click)="exportFinanceCsv()"><bf-icon name="details"/> {{exporting()?'Exportando...':'Exportar CSV'}}</button>
+      <button class="bf-button" type="button" (click)="openExpense()"><bf-icon name="plus" /> Nova saída</button>
+    </div>
   </header>
 
   @if (refreshing()) { <bf-page-refresh /> }

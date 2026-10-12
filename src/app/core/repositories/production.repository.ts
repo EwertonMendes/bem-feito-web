@@ -203,7 +203,19 @@ export class ProductionRepository {
         const stock = product.stock + item.quantity;
         const committedStock = product.committedStock ?? 0;
         const previousReserved = product.reservedPhysicalStock ?? Math.min(product.stock, committedStock);
-        const reservedPhysicalStock = Math.min(stock, previousReserved + Math.min(item.quantity, Math.max(0, committedStock - previousReserved)));
+        const explicitCommitted = product.explicitCommittedStock ?? 0;
+        const explicitAllocated = product.explicitAllocatedStock ?? 0;
+        // Legacy orders retain their former automatic reservation behavior.
+        // Tracked orders allocate explicitly through their own sale line, so production
+        // must not preemptively reserve those units for an unspecified customer.
+        if (explicitCommitted > committedStock || explicitAllocated > previousReserved ||
+            explicitAllocated > explicitCommitted) {
+          throw new Error('Contadores de reservas inconsistentes. Concilie antes de produzir.');
+        }
+        const legacyDemand = committedStock - explicitCommitted;
+        const legacyReserved = previousReserved - explicitAllocated;
+        const legacyNeed = Math.max(0, legacyDemand - legacyReserved);
+        const reservedPhysicalStock = Math.min(stock, previousReserved + Math.min(item.quantity, legacyNeed));
         transaction.update(doc(this.firestore, 'products', item.productId), {
           stock, stockStatus: productStockStatus(stock, product.minimumStock),
           reservedPhysicalStock,

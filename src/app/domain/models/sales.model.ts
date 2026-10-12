@@ -28,11 +28,20 @@ export interface StockEffect {
   unitCostDeciCents?: number;
 }
 
+export interface OrderLineAllocation {
+  /** Immutable sale line identifier; never allocate by display name. */
+  lineId: string;
+  productId: string;
+  quantity: number;
+}
+
 export interface Sale extends AuditFields {
   id: string;
   code: string;
   businessDate: string;
   customerName?: string;
+  /** Indexed normalized key for history search. Legacy documents may not have it yet. */
+  customerSearchKey?: string;
   dueDate?: string;
   discountCents: number;
   subtotalCents: number;
@@ -46,6 +55,8 @@ export interface Sale extends AuditFields {
   items: SaleLineSnapshot[];
   paymentIds: string[];
   stockEffects: StockEffect[];
+  /** Explicit reservations per order. Absent means legacy allocation must be reconciled. */
+  orderAllocations?: OrderLineAllocation[];
   /** Legacy sales without this field are considered delivered. */
   fulfillmentStatus?: FulfillmentStatus;
   /** False for orders that reserve inventory until delivery. Legacy sales are true. */

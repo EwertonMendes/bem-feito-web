@@ -1,6 +1,6 @@
 import { AuditFields } from './common.model';
 
-export type StockSourceType = 'sale' | 'sale-cancellation' | 'production' | 'purchase' | 'purchase-correction' | 'purchase-cancellation' | 'adjustment' | 'migration';
+export type StockSourceType = 'sale' | 'sale-correction' | 'sale-cancellation' | 'production' | 'purchase' | 'purchase-correction' | 'purchase-cancellation' | 'adjustment' | 'migration';
 
 export interface StockMovement extends AuditFields {
   id: string;

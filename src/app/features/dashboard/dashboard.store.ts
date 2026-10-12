@@ -53,11 +53,13 @@ export class DashboardStore {
   private readonly paymentRevision = this.revisions.changeRevision('payments');
   private readonly catalogRevision = this.revisions.changeRevision('catalog');
   private readonly inventoryRevision = this.revisions.changeRevision('inventory');
+  private readonly financeRevision = this.revisions.changeRevision('finance');
   private lastSalesRevision = 0;
   private lastExpenseRevision = 0;
   private lastPaymentRevision = 0;
   private lastCatalogRevision = 0;
   private lastInventoryRevision = 0;
+  private lastFinanceRevision = 0;
   private active = false;
   private readonly initializedState = signal(false);
   private pendingLoads = 0;
@@ -146,15 +148,18 @@ export class DashboardStore {
       const payments = this.paymentRevision();
       const catalog = this.catalogRevision();
       const inventory = this.inventoryRevision();
+      const finance = this.financeRevision();
       const changed =
         expenses !== this.lastExpenseRevision ||
         payments !== this.lastPaymentRevision ||
         catalog !== this.lastCatalogRevision ||
-        inventory !== this.lastInventoryRevision;
+        inventory !== this.lastInventoryRevision ||
+        finance !== this.lastFinanceRevision;
       this.lastExpenseRevision = expenses;
       this.lastPaymentRevision = payments;
       this.lastCatalogRevision = catalog;
       this.lastInventoryRevision = inventory;
+      this.lastFinanceRevision = finance;
       if (!changed) return;
       this.periodStale = true;
       this.scheduleRefresh();

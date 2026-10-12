@@ -44,8 +44,10 @@ export class SalesPage {
   readonly historicalBusy = signal(false);
   readonly historyActive = computed(()=>this.historicalQuery().length>0 && this.search().trim()===this.historicalQuery());
   readonly statusFilter = signal<'all' | 'paid' | 'open' | 'cancelled'>('all');
-  readonly pendingAction = signal<'ready' | 'delivered' | 'cancel' | 'allocate' | null>(null);
-  readonly allocatingLineId = signal<string | null>(null);
+  readonly pendingAction = signal<'ready' | 'delivered' | 'cancel' | 'allocate' | 'correct' | null>(null);
+  readonly editingDetails = signal(false);
+  readonly metadataDraft = signal({customerName:'',dueDate:'',notes:'',reason:''});
+    readonly allocatingLineId = signal<string | null>(null);
   readonly allocationQuantity = signal(1);
   readonly orderProgress = orderProgress;
   private readonly selectedSnapshot = signal<Sale | null>(null);
@@ -98,12 +100,28 @@ export class SalesPage {
   openDetails(sale: Sale): void {
     if (this.pendingAction()) return;
     this.selectedSnapshot.set(sale);
+    this.editingDetails.set(false);
+    this.metadataDraft.set({customerName:sale.customerName??'',dueDate:sale.dueDate??'',notes:sale.notes??'',reason:''});
     this.detailDialog().open();
   }
 
   showAllocation(lineId: string): void {
     this.allocatingLineId.set(this.allocatingLineId() === lineId ? null : lineId);
     this.allocationQuantity.set(1);
+  }
+
+  patchMetadata(field:'customerName'|'dueDate'|'notes'|'reason',value:string):void {
+    this.metadataDraft.update(draft=>({...draft,[field]:value}));
+  }
+
+  async saveMetadata():Promise<void>{
+    const sale=this.selectedSale(),draft=this.metadataDraft();
+    if(!sale||this.pendingAction()||draft.reason.trim().length<4)return;
+    this.pendingAction.set('correct');
+    try{
+      const updated=await this.store.correctMetadata(sale.id,draft);
+      if(updated){this.selectedSnapshot.set(updated);this.editingDetails.set(false);}
+    }finally{this.pendingAction.set(null);}
   }
 
   async allocateSelected(lineId: string): Promise<void> {

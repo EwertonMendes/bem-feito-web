@@ -10,7 +10,7 @@ import { AuthService } from '../auth/auth.service';
 import { DataRevisionService } from '../firebase/data-revision.service';
 import { FIRESTORE } from '../firebase/firebase.providers';
 import { isValidBusinessDate, todayBusinessDate } from '../utils/date';
-import { normalizeCustomerSearch } from '../utils/customer-search';
+import { customerSearchPrefixes, normalizeCustomerSearch } from '../utils/customer-search';
 
 export interface SaleMetadataCorrection {
   customerName: string;
@@ -49,6 +49,7 @@ export class SaleCorrectionRepository {
       tx.update(ref,{
         customerName:name||deleteField(),
         customerSearchKey:name?normalizeCustomerSearch(name):deleteField(),
+        customerSearchPrefixes:name?customerSearchPrefixes(name):deleteField(),
         dueDate:date||deleteField(),notes:notes||deleteField(),
         updatedAt:serverTimestamp(),updatedBy:userId,
       });
@@ -58,6 +59,7 @@ export class SaleCorrectionRepository {
         createdBy:userId,updatedBy:userId});
       this.revisions.touchTransaction(tx,'sales');
       return {...current,customerName:name||undefined,customerSearchKey:name?normalizeCustomerSearch(name):undefined,
+        customerSearchPrefixes:name?customerSearchPrefixes(name):undefined,
         dueDate:date||undefined,notes:notes||undefined};
     });
   }

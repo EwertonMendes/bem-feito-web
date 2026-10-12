@@ -14,23 +14,80 @@
 
   @if (store.initialized() && store.loading()) { <bf-page-refresh /> }
 
-  <div class="filters">
-    <label class="search">
-      <bf-icon name="search" />
-      <input type="search" placeholder="Cliente ou ID" [value]="search()" (input)="search.set($any($event.target).value)" />
-    </label>
-
-    <button type="button" class="bf-button secondary historical-search" [disabled]="search().trim().length < 2 || historicalBusy()" (click)="searchAllHistory()"><bf-icon name="search"/> {{historicalBusy()?'Buscando...':'Buscar no histórico'}}</button>
-        <div class="bf-segments status-tabs" aria-label="Filtrar vendas por status">
-      <button [class.active]="statusFilter()==='all'" (click)="statusFilter.set('all')">Todas</button>
-      <button [class.active]="statusFilter()==='paid'" (click)="statusFilter.set('paid')">Pagas</button>
-      <button [class.active]="statusFilter()==='open'" (click)="statusFilter.set('open')">Em aberto</button>
-      <button [class.active]="statusFilter()==='cancelled'" (click)="statusFilter.set('cancelled')">Canceladas</button>
+  <section class="sales-filters-panel" aria-label="Pesquisar e filtrar vendas">
+    <div class="sales-filter-primary">
+      <div class="sales-search-actions">
+        <label class="search">
+          <bf-icon name="search" />
+          <input type="search" aria-label="Buscar vendas por cliente ou código"
+            placeholder="Cliente ou código"
+            [value]="search()" (input)="search.set($any($event.target).value)"
+            (keydown.enter)="searchAllHistory()" />
+        </label>
+        <button type="button" class="bf-button historical-search"
+          [disabled]="search().trim().length===1 || historicalBusy()"
+          (click)="searchAllHistory()">
+          <bf-icon name="search"/>
+          <span class="search-desktop-label">{{historicalBusy()?'Pesquisando...':'Pesquisar'}}</span>
+          <span class="search-mobile-label">{{historicalBusy()?'...':'Buscar'}}</span>
+        </button>
+      </div>
+      <div class="bf-segments status-tabs" aria-label="Situação das vendas">
+        <button type="button" [class.active]="statusFilter()==='all'" (click)="setHistoryStatus('all')">Todas</button>
+        <button type="button" [class.active]="statusFilter()==='paid'" (click)="setHistoryStatus('paid')">Pagas</button>
+        <button type="button" [class.active]="statusFilter()==='open'" (click)="setHistoryStatus('open')">Em aberto</button>
+        <button type="button" [class.active]="statusFilter()==='cancelled'" (click)="setHistoryStatus('cancelled')">Canceladas</button>
+      </div>
     </div>
-  </div>
+    <div class="sales-filter-secondary">
+      <button class="sales-expand-filters" type="button"
+        [attr.aria-expanded]="advancedFiltersOpen()" aria-controls="sales-advanced-filters"
+        (click)="advancedFiltersOpen.set(!advancedFiltersOpen())">
+        <bf-icon name="details"/>
+        <span>Mais filtros</span>
+        @if(activeAdvancedFilterCount()){<span class="sales-filter-count">{{activeAdvancedFilterCount()}}</span>}
+        <bf-icon class="sales-expand-arrow" name="chevron-right" [class.expanded]="advancedFiltersOpen()"/>
+      </button>
+      <span class="sales-filter-context">
+        {{historyActive()?'Consulta ao histórico completo':'Visualizando vendas recentes'}}
+      </span>
+      @if(historyActive() || activeAdvancedFilterCount() || search().trim()){
+        <button type="button" class="sales-clear-filters" (click)="clearSalesFilters()">
+          <bf-icon name="close"/> Limpar busca
+        </button>
+      }
+    </div>
+    @if(advancedFiltersOpen()){
+      <div id="sales-advanced-filters" class="sales-advanced-filters" aria-label="Filtros avançados">
+        <label class="sales-date-field">
+          <span>Data inicial</span>
+          <input class="bf-input" type="date" [value]="historyFrom()"
+            (input)="historyFrom.set($any($event.target).value)"/>
+        </label>
+        <label class="sales-date-field">
+          <span>Data final</span>
+          <input class="bf-input" type="date" [min]="historyFrom()" [value]="historyTo()"
+            (input)="historyTo.set($any($event.target).value)"/>
+        </label>
+        <div class="sales-product-field">
+          <span>Sabonete</span>
+          <bf-select ariaLabel="Filtrar por sabonete" [options]="productFilterOptions()"
+            [value]="historyProduct()" (valueChange)="historyProduct.set($event)"/>
+        </div>
+        <div class="sales-advanced-actions">
+          <button type="button" class="bf-button sales-apply-filters"
+            [disabled]="search().trim().length===1 || historicalBusy()" (click)="searchAllHistory()">
+            <bf-icon name="search"/> Aplicar
+          </button>
+          <button type="button" class="bf-button secondary sales-reset-filters"
+            (click)="clearSalesFilters()">Limpar</button>
+        </div>
+      </div>
+    }
+  </section>
 
   @if(historyActive()){
-    <p class="history-feedback" role="status">{{historicalMatches().length}} resultado(s) do histórico para “{{historicalQuery()}}”. A busca por cliente inclui os registros já indexados; códigos de venda funcionam em todo o histórico.</p>
+    <p class="history-feedback" role="status"><bf-icon name="search"/> {{historicalMatches().length}} {{historicalMatches().length===1?'venda encontrada':'vendas encontradas'}}{{historyHasMore()?' nesta etapa da busca':' no histórico'}}.</p>
   }
     @if (!store.initialized()) {
     <bf-table-skeleton [columns]="8" [rows]="7" />
@@ -110,12 +167,23 @@
         </article>
       }
     </div>
-    @if (store.hasMore()) {
+    @if (historyActive() && historyHasMore()) {
+      <div class="bf-actions"><button class="bf-button secondary" type="button" [disabled]="historicalBusy()" (click)="loadMoreHistory()"><bf-icon name="details"/> {{historicalBusy()?'Carregando...':'Carregar mais resultados'}}</button></div>
+    } @else if (!historyActive() && store.hasMore()) {
       <div class="bf-actions"><button class="bf-button secondary" type="button" [disabled]="store.loadingMore()" (click)="store.loadMore()">{{ store.loadingMore() ? 'Carregando...' : 'Carregar mais' }}</button></div>
     }
   } @else {
     <div class="empty-sales">
-      <bf-empty-state title="Nenhuma venda encontrada" description="Experimente outra pesquisa ou revise os filtros." />
+      @if(historyActive() && historyHasMore()){
+        <bf-empty-state title="Nenhuma correspondência nesta parte do histórico" description="Há registros mais antigos para pesquisar. Continue a busca para verificar todas as páginas." />
+        <div class="bf-actions">
+          <button class="bf-button secondary" type="button" [disabled]="historicalBusy()" (click)="loadMoreHistory()">
+            {{historicalBusy()?'Pesquisando...':'Continuar buscando no histórico'}}
+          </button>
+        </div>
+      } @else {
+        <bf-empty-state title="Nenhuma venda encontrada" description="Experimente outra pesquisa ou revise os filtros." />
+      }
     </div>
   }
 
@@ -131,6 +199,7 @@
         <button class="bf-floating-close" type="button" aria-label="Fechar detalhes" (click)="detailDialog.close()"><bf-icon name="close" /></button>
       </div>
       <div class="bf-dialog-body">
+        @if(!editingItems()) {
         <div class="detail-total"><span>Total · {{ fulfillmentLabel(sale) }}</span><strong>{{ currency(sale.totalCents) }}</strong></div>
         <div class="detail-grid">
           <div><span>Recebido</span><strong>{{ currency(sale.receivedCents) }}</strong></div>
@@ -188,51 +257,87 @@
           </section>
         }
         @if (sale.notes && !editingDetails()) { <p class="notes">{{ sale.notes }}</p> }
+        }
         @if(editingItems()){
-          <section class="sale-item-correction">
-            <h3><bf-icon name="details"/> Corrigir quantidades e preços</h3>
-            <p>Confira a diferença antes de salvar. Os preços e os custos históricos da venda são preservados. Alterações de produtos e adicionais exigem outro fluxo.</p>
-            @for(line of sale.items;track line.id){
-              @if(line.kind==='product'){
-                <div class="sale-item-correction-row">
-                  <strong>{{line.name}}</strong>
-                  <label>Quantidade
-                    <input type="number" class="bf-input" min="0" step="1"
-                      [value]="lineChange(line.id)!.quantity"
-                      (input)="patchProductLine(line.id,'quantity',+$any($event.target).value)"/>
-                  </label>
-                  <label>Preço unitário (R$)
-                    <input type="number" class="bf-input" min="0" step="0.01"
-                      [value]="(lineChange(line.id)!.unitPriceCents)/100"
-                      (input)="patchProductLine(line.id,'unitPriceCents',Math.round(+$any($event.target).value*100))"/>
-                  </label>
-                </div>
-              }
+          <section class="sale-item-correction" aria-label="Editar itens da venda">
+            <h3><bf-icon name="details"/> Editar venda</h3>
+            <p>Inclua, remova ou substitua itens. Os custos históricos dos itens preservados continuam intactos. Confira o impacto antes de confirmar.</p>
+            @for(line of advancedChanges();track line.id){
+              <div class="sale-item-correction-row advanced-item-row">
+                <strong>{{advancedLineName(line)}}</strong>
+                <label>Quantidade
+                  <input class="bf-input" type="number" min="1" step="1" [value]="line.quantity"
+                    (input)="patchAdvancedLine(line.id,'quantity',+$any($event.target).value)"/>
+                </label>
+                <label>Preço unitário (R$)
+                  <input class="bf-input" type="number" min="0" step="0.01" [value]="line.unitPriceCents/100"
+                    (input)="patchAdvancedLine(line.id,'unitPriceCents',Math.round(+$any($event.target).value*100))"/>
+                </label>
+                <button class="bf-button secondary advanced-remove" type="button"
+                  [disabled]="!!pendingAction()" [attr.aria-label]="'Remover '+advancedLineName(line)"
+                  (click)="removeAdvancedLine(line.id)"><bf-icon name="close"/> Remover</button>
+              </div>
             }
+            <div class="advanced-add-item">
+              <h4>Adicionar item</h4>
+              <div class="bf-segments" aria-label="Tipo de item">
+                <button type="button" [class.active]="newLineKind()==='product'"
+                  (click)="newLineKind.set('product');newLineSource.set('')">Sabonete</button>
+                <button type="button" [class.active]="newLineKind()==='addition'"
+                  (click)="newLineKind.set('addition');newLineSource.set('')">Adicional</button>
+              </div>
+              <div class="advanced-add-controls">
+                <bf-select ariaLabel="Selecionar item para adicionar" [options]="newLineOptions()"
+                  [value]="newLineSource()" (valueChange)="newLineSource.set($event)"/>
+                <button class="bf-button secondary" type="button" [disabled]="!newLineSource()"
+                  (click)="addAdvancedLine()"><bf-icon name="plus"/> Adicionar</button>
+              </div>
+            </div>
             <div class="sale-item-correction-row">
               <label>Desconto total (R$)
-                <input type="number" min="0" step="0.01" class="bf-input" [value]="correctionDiscountCents()/100"
+                <input class="bf-input" type="number" min="0" step="0.01" [value]="correctionDiscountCents()/100"
                   (input)="correctionDiscountCents.set(Math.round(+$any($event.target).value*100))"/>
               </label>
               <label>Motivo da correção <em>*</em>
-                <textarea class="bf-textarea" maxlength="240" placeholder="Por que esta venda precisa ser corrigida?"
+                <textarea class="bf-textarea" maxlength="240" placeholder="O que mudou nesta venda?"
                   [value]="correctionReason()" (input)="correctionReason.set($any($event.target).value)"></textarea>
               </label>
             </div>
             @if(correctionPreview();as preview){
               @if(preview.value){
-                <div class="sale-correction-preview">
+                <div class="sale-correction-preview" role="status">
+                  <span>Total anterior <strong>{{currency(sale.totalCents)}}</strong></span>
                   <span>Novo total <strong>{{currency(preview.value.totalCents)}}</strong></span>
-                  <span>Recebido <strong>{{currency(sale.receivedCents)}}</strong></span>
-                  <span>Saldo restante <strong>{{currency(preview.value.balanceCents)}}</strong></span>
+                  <span>Já recebido <strong>{{currency(sale.receivedCents)}}</strong></span>
+                  <span>Novo saldo <strong>{{currency(preview.value.balanceCents)}}</strong></span>
+                  <span>Itens alterando estoque <strong>{{preview.value.inventoryDeltas.length}}</strong></span>
                 </div>
+                @if(preview.value.inventoryDeltas.length){
+                  <div class="advanced-impact">
+                    <strong>Impacto de estoque</strong>
+                    @for(change of preview.value.inventoryDeltas;track change.itemType+change.itemId){
+                      <span>{{change.itemType==='product'?'Sabonete':'Insumo'}} · {{change.itemId}}:
+                        {{change.quantityDelta>0?'+':''}}{{change.quantityDelta}} {{sale.stockApplied===false?'(compromisso inverso)':'no estoque'}}</span>
+                    }
+                  </div>
+                }
               }@else{
                 <p class="sale-correction-error" role="alert"><bf-icon name="alert"/> {{preview.error}}</p>
               }
             }
+            @if(sale.stockApplied!==false && correctionPreview()?.value?.inventoryDeltas?.length){
+              <div class="advanced-stock-confirm">
+                <bf-checkbox [checked]="advancedStockConfirmed()" (checkedChange)="advancedStockConfirmed.set($event)"
+                  label="Conferi o estoque físico"
+                  description="Confirmo que a alteração de sabonetes e insumos reflete a movimentação real."/>
+              </div>
+            }
             <div class="sale-metadata-actions">
-              <button class="bf-button secondary" type="button" [disabled]="!!pendingAction()" (click)="editingItems.set(false)">Cancelar</button>
-              <button class="bf-button" type="button" [disabled]="!!pendingAction() || !correctionPreview()?.value || correctionReason().trim().length<4" (click)="correctSelectedItems()">Salvar correção</button>
+              <button class="bf-button secondary" type="button" [disabled]="!!pendingAction()"
+                (click)="cancelItemCorrection()">Cancelar</button>
+              <button class="bf-button" type="button"
+                [disabled]="!!pendingAction() || !correctionPreview()?.value || correctionReason().trim().length<4 || (sale.stockApplied!==false && !!correctionPreview()?.value?.inventoryDeltas?.length && !advancedStockConfirmed())"
+                (click)="correctSelectedItems()">Confirmar edição</button>
             </div>
           </section>
         }
@@ -254,12 +359,12 @@
         }
       </div>
       <div class="bf-dialog-footer">
-        @if(sale.status==='active' && !editingDetails() && !editingItems() && hasProductLines(sale)) { <button class="bf-button secondary" type="button" [disabled]="!!pendingAction()" (click)="openItemCorrection(sale)"><bf-icon name="details"/> Corrigir itens</button> }
+        @if(sale.status==='active' && !editingDetails() && !editingItems() && hasProductLines(sale)) { <button class="bf-button secondary" type="button" [disabled]="!!pendingAction() || openingItemEditor()" [bfLoadingButton]="openingItemEditor()" (click)="openItemCorrection(sale)"><bf-icon name="details"/> {{openingItemEditor()?"Carregando...":"Editar venda"}}</button> }
         @if(sale.status==='active' && !editingDetails() && !editingItems()) { <button class="bf-button secondary" type="button" [disabled]="!!pendingAction()" (click)="editingDetails.set(true)"><bf-icon name="details"/> Corrigir dados</button> }
-        @if (sale.status==='active' && sale.balanceCents>0){<button class="bf-button" type="button" (click)="modals.openReceipt(sale.id)"><bf-icon name="payment"/> Receber</button>}
-        @if (sale.status==='active' && sale.fulfillmentStatus==='in-production'){<button class="bf-button" type="button" [disabled]="!!pendingAction()" [bfLoadingButton]="pendingAction()==='ready'" (click)="advanceSelected('ready')">{{pendingAction()==='ready'?'Atualizando...':'Marcar pronta'}}</button>}
-        @if (sale.status==='active' && sale.fulfillmentStatus==='ready'){<button class="bf-button" type="button" [disabled]="!!pendingAction()" [bfLoadingButton]="pendingAction()==='delivered'" (click)="advanceSelected('delivered')">{{pendingAction()==='delivered'?'Atualizando...':'Entregar / retirar'}}</button>}
-        @if (sale.status!=='cancelled') { <button class="bf-button danger" type="button" [disabled]="!!pendingAction()" [bfLoadingButton]="pendingAction()==='cancel'" (click)="cancelSelected()">{{pendingAction()==='cancel'?'Cancelando...':'Cancelar venda'}}</button> }
+        @if (sale.status==='active' && sale.balanceCents>0 && !editingItems() && !editingDetails()){<button class="bf-button" type="button" (click)="modals.openReceipt(sale.id)"><bf-icon name="payment"/> Receber</button>}
+        @if (sale.status==='active' && sale.fulfillmentStatus==='in-production' && !editingItems() && !editingDetails()){<button class="bf-button" type="button" [disabled]="!!pendingAction()" [bfLoadingButton]="pendingAction()==='ready'" (click)="advanceSelected('ready')">{{pendingAction()==='ready'?'Atualizando...':'Marcar pronta'}}</button>}
+        @if (sale.status==='active' && sale.fulfillmentStatus==='ready' && !editingItems() && !editingDetails()){<button class="bf-button" type="button" [disabled]="!!pendingAction()" [bfLoadingButton]="pendingAction()==='delivered'" (click)="advanceSelected('delivered')">{{pendingAction()==='delivered'?'Atualizando...':'Entregar / retirar'}}</button>}
+        @if (sale.status!=='cancelled' && !editingItems() && !editingDetails()) { <button class="bf-button danger" type="button" [disabled]="!!pendingAction()" [bfLoadingButton]="pendingAction()==='cancel'" (click)="cancelSelected()">{{pendingAction()==='cancel'?'Cancelando...':'Cancelar venda'}}</button> }
         <button class="bf-button secondary" type="button" (click)="detailDialog.close()">Fechar</button>
       </div>
     }

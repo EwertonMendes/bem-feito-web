@@ -3,7 +3,8 @@ import { ChangeDetectionStrategy, Component, DestroyRef, afterNextRender, comput
 import { ActivatedRoute, Router } from '@angular/router';
 import { Sale } from '../../domain/models/sales.model';
 import { orderProgress } from '../../domain/logic/order-progress';
-import { planSaleProductCorrection, saleCorrectionSignature, SaleProductLineChange } from '../../domain/logic/sale-correction';
+import { saleCorrectionSignature } from '../../domain/logic/sale-correction';
+import { AdvancedSaleLineDraft, planAdvancedSaleEdit } from '../../domain/logic/advanced-sale-edit';
 import { CatalogStore } from '../../features/catalog/catalog.store';
 import { ModalActions } from '../../core/services/modal-actions.service';
 import { SalesStore } from '../../features/sales/sales.store';
@@ -14,6 +15,9 @@ import { formatBusinessDate } from '../../core/utils/date';
 import { formatCurrency } from '../../core/utils/money';
 import { downloadCsv, exportCents } from '../../core/utils/csv-export';
 import { BfDialog } from '../../shared/ui/dialog/dialog';
+import { BfSelect } from '../../shared/ui/select/select';
+import { BfCheckbox } from '../../shared/ui/checkbox/checkbox';
+import { BusinessDateCursor } from '../../core/repositories/pagination';
 import { BfIcon } from '../../shared/ui/icon/icon';
 import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
 import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
@@ -21,7 +25,7 @@ import { BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
 
 @Component({
   selector: 'bf-sales-page',
-  imports: [BfLoadingButton, BfIcon, BfDialog, BfEmptyState, BfPageRefresh, BfTableSkeleton],
+  imports: [BfLoadingButton, BfIcon, BfDialog, BfSelect, BfCheckbox, BfEmptyState, BfPageRefresh, BfTableSkeleton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sales.page.html',
   styleUrl: './sales.page.scss',
@@ -44,23 +48,53 @@ export class SalesPage {
   readonly exporting = signal(false);
   readonly historicalMatches = signal<Sale[]>([]);
   readonly historicalQuery = signal('');
+  readonly historySubmitted = signal(false);
+  readonly historyHasMore = signal(false);
+  readonly historyCursor = signal<BusinessDateCursor | null>(null);
+  readonly historyFrom = signal('');
+  readonly historyTo = signal('');
+  readonly historyProduct = signal('');
+  readonly productFilterOptions = computed(() => [{value:'',label:'Todos os sabonetes'},
+    ...this.catalog.activeProducts().map(product=>({value:product.id,label:product.displayName}))]);
   readonly historicalBusy = signal(false);
-  readonly historyActive = computed(()=>this.historicalQuery().length>0 && this.search().trim()===this.historicalQuery());
+  readonly advancedFiltersOpen = signal(false);
+  readonly activeAdvancedFilterCount = computed(() =>
+    Number(Boolean(this.historyFrom())) + Number(Boolean(this.historyTo())) + Number(Boolean(this.historyProduct())));
+  readonly historyActive = computed(()=>this.historySubmitted() && this.search().trim()===this.historicalQuery());
   readonly statusFilter = signal<'all' | 'paid' | 'open' | 'cancelled'>('all');
   readonly pendingAction = signal<'ready' | 'delivered' | 'cancel' | 'allocate' | 'correct' | 'correct-items' | null>(null);
   readonly editingDetails = signal(false);
   readonly editingItems = signal(false);
-  readonly productChanges = signal<SaleProductLineChange[]>([]);
-  readonly correctionDiscountCents = signal(0);
-  readonly correctionReason = signal('');
-  readonly correctionSignature = signal('');
-  readonly correctionPreview = computed(() => {
-    const sale=this.selectedSale();
-    if(!sale || !this.editingItems())return null;
-    try{return {value:planSaleProductCorrection(sale,{
-      expectedSignature:this.correctionSignature(),lines:this.productChanges(),
-      discountCents:this.correctionDiscountCents(),reason:this.correctionReason(),
-    }),error:''};}catch(error){return {value:null,error:error instanceof Error?error.message:'Revisão inválida.'};}
+  readonly openingItemEditor = signal(false);
+  private readonly editBaseline = signal<Sale | null>(null);
+  readonly advancedChanges=signal<AdvancedSaleLineDraft[]>([]);
+  readonly newLineKind=signal<'product'|'addition'>('product');
+  readonly newLineSource=signal('');
+  readonly newLineOptions=computed(()=>[
+    {value:'',label:'Selecione um item'},
+    ...(this.newLineKind()==='product'
+      ? this.catalog.activeProducts().map(p=>({value:p.id,label:p.displayName}))
+      : this.catalog.activeAdditions().map(a=>({value:a.id,label:a.name}))),
+  ]);
+  readonly correctionDiscountCents=signal(0);
+  readonly correctionReason=signal('');
+  readonly advancedStockConfirmed=signal(false);
+  readonly correctionSignature=signal('');
+  readonly correctionPreview=computed(()=>{
+    const sale=this.editBaseline();
+    if(!sale||!this.editingItems())return null;
+    try{
+      const catalog={
+        products:new Map(this.catalog.products().map(p=>[p.id,p])),
+        additions:new Map(this.catalog.additions().map(a=>[a.id,a])),
+        inputs:new Map(this.catalog.inputs().map(i=>[i.id,i])),
+      };
+      const reason=this.correctionReason().trim().length>=4?this.correctionReason():'Prévia para conferência';
+      return {value:planAdvancedSaleEdit(sale,{
+        expectedSignature:this.correctionSignature(),lines:this.advancedChanges(),
+        discountCents:this.correctionDiscountCents(),reason,
+      },catalog),error:''};
+    }catch(error){return {value:null,error:error instanceof Error?error.message:'Alterações inválidas.'};}
   });
   readonly metadataDraft = signal({customerName:'',dueDate:'',notes:'',reason:''});
     readonly allocatingLineId = signal<string | null>(null);
@@ -68,19 +102,51 @@ export class SalesPage {
   readonly orderProgress = orderProgress;
   private readonly selectedSnapshot = signal<Sale | null>(null);
   readonly selectedSale = computed(() => {
+    if(this.editingItems() && this.editBaseline())return this.editBaseline();
     const snapshot = this.selectedSnapshot();
     return snapshot ? this.store.sales().find(sale => sale.id === snapshot.id) ?? snapshot : null;
   });
 
   readonly filteredSales = computed(() => {
-    const term = this.search().trim().toLocaleLowerCase('pt-BR');
-    return (this.historyActive()?this.historicalMatches():this.store.sales()).filter((sale) => {
-      if (this.statusFilter() === 'paid' && sale.paymentStatus !== 'paid') return false;
-      if (this.statusFilter() === 'open' && !(sale.status === 'active' && sale.balanceCents > 0)) return false;
-      if (this.statusFilter() === 'cancelled' && sale.status !== 'cancelled') return false;
-      return !term || (sale.code + ' ' + (sale.customerName ?? '')).toLocaleLowerCase('pt-BR').includes(term);
+    if(this.historyActive())return this.historicalMatches();
+    const term=this.search().trim().toLocaleLowerCase('pt-BR');
+    return this.store.sales().filter(sale=>{
+      if(this.statusFilter()==='paid'&&sale.paymentStatus!=='paid')return false;
+      if(this.statusFilter()==='open'&&!(sale.status==='active'&&sale.balanceCents>0))return false;
+      if(this.statusFilter()==='cancelled'&&sale.status!=='cancelled')return false;
+      return !term||(sale.code+' '+(sale.customerName??'')).toLocaleLowerCase('pt-BR').includes(term);
     });
   });
+
+  readonly searchFilters = computed(() => ({
+    status:this.statusFilter(),from:this.historyFrom(),to:this.historyTo(),productId:this.historyProduct(),
+  }));
+  readonly appliedHistoryFilters=signal<ReturnType<typeof this.searchFilters> | null>(null);
+
+  setHistoryStatus(status:'all'|'paid'|'open'|'cancelled'):void {
+    this.statusFilter.set(status);
+    if(this.historyActive())void this.searchAllHistory();
+  }
+
+  clearSalesFilters():void {
+    this.search.set('');
+    this.historyFrom.set('');this.historyTo.set('');this.historyProduct.set('');
+    this.statusFilter.set('all');this.historySubmitted.set(false);
+    this.historicalQuery.set('');this.historicalMatches.set([]);
+    this.historyHasMore.set(false);this.historyCursor.set(null);
+    this.appliedHistoryFilters.set(null);
+  }
+
+  async loadMoreHistory():Promise<void>{
+    if(!this.historyActive()||!this.historyHasMore()||this.historicalBusy())return;
+    this.historicalBusy.set(true);
+    try{
+      const page=await this.repository.searchHistoricalPage(this.historicalQuery(),this.appliedHistoryFilters()??{},this.historyCursor());
+      this.historicalMatches.update(old=>[...old,...page.items.filter(item=>!old.some(x=>x.id===item.id))]);
+      this.historyHasMore.set(page.hasMore);this.historyCursor.set(page.nextCursor);
+    }catch(error){this.toast.error(this.errors.message(error));}
+    finally{this.historicalBusy.set(false);}
+  }
 
   async exportAllSales():Promise<void> {
     if(this.exporting())return;
@@ -109,17 +175,18 @@ export class SalesPage {
 
   async searchAllHistory(): Promise<void> {
     const value=this.search().trim();
-    if(value.length<2||this.historicalBusy())return;
+    if(value.length===1||this.historicalBusy())return;
     this.historicalBusy.set(true);
-    this.historicalQuery.set('');
-    try {
-      this.historicalMatches.set(await this.repository.searchHistorical(value));
-      this.historicalQuery.set(value);
-    } catch(error) {
-      this.toast.error(this.errors.message(error));
-    } finally {
-      this.historicalBusy.set(false);
-    }
+    this.historySubmitted.set(false);
+    try{
+      const filters=this.searchFilters();
+      const page=await this.repository.searchHistoricalPage(value,filters);
+      this.appliedHistoryFilters.set(filters);
+      this.historicalMatches.set(page.items);this.historyHasMore.set(page.hasMore);
+      this.historyCursor.set(page.nextCursor);
+      this.historicalQuery.set(value);this.historySubmitted.set(true);
+    }catch(error){this.toast.error(this.errors.message(error));}
+    finally{this.historicalBusy.set(false);}
   }
 
   constructor() {
@@ -143,43 +210,90 @@ export class SalesPage {
     this.selectedSnapshot.set(sale);
     this.editingDetails.set(false);
     this.editingItems.set(false);
+    this.editBaseline.set(null);
     this.metadataDraft.set({customerName:sale.customerName??'',dueDate:sale.dueDate??'',notes:sale.notes??'',reason:''});
     this.detailDialog().open();
   }
 
-  openItemCorrection(sale:Sale):void {
-    this.editingDetails.set(false);
-    this.editingItems.set(true);
-    this.productChanges.set(sale.items.filter(item=>item.kind==='product').map(item=>({
-      lineId:item.id,quantity:item.quantity,unitPriceCents:item.unitPriceCents,
-    })));
-    this.correctionDiscountCents.set(sale.discountCents);
-    this.correctionReason.set('');
-    this.correctionSignature.set(saleCorrectionSignature(sale));
+  async openItemCorrection(sale:Sale):Promise<void> {
+    if(this.pendingAction() || this.openingItemEditor())return;
+    this.openingItemEditor.set(true);
+    try{
+      const current=await this.repository.findByIdFromServer(sale.id);
+      if(!current || current.status!=='active'){
+        this.toast.error('A venda não está mais disponível para edição.');
+        return;
+      }
+      // Discard responses for a different sale after the dialog selection changes.
+      if(this.selectedSnapshot()?.id!==sale.id)return;
+      // Keep the immutable editor base independent from the list-store refresh.
+      this.editBaseline.set(current);
+      this.selectedSnapshot.set(current);
+      this.editingDetails.set(false);
+      this.advancedChanges.set(current.items.map(i=>({
+        id:i.id,kind:i.kind,sourceId:i.sourceId,
+        quantity:i.quantity,unitPriceCents:i.unitPriceCents,
+      })));
+      this.correctionDiscountCents.set(current.discountCents);
+      this.correctionReason.set('');
+      this.advancedStockConfirmed.set(false);
+      this.correctionSignature.set(saleCorrectionSignature(current));
+      this.newLineSource.set('');
+      this.newLineKind.set('product');
+      this.editingItems.set(true);
+    }catch(error){
+      this.toast.error(this.errors.message(error));
+    }finally{
+      this.openingItemEditor.set(false);
+    }
   }
-
-  readonly Math = Math;
-  hasProductLines(sale:Sale):boolean { return sale.items.some(item=>item.kind==='product'); }
-  lineChange(id:string):SaleProductLineChange|undefined { return this.productChanges().find(item=>item.lineId===id); }
-
-  patchProductLine(id:string,field:'quantity'|'unitPriceCents',value:number):void {
-    this.productChanges.update(lines=>lines.map(item=>item.lineId===id?{...item,[field]:value}:item));
+  cancelItemCorrection():void {
+    this.editingItems.set(false);
+    this.editBaseline.set(null);
   }
-
-  async correctSelectedItems():Promise<void> {
+  readonly Math=Math;
+  hasProductLines(sale:Sale):boolean {return sale.items.length>0;}
+  advancedLineName(line:AdvancedSaleLineDraft):string{
+    const original=this.selectedSale()?.items.find(item=>item.id===line.id);
+    if(original)return original.name;
+    return line.kind==='product'
+      ?this.catalog.products().find(p=>p.id===line.sourceId)?.displayName??'Sabonete'
+      :this.catalog.additions().find(a=>a.id===line.sourceId)?.name??'Adicional';
+  }
+  patchAdvancedLine(id:string,field:'quantity'|'unitPriceCents',value:number):void{
+    this.advancedChanges.update(lines=>lines.map(line=>line.id===id?{...line,[field]:value}:line));
+  }
+  removeAdvancedLine(id:string):void{
+    this.advancedChanges.update(lines=>lines.filter(line=>line.id!==id));
+  }
+  addAdvancedLine():void{
+    const sourceId=this.newLineSource(),kind=this.newLineKind();
+    if(!sourceId)return;
+    const product=kind==='product'?this.catalog.activeProducts().find(p=>p.id===sourceId):null;
+    const addition=kind==='addition'?this.catalog.activeAdditions().find(a=>a.id===sourceId):null;
+    if(!product&&!addition)return;
+    this.advancedChanges.update(lines=>[...lines,{
+      id:crypto.randomUUID(),kind,sourceId,quantity:1,
+      unitPriceCents:product?.salePriceCents??addition?.priceCents??0,
+    }]);
+    this.newLineSource.set('');
+  }
+  async correctSelectedItems():Promise<void>{
     if(this.pendingAction())return;
-    const sale=this.selectedSale(), preview=this.correctionPreview();
+    const sale=this.editBaseline(),preview=this.correctionPreview();
     if(!sale||!preview?.value||this.correctionReason().trim().length<4)return;
     this.pendingAction.set('correct-items');
     try{
-      const result=await this.store.correctProductLines(sale.id,{
-        expectedSignature:this.correctionSignature(),lines:this.productChanges(),
+      const result=await this.store.correctAdvancedSale(sale.id,{
+        expectedSignature:this.correctionSignature(),lines:this.advancedChanges(),
         discountCents:this.correctionDiscountCents(),reason:this.correctionReason(),
+        stockReconciliationConfirmed:this.advancedStockConfirmed(),
       });
       if(result){
         this.catalog.applyStockChanges(result.stockChanges);
         this.selectedSnapshot.set(result.sale);
         this.editingItems.set(false);
+        this.editBaseline.set(null);
       }
     }finally{this.pendingAction.set(null);}
   }

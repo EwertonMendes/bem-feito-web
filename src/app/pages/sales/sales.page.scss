@@ -372,7 +372,7 @@
 @media(max-width:520px){.sale-metadata-grid{grid-template-columns:1fr}.sale-metadata-actions button{flex:1;min-width:0}}
 
 
-.sale-item-correction{margin-top:18px;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2);display:grid;gap:12px}
+.sale-item-correction{margin-top:18px;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2);display:grid;grid-template-columns:minmax(0,1fr);min-width:0;max-width:100%;gap:12px}
 .sale-item-correction h3{display:flex;align-items:center;gap:8px;margin:0;font-size:.94rem}
 .sale-item-correction h3 bf-icon{color:var(--brand-strong);display:inline-flex}
 .sale-item-correction>p{margin:0;color:var(--muted);font-size:.76rem;line-height:1.55}
@@ -392,3 +392,189 @@
 
 .sales-header-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:flex-end}
 @media(max-width:540px){.sales-header-actions{width:100%}.sales-header-actions button{flex:1;min-width:0}}
+
+/* Advanced sale editor. Compact line cards reflow without overflowing on narrow devices. */
+.advanced-item-row{display:grid;grid-template-columns:minmax(160px,2fr) minmax(85px,1fr) minmax(120px,1fr) auto;align-items:end;gap:12px;border:1px solid var(--line);border-radius:14px;padding:12px;margin:10px 0;background:var(--surface)}
+.advanced-item-row strong{min-width:0;overflow-wrap:anywhere;align-self:center}
+.advanced-item-row label{display:grid;gap:6px;min-width:0}
+.advanced-item-row .bf-input{width:100%;min-width:0}
+.advanced-remove{display:inline-flex;align-items:center;gap:5px;justify-content:center;min-height:40px}
+.advanced-add-item{display:grid;gap:10px;padding:14px;margin:14px 0;background:var(--surface-2);border-radius:14px}
+.advanced-add-item h4{margin:0;font-size:.88rem}
+.advanced-add-controls{display:flex;gap:10px;align-items:center;min-width:0}
+.advanced-add-controls bf-select{min-width:0;flex:1}
+.advanced-impact{display:flex;flex-wrap:wrap;gap:8px;font-size:.75rem;color:var(--muted);padding:12px;border-radius:12px;background:var(--surface-2);margin-top:8px}
+.advanced-impact strong{width:100%;color:var(--text)}
+.advanced-impact span{border:1px solid var(--line);border-radius:8px;padding:6px 8px;overflow-wrap:anywhere}
+@media(max-width:800px){.advanced-item-row{grid-template-columns:repeat(2,minmax(0,1fr))}.advanced-item-row strong{grid-column:1/-1}.advanced-remove{grid-column:1/-1;justify-self:end}}
+@media(max-width:430px){.advanced-add-controls{display:grid;grid-template-columns:minmax(0,1fr)}.advanced-add-controls .bf-button{width:100%}}
+
+.advanced-stock-confirm{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:.78rem;color:var(--text);line-height:1.5;background:var(--surface-2)}
+.advanced-stock-confirm input{flex:none;width:17px;height:17px;margin-top:2px;accent-color:var(--brand)}
+
+/* Prevent nested grid min-content from enlarging the mobile dialog. */
+.bf-dialog .sale-item-correction>*{min-width:0;max-width:100%}
+.bf-dialog .sale-item-correction .advanced-add-item{grid-template-columns:minmax(0,1fr)}
+.bf-dialog .sale-item-correction .advanced-add-controls{max-width:100%}
+@media(max-width:560px){
+  .bf-dialog .sale-item-correction{padding:12px}
+  .bf-dialog .sale-item-correction .sale-item-correction-row:last-of-type{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .bf-dialog .sale-item-correction .advanced-item-row{grid-template-columns:repeat(2,minmax(0,1fr));min-width:0}
+  .bf-dialog .sale-item-correction .advanced-item-row>strong{grid-column:1/-1}
+}
+
+/* Sales: compact search and collapsible advanced filters. One consistent layout for
+   desktop, tablets and phones; no absolute positioning or overflowing min widths. */
+.sales-filters-panel {
+  display:grid;
+  gap:0;
+  min-width:0;
+  margin-bottom:18px;
+  border:1px solid var(--line);
+  border-radius:18px;
+  background:var(--surface);
+  padding:12px 14px;
+}
+.sales-filter-primary {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:16px;
+  align-items:center;
+  min-width:0;
+}
+.sales-search-actions {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:9px;
+  align-items:center;
+  min-width:0;
+}
+.sales-search-actions .search {
+  width:100%;
+  min-width:0;
+  min-height:44px;
+  border-radius:12px;
+  background:var(--surface-2);
+}
+.sales-search-actions .search input {min-width:0;height:42px}
+.sales-search-actions .historical-search {
+  min-width:115px;
+  height:44px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  white-space:nowrap;
+  border-radius:12px;
+}
+.search-mobile-label {display:none}
+.sales-filter-primary .status-tabs {
+  display:flex;
+  flex-wrap:nowrap;
+  width:max-content;
+  min-width:0;
+  max-width:100%;
+}
+.sales-filter-primary .status-tabs button {
+  white-space:nowrap;
+  flex:0 1 auto;
+}
+.sales-filter-secondary {
+  border-top:1px solid var(--line);
+  margin-top:12px;
+  padding-top:10px;
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  align-items:center;
+  min-width:0;
+}
+.sales-expand-filters,.sales-clear-filters {
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  background:transparent;
+  border:0;
+  border-radius:9px;
+  padding:7px 8px;
+  color:var(--brand-strong);
+  font-size:.79rem;
+  font-weight:650;
+  cursor:pointer;
+}
+.sales-expand-filters:hover,.sales-clear-filters:hover{background:var(--brand-soft)}
+.sales-expand-filters:focus-visible,.sales-clear-filters:focus-visible {
+  outline:2px solid var(--brand);
+  outline-offset:2px;
+}
+.sales-filter-count {
+  display:grid;place-items:center;
+  min-width:19px;height:19px;padding:0 4px;
+  border-radius:50%;
+  font-size:.68rem;
+  color:var(--brand-strong);
+  background:var(--brand-soft);
+}
+.sales-filter-context {font-size:.75rem;color:var(--muted);margin-left:auto}
+.sales-clear-filters {color:var(--muted-strong)}
+.sales-advanced-filters {
+  display:grid;
+  grid-template-columns:minmax(130px,1fr) minmax(130px,1fr) minmax(190px,1.6fr) auto;
+  align-items:end;
+  gap:12px;
+  min-width:0;
+  border-top:1px solid var(--line);
+  margin-top:10px;
+  padding-top:14px;
+}
+.sales-date-field,.sales-product-field{
+  display:grid;
+  gap:7px;
+  min-width:0;
+  color:var(--muted);
+  font-size:.76rem;
+  font-weight:650;
+}
+.sales-date-field .bf-input{width:100%;min-width:0;height:43px}
+.sales-product-field bf-select{width:100%;min-width:0}
+.sales-advanced-actions{display:flex;align-items:center;gap:7px;min-width:0}
+.sales-advanced-actions .bf-button{min-height:43px;white-space:nowrap}
+@media(max-width:1360px) {
+  .sales-filter-primary {grid-template-columns:minmax(0,1fr)}
+  .sales-filter-primary .status-tabs {width:max-content}
+  .sales-advanced-filters {grid-template-columns:repeat(2,minmax(0,1fr))}
+  .sales-advanced-actions {justify-content:flex-end}
+}
+@media(max-width:690px) {
+  .sales-filters-panel{padding:10px 11px;border-radius:15px;margin-bottom:12px}
+  .sales-filter-primary {gap:10px}
+  .sales-filter-primary .status-tabs {width:100%}
+  .sales-filter-primary .status-tabs button {
+    flex:1 1 25%;
+    padding:9px 4px;
+    font-size:.74rem;
+  }
+  .sales-search-actions .historical-search {min-width:84px;padding-inline:10px}
+  .search-desktop-label{display:none}
+  .search-mobile-label{display:inline}
+  .sales-filter-context{display:none}
+  .sales-filter-secondary{margin-top:10px}
+  .sales-advanced-filters{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  .sales-product-field,.sales-advanced-actions{grid-column:1/-1}
+  .sales-advanced-actions{display:grid;grid-template-columns:1fr auto}
+  .sales-advanced-actions .bf-button{min-width:0}
+}
+@media(max-width:390px) {
+  .sales-search-actions{gap:6px}
+  .sales-search-actions .search{padding-inline:10px}
+  .sales-filter-primary .status-tabs button{font-size:.69rem;padding:8px 2px}
+}
+
+/* One existing chevron icon for both states: no extra Lucide imports in the initial bundle. */
+.sales-expand-arrow{transition:transform 150ms ease;transform:rotate(90deg)}
+.sales-expand-arrow.expanded{transform:rotate(-90deg)}
+@media(prefers-reduced-motion:reduce){.sales-expand-arrow{transition:none}}
+
+/* Calm confirmation of historical queries, consistent in both themes. */
+.history-feedback{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.8rem;margin:1px 0 14px;line-height:1.4}
+.history-feedback bf-icon{display:inline-flex;color:var(--brand-strong);flex:none}

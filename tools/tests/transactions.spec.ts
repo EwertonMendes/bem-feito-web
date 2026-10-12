@@ -15,6 +15,8 @@ import { FinanceRepository } from '../../src/app/core/repositories/finance.repos
 import { ExpenseCorrectionRepository } from '../../src/app/core/repositories/expense-correction.repository';
 import { CashManagementRepository } from '../../src/app/core/repositories/cash-management.repository';
 import { SaleCorrectionRepository } from '../../src/app/core/repositories/sale-correction.repository';
+import { AdvancedSaleCorrectionRepository } from '../../src/app/core/repositories/advanced-sale-correction.repository';
+import { saleCorrectionSignature } from '../../src/app/domain/logic/sale-correction';
 import { InventoryRepository } from '../../src/app/core/repositories/inventory.repository';
 
 let env: RulesTestEnvironment;
@@ -27,6 +29,7 @@ let finance: FinanceRepository;
 let corrections: ExpenseCorrectionRepository;
 let cash: CashManagementRepository;
 let saleCorrections: SaleCorrectionRepository;
+let advancedCorrections: AdvancedSaleCorrectionRepository;
 let inventory: InventoryRepository;
 const day = '2026-10-05';
 const audit = () => ({ createdAt: serverTimestamp(), updatedAt: serverTimestamp(), createdBy: 'operator', updatedBy: 'operator' });
@@ -87,6 +90,7 @@ beforeEach(async () => {
   corrections = runInInjectionContext(injector, () => new ExpenseCorrectionRepository());
   cash = runInInjectionContext(injector, () => new CashManagementRepository());
   saleCorrections = runInInjectionContext(injector, () => new SaleCorrectionRepository());
+  advancedCorrections = runInInjectionContext(injector, () => new AdvancedSaleCorrectionRepository());
   inventory = runInInjectionContext(injector, () => new InventoryRepository());
 });
 afterAll(async () => { injector?.destroy(); await env?.cleanup(); });
@@ -653,5 +657,91 @@ describe('Actual repositories against restrictive emulator rules', () => {
     expect(await data('inputs', 'i')).toMatchObject({ stock: 15 });
   });
 
+
+
+  it('E2E transaction: replaces a sold soap, preserving stock and an immutable correction log',async()=>{
+    await env.withSecurityRulesDisabled(async ctx=>{await setDoc(doc(ctx.firestore(),'products','p2'),
+      {code:'P2',displayName:'SOAP TWO',active:true,collectionId:'c',fragranceId:'f',
+      formatId:'fmt',salePriceCents:900,additionalCostCents:0,averageUnitCostCents:175,
+      stock:4,minimumStock:0,recipe:[],...audit()});});
+    const created=(await sales.create({...draft(),lines:[{kind:'product',sourceId:'p',quantity:2}]})).sale;
+    await expect(advancedCorrections.correct(created.id,{
+      expectedSignature:saleCorrectionSignature(created),
+      lines:[{id:'new-p2',kind:'product',sourceId:'p2',quantity:1,unitPriceCents:900}],
+      discountCents:0,reason:'Trocar sabonete do pedido',
+    })).rejects.toThrow('estoque físico');
+    const changed=await advancedCorrections.correct(created.id,{
+      expectedSignature:saleCorrectionSignature(created),
+      lines:[{id:'new-p2',kind:'product',sourceId:'p2',quantity:1,unitPriceCents:900}],
+      discountCents:0,reason:'Trocar sabonete do pedido',stockReconciliationConfirmed:true,
+    });
+    expect(changed.sale).toMatchObject({totalCents:900,balanceCents:900,productIds:['p2']});
+    expect(changed.sale.items).toMatchObject([{id:'new-p2',sourceId:'p2',totalCostCents:175}]);
+    expect(await data('products','p')).toMatchObject({stock:10});
+    expect(await data('products','p2')).toMatchObject({stock:3});
+    expect(await count('saleCorrections')).toBe(1);
+    expect(await count('stockMovements')).toBe(3);
+    await expect(advancedCorrections.correct(created.id,{
+      expectedSignature:saleCorrectionSignature(created),
+      lines:[{id:'new-p2',kind:'product',sourceId:'p2',quantity:1,unitPriceCents:900}],
+      discountCents:0,reason:'Substituição repetida',stockReconciliationConfirmed:true,
+    })).rejects.toThrow('mudou');
+  });
+
+  it('E2E transaction: removes an itemized addition and restores only its material',async()=>{
+    const created=(await sales.create({...draft(),lines:[
+      {kind:'product',sourceId:'p',quantity:1},
+      {kind:'addition',sourceId:'a',quantity:2},
+    ]})).sale;
+    expect(await data('inputs','i')).toMatchObject({stock:18});
+    const soap=created.items.find(item=>item.kind==='product')!;
+    const updated=await advancedCorrections.correct(created.id,{
+      expectedSignature:saleCorrectionSignature(created),
+      lines:[{id:soap.id,kind:'product',sourceId:'p',quantity:1,unitPriceCents:soap.unitPriceCents}],
+      discountCents:0,reason:'Retirar embalagem duplicada',stockReconciliationConfirmed:true,
+    });
+    expect(updated.sale.items).toHaveLength(1);
+    expect(await data('inputs','i')).toMatchObject({stock:20});
+    expect(await data('products','p')).toMatchObject({stock:9});
+    expect(await count('saleCorrections')).toBe(1);
+  });
+
+  it('E2E transaction: adjusts future order commitments and protects allocated units',async()=>{
+    const created=(await sales.create({...draft(),fulfillmentStatus:'in-production',
+      lines:[{kind:'product',sourceId:'p',quantity:2}]})).sale;
+    const line=created.items[0]!;
+    const changed=await advancedCorrections.correct(created.id,{
+      expectedSignature:saleCorrectionSignature(created),
+      lines:[{id:line.id,kind:'product',sourceId:'p',quantity:3,unitPriceCents:line.unitPriceCents}],
+      discountCents:0,reason:'Cliente pediu mais uma unidade',
+    });
+    expect(await data('products','p')).toMatchObject({stock:10,committedStock:3,explicitCommittedStock:3});
+    expect(changed.sale.orderAllocations?.[0]).toMatchObject({lineId:line.id,quantity:0});
+    await sales.allocateOrderLine(created.id,line.id,2);
+    const latest=await sales.findById(created.id);
+    await expect(advancedCorrections.correct(created.id,{
+      expectedSignature:saleCorrectionSignature(latest!),
+      lines:[{id:line.id,kind:'product',sourceId:'p',quantity:1,unitPriceCents:line.unitPriceCents}],
+      discountCents:0,reason:'Reduzir encomenda',
+    })).rejects.toThrow('reservada');
+    expect(await data('products','p')).toMatchObject({committedStock:3});
+  });
+
+  it('E2E transaction: insufficient stock aborts all changes',async()=>{
+    await env.withSecurityRulesDisabled(async ctx=>{await setDoc(doc(ctx.firestore(),'products','p2'),
+      {code:'P2',displayName:'SOAP TWO',active:true,collectionId:'c',fragranceId:'f',
+      formatId:'fmt',salePriceCents:900,additionalCostCents:0,averageUnitCostCents:175,
+      stock:1,minimumStock:0,recipe:[],...audit()});});
+    const created=(await sales.create(draft())).sale;
+    await expect(advancedCorrections.correct(created.id,{
+      expectedSignature:saleCorrectionSignature(created),
+      lines:[{id:created.items[0]!.id,kind:'product',sourceId:'p',quantity:1,unitPriceCents:1000},
+        {id:'new',kind:'product',sourceId:'p2',quantity:3,unitPriceCents:900}],
+      discountCents:0,reason:'Adicionar produto indisponível',stockReconciliationConfirmed:true,
+    })).rejects.toThrow('Estoque livre');
+    expect(await data('products','p2')).toMatchObject({stock:1});
+    expect(await data('sales',created.id)).toMatchObject({totalCents:1000});
+    expect(await count('saleCorrections')).toBe(0);
+  });
 
 });

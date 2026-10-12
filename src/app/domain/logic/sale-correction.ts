@@ -24,13 +24,45 @@ export interface SaleProductCorrectionPlan {
   /** Difference in physical stock demand by product, positive means more consumption. */
   demandChange: Map<string, number>;
 }
+/**
+ * Canonical fingerprint of the fields the correction depends on.
+ * Firestore may serialize maps with different property insertion order in
+ * paginated reads and transactions; object-key order is not a revision.
+ * Actual concurrent changes to inventory effects, allocations or payments
+ * still invalidate the fingerprint.
+ */
 export function saleCorrectionSignature(sale: Sale): string {
+  const effects = (items: readonly StockEffect[]) => items.map(effect => ({
+    itemType: effect.itemType,
+    itemId: effect.itemId,
+    quantityDelta: effect.quantityDelta,
+    unitCostCents: effect.unitCostCents,
+    unitCostDeciCents: effect.unitCostDeciCents ?? null,
+  })).sort((a,b) =>
+    a.itemType.localeCompare(b.itemType) ||
+    a.itemId.localeCompare(b.itemId) ||
+    a.quantityDelta-b.quantityDelta ||
+    a.unitCostCents-b.unitCostCents ||
+    (a.unitCostDeciCents??0)-(b.unitCostDeciCents??0));
+  const allocations = sale.orderAllocations?.map(item => ({
+    lineId: item.lineId, productId: item.productId, quantity: item.quantity,
+  })).sort((a,b)=>a.lineId.localeCompare(b.lineId)||a.productId.localeCompare(b.productId)) ?? null;
   return JSON.stringify({
-    items:sale.items.map(({id,quantity,unitPriceCents,totalCostCents})=>({id,quantity,unitPriceCents,totalCostCents})),
-    discountCents:sale.discountCents,receivedCents:sale.receivedCents,
-    fulfillmentStatus:sale.fulfillmentStatus,stockApplied:sale.stockApplied,
+    status: sale.status,
+    items: sale.items.map(item=>({
+      id: item.id, kind:item.kind, sourceId:item.sourceId,
+      quantity:item.quantity, unitPriceCents:item.unitPriceCents,
+      unitCostCents:item.unitCostCents,totalCostCents:item.totalCostCents,
+      stockEffects:item.stockEffects?effects(item.stockEffects):null,
+    })),
+    discountCents:sale.discountCents, receivedCents:sale.receivedCents,
+    fulfillmentStatus:sale.fulfillmentStatus??'delivered',
+    stockApplied:sale.stockApplied!==false,
+    orderAllocations:allocations,
+    stockEffects:effects(sale.stockEffects),
   });
 }
+
 export function planSaleProductCorrection(sale:Sale,draft:SaleProductCorrection):SaleProductCorrectionPlan {
   if(sale.status!=='active')throw new Error('A venda foi cancelada.');
   if(saleCorrectionSignature(sale)!==draft.expectedSignature)

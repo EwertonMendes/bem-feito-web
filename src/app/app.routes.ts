@@ -23,6 +23,7 @@ export const routes: Routes = [
       { path: 'vendas', title: 'Vendas | Bem Feito', loadComponent: () => import('./pages/sales/sales.page').then((m) => m.SalesPage) },
       { path: 'producao', title: 'Produção | Bem Feito', loadComponent: () => import('./pages/production/production.page').then((m) => m.ProductionPage) },
       { path: 'estoque', title: 'Estoque | Bem Feito', loadComponent: () => import('./pages/inventory/inventory.page').then((m) => m.InventoryPage) },
+      { path: 'relatorios', title: 'Relatórios | Bem Feito', loadComponent: () => import('./pages/reports/reports.page').then(m=>m.ReportsPage) },
       { path: 'financeiro', title: 'Financeiro | Bem Feito', loadComponent: () => import('./pages/finance/finance.page').then((m) => m.FinancePage) },
       { path: 'catalogo', title: 'Catálogo | Bem Feito', loadComponent: () => import('./pages/catalog/catalog.page').then((m) => m.CatalogPage) },
       { path: 'configuracoes', title: 'Configurações | Bem Feito', loadComponent: () => import('./pages/settings/settings.page').then((m) => m.SettingsPage) },

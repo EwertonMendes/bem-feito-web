@@ -1,5 +1,4 @@
 import { computed, effect, inject, Injectable, signal } from '@angular/core';
-import { ReadOptimizationBackfillService } from '../../core/migrations/read-optimization-backfill.service';
 import { DataRevisionService } from '../../core/firebase/data-revision.service';
 import { ErrorService } from '../../core/services/error.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -44,7 +43,6 @@ const EMPTY_METRICS: DashboardMetrics = {
 @Injectable({ providedIn: 'root' })
 export class DashboardStore {
   private readonly repository = inject(DashboardRepository);
-  private readonly backfill = inject(ReadOptimizationBackfillService);
   private readonly revisions = inject(DataRevisionService);
   private readonly errors = inject(ErrorService);
   private readonly toast = inject(ToastService);
@@ -170,8 +168,6 @@ export class DashboardStore {
     this.active = true;
     this.beginLoad();
     try {
-      // Compatibility backfill is opportunistic; dashboard reads have a safe legacy fallback.
-      void this.backfill.ensure().catch(() => undefined);
       const tasks: Promise<void>[] = [];
       if (!this.initializedState() || this.periodStale) tasks.push(this.refreshPeriod());
       if (!this.initializedState() || this.yearStale) tasks.push(this.refreshYear());

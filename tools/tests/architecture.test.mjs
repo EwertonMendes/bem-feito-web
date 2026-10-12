@@ -221,7 +221,7 @@ test('catalog follows sales in sidebar and replaces inventory in mobile primary 
 
   assert.deepEqual(items.map((item) => item.path), [
     '/dashboard', '/vendas', '/catalogo', '/producao',
-    '/estoque', '/financeiro', '/configuracoes',
+    '/estoque', '/financeiro', '/relatorios', '/configuracoes',
   ]);
   assert.deepEqual(items.filter((item) => item.mobilePlacement === 'primary').map((item) => item.path), [
     '/dashboard', '/vendas', '/catalogo',

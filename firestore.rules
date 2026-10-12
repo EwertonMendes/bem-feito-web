@@ -199,7 +199,7 @@ service cloud.firestore {
 
     function validOperation(name, data) {
       return (name == 'sales'
-          && fields(data, ['code', 'businessDate', 'discountCents', 'subtotalCents', 'totalCents', 'receivedCents', 'tipCents', 'balanceCents', 'paymentStatus', 'status', 'items', 'paymentIds', 'stockEffects'], ['customerName', 'customerSearchKey', 'dueDate', 'notes', 'cancelledAt', 'cancelledBy', 'analyticsVersion', 'cogsCents', 'itemsSold', 'missingCostItems', 'fulfillmentStatus', 'stockApplied', 'orderAllocations'])
+          && fields(data, ['code', 'businessDate', 'discountCents', 'subtotalCents', 'totalCents', 'receivedCents', 'tipCents', 'balanceCents', 'paymentStatus', 'status', 'items', 'paymentIds', 'stockEffects'], ['customerName', 'customerSearchKey', 'customerSearchPrefixes', 'productIds', 'dueDate', 'notes', 'cancelledAt', 'cancelledBy', 'analyticsVersion', 'cogsCents', 'itemsSold', 'missingCostItems', 'fulfillmentStatus', 'stockApplied', 'orderAllocations'])
           && text(data.code) && businessDate(data)
           && money(data.discountCents) && money(data.subtotalCents) && money(data.totalCents)
           && money(data.receivedCents) && money(data.tipCents) && money(data.balanceCents)
@@ -216,6 +216,8 @@ service cloud.firestore {
                 || (data.balanceCents > 0 && data.receivedCents == 0 && data.paymentStatus == 'pending')
                 || (data.balanceCents > 0 && data.receivedCents > 0 && data.paymentStatus == 'partial'))))
           && data.items is list && data.items.size() > 0 && data.paymentIds is list && data.stockEffects is list
+          && (!('customerSearchPrefixes' in data) || (data.customerSearchPrefixes is list && data.customerSearchPrefixes.size() <= 280))
+          && (!('productIds' in data) || (data.productIds is list && data.productIds.size() <= 120))
            && (!('orderAllocations' in data) || (data.orderAllocations is list && data.orderAllocations.size() <= 120))
           && ((!(('analyticsVersion' in data) || ('cogsCents' in data) || ('itemsSold' in data) || ('missingCostItems' in data)))
             || (data.analyticsVersion == 1 && money(data.cogsCents)

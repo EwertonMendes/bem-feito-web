@@ -137,6 +137,40 @@
 
           }
         </section>
+        @if (sale.stockApplied === false && sale.fulfillmentStatus !== 'delivered') {
+          <section class="order-progress">
+            <h3><bf-icon name="production"/> Acompanhamento da encomenda</h3>
+            @for (progress of orderProgress(sale); track progress.line.id) {
+              <div class="order-progress-item">
+                <strong>{{progress.line.name}}</strong>
+                @if(progress.allocated === null){
+                  <p class="order-progress-legacy"><bf-icon name="alert"/> Pedido histórico: produção individual não conciliada. Não é possível reservar sem validar a origem.</p>
+                } @else {
+                  <div class="order-progress-meta">
+                    <span>{{progress.allocated}} de {{progress.line.quantity}} unidade(s) reservada(s)</span>
+                    <span [class.complete]="progress.pending===0">{{progress.pending===0?'Pronto':(progress.pending+' a produzir / alocar')}}</span>
+                  </div>
+                  <div class="order-progress-track" role="progressbar" [attr.aria-label]="'Progresso de '+progress.line.name" [attr.aria-valuemin]="0" [attr.aria-valuemax]="progress.line.quantity" [attr.aria-valuenow]="progress.allocated">
+                    <span [style.width.%]="progress.line.quantity>0?progress.allocated/progress.line.quantity*100:0"></span>
+                  </div>
+                  @if(progress.pending && sale.fulfillmentStatus==='in-production'){
+                    @if(allocatingLineId() === progress.line.id){
+                      <div class="order-allocate-form">
+                        <label>Reservar quantidade
+                          <input class="bf-input" type="number" min="1" step="1" [max]="progress.pending" [value]="allocationQuantity()" (input)="allocationQuantity.set(+$any($event.target).value)"/>
+                        </label>
+                        <button type="button" class="bf-button" [disabled]="!!pendingAction() || allocationQuantity()<1 || allocationQuantity()>progress.pending" (click)="allocateSelected(progress.line.id)">Confirmar</button>
+                        <button type="button" class="bf-button secondary" (click)="showAllocation(progress.line.id)">Cancelar</button>
+                      </div>
+                    } @else {
+                      <button class="bf-button secondary order-allocate-button" type="button" [disabled]="!!pendingAction()" (click)="showAllocation(progress.line.id)"><bf-icon name="inventory"/> Reservar unidades disponíveis</button>
+                    }
+                  }
+                }
+              </div>
+            } @empty {<p class="order-progress-legacy">Esta encomenda não possui sabonetes acabados.</p>}
+          </section>
+        }
         @if (sale.notes) { <p class="notes">{{ sale.notes }}</p> }
       </div>
       <div class="bf-dialog-footer">

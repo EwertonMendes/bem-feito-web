@@ -372,7 +372,7 @@
 @media(max-width:520px){.sale-metadata-grid{grid-template-columns:1fr}.sale-metadata-actions button{flex:1;min-width:0}}
 
 
-.sale-item-correction{margin-top:18px;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2);display:grid;gap:12px}
+.sale-item-correction{margin-top:18px;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2);display:grid;grid-template-columns:minmax(0,1fr);min-width:0;max-width:100%;gap:12px}
 .sale-item-correction h3{display:flex;align-items:center;gap:8px;margin:0;font-size:.94rem}
 .sale-item-correction h3 bf-icon{color:var(--brand-strong);display:inline-flex}
 .sale-item-correction>p{margin:0;color:var(--muted);font-size:.76rem;line-height:1.55}
@@ -422,3 +422,14 @@
 
 .advanced-stock-confirm{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:.78rem;color:var(--text);line-height:1.5;background:var(--surface-2)}
 .advanced-stock-confirm input{flex:none;width:17px;height:17px;margin-top:2px;accent-color:var(--brand)}
+
+/* Prevent nested grid min-content from enlarging the mobile dialog. */
+.bf-dialog .sale-item-correction>*{min-width:0;max-width:100%}
+.bf-dialog .sale-item-correction .advanced-add-item{grid-template-columns:minmax(0,1fr)}
+.bf-dialog .sale-item-correction .advanced-add-controls{max-width:100%}
+@media(max-width:560px){
+  .bf-dialog .sale-item-correction{padding:12px}
+  .bf-dialog .sale-item-correction .sale-item-correction-row:last-of-type{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .bf-dialog .sale-item-correction .advanced-item-row{grid-template-columns:repeat(2,minmax(0,1fr));min-width:0}
+  .bf-dialog .sale-item-correction .advanced-item-row>strong{grid-column:1/-1}
+}

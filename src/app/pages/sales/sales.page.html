@@ -14,25 +14,77 @@
 
   @if (store.initialized() && store.loading()) { <bf-page-refresh /> }
 
-  <div class="filters">
-    <label class="search">
-      <bf-icon name="search" />
-      <input type="search" placeholder="Cliente ou ID" [value]="search()" (input)="search.set($any($event.target).value)" />
-    </label>
-
-    <button type="button" class="bf-button secondary historical-search" [disabled]="search().trim().length===1 || historicalBusy()" (click)="searchAllHistory()"><bf-icon name="search"/> {{historicalBusy()?'Buscando...':'Buscar histórico'}}</button>
-    <div class="sales-history-filters" aria-label="Filtros de busca histórica">
-      <label>De <input class="bf-input" type="date" [value]="historyFrom()" (input)="historyFrom.set($any($event.target).value)"/></label>
-      <label>Até <input class="bf-input" type="date" [min]="historyFrom()" [value]="historyTo()" (input)="historyTo.set($any($event.target).value)"/></label>
-      <bf-select ariaLabel="Filtrar por sabonete" [options]="productFilterOptions()" [value]="historyProduct()" (valueChange)="historyProduct.set($event)"/>
+  <section class="sales-filters-panel" aria-label="Pesquisar e filtrar vendas">
+    <div class="sales-filter-primary">
+      <div class="sales-search-actions">
+        <label class="search">
+          <bf-icon name="search" />
+          <input type="search" aria-label="Buscar vendas por cliente ou código"
+            placeholder="Cliente ou código da venda"
+            [value]="search()" (input)="search.set($any($event.target).value)"
+            (keydown.enter)="searchAllHistory()" />
+        </label>
+        <button type="button" class="bf-button historical-search"
+          [disabled]="search().trim().length===1 || historicalBusy()"
+          (click)="searchAllHistory()">
+          <bf-icon name="search"/>
+          <span class="search-desktop-label">{{historicalBusy()?'Pesquisando...':'Pesquisar'}}</span>
+          <span class="search-mobile-label">{{historicalBusy()?'...':'Buscar'}}</span>
+        </button>
+      </div>
+      <div class="bf-segments status-tabs" aria-label="Situação das vendas">
+        <button type="button" [class.active]="statusFilter()==='all'" (click)="setHistoryStatus('all')">Todas</button>
+        <button type="button" [class.active]="statusFilter()==='paid'" (click)="setHistoryStatus('paid')">Pagas</button>
+        <button type="button" [class.active]="statusFilter()==='open'" (click)="setHistoryStatus('open')">Em aberto</button>
+        <button type="button" [class.active]="statusFilter()==='cancelled'" (click)="setHistoryStatus('cancelled')">Canceladas</button>
+      </div>
     </div>
-        <div class="bf-segments status-tabs" aria-label="Filtrar vendas por status">
-      <button [class.active]="statusFilter()==='all'" (click)="setHistoryStatus('all')">Todas</button>
-      <button [class.active]="statusFilter()==='paid'" (click)="setHistoryStatus('paid')">Pagas</button>
-      <button [class.active]="statusFilter()==='open'" (click)="setHistoryStatus('open')">Em aberto</button>
-      <button [class.active]="statusFilter()==='cancelled'" (click)="setHistoryStatus('cancelled')">Canceladas</button>
+    <div class="sales-filter-secondary">
+      <button class="sales-expand-filters" type="button"
+        [attr.aria-expanded]="advancedFiltersOpen()" aria-controls="sales-advanced-filters"
+        (click)="advancedFiltersOpen.set(!advancedFiltersOpen())">
+        <bf-icon name="filter"/>
+        <span>Mais filtros</span>
+        @if(activeAdvancedFilterCount()){<span class="sales-filter-count">{{activeAdvancedFilterCount()}}</span>}
+        <bf-icon [name]="advancedFiltersOpen()?'chevron-up':'chevron-down'"/>
+      </button>
+      <span class="sales-filter-context">
+        {{historyActive()?'Consulta ao histórico completo':'Visualizando vendas recentes'}}
+      </span>
+      @if(historyActive() || activeAdvancedFilterCount() || search().trim()){
+        <button type="button" class="sales-clear-filters" (click)="clearSalesFilters()">
+          <bf-icon name="close"/> Limpar busca
+        </button>
+      }
     </div>
-  </div>
+    @if(advancedFiltersOpen()){
+      <div id="sales-advanced-filters" class="sales-advanced-filters" aria-label="Filtros avançados">
+        <label class="sales-date-field">
+          <span>Data inicial</span>
+          <input class="bf-input" type="date" [value]="historyFrom()"
+            (input)="historyFrom.set($any($event.target).value)"/>
+        </label>
+        <label class="sales-date-field">
+          <span>Data final</span>
+          <input class="bf-input" type="date" [min]="historyFrom()" [value]="historyTo()"
+            (input)="historyTo.set($any($event.target).value)"/>
+        </label>
+        <div class="sales-product-field">
+          <span>Sabonete</span>
+          <bf-select ariaLabel="Filtrar por sabonete" [options]="productFilterOptions()"
+            [value]="historyProduct()" (valueChange)="historyProduct.set($event)"/>
+        </div>
+        <div class="sales-advanced-actions">
+          <button type="button" class="bf-button sales-apply-filters"
+            [disabled]="search().trim().length===1 || historicalBusy()" (click)="searchAllHistory()">
+            <bf-icon name="search"/> Aplicar
+          </button>
+          <button type="button" class="bf-button secondary sales-reset-filters"
+            (click)="clearSalesFilters()">Limpar</button>
+        </div>
+      </div>
+    }
+  </section>
 
   @if(historyActive()){
     <p class="history-feedback" role="status">{{historicalMatches().length}} resultado(s) {{historyHasMore()?'nesta página de busca':'encontrado(s)'}}. Consulta em todo o histórico, com filtros cumulativos.</p>
@@ -280,7 +332,7 @@
             }
             <div class="sale-metadata-actions">
               <button class="bf-button secondary" type="button" [disabled]="!!pendingAction()"
-                (click)="editingItems.set(false)">Cancelar</button>
+                (click)="cancelItemCorrection()">Cancelar</button>
               <button class="bf-button" type="button"
                 [disabled]="!!pendingAction() || !correctionPreview()?.value || correctionReason().trim().length<4 || (sale.stockApplied!==false && !!correctionPreview()?.value?.inventoryDeltas?.length && !advancedStockConfirmed())"
                 (click)="correctSelectedItems()">Confirmar edição</button>
@@ -305,7 +357,7 @@
         }
       </div>
       <div class="bf-dialog-footer">
-        @if(sale.status==='active' && !editingDetails() && !editingItems() && hasProductLines(sale)) { <button class="bf-button secondary" type="button" [disabled]="!!pendingAction()" (click)="openItemCorrection(sale)"><bf-icon name="details"/> Editar venda</button> }
+        @if(sale.status==='active' && !editingDetails() && !editingItems() && hasProductLines(sale)) { <button class="bf-button secondary" type="button" [disabled]="!!pendingAction() || openingItemEditor()" [bfLoadingButton]="openingItemEditor()" (click)="openItemCorrection(sale)"><bf-icon name="details"/> {{openingItemEditor()?"Carregando...":"Editar venda"}}</button> }
         @if(sale.status==='active' && !editingDetails() && !editingItems()) { <button class="bf-button secondary" type="button" [disabled]="!!pendingAction()" (click)="editingDetails.set(true)"><bf-icon name="details"/> Corrigir dados</button> }
         @if (sale.status==='active' && sale.balanceCents>0){<button class="bf-button" type="button" (click)="modals.openReceipt(sale.id)"><bf-icon name="payment"/> Receber</button>}
         @if (sale.status==='active' && sale.fulfillmentStatus==='in-production'){<button class="bf-button" type="button" [disabled]="!!pendingAction()" [bfLoadingButton]="pendingAction()==='ready'" (click)="advanceSelected('ready')">{{pendingAction()==='ready'?'Atualizando...':'Marcar pronta'}}</button>}

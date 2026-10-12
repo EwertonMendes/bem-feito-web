@@ -11,6 +11,7 @@ import { formatCurrency } from '../../core/utils/money';
 import { CatalogEditor } from '../../features/catalog/components/catalog-editor/catalog-editor';
 import { CatalogImage } from '../../shared/media/catalog-image/catalog-image';
 import { BfIcon } from '../../shared/ui/icon/icon';
+import { BfSearchField } from '../../shared/ui/search-field/search-field';
 import { BfSelect, BfSelectOption } from '../../shared/ui/select/select';
 import { BfSelectSearch } from '../../shared/ui/select-search/select-search';
 import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
@@ -22,7 +23,7 @@ type SortMode = 'name' | 'price-asc' | 'price-desc' | 'margin-desc' | 'stock-des
 
 @Component({
   selector: 'bf-catalog-page',
-  imports: [BfButton, BfIcon, BfSelect, BfSelectSearch, CatalogImage, CatalogEditor, CatalogDetails, BfEmptyState, BfPageRefresh],
+  imports: [BfButton, BfIcon, BfSearchField, BfSelect, BfSelectSearch, CatalogImage, CatalogEditor, CatalogDetails, BfEmptyState, BfPageRefresh],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './catalog.page.html',
   styleUrl: './catalog.page.scss',

@@ -280,7 +280,10 @@ describe('Actual repositories against restrictive emulator rules', () => {
   });
 
   it('keeps legacy automatic reservation without assigning units to a tracked order', async () => {
-    await seed('products','p',{stock:0,committedStock:2,reservedPhysicalStock:0});
+    await env.withSecurityRulesDisabled(async context => {
+      await setDoc(doc(context.firestore(),'products','p'),
+        {stock:0,committedStock:2,reservedPhysicalStock:0},{merge:true});
+    });
     const tracked=await sales.create({...draft(),fulfillmentStatus:'in-production',
       lines:[{kind:'product',sourceId:'p',quantity:3}]});
     await production.create('p',4,day);

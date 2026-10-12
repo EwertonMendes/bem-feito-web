@@ -265,7 +265,7 @@ service cloud.firestore {
           && businessDate(data) && text(data.itemId) && text(data.sourceId)
           && data.itemType in ['product', 'input'] && quantityDelta(data.quantityDelta)
           && money(data.unitCostCents) && money(data.totalCostCents)
-          && data.sourceType in ['sale', 'sale-cancellation', 'production', 'purchase', 'purchase-correction', 'purchase-cancellation', 'adjustment']);
+          && data.sourceType in ['sale', 'sale-correction', 'sale-cancellation', 'production', 'purchase', 'purchase-correction', 'purchase-cancellation', 'adjustment']);
     }
 
 
@@ -408,7 +408,7 @@ service cloud.firestore {
       allow read: if activeUser();
       allow create: if canOperate() && auditCreate(request.resource.data)
         && fields(request.resource.data,
-          ['saleId','businessDate','reason','before','after'], [])
+          ['saleId','businessDate','reason','before','after'], ['kind'])
         && text(request.resource.data.saleId) && businessDate(request.resource.data)
         && request.resource.data.reason is string
         && request.resource.data.reason.size() >= 4 && request.resource.data.reason.size() <= 240

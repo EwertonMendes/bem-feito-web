@@ -230,6 +230,16 @@
                 <div class="line-main">
                   <strong>{{ lineName(line) }}</strong>
                   <small>{{ currency(lineUnitPrice(line)) }} cada</small>
+                  @if(line.kind === 'product'){
+                    <div class="sale-line-price">
+                      <label>Preço unitário
+                        <bf-number-input kind="currency" [min]="0" [value]="lineUnitPrice(line)/100" [ariaLabel]="'Preço de '+lineName(line)" (valueChange)="setLinePrice(line,$event)"/>
+                      </label>
+                      @if(line.manualUnitPriceCents !== undefined){
+                        <button type="button" class="restore-line-price" (click)="restoreLinePrice(line)">Padrão</button>
+                      }
+                    </div>
+                  }
                 </div>
 
                 <div class="line-controls">

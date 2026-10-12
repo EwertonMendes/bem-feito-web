@@ -1,5 +1,6 @@
 import { computed, effect, inject, Injectable, signal } from '@angular/core';
 import { Sale, SaleDraft } from '../../domain/models/sales.model';
+import { SaleProductCorrection } from '../../domain/logic/sale-correction';
 import { DataRevisionService } from '../../core/firebase/data-revision.service';
 import {
   SaleCancellationResult,
@@ -8,6 +9,7 @@ import {
   SalePaymentResult,
   SalePaymentReversalResult,
 } from '../../core/repositories/mutation-results';
+import { StockChange } from '../../core/repositories/mutation-results';
 import { BusinessDateCursor, compareBusinessDateDesc } from '../../core/repositories/pagination';
 import { SalesRepository } from '../../core/repositories/sales.repository';
 import { SaleCorrectionRepository, SaleMetadataCorrection } from '../../core/repositories/sale-correction.repository';
@@ -214,6 +216,20 @@ export class SalesStore {
       this.toast.success('Recebimento estornado.');
       return result;
     } catch (error) {
+      this.toast.error(this.errors.message(error));
+      return null;
+    }
+  }
+
+  async correctProductLines(saleId:string,draft:SaleProductCorrection):
+    Promise<{sale:Sale;stockChanges:StockChange[]}|null> {
+    try{
+      const result=await this.corrections.correctProductLines(saleId,draft);
+      this.patchSale(result.sale);
+      this.syncReceivable(result.sale,result.previousBalanceCents);
+      this.toast.success('Itens da venda corrigidos com auditoria.');
+      return {sale:result.sale,stockChanges:result.stockChanges};
+    }catch(error){
       this.toast.error(this.errors.message(error));
       return null;
     }

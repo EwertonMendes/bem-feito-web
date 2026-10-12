@@ -72,6 +72,7 @@ export class SalesPage {
   ]);
   readonly correctionDiscountCents=signal(0);
   readonly correctionReason=signal('');
+  readonly advancedStockConfirmed=signal(false);
   readonly correctionSignature=signal('');
   readonly correctionPreview=computed(()=>{
     const sale=this.selectedSale();
@@ -199,7 +200,8 @@ export class SalesPage {
     this.advancedChanges.set(sale.items.map(i=>({id:i.id,kind:i.kind,sourceId:i.sourceId,
       quantity:i.quantity,unitPriceCents:i.unitPriceCents})));
     this.correctionDiscountCents.set(sale.discountCents);
-    this.correctionReason.set('');this.correctionSignature.set(saleCorrectionSignature(sale));
+    this.correctionReason.set('');this.advancedStockConfirmed.set(false);
+    this.correctionSignature.set(saleCorrectionSignature(sale));
     this.newLineSource.set('');this.newLineKind.set('product');
   }
   readonly Math=Math;
@@ -238,6 +240,7 @@ export class SalesPage {
       const result=await this.store.correctAdvancedSale(sale.id,{
         expectedSignature:this.correctionSignature(),lines:this.advancedChanges(),
         discountCents:this.correctionDiscountCents(),reason:this.correctionReason(),
+        stockReconciliationConfirmed:this.advancedStockConfirmed(),
       });
       if(result){
         this.catalog.applyStockChanges(result.stockChanges);

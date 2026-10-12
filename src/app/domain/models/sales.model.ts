@@ -18,6 +18,12 @@ export interface SaleLineSnapshot {
   unitCostCents: number;
   totalCents: number;
   totalCostCents: number;
+  /** Immutable classification at sale time, unaffected by later catalog changes. */
+  collectionId?: string;
+  fragranceId?: string;
+  formatId?: string;
+  /** Per-line inventory provenance; required to change existing additions safely. */
+  stockEffects?: StockEffect[];
 }
 
 export interface StockEffect {
@@ -42,6 +48,8 @@ export interface Sale extends AuditFields {
   customerName?: string;
   /** Indexed normalized key for history search. Legacy documents may not have it yet. */
   customerSearchKey?: string;
+  customerSearchPrefixes?: string[];
+  productIds?: string[];
   dueDate?: string;
   discountCents: number;
   subtotalCents: number;

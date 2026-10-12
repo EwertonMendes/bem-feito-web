@@ -404,6 +404,18 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /saleCorrections/{correctionId} {
+      allow read: if activeUser();
+      allow create: if canOperate() && auditCreate(request.resource.data)
+        && fields(request.resource.data,
+          ['saleId','businessDate','reason','before','after'], [])
+        && text(request.resource.data.saleId) && businessDate(request.resource.data)
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() >= 4 && request.resource.data.reason.size() <= 240
+        && request.resource.data.before is map && request.resource.data.after is map;
+      allow update, delete: if false;
+    }
+
     match /orderAllocationHistory/{eventId} {
       allow read: if activeUser();
       allow create: if canOperate() && auditCreate(request.resource.data)

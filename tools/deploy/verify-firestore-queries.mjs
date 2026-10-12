@@ -1,5 +1,5 @@
 import { applicationDefault, initializeApp } from 'firebase-admin/app';
-import { AggregateField, getFirestore } from 'firebase-admin/firestore';
+import { AggregateField, FieldPath, getFirestore } from 'firebase-admin/firestore';
 
 const projectId = process.env.GOOGLE_CLOUD_PROJECT?.trim()
   || process.env.GCLOUD_PROJECT?.trim()
@@ -20,6 +20,30 @@ const endDate = `${year}-${month}-${day}`;
 const todayDate = endDate;
 
 const checks = [
+  // Exercise the exact index shapes introduced in v1.1. Firestore rules
+  // emulators don't require composite indexes, so pre-deploy must catch them.
+  ['history:customer-prefix-and-period', () => db.collection('sales')
+    .where('customerSearchPrefixes', 'array-contains', 'cl')
+    .where('businessDate', '>=', startDate).where('businessDate', '<=', endDate)
+    .orderBy('businessDate', 'desc').orderBy(FieldPath.documentId(), 'desc').limit(1).get()],
+  ['history:product-and-period', () => db.collection('sales')
+    .where('productIds', 'array-contains', 'sample-product')
+    .where('businessDate', '>=', startDate).where('businessDate', '<=', endDate)
+    .orderBy('businessDate', 'desc').orderBy(FieldPath.documentId(), 'desc').limit(1).get()],
+  ['history:payment-status-and-period', () => db.collection('sales')
+    .where('paymentStatus', '==', 'paid')
+    .where('businessDate', '>=', startDate).where('businessDate', '<=', endDate)
+    .orderBy('businessDate', 'desc').orderBy(FieldPath.documentId(), 'desc').limit(1).get()],
+  ['history:open-and-period', () => db.collection('sales')
+    .where('paymentStatus', 'in', ['pending','partial'])
+    .where('businessDate', '>=', startDate).where('businessDate', '<=', endDate)
+    .orderBy('businessDate', 'desc').orderBy(FieldPath.documentId(), 'desc').limit(1).get()],
+  ...['sales','payments','expenses'].map(name => [
+    'reports:dated-'+name,
+    () => db.collection(name).where('businessDate', '>=', startDate)
+      .where('businessDate', '<=', endDate)
+      .orderBy('businessDate', 'desc').orderBy(FieldPath.documentId(), 'desc').limit(1).get(),
+  ]),
   ['dashboard:sales-period', () => db.collection('sales')
     .where('status', '==', 'active')
     .where('businessDate', '>=', startDate)

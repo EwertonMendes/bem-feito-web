@@ -52,7 +52,7 @@
         } @else {
           <div><span>{{insumo.trackingMode==='exact'?'Saldo registrado':'Saldo aproximado'}}</span><strong>{{quantity(insumo.stock)}} {{unitName(insumo.unitId)}}</strong></div>
           <div><span>Reservado</span><strong>{{quantity(insumo.reservedPhysicalStock??0)}} {{unitName(insumo.unitId)}}</strong></div>
-          @if(insumo.minimumStockConfigured!==false){<div><span>Estoque mínimo</span><strong>{{quantity(insumo.minimumStock)}} {{unitName(insumo.unitId)}}</strong></div>}
+          <div><span>Estoque mínimo</span><strong>{{quantity(insumo.minimumStock)}} {{unitName(insumo.unitId)}}</strong></div>
         }
       </div>
       <div class="details-section-title">Utilizado em</div>

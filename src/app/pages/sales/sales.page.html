@@ -4,9 +4,12 @@
       <h1>Vendas</h1>
       <p>Venda rápido, receba em uma ou mais formas e deixe o estoque cuidar do resto.</p>
     </div>
+    <div class="sales-header-actions">
+      <button class="bf-button secondary" type="button" [disabled]="exporting()" (click)="exportAllSales()"><bf-icon name="details"/> {{exporting()?'Exportando...':'Exportar CSV'}}</button>
     <button class="bf-button new-sale" type="button" (click)="modals.openSale()">
       <bf-icon name="plus" /> Nova venda
     </button>
+    </div>
   </header>
 
   @if (store.initialized() && store.loading()) { <bf-page-refresh /> }

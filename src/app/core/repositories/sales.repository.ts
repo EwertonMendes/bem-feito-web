@@ -714,9 +714,17 @@ export class SalesRepository {
         const allocatedHere = currentSale.orderAllocations && effect.itemType === 'product'
           ? currentSale.orderAllocations.filter(item => item.productId === effect.itemId)
             .reduce((total, item) => total + item.quantity, 0) : null;
+        const allocatedExplicit = effect.itemType === 'product'
+          ? (entity as Product).explicitAllocatedStock ?? 0 : 0;
+        const committedExplicit = effect.itemType === 'product'
+          ? (entity as Product).explicitCommittedStock ?? 0 : 0;
         const reservedPhysicalStock = currentSale.stockApplied === false
-          ? allocatedHere === null ? Math.min(originallyReserved, committedStock)
-            : originallyReserved - allocatedHere : originallyReserved;
+          ? allocatedHere !== null ? originallyReserved - allocatedHere
+            : effect.itemType === 'product'
+              ? allocatedExplicit + Math.min(Math.max(0, originallyReserved - allocatedExplicit),
+                  Math.max(0, committedStock - committedExplicit))
+              : Math.min(originallyReserved, committedStock)
+          : originallyReserved;
         if (reservedPhysicalStock < 0 || reservedPhysicalStock > committedStock)
           throw new Error('Reserva global inconsistente com a encomenda. Faça a conciliação.');
         const stockStatus = effect.itemType === 'product'

@@ -356,3 +356,17 @@
 .order-allocate-form button{min-height:40px}
 @media(max-width:520px){.order-allocate-form button{flex:1 1 auto}.order-progress-meta{flex-direction:column}}
 @media(prefers-reduced-motion:reduce){.order-progress-track>span{transition:none}}
+
+
+.sale-metadata-editor{margin-top:18px;padding:17px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2)}
+.sale-metadata-editor h3{display:flex;align-items:center;gap:8px;margin:0 0 7px;font-size:.94rem}
+.sale-metadata-editor h3 bf-icon{display:inline-flex;color:var(--brand-strong)}
+.sale-metadata-editor p{margin:0 0 14px;color:var(--muted);font-size:.75rem;line-height:1.5}
+.sale-metadata-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.sale-metadata-grid label{display:grid;gap:5px;font-size:.75rem;font-weight:650;min-width:0}
+.sale-metadata-grid label.wide{grid-column:1/-1}
+.sale-metadata-grid textarea{resize:vertical;min-height:65px;width:100%}
+.sale-metadata-grid input{width:100%;min-width:0}
+.sale-metadata-grid em{color:var(--danger);font-style:normal}
+.sale-metadata-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+@media(max-width:520px){.sale-metadata-grid{grid-template-columns:1fr}.sale-metadata-actions button{flex:1;min-width:0}}

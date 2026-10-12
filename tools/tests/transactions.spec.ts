@@ -264,6 +264,35 @@ describe('Actual repositories against restrictive emulator rules', () => {
     expect(await data('products', 'p')).toMatchObject({ stock: 8, committedStock: 0, reservedPhysicalStock: 0 });
   });
 
+  it('does not automatically consume tracked-order reservations when producing', async () => {
+    const created=await sales.create({...draft(),fulfillmentStatus:'in-production',
+      lines:[{kind:'product',sourceId:'p',quantity:13}]});
+    expect(await data('products','p')).toMatchObject({committedStock:13,
+      explicitCommittedStock:13,explicitAllocatedStock:0,reservedPhysicalStock:0});
+    await production.create('p',4,day);
+    expect(await data('products','p')).toMatchObject({stock:14,
+      committedStock:13,reservedPhysicalStock:0});
+    await sales.allocateOrderLine(created.sale.id,created.sale.items[0]!.id,4);
+    expect(await data('products','p')).toMatchObject({reservedPhysicalStock:4,explicitAllocatedStock:4});
+    await sales.cancel(created.sale.id);
+    expect(await data('products','p')).toMatchObject({stock:14,committedStock:0,
+      explicitCommittedStock:0,explicitAllocatedStock:0,reservedPhysicalStock:0});
+  });
+
+  it('keeps legacy automatic reservation without assigning units to a tracked order', async () => {
+    await seed('products','p',{stock:0,committedStock:2,reservedPhysicalStock:0});
+    const tracked=await sales.create({...draft(),fulfillmentStatus:'in-production',
+      lines:[{kind:'product',sourceId:'p',quantity:3}]});
+    await production.create('p',4,day);
+    expect(await data('products','p')).toMatchObject({stock:4,committedStock:5,
+      explicitCommittedStock:3,reservedPhysicalStock:2,explicitAllocatedStock:0});
+    await sales.allocateOrderLine(tracked.sale.id,tracked.sale.items[0]!.id,2);
+    expect(await data('products','p')).toMatchObject({reservedPhysicalStock:4,explicitAllocatedStock:2});
+    await sales.cancel(tracked.sale.id);
+    expect(await data('products','p')).toMatchObject({stock:4,committedStock:2,
+      explicitCommittedStock:0,reservedPhysicalStock:2,explicitAllocatedStock:0});
+  });
+
   it('reserves ready stock and only decrements inventory at physical delivery', async () => {
     const result = await sales.create({ ...draft(), fulfillmentStatus: 'ready', lines: [{ kind: 'product', sourceId: 'p', quantity: 2 }] });
     expect(await data('products', 'p')).toMatchObject({ stock: 10, committedStock: 2, reservedPhysicalStock: 2 });

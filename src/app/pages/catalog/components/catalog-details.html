@@ -6,7 +6,7 @@
   <div class="bf-dialog-body">
     @if (kind()==='products' && product(); as p) {
       <div class="details-hero">
-        <bf-catalog-image [image]="p.image" [alt]="p.displayName" [compact]="true"/>
+        <bf-catalog-image [image]="p.image" [alt]="p.displayName" [compact]="true" fit="contain"/>
         <div><span class="details-eyebrow">{{collectionName(p)}} · {{p.code}}</span>
           <h3>{{p.displayName}}</h3>
           <p>{{fragranceName(p)}} · {{formatName(p)}} @if(weight(p) !== null){ · ≈ {{quantity(weight(p)!)}} g}</p>
@@ -39,7 +39,7 @@
         </div>
       } @else {<p class="details-hint">Composição indisponível. Verifique os vínculos de insumos e unidades.</p>}
     } @else if(kind()==='inputs' && input(); as insumo) {
-      <div class="details-hero"><bf-catalog-image [image]="insumo.image" [alt]="insumo.name" [compact]="true"/><div>
+      <div class="details-hero"><bf-catalog-image [image]="insumo.image" [alt]="insumo.name" [compact]="true" fit="contain"/><div>
         <span class="details-eyebrow">{{insumo.code}}</span><h3>{{insumo.name}}</h3>
         <p>{{tracking(insumo)}} · {{unitName(insumo.unitId)}}</p>
         <span class="bf-badge" [class.muted]="!insumo.active">{{insumo.active?'Ativo':'Inativo'}}</span>
@@ -62,7 +62,7 @@
         @if(!usedByProducts().length && !usedByAdditions().length){<p class="details-hint">Nenhum produto ou adicional utiliza esse insumo em uma composição cadastrada.</p>}
       </div>
     } @else if(kind()==='additions' && addition(); as extra) {
-      <div class="details-hero"><bf-catalog-image [image]="extra.image" [alt]="extra.name" [compact]="true"/><div>
+      <div class="details-hero"><bf-catalog-image [image]="extra.image" [alt]="extra.name" [compact]="true" fit="contain"/><div>
         <span class="details-eyebrow">{{extra.category}}</span><h3>{{extra.name}}</h3>
         <p>{{extra.components.length}} componente(s) de consumo</p>
         <span class="bf-badge" [class.muted]="!extra.active">{{extra.active?'Ativo':'Inativo'}}</span>

@@ -136,10 +136,28 @@ export class FinancePage {
  async exportFinanceCsv(): Promise<void> {
    if(this.exporting())return;
    const kind=this.tab();
-   if(kind==='cash'){this.toast.error('Exportação do caixa será feita após carregar seu histórico completo.');return;}
    this.exporting.set(true);
    try {
      const rows:(string|number)[][]=[];
+     if(kind==='cash'){
+       let cursor:{businessDate:string;id:string}|null=null;
+       let complete=false;
+       for(let i=0;i<1000;i++){
+         const page=await this.cashRepo.movementPage(100,cursor);
+         for(const item of page.items){
+           rows.push([item.businessDate,item.accountName,item.kind,item.partyName??'',
+             item.status,exportCents(item.amountCents),exportCents(item.impactCents),item.notes??'']);
+         }
+         if(!page.hasMore){complete=true;break;}
+         if(!page.nextCursor)throw new Error('Paginação incompleta: exportação interrompida.');
+         cursor=page.nextCursor;
+       }
+       if(!complete)throw new Error('Limite seguro da exportação atingido.');
+       downloadCsv('bem-feito-caixa-movimentacoes.csv',
+         ['Data','Conta','Tipo','Parte','Situação','Valor (R$)','Impacto (R$)','Observações'],rows);
+       this.toast.success('Movimentações de caixa exportadas.');
+       return;
+     }
      let cursor:{businessDate:string;id:string}|null=null;
      let complete=false;
      for(let i=0;i<1000;i++){

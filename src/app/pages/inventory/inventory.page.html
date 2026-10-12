@@ -46,11 +46,10 @@
           </div>
           <div class="balance" [class.low]="inputMode(item)!=='untracked' && item.stock<=item.minimumStock">
             @if(inputMode(item)==='untracked'){
-              <strong>—</strong><span>sem controle de saldo</span>
-            } @else if(inputMode(item)==='estimated'){
-              <strong>{{item.stock}}</strong><span>aprox. · mín. {{item.minimumStock}}</span>
+              <strong>—</strong><span>Sem controle de saldo · {{item.availabilityStatus || 'Disponibilidade não informada'}}</span>
             } @else {
-              <strong>{{item.stock}}</strong><span>mín. {{item.minimumStock}}</span>
+              <strong>{{formatQuantity(item.stock)}}</strong>
+              <span>{{inputMode(item)==='estimated'?'Físico estimado':'Físico'}} · Reservado {{formatQuantity(item.reservedPhysicalStock ?? 0)}} · Livre {{formatQuantity(inputFreeStock(item))}} · Mín. {{formatQuantity(item.minimumStock)}}</span>
             }
           </div>
           <div class="cost"><strong>{{currency(item.averageUnitCostCents)}}</strong><span>custo médio</span></div>

@@ -57,6 +57,9 @@ export class SalesPage {
   readonly productFilterOptions = computed(() => [{value:'',label:'Todos os sabonetes'},
     ...this.catalog.activeProducts().map(product=>({value:product.id,label:product.displayName}))]);
   readonly historicalBusy = signal(false);
+  readonly advancedFiltersOpen = signal(false);
+  readonly activeAdvancedFilterCount = computed(() =>
+    Number(Boolean(this.historyFrom())) + Number(Boolean(this.historyTo())) + Number(Boolean(this.historyProduct())));
   readonly historyActive = computed(()=>this.historySubmitted() && this.search().trim()===this.historicalQuery());
   readonly statusFilter = signal<'all' | 'paid' | 'open' | 'cancelled'>('all');
   readonly pendingAction = signal<'ready' | 'delivered' | 'cancel' | 'allocate' | 'correct' | 'correct-items' | null>(null);
@@ -99,6 +102,7 @@ export class SalesPage {
   readonly orderProgress = orderProgress;
   private readonly selectedSnapshot = signal<Sale | null>(null);
   readonly selectedSale = computed(() => {
+    if(this.editingItems() && this.editBaseline())return this.editBaseline();
     const snapshot = this.selectedSnapshot();
     return snapshot ? this.store.sales().find(sale => sale.id === snapshot.id) ?? snapshot : null;
   });
@@ -122,6 +126,15 @@ export class SalesPage {
   setHistoryStatus(status:'all'|'paid'|'open'|'cancelled'):void {
     this.statusFilter.set(status);
     if(this.historyActive())void this.searchAllHistory();
+  }
+
+  clearSalesFilters():void {
+    this.search.set('');
+    this.historyFrom.set('');this.historyTo.set('');this.historyProduct.set('');
+    this.statusFilter.set('all');this.historySubmitted.set(false);
+    this.historicalQuery.set('');this.historicalMatches.set([]);
+    this.historyHasMore.set(false);this.historyCursor.set(null);
+    this.appliedHistoryFilters.set(null);
   }
 
   async loadMoreHistory():Promise<void>{
@@ -211,6 +224,8 @@ export class SalesPage {
         this.toast.error('A venda não está mais disponível para edição.');
         return;
       }
+      // Discard responses for a different sale after the dialog selection changes.
+      if(this.selectedSnapshot()?.id!==sale.id)return;
       // Keep the immutable editor base independent from the list-store refresh.
       this.editBaseline.set(current);
       this.selectedSnapshot.set(current);
@@ -231,6 +246,10 @@ export class SalesPage {
     }finally{
       this.openingItemEditor.set(false);
     }
+  }
+  cancelItemCorrection():void {
+    this.editingItems.set(false);
+    this.editBaseline.set(null);
   }
   readonly Math=Math;
   hasProductLines(sale:Sale):boolean {return sale.items.length>0;}

@@ -1,0 +1,69 @@
+<section class="bf-page reports-page">
+  <header class="bf-page-header">
+    <div>
+      <h1>Relatórios</h1>
+      <p>Vendas, custos e rentabilidade para decidir com segurança.</p>
+    </div>
+    <button type="button" class="bf-button secondary" [disabled]="!report()||loading()||exporting()" (click)="exportCsv()">
+      <bf-icon name="details"/> Exportar análise CSV
+    </button>
+  </header>
+  <section class="reports-toolbar" aria-label="Período dos relatórios">
+    <div class="bf-segments reports-presets">
+      <button type="button" [class.active]="selectedPreset()==='today'" (click)="selectPeriod('today')">Hoje</button>
+      <button type="button" [class.active]="selectedPreset()==='last7'" (click)="selectPeriod('last7')">7 dias</button>
+      <button type="button" [class.active]="selectedPreset()==='last30'" (click)="selectPeriod('last30')">30 dias</button>
+      <button type="button" [class.active]="selectedPreset()==='month'" (click)="selectPeriod('month')">Este mês</button>
+      <button type="button" [class.active]="selectedPreset()==='year'" (click)="selectPeriod('year')">Este ano</button>
+    </div>
+    <div class="report-date-fields">
+      <label>De <input class="bf-input" type="date" [value]="from()" (input)="setCustomDate('from',$any($event.target).value)"/></label>
+      <label>Até <input class="bf-input" type="date" [min]="from()" [value]="to()" (input)="setCustomDate('to',$any($event.target).value)"/></label>
+      <button type="button" class="bf-button" [disabled]="loading()" (click)="load()">Aplicar</button>
+    </div>
+  </section>
+  @if(loading()){<p class="reports-state" role="status"><bf-icon name="details"/> Calculando dados do período...</p>}
+  @if(error()){<p class="reports-error" role="alert"><bf-icon name="alert"/> {{error()}}</p>}
+  @if(report();as data){
+    <div class="reports-metrics">
+      <article class="report-metric"><span>Faturamento</span><strong>{{money(data.revenueCents)}}</strong><small>{{data.salesCount}} venda(s)</small></article>
+      <article class="report-metric"><span>Lucro bruto estimado</span><strong>{{money(data.grossProfitCents)}}</strong><small>CMV {{money(data.cogsCents)}}</small></article>
+      <article class="report-metric"><span>Resultado operacional estimado</span><strong>{{money(data.operationalResultCents)}}</strong><small>Após despesas operacionais</small></article>
+      <article class="report-metric"><span>Margem bruta</span><strong>{{data.marginPercent===null?'Indisponível':data.marginPercent+'%'}}</strong><small>{{data.missingCostItems}} item(ns) sem custo informado</small></article>
+    </div>
+    <div class="reports-overview">
+      <article><span>Recebido no período</span><strong>{{money(data.receivedCents)}}</strong><small>Por data de recebimento, não por data de venda</small></article>
+      <article><span>Ticket médio</span><strong>{{money(data.averageTicketCents)}}</strong><small>{{data.unitsSold}} sabonetes vendidos</small></article>
+      <article><span>Despesas operacionais</span><strong>{{money(data.operatingExpensesCents)}}</strong><small>Não confundir com compra de estoque</small></article>
+      <article><span>Compras de insumos</span><strong>{{money(data.inventoryPurchasesCents)}}</strong><small>Separadas do CMV histórico</small></article>
+    </div>
+    <section class="report-breakdown" aria-label="Rentabilidade detalhada">
+      <div class="reports-section-head">
+        <div><h2>Rentabilidade</h2><p>Comparação com base nas vendas do período, incluindo descontos distribuídos em centavos.</p></div>
+        <div class="bf-segments report-group-switch" role="group" aria-label="Agrupar por">
+          @for(group of groupOptions;track group.key){
+            <button type="button" [class.active]="selectedGroup()===group.key" [attr.aria-pressed]="selectedGroup()===group.key" (click)="selectedGroup.set(group.key)">{{group.label}}</button>
+          }
+        </div>
+      </div>
+      @if(groups().length){
+        <div class="reports-group-list">
+          @for(item of groups();track item.key){
+            <article class="report-group-row">
+              <div class="group-top"><strong>{{item.label}}</strong><span>{{money(item.revenueCents)}}</span></div>
+              <div class="group-track" role="meter" [attr.aria-label]="'Faturamento de '+item.label" [attr.aria-valuemin]="0" [attr.aria-valuemax]="maxRevenue()" [attr.aria-valuenow]="item.revenueCents"><span [style.width.%]="item.revenueCents/maxRevenue()*100"></span></div>
+              <div class="group-meta"><span>{{item.units}} un.</span><span>CMV {{money(item.cogsCents)}}</span><span>Lucro {{money(item.grossProfitCents)}}</span>
+                <span [class.group-missing]="item.marginPercent===null">{{item.marginPercent===null?'Custo incompleto':item.marginPercent+'% margem'}}</span>
+              </div>
+            </article>
+          }
+        </div>
+      } @else {
+        <bf-empty-state title="Sem vendas para analisar" description="Escolha outro período para consultar a rentabilidade."/>
+      }
+    </section>
+    <p class="reports-note"><bf-icon name="alert"/> Os custos representam a base histórica conhecida. Itens sem custo não são tratados como lucro integral. Aportes e investimentos não são faturamento.</p>
+  } @else if(!loading()&&!error()){
+    <bf-empty-state title="Sem dados de relatório" description="Selecione um período e clique em Aplicar."/>
+  }
+</section>

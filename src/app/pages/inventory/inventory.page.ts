@@ -61,6 +61,9 @@ export class InventoryPage {
     const reserved = item.reservedPhysicalStock ?? Math.min(item.stock, item.committedStock ?? 0);
     return Math.max(0, item.stock - reserved);
   }
+  inputFreeStock(input: InputItem): number {
+    return Math.max(0, input.stock - (input.reservedPhysicalStock ?? 0));
+  }
   readonly date = formatBusinessDate;
   readonly filteredProducts = computed(() => {
     const term = this.search().toLocaleLowerCase('pt-BR').trim();

@@ -13,8 +13,6 @@ import {
   LucideChartNoAxesColumnIncreasing,
   LucideCheck,
   LucideChevronRight,
-  LucideChevronDown,
-  LucideChevronUp,
   LucideCircleCheck,
   LucideCircleDollarSign,
   LucideCirclePlus,
@@ -29,7 +27,6 @@ import {
   LucideEye,
   LucideFactory,
   LucideFlaskConical,
-  LucideFilter,
   LucideHandCoins,
   LucideImage,
   LucideInfo,
@@ -87,7 +84,7 @@ export type BfIconName =
   // Generic actions, media and states
   | 'plus' | 'minus' | 'search' | 'sun' | 'moon' | 'logout' | 'close' | 'trash' | 'image'
   | 'calendar' | 'alert' | 'info' | 'chevron-right' | 'arrow-right' | 'eye' | 'check'
-  | 'tick' | 'upload' | 'more' | 'history' | 'filter' | 'chevron-up' | 'chevron-down';
+  | 'tick' | 'upload' | 'more' | 'history';
 
 const ICONS = {
   dashboard: LucideLayoutDashboard,
@@ -149,9 +146,6 @@ const ICONS = {
   alert: LucideTriangleAlert,
   info: LucideInfo,
   'chevron-right': LucideChevronRight,
-  'chevron-up': LucideChevronUp,
-  'chevron-down': LucideChevronDown,
-  filter: LucideFilter,
   'arrow-right': LucideArrowRight,
   eye: LucideEye,
   check: LucideCircleCheck,

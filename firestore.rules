@@ -194,7 +194,7 @@ service cloud.firestore {
 
     function validOperation(name, data) {
       return (name == 'sales'
-          && fields(data, ['code', 'businessDate', 'discountCents', 'subtotalCents', 'totalCents', 'receivedCents', 'tipCents', 'balanceCents', 'paymentStatus', 'status', 'items', 'paymentIds', 'stockEffects'], ['customerName', 'dueDate', 'notes', 'cancelledAt', 'cancelledBy', 'analyticsVersion', 'cogsCents', 'itemsSold', 'missingCostItems', 'fulfillmentStatus', 'stockApplied', 'orderAllocations'])
+          && fields(data, ['code', 'businessDate', 'discountCents', 'subtotalCents', 'totalCents', 'receivedCents', 'tipCents', 'balanceCents', 'paymentStatus', 'status', 'items', 'paymentIds', 'stockEffects'], ['customerName', 'customerSearchKey', 'dueDate', 'notes', 'cancelledAt', 'cancelledBy', 'analyticsVersion', 'cogsCents', 'itemsSold', 'missingCostItems', 'fulfillmentStatus', 'stockApplied', 'orderAllocations'])
           && text(data.code) && businessDate(data)
           && money(data.discountCents) && money(data.subtotalCents) && money(data.totalCents)
           && money(data.receivedCents) && money(data.tipCents) && money(data.balanceCents)

@@ -38,6 +38,8 @@ export function resolveSaleDraft(
       const product = catalog.products.get(line.sourceId);
       if (!product) throw new Error('Produto inválido.');
       const unitPriceCents = line.manualUnitPriceCents ?? product.salePriceCents;
+      if (!Number.isSafeInteger(unitPriceCents) || unitPriceCents < 0)
+        throw new Error('O preço unitário precisa ser um valor válido em centavos.');
       const unitCostCents = catalog.productUnitCosts.get(product.id) ?? product.averageUnitCostCents;
       lines.push({
         id: createId(),

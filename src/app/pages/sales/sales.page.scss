@@ -574,3 +574,7 @@
 .sales-expand-arrow{transition:transform 150ms ease;transform:rotate(90deg)}
 .sales-expand-arrow.expanded{transform:rotate(-90deg)}
 @media(prefers-reduced-motion:reduce){.sales-expand-arrow{transition:none}}
+
+/* Calm confirmation of historical queries, consistent in both themes. */
+.history-feedback{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.8rem;margin:1px 0 14px;line-height:1.4}
+.history-feedback bf-icon{display:inline-flex;color:var(--brand-strong);flex:none}

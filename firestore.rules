@@ -194,7 +194,7 @@ service cloud.firestore {
 
     function validOperation(name, data) {
       return (name == 'sales'
-          && fields(data, ['code', 'businessDate', 'discountCents', 'subtotalCents', 'totalCents', 'receivedCents', 'tipCents', 'balanceCents', 'paymentStatus', 'status', 'items', 'paymentIds', 'stockEffects'], ['customerName', 'dueDate', 'notes', 'cancelledAt', 'cancelledBy', 'analyticsVersion', 'cogsCents', 'itemsSold', 'missingCostItems', 'fulfillmentStatus', 'stockApplied'])
+          && fields(data, ['code', 'businessDate', 'discountCents', 'subtotalCents', 'totalCents', 'receivedCents', 'tipCents', 'balanceCents', 'paymentStatus', 'status', 'items', 'paymentIds', 'stockEffects'], ['customerName', 'dueDate', 'notes', 'cancelledAt', 'cancelledBy', 'analyticsVersion', 'cogsCents', 'itemsSold', 'missingCostItems', 'fulfillmentStatus', 'stockApplied', 'orderAllocations'])
           && text(data.code) && businessDate(data)
           && money(data.discountCents) && money(data.subtotalCents) && money(data.totalCents)
           && money(data.receivedCents) && money(data.tipCents) && money(data.balanceCents)
@@ -211,6 +211,7 @@ service cloud.firestore {
                 || (data.balanceCents > 0 && data.receivedCents == 0 && data.paymentStatus == 'pending')
                 || (data.balanceCents > 0 && data.receivedCents > 0 && data.paymentStatus == 'partial'))))
           && data.items is list && data.items.size() > 0 && data.paymentIds is list && data.stockEffects is list
+           && (!('orderAllocations' in data) || (data.orderAllocations is list && data.orderAllocations.size() <= 120))
           && ((!(('analyticsVersion' in data) || ('cogsCents' in data) || ('itemsSold' in data) || ('missingCostItems' in data)))
             || (data.analyticsVersion == 1 && money(data.cogsCents)
               && data.itemsSold is int && data.itemsSold >= 0
@@ -400,6 +401,19 @@ service cloud.firestore {
         && text(request.resource.data.reason) && request.resource.data.reason.size() <= 240
         && request.resource.data.kind in ['correction', 'cancellation']
         && request.resource.data.before is map && request.resource.data.after is map;
+      allow update, delete: if false;
+    }
+
+    match /orderAllocationHistory/{eventId} {
+      allow read: if activeUser();
+      allow create: if canOperate() && auditCreate(request.resource.data)
+        && fields(request.resource.data,
+          ['saleId','lineId','productId','businessDate','quantityAdded','before','after'], [])
+        && text(request.resource.data.saleId) && text(request.resource.data.lineId)
+        && text(request.resource.data.productId) && businessDate(request.resource.data)
+        && request.resource.data.quantityAdded is int && request.resource.data.quantityAdded > 0
+        && request.resource.data.before is int && request.resource.data.before >= 0
+        && request.resource.data.after == request.resource.data.before + request.resource.data.quantityAdded;
       allow update, delete: if false;
     }
 

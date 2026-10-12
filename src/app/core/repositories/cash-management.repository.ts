@@ -34,8 +34,17 @@ export class CashManagementRepository {
 
   async balanceChecks(): Promise<CashBalanceCheck[]> {
     const snapshot = await getDocs(query(collection(this.db, 'cashBalanceChecks'),
-      orderBy('businessDate', 'desc'), limit(30)));
+      orderBy('businessDate', 'desc'), orderBy('createdAt', 'desc'), limit(30)));
     return snapshot.docs.map(item => ({ id: item.id, ...item.data() }) as CashBalanceCheck);
+  }
+
+  /** One authoritative latest bank balance for every consumer. A legacy import is a fallback only. */
+  async latestBalanceCheck(): Promise<CashBalanceCheck | null> {
+    const latest = await getDocs(query(collection(this.db, 'cashBalanceChecks'),
+      orderBy('businessDate', 'desc'), orderBy('createdAt', 'desc'), limit(1)));
+    const current = latest.docs[0];
+    if (current) return { id: current.id, ...current.data() } as CashBalanceCheck;
+    return this.legacyBalance();
   }
 
   async legacyBalance(): Promise<CashBalanceCheck | null> {

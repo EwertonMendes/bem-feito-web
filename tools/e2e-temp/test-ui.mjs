@@ -13,7 +13,8 @@ async function usePage(size,description){
   const context=await browser.newContext({viewport:size,colorScheme:'light'});
   const page=await context.newPage();
   page.on('pageerror',error=>errors.push(description+': '+error.message));
-  page.on('console',message=>{if(message.type()==='error'&&!/extension|third.party|Google Drive/i.test(message.text()))
+  page.on('response',response=>{if(response.status()===404)errors.push(description+': HTTP 404 '+response.url());});
+  page.on('console',message=>{if(message.type()==='error'&&!/extension|third.party|Google Drive|Failed to load resource/i.test(message.text()))
     errors.push(description+': '+message.text().slice(0,400));});
   await page.goto(url+'/login',{waitUntil:'domcontentloaded',timeout:60000});
   await page.getByRole('button',{name:/Entrar com Google/}).click();
@@ -26,7 +27,8 @@ async function noOverflow(page,label){
     body:document.body.scrollWidth,
     dialogs:[...document.querySelectorAll('dialog[open]')].map(el=>({width:el.scrollWidth,clientWidth:el.clientWidth})),
   }));
-  if(metrics.document>metrics.width+3 || metrics.body>metrics.width+3)
+  if(metrics.document>metrics.width+3 || metrics.body>metrics.width+3 ||
+    metrics.dialogs.some(d=>d.width>d.clientWidth+3))
     throw Error(label+' horizontal page overflow: '+JSON.stringify(metrics));
   process.stdout.write(label+' geometry '+JSON.stringify(metrics)+'\n');
 }

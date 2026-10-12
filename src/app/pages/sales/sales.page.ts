@@ -2,6 +2,7 @@ import { BfLoadingButton } from '../../shared/ui/button/loading-button';
 import { ChangeDetectionStrategy, Component, DestroyRef, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Sale } from '../../domain/models/sales.model';
+import { orderProgress } from '../../domain/logic/order-progress';
 import { CatalogStore } from '../../features/catalog/catalog.store';
 import { ModalActions } from '../../core/services/modal-actions.service';
 import { SalesStore } from '../../features/sales/sales.store';
@@ -33,7 +34,10 @@ export class SalesPage {
   readonly date = formatBusinessDate;
   readonly search = signal('');
   readonly statusFilter = signal<'all' | 'paid' | 'open' | 'cancelled'>('all');
-  readonly pendingAction = signal<'ready' | 'delivered' | 'cancel' | null>(null);
+  readonly pendingAction = signal<'ready' | 'delivered' | 'cancel' | 'allocate' | null>(null);
+  readonly allocatingLineId = signal<string | null>(null);
+  readonly allocationQuantity = signal(1);
+  readonly orderProgress = orderProgress;
   private readonly selectedSnapshot = signal<Sale | null>(null);
   readonly selectedSale = computed(() => {
     const snapshot = this.selectedSnapshot();
@@ -70,6 +74,32 @@ export class SalesPage {
     if (this.pendingAction()) return;
     this.selectedSnapshot.set(sale);
     this.detailDialog().open();
+  }
+
+  showAllocation(lineId: string): void {
+    this.allocatingLineId.set(this.allocatingLineId() === lineId ? null : lineId);
+    this.allocationQuantity.set(1);
+  }
+
+  async allocateSelected(lineId: string): Promise<void> {
+    if (this.pendingAction()) return;
+    const sale = this.selectedSale();
+    const item = sale?.items.find(x=>x.id===lineId);
+    if (!sale || !item || sale.status !== 'active' || sale.fulfillmentStatus !== 'in-production') return;
+    const pending = this.orderProgress(sale).find(x=>x.line.id===lineId)?.pending;
+    const quantity = this.allocationQuantity();
+    if (pending === null || pending === undefined || !Number.isSafeInteger(quantity) || quantity < 1 || quantity > pending) return;
+    this.pendingAction.set('allocate');
+    try {
+      const result = await this.store.allocateOrderLine(sale.id,lineId,quantity);
+      if (result) {
+        this.catalog.applyStockChanges(result.stockChanges);
+        this.selectedSnapshot.set(result.sale);
+        this.allocatingLineId.set(null);
+      }
+    } finally {
+      this.pendingAction.set(null);
+    }
   }
 
   fulfillmentLabel(sale: Sale): string {

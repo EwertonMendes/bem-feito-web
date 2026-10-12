@@ -570,7 +570,7 @@ describe('Actual repositories against restrictive emulator rules', () => {
     const backfill = runInInjectionContext(injector, () => new ReadOptimizationBackfillService());
     await expect(backfill.ensure()).resolves.toBeUndefined();
 
-    expect(await data('system', 'read-optimization')).toMatchObject({ version: 1, updatedBy: 'operator' });
+    expect(await data('system', 'read-optimization')).toMatchObject({ version: 2, updatedBy: 'operator' });
     expect(await data('products', 'p')).toMatchObject({ stockStatus: 'ok' });
     expect(await data('inputs', 'i')).toMatchObject({ stockStatus: 'ok' });
     for (let index = 0; index < 10; index += 1) {

@@ -70,7 +70,7 @@ try {
   await noOverflow(mobile,'mobile-reports');
   await mobile.screenshot({path:out+'/mobile-reports.png',fullPage:true});
   await mobile.goto(url+'/vendas',{waitUntil:'domcontentloaded'});
-  await mobile.getByText('V00001').first().waitFor({timeout:35000});
+  await mobile.locator('.sales-mobile-list .mobile-card-button').first().waitFor({timeout:35000});
   await noOverflow(mobile,'mobile-sales');
   await mobile.screenshot({path:out+'/mobile-sales.png',fullPage:true});
   await mobile.locator('.mobile-card-button').first().click();

@@ -53,9 +53,14 @@ const checks = [
     .where('businessDate', '>=', startDate)
     .where('businessDate', '<=', endDate)
     .aggregate({ cashOutCents: AggregateField.sum('bankDebitCents') }).get()],
-  ['dashboard:personal-funding', () => db.collection('expenses')
-    .where('fundingSource', 'in', ['ewerton', 'maria'])
+  // Keep pre-deploy probes identical to the client queries. A legacy-only
+  // check previously missed the new fundingType aggregation index entirely.
+  ['dashboard:personal-funding-modern', () => db.collection('expenses')
+    .where('fundingType', '==', 'third-party')
     .aggregate({ value: AggregateField.sum('amountCents') }).get()],
+  ['dashboard:personal-funding-legacy', () => db.collection('expenses')
+    .where('fundingSource', 'in', ['ewerton', 'maria', 'owner-unassigned'])
+    .get()],
   ['finance:input-purchase-bank-debits', () => db.collection('expenses')
     .where('kind', '==', 'input-purchase')
     .where('businessDate', '>=', startDate)
@@ -86,16 +91,13 @@ const checks = [
   ['dashboard:inputs-status-completeness', () => db.collection('inputs')
     .where('stockStatus', 'in', ['negative', 'low', 'ok', 'untracked'])
     .aggregate({ value: AggregateField.count() }).get()],
-  ['dashboard:negative-products', () => db.collection('products')
-    .where('stockStatus', '==', 'negative')
-    .aggregate({ value: AggregateField.count() }).get()],
   ['dashboard:low-products', () => db.collection('products')
     .where('active', '==', true)
-    .where('stockStatus', 'in', ['negative', 'low'])
+    .where('stockStatus', '==', 'low')
     .aggregate({ value: AggregateField.count() }).get()],
   ['dashboard:low-inputs', () => db.collection('inputs')
     .where('active', '==', true)
-    .where('stockStatus', 'in', ['negative', 'low'])
+    .where('stockStatus', '==', 'low')
     .aggregate({ value: AggregateField.count() }).get()],
   ['finance:expenses-total', () => db.collection('expenses')
     .aggregate({ total: AggregateField.sum('amountCents') }).get()],

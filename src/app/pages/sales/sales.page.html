@@ -176,7 +176,7 @@
                           <bf-icon name="inventory"/> Reservar unidades disponíveis
                         </button>
                         <button class="bf-button secondary order-allocate-button" type="button"
-                          [disabled]="!!pendingAction()" (click)="detailDialog().close(); modals.openProduction(progress.line.sourceId)">
+                          [disabled]="!!pendingAction()" (click)="detailDialog.close(); modals.openProduction(progress.line.sourceId)">
                           <bf-icon name="production"/> Registrar produção
                         </button>
                       </div>

@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { collection, documentId, getDocs, limit, orderBy, query, startAfter, where } from 'firebase/firestore';
+import { collection, documentId, DocumentData, QuerySnapshot, getDocs, limit, orderBy, query, startAfter, where } from 'firebase/firestore';
 import { FIRESTORE } from '../firebase/firebase.providers';
 import { Sale, Payment } from '../../domain/models/sales.model';
 import { Expense } from '../../domain/models/finance.model';
@@ -28,14 +28,14 @@ export class ManagementReportsRepository {
     // This is a user-invoked report query; guard the read budget explicitly.
     // A large period is rejected rather than silently producing a partial report.
     for(let i=0;i<50;i++){
-      const documents=await getDocs(query(collection(this.db,name),
+      const documents:QuerySnapshot<DocumentData>=await getDocs(query(collection(this.db,name),
         where('businessDate','>=',from),where('businessDate','<=',to),
         orderBy('businessDate','desc'),orderBy(documentId(),'desc'),
         ...(cursor?[startAfter(cursor.businessDate,cursor.id)]:[]),limit(101)));
-      const batch=documents.docs.slice(0,100).map(doc=>({id:doc.id,...doc.data()} as T));
+      const batch:T[]=documents.docs.slice(0,100).map(item=>({id:item.id,...item.data()} as T));
       records.push(...batch);
       if(documents.docs.length<=100)return records;
-      const last=batch.at(-1);
+      const last:T|undefined=batch.at(-1);
       if(!last)throw new Error('Não foi possível paginar os registros.');
       cursor={businessDate:last.businessDate,id:last.id};
     }

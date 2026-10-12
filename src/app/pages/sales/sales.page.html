@@ -272,10 +272,11 @@
               }
             }
             @if(sale.stockApplied!==false && correctionPreview()?.value?.inventoryDeltas?.length){
-              <label class="advanced-stock-confirm"><input type="checkbox" [checked]="advancedStockConfirmed()"
-                (change)="advancedStockConfirmed.set($any($event.target).checked)"/>
-                <span>Conferi o estoque físico e confirmo que a alteração de sabonetes e insumos reflete a movimentação real.</span>
-              </label>
+              <div class="advanced-stock-confirm">
+                <bf-checkbox [checked]="advancedStockConfirmed()" (checkedChange)="advancedStockConfirmed.set($event)"
+                  label="Conferi o estoque físico"
+                  description="Confirmo que a alteração de sabonetes e insumos reflete a movimentação real."/>
+              </div>
             }
             <div class="sale-metadata-actions">
               <button class="bf-button secondary" type="button" [disabled]="!!pendingAction()"

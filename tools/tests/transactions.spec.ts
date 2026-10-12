@@ -92,6 +92,53 @@ beforeEach(async () => {
 afterAll(async () => { injector?.destroy(); await env?.cleanup(); });
 
 describe('Actual repositories against restrictive emulator rules', () => {
+  it('atomically corrects sold soap quantity and price while preserving historic costs', async () => {
+    const created=await sales.create({...draft(),lines:[{kind:'product',sourceId:'p',quantity:2}]});
+    const sale=created.sale;
+    const {saleCorrectionSignature}=await import('../../src/app/domain/logic/sale-correction');
+    const result=await saleCorrections.correctProductLines(sale.id,{
+      expectedSignature:saleCorrectionSignature(sale),
+      lines:[{lineId:sale.items[0]!.id,quantity:3,unitPriceCents:900}],
+      discountCents:100,reason:'Corrigir quantidades e preço',
+    });
+    expect(result.sale).toMatchObject({totalCents:2600,balanceCents:2600,discountCents:100});
+    expect(result.sale.items[0]).toMatchObject({quantity:3,unitPriceCents:900});
+    expect(await data('products','p')).toMatchObject({stock:7});
+    expect(await count('saleCorrections')).toBe(1);
+    expect(await count('stockMovements')).toBe(2);
+    await expect(saleCorrections.correctProductLines(sale.id,{
+      expectedSignature:saleCorrectionSignature(sale),
+      lines:[{lineId:sale.items[0]!.id,quantity:2,unitPriceCents:1000}],
+      discountCents:0,reason:'Tentar revisão antiga',
+    })).rejects.toThrow('mudou');
+  });
+
+  it('rejects corrections without physical free stock and rolls back changes', async () => {
+    const created=await sales.create({...draft(),lines:[{kind:'product',sourceId:'p',quantity:2}]});
+    const {saleCorrectionSignature}=await import('../../src/app/domain/logic/sale-correction');
+    await expect(saleCorrections.correctProductLines(created.sale.id,{
+      expectedSignature:saleCorrectionSignature(created.sale),
+      lines:[{lineId:created.sale.items[0]!.id,quantity:50,unitPriceCents:1000}],
+      discountCents:0,reason:'Quantidade errada',
+    })).rejects.toThrow('Estoque livre');
+    expect(await data('products','p')).toMatchObject({stock:8});
+    expect(await data('sales',created.sale.id)).toMatchObject({totalCents:2000});
+    expect(await count('saleCorrections')).toBe(0);
+  });
+
+  it('does not allow edited total smaller than applied payments', async () => {
+    const created=await sales.create({...draft(),lines:[{kind:'product',sourceId:'p',quantity:2}],
+      payments:[{methodId:'pix',amountReceivedCents:1500}]});
+    const {saleCorrectionSignature}=await import('../../src/app/domain/logic/sale-correction');
+    await expect(saleCorrections.correctProductLines(created.sale.id,{
+      expectedSignature:saleCorrectionSignature(created.sale),
+      lines:[{lineId:created.sale.items[0]!.id,quantity:1,unitPriceCents:100}],
+      discountCents:0,reason:'Preço corrigido',
+    })).rejects.toThrow('pagamentos');
+    expect(await data('products','p')).toMatchObject({stock:8});
+    expect(await count('saleCorrections')).toBe(0);
+  });
+
   it('audits a customer correction without touching inventory, totals or payments', async () => {
     const created=await sales.create(draft());
     const beforeStock=(await data('products','p'))?.['stock'];

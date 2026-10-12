@@ -569,3 +569,8 @@
   .sales-search-actions .search{padding-inline:10px}
   .sales-filter-primary .status-tabs button{font-size:.69rem;padding:8px 2px}
 }
+
+/* One existing chevron icon for both states: no extra Lucide imports in the initial bundle. */
+.sales-expand-arrow{transition:transform 150ms ease;transform:rotate(90deg)}
+.sales-expand-arrow.expanded{transform:rotate(-90deg)}
+@media(prefers-reduced-motion:reduce){.sales-expand-arrow{transition:none}}

@@ -43,10 +43,10 @@
       <button class="sales-expand-filters" type="button"
         [attr.aria-expanded]="advancedFiltersOpen()" aria-controls="sales-advanced-filters"
         (click)="advancedFiltersOpen.set(!advancedFiltersOpen())">
-        <bf-icon name="filter"/>
+        <bf-icon name="details"/>
         <span>Mais filtros</span>
         @if(activeAdvancedFilterCount()){<span class="sales-filter-count">{{activeAdvancedFilterCount()}}</span>}
-        <bf-icon [name]="advancedFiltersOpen()?'chevron-up':'chevron-down'"/>
+        <bf-icon class="sales-expand-arrow" name="chevron-right" [class.expanded]="advancedFiltersOpen()"/>
       </button>
       <span class="sales-filter-context">
         {{historyActive()?'Consulta ao histórico completo':'Visualizando vendas recentes'}}

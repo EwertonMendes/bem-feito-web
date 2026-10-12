@@ -1,5 +1,6 @@
 import { inject, Injectable } from '@angular/core';
-import { collection, doc, getDoc, getDocs, limit, orderBy, query, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, documentId, getDoc, getDocs, limit, orderBy, query, runTransaction, serverTimestamp, startAfter } from 'firebase/firestore';
+import { BusinessDateCursor, PageResult } from './pagination';
 import { CashBalanceCheck, CashMovement, CashMovementDraft, CashMovementKind } from '../../domain/models/finance.model';
 import { AuthService } from '../auth/auth.service';
 import { DataRevisionService } from '../firebase/data-revision.service';
@@ -25,6 +26,15 @@ export class CashManagementRepository {
   private readonly db = inject(FIRESTORE);
   private readonly auth = inject(AuthService);
   private readonly revisions = inject(DataRevisionService);
+
+  async movementPage(pageSize=100,cursor?:BusinessDateCursor|null):Promise<PageResult<CashMovement>> {
+    const snapshot=await getDocs(query(collection(this.db,'cashMovements'),
+      orderBy('businessDate','desc'),orderBy(documentId(),'desc'),
+      ...(cursor?[startAfter(cursor.businessDate,cursor.id)]:[]),limit(pageSize+1)));
+    const items=snapshot.docs.slice(0,pageSize).map(item=>({id:item.id,...item.data()} as CashMovement));
+    const last=items.at(-1),hasMore=snapshot.size>pageSize;
+    return {items,hasMore,nextCursor:hasMore&&last?{businessDate:last.businessDate,id:last.id}:null};
+  }
 
   async movements(): Promise<CashMovement[]> {
     const snapshot = await getDocs(query(collection(this.db, 'cashMovements'),

@@ -17,7 +17,8 @@
       <input type="search" placeholder="Cliente ou ID" [value]="search()" (input)="search.set($any($event.target).value)" />
     </label>
 
-    <div class="bf-segments status-tabs" aria-label="Filtrar vendas por status">
+    <button type="button" class="bf-button secondary historical-search" [disabled]="search().trim().length < 2 || historicalBusy()" (click)="searchAllHistory()"><bf-icon name="search"/> {{historicalBusy()?'Buscando...':'Buscar no histórico'}}</button>
+        <div class="bf-segments status-tabs" aria-label="Filtrar vendas por status">
       <button [class.active]="statusFilter()==='all'" (click)="statusFilter.set('all')">Todas</button>
       <button [class.active]="statusFilter()==='paid'" (click)="statusFilter.set('paid')">Pagas</button>
       <button [class.active]="statusFilter()==='open'" (click)="statusFilter.set('open')">Em aberto</button>
@@ -25,7 +26,10 @@
     </div>
   </div>
 
-  @if (!store.initialized()) {
+  @if(historyActive()){
+    <p class="history-feedback" role="status">{{historicalMatches().length}} resultado(s) do histórico para “{{historicalQuery()}}”. A busca por cliente inclui os registros já indexados; códigos de venda funcionam em todo o histórico.</p>
+  }
+    @if (!store.initialized()) {
     <bf-table-skeleton [columns]="8" [rows]="7" />
   } @else if (filteredSales().length) {
     <div class="sales-table-wrap">
@@ -108,7 +112,7 @@
     }
   } @else {
     <div class="empty-sales">
-      <bf-empty-state title="Nenhuma venda encontrada" description="Use “Nova venda” para registrar a primeira." />
+      <bf-empty-state title="Nenhuma venda encontrada" description="Experimente outra pesquisa ou revise os filtros." />
     </div>
   }
 

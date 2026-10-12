@@ -183,6 +183,10 @@ describe('Actual repositories against restrictive emulator rules', () => {
     const created = await sales.create({ ...draft(), fulfillmentStatus: 'in-production',
       lines: [{ kind: 'product', sourceId: 'p', quantity: 2 }] });
     expect(await data('products', 'p')).toMatchObject({ stock: 10, committedStock: 2, reservedPhysicalStock: 0 });
+    await expect(sales.advanceFulfillment(created.sale.id, 'ready')).rejects.toThrow('alocadas');
+    await sales.allocateOrderLine(created.sale.id, created.sale.items[0]!.id, 2);
+    expect(await count('orderAllocationHistory')).toBe(1);
+    await expect(sales.allocateOrderLine(created.sale.id, created.sale.items[0]!.id, 1)).rejects.toThrow();
     await sales.advanceFulfillment(created.sale.id, 'ready');
     expect(await data('products', 'p')).toMatchObject({ stock: 10, committedStock: 2, reservedPhysicalStock: 2 });
     await sales.advanceFulfillment(created.sale.id, 'delivered');

@@ -10,7 +10,11 @@ export function matchesCatalogSearch(query: string, ...fields: Array<string | un
   const terms = normalizeCatalogText(query).split(' ').filter(Boolean);
   if (!terms.length) return true;
   const searchable = normalizeCatalogText(fields.filter(Boolean).join(' ')).split(' ').filter(Boolean);
-  return terms.every(term => searchable.some(word => term.length === 1 ? word === term : word.startsWith(term)));
+  // A lone character is exploratory ('a' finds Lavanda), while a short token
+  // combined with other terms identifies a variant ('Patinha G' must exclude M).
+  return terms.every(term => searchable.some(word => term.length === 1
+    ? (terms.length === 1 ? word.includes(term) : word === term)
+    : word.startsWith(term)));
 }
 
 export type CatalogAvailability = 'all' | 'available' | 'unavailable' | 'low' | 'inactive';

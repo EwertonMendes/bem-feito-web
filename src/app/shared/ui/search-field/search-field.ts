@@ -7,7 +7,7 @@ import { BfIcon } from '../icon/icon';
   standalone: true,
   imports: [BfIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: \`
+  template: `
     <div class="search-shell">
       <bf-icon name="search" />
       <input #searchInput type="text" inputmode="search" autocomplete="off" spellcheck="false"
@@ -19,8 +19,8 @@ import { BfIcon } from '../icon/icon';
         </button>
       }
     </div>
-  \`,
-  styles: [\`
+  `,
+  styles: [`
     :host {display:block;min-width:0}
     .search-shell {
       display:flex;align-items:center;gap:9px;min-height:45px;width:100%;min-width:0;
@@ -49,7 +49,7 @@ import { BfIcon } from '../icon/icon';
     button:focus-visible {outline:2px solid var(--brand);outline-offset:1px}
     button bf-icon{display:inline-flex;width:16px}
     @media(prefers-reduced-motion:reduce){.search-shell{transition:none}}
-  \`],
+  `],
 })
 export class BfSearchField {
   readonly value = input('');

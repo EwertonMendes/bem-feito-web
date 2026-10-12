@@ -13,6 +13,8 @@ import { StockChange } from '../../core/repositories/mutation-results';
 import { BusinessDateCursor, compareBusinessDateDesc } from '../../core/repositories/pagination';
 import { SalesRepository } from '../../core/repositories/sales.repository';
 import { SaleCorrectionRepository, SaleMetadataCorrection } from '../../core/repositories/sale-correction.repository';
+import { AdvancedSaleCorrectionRepository } from '../../core/repositories/advanced-sale-correction.repository';
+import { AdvancedSaleDraft } from '../../domain/logic/advanced-sale-edit';
 import { ErrorService } from '../../core/services/error.service';
 import { ToastService } from '../../core/services/toast.service';
 import { AsyncLoadGate } from '../../core/state/async-load-gate';
@@ -216,6 +218,22 @@ export class SalesStore {
       this.toast.success('Recebimento estornado.');
       return result;
     } catch (error) {
+      this.toast.error(this.errors.message(error));
+      return null;
+    }
+  }
+
+  private readonly advancedCorrections = inject(AdvancedSaleCorrectionRepository);
+
+  async correctAdvancedSale(saleId:string,draft:AdvancedSaleDraft):
+    Promise<{sale:Sale;stockChanges:StockChange[]}|null>{
+    try{
+      const result=await this.advancedCorrections.correct(saleId,draft);
+      this.patchSale(result.sale);
+      this.syncReceivable(result.sale,result.previousBalanceCents);
+      this.toast.success('Venda editada com histórico e estoque atualizado.');
+      return {sale:result.sale,stockChanges:result.stockChanges};
+    }catch(error){
       this.toast.error(this.errors.message(error));
       return null;
     }

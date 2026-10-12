@@ -370,3 +370,22 @@
 .sale-metadata-grid em{color:var(--danger);font-style:normal}
 .sale-metadata-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
 @media(max-width:520px){.sale-metadata-grid{grid-template-columns:1fr}.sale-metadata-actions button{flex:1;min-width:0}}
+
+
+.sale-item-correction{margin-top:18px;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2);display:grid;gap:12px}
+.sale-item-correction h3{display:flex;align-items:center;gap:8px;margin:0;font-size:.94rem}
+.sale-item-correction h3 bf-icon{color:var(--brand-strong);display:inline-flex}
+.sale-item-correction>p{margin:0;color:var(--muted);font-size:.76rem;line-height:1.55}
+.sale-item-correction-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(92px,130px) minmax(115px,160px);align-items:end;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.sale-item-correction-row>strong{font-size:.81rem;overflow-wrap:anywhere;align-self:center}
+.sale-item-correction-row>label{display:grid;gap:6px;min-width:0;font-size:.75rem;color:var(--muted);font-weight:650}
+.sale-item-correction-row:last-of-type{grid-template-columns:minmax(120px,1fr) minmax(0,2fr)}
+.sale-item-correction-row input,.sale-item-correction-row textarea{width:100%;min-width:0}
+.sale-item-correction-row textarea{resize:vertical;min-height:70px}
+.sale-item-correction-row em{font-style:normal;color:var(--danger)}
+.sale-correction-preview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.sale-correction-preview>span{display:grid;gap:6px;padding:12px;border:1px solid var(--line);border-radius:11px;background:var(--surface);font-size:.72rem;color:var(--muted)}
+.sale-correction-preview strong{font-variant-numeric:tabular-nums;color:var(--text);font-size:.9rem}
+.sale-correction-error{display:flex;gap:8px;align-items:start;padding:12px;border-radius:10px;background:var(--warning-soft);color:var(--warning);font-size:.76rem}
+.sale-correction-error bf-icon{display:inline-flex;flex:none}
+@media(max-width:560px){.sale-item-correction-row{grid-template-columns:repeat(2,minmax(0,1fr))}.sale-item-correction-row>strong{grid-column:1/-1}.sale-correction-preview{grid-template-columns:1fr}}

@@ -28,6 +28,10 @@ export interface Product extends AuditFields {
   committedStock?: number;
   /** Physical pieces assigned to commitments; the rest requires production. */
   reservedPhysicalStock?: number;
+  /** Open commitments created with explicit order-line tracking. Legacy orders remain outside this counter. */
+  explicitCommittedStock?: number;
+  /** Physical pieces allocated explicitly to tracked order lines. */
+  explicitAllocatedStock?: number;
   minimumStock: number;
   stockStatus?: StockStatus;
   image?: CatalogImageRef;

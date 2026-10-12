@@ -186,12 +186,12 @@
                   <strong>{{line.name}}</strong>
                   <label>Quantidade
                     <input type="number" class="bf-input" min="0" step="1"
-                      [value]="lineChange(line.id)?.quantity ?? line.quantity"
+                      [value]="lineChange(line.id)!.quantity"
                       (input)="patchProductLine(line.id,'quantity',+$any($event.target).value)"/>
                   </label>
                   <label>Preço unitário (R$)
                     <input type="number" class="bf-input" min="0" step="0.01"
-                      [value]="(lineChange(line.id)?.unitPriceCents ?? line.unitPriceCents)/100"
+                      [value]="(lineChange(line.id)!.unitPriceCents)/100"
                       (input)="patchProductLine(line.id,'unitPriceCents',Math.round(+$any($event.target).value*100))"/>
                   </label>
                 </div>

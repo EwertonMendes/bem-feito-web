@@ -29,6 +29,7 @@ export function saleCorrectionSignature(sale: Sale): string {
     items:sale.items.map(({id,quantity,unitPriceCents,totalCostCents})=>({id,quantity,unitPriceCents,totalCostCents})),
     discountCents:sale.discountCents,receivedCents:sale.receivedCents,
     fulfillmentStatus:sale.fulfillmentStatus,stockApplied:sale.stockApplied,
+    orderAllocations:sale.orderAllocations??[],stockEffects:sale.stockEffects,
   });
 }
 export function planSaleProductCorrection(sale:Sale,draft:SaleProductCorrection):SaleProductCorrectionPlan {

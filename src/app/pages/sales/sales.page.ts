@@ -14,6 +14,8 @@ import { formatBusinessDate } from '../../core/utils/date';
 import { formatCurrency } from '../../core/utils/money';
 import { downloadCsv, exportCents } from '../../core/utils/csv-export';
 import { BfDialog } from '../../shared/ui/dialog/dialog';
+import { BfSelect } from '../../shared/ui/select/select';
+import { BusinessDateCursor } from '../../core/repositories/pagination';
 import { BfIcon } from '../../shared/ui/icon/icon';
 import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
 import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
@@ -21,7 +23,7 @@ import { BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
 
 @Component({
   selector: 'bf-sales-page',
-  imports: [BfLoadingButton, BfIcon, BfDialog, BfEmptyState, BfPageRefresh, BfTableSkeleton],
+  imports: [BfLoadingButton, BfIcon, BfDialog, BfSelect, BfEmptyState, BfPageRefresh, BfTableSkeleton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sales.page.html',
   styleUrl: './sales.page.scss',
@@ -44,8 +46,16 @@ export class SalesPage {
   readonly exporting = signal(false);
   readonly historicalMatches = signal<Sale[]>([]);
   readonly historicalQuery = signal('');
+  readonly historySubmitted = signal(false);
+  readonly historyHasMore = signal(false);
+  readonly historyCursor = signal<BusinessDateCursor | null>(null);
+  readonly historyFrom = signal('');
+  readonly historyTo = signal('');
+  readonly historyProduct = signal('');
+  readonly productFilterOptions = computed(() => [{value:'',label:'Todos os sabonetes'},
+    ...this.catalog.activeProducts().map(product=>({value:product.id,label:product.displayName}))]);
   readonly historicalBusy = signal(false);
-  readonly historyActive = computed(()=>this.historicalQuery().length>0 && this.search().trim()===this.historicalQuery());
+  readonly historyActive = computed(()=>this.historySubmitted() && this.search().trim()===this.historicalQuery());
   readonly statusFilter = signal<'all' | 'paid' | 'open' | 'cancelled'>('all');
   readonly pendingAction = signal<'ready' | 'delivered' | 'cancel' | 'allocate' | 'correct' | 'correct-items' | null>(null);
   readonly editingDetails = signal(false);
@@ -73,14 +83,35 @@ export class SalesPage {
   });
 
   readonly filteredSales = computed(() => {
-    const term = this.search().trim().toLocaleLowerCase('pt-BR');
-    return (this.historyActive()?this.historicalMatches():this.store.sales()).filter((sale) => {
-      if (this.statusFilter() === 'paid' && sale.paymentStatus !== 'paid') return false;
-      if (this.statusFilter() === 'open' && !(sale.status === 'active' && sale.balanceCents > 0)) return false;
-      if (this.statusFilter() === 'cancelled' && sale.status !== 'cancelled') return false;
-      return !term || (sale.code + ' ' + (sale.customerName ?? '')).toLocaleLowerCase('pt-BR').includes(term);
+    if(this.historyActive())return this.historicalMatches();
+    const term=this.search().trim().toLocaleLowerCase('pt-BR');
+    return this.store.sales().filter(sale=>{
+      if(this.statusFilter()==='paid'&&sale.paymentStatus!=='paid')return false;
+      if(this.statusFilter()==='open'&&!(sale.status==='active'&&sale.balanceCents>0))return false;
+      if(this.statusFilter()==='cancelled'&&sale.status!=='cancelled')return false;
+      return !term||(sale.code+' '+(sale.customerName??'')).toLocaleLowerCase('pt-BR').includes(term);
     });
   });
+
+  readonly searchFilters = computed(() => ({
+    status:this.statusFilter(),from:this.historyFrom(),to:this.historyTo(),productId:this.historyProduct(),
+  }));
+
+  setHistoryStatus(status:'all'|'paid'|'open'|'cancelled'):void {
+    this.statusFilter.set(status);
+    if(this.historyActive())void this.searchAllHistory();
+  }
+
+  async loadMoreHistory():Promise<void>{
+    if(!this.historyActive()||!this.historyHasMore()||this.historicalBusy())return;
+    this.historicalBusy.set(true);
+    try{
+      const page=await this.repository.searchHistoricalPage(this.historicalQuery(),this.searchFilters(),this.historyCursor());
+      this.historicalMatches.update(old=>[...old,...page.items.filter(item=>!old.some(x=>x.id===item.id))]);
+      this.historyHasMore.set(page.hasMore);this.historyCursor.set(page.nextCursor);
+    }catch(error){this.toast.error(this.errors.message(error));}
+    finally{this.historicalBusy.set(false);}
+  }
 
   async exportAllSales():Promise<void> {
     if(this.exporting())return;
@@ -109,17 +140,16 @@ export class SalesPage {
 
   async searchAllHistory(): Promise<void> {
     const value=this.search().trim();
-    if(value.length<2||this.historicalBusy())return;
+    if(value.length===1||this.historicalBusy())return;
     this.historicalBusy.set(true);
-    this.historicalQuery.set('');
-    try {
-      this.historicalMatches.set(await this.repository.searchHistorical(value));
-      this.historicalQuery.set(value);
-    } catch(error) {
-      this.toast.error(this.errors.message(error));
-    } finally {
-      this.historicalBusy.set(false);
-    }
+    this.historySubmitted.set(false);
+    try{
+      const page=await this.repository.searchHistoricalPage(value,this.searchFilters());
+      this.historicalMatches.set(page.items);this.historyHasMore.set(page.hasMore);
+      this.historyCursor.set(page.nextCursor);
+      this.historicalQuery.set(value);this.historySubmitted.set(true);
+    }catch(error){this.toast.error(this.errors.message(error));}
+    finally{this.historicalBusy.set(false);}
   }
 
   constructor() {

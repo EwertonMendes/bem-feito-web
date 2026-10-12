@@ -12,6 +12,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { ErrorService } from '../../core/services/error.service';
 import { formatBusinessDate } from '../../core/utils/date';
 import { formatCurrency } from '../../core/utils/money';
+import { downloadCsv, exportCents } from '../../core/utils/csv-export';
 import { BfDialog } from '../../shared/ui/dialog/dialog';
 import { BfIcon } from '../../shared/ui/icon/icon';
 import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
@@ -40,6 +41,7 @@ export class SalesPage {
   readonly currency = formatCurrency;
   readonly date = formatBusinessDate;
   readonly search = signal('');
+  readonly exporting = signal(false);
   readonly historicalMatches = signal<Sale[]>([]);
   readonly historicalQuery = signal('');
   readonly historicalBusy = signal(false);
@@ -79,6 +81,31 @@ export class SalesPage {
       return !term || (sale.code + ' ' + (sale.customerName ?? '')).toLocaleLowerCase('pt-BR').includes(term);
     });
   });
+
+  async exportAllSales():Promise<void> {
+    if(this.exporting())return;
+    this.exporting.set(true);
+    try{
+      const rows:Sale[]=[];
+      let cursor:{businessDate:string;id:string}|null=null;
+      for(let page=0;page<1000;page++){
+        const batch=await this.repository.page(100,cursor);
+        rows.push(...batch.items);
+        if(!batch.hasMore){cursor=null;break;}
+        if(!batch.nextCursor)throw new Error('Paginação incompleta: exportação interrompida.');
+        cursor=batch.nextCursor;
+      }
+      if(cursor!==null)throw new Error('Exportação excedeu o limite seguro. Utilize um período menor.');
+      downloadCsv('bem-feito-vendas.csv',
+        ['Código','Data','Cliente','Situação','Entrega','Valor total (R$)','Recebido (R$)','Saldo (R$)','Gorjetas (R$)','Itens'],
+        rows.map(sale=>[sale.code,sale.businessDate,sale.customerName??'',sale.status,
+          sale.fulfillmentStatus??'delivered',exportCents(sale.totalCents),
+          exportCents(sale.receivedCents),exportCents(sale.balanceCents),
+          exportCents(sale.tipCents),sale.items.map(item=>item.quantity+'x '+item.name).join(' | ')]));
+      this.toast.success('Arquivo CSV de vendas gerado.');
+    }catch(error){this.toast.error(this.errors.message(error));}
+    finally{this.exporting.set(false);}
+  }
 
   async searchAllHistory(): Promise<void> {
     const value=this.search().trim();

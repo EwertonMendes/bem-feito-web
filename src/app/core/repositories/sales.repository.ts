@@ -58,14 +58,14 @@ export class SalesRepository {
     const text = raw.trim();
     if (text.length < 2 || text.length > 120) return [];
     const normalized = normalizeCustomerSearch(text);
-    const code = /^v\\d{1,6}$/i.test(text)
+    const code = /^v\d{1,6}$/i.test(text)
       ? 'V' + text.slice(1).padStart(5,'0') : null;
     const sales = collection(this.firestore, 'sales');
     const snapshots = await Promise.all(code
       ? [getDocs(query(sales,where('code','==',code),limit(1)))]
       : [
         getDocs(query(sales,where('customerSearchKey','>=',normalized),
-          where('customerSearchKey','<=',normalized+'\\uf8ff'),limit(40))),
+          where('customerSearchKey','<=',normalized+'\uf8ff'),limit(40))),
         getDocs(query(sales,where('customerName','==',text),limit(40))),
       ]);
     const result = new Map<string,Sale>();

@@ -131,6 +131,9 @@ export class SalesPage {
     this.correctionSignature.set(saleCorrectionSignature(sale));
   }
 
+  hasProductLines(sale:Sale):boolean { return sale.items.some(item=>item.kind==='product'); }
+  lineChange(id:string):SaleProductLineChange|undefined { return this.productChanges().find(item=>item.lineId===id); }
+
   patchProductLine(id:string,field:'quantity'|'unitPriceCents',value:number):void {
     this.productChanges.update(lines=>lines.map(item=>item.lineId===id?{...item,[field]:value}:item));
   }

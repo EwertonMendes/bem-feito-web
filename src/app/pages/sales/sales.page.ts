@@ -131,6 +131,7 @@ export class SalesPage {
     this.correctionSignature.set(saleCorrectionSignature(sale));
   }
 
+  readonly Math = Math;
   hasProductLines(sale:Sale):boolean { return sale.items.some(item=>item.kind==='product'); }
   lineChange(id:string):SaleProductLineChange|undefined { return this.productChanges().find(item=>item.lineId===id); }
 

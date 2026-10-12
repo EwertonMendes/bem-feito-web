@@ -50,6 +50,10 @@ export function resolveSaleDraft(
         quantity: line.quantity,
         unitPriceCents,
         unitCostCents,
+        collectionId: product.collectionId, fragranceId: product.fragranceId,
+        formatId: product.formatId,
+        stockEffects: [{ itemType: 'product', itemId: product.id, quantityDelta: -line.quantity,
+          unitCostCents, ...(product.unitCostDeciCents !== undefined ? { unitCostDeciCents: product.unitCostDeciCents } : {}) }],
         totalCents: Math.round(unitPriceCents * line.quantity),
         totalCostCents: Math.round((product.unitCostDeciCents ?? unitCostCents * 10) * line.quantity / 10),
       });
@@ -67,12 +71,14 @@ export function resolveSaleDraft(
     const addition = catalog.additions.get(line.sourceId);
     if (!addition) throw new Error('Adicional inválido.');
     let unitCostCents = 0;
+    const lineEffects: StockEffect[] = [];
 
     for (const component of addition.components) {
       const input = catalog.inputs.get(component.inputId);
       if (!input) throw new Error(`Insumo inválido no adicional ${addition.name}.`);
       unitCostCents += Math.round(component.quantity * input.averageUnitCostCents);
       if (trackingModeForInput(input) !== 'untracked') {
+        lineEffects.push({itemType:'input',itemId:input.id,quantityDelta:-(component.quantity * line.quantity),unitCostCents:input.averageUnitCostCents});
         addEffect({
           itemType: 'input',
           itemId: input.id,
@@ -91,6 +97,7 @@ export function resolveSaleDraft(
       quantity: line.quantity,
       unitPriceCents: addition.priceCents,
       unitCostCents,
+      stockEffects: lineEffects,
       totalCents: Math.round(addition.priceCents * line.quantity),
       totalCostCents: unitCostCents * line.quantity,
     });

@@ -115,6 +115,7 @@ export class SalesPage {
   readonly searchFilters = computed(() => ({
     status:this.statusFilter(),from:this.historyFrom(),to:this.historyTo(),productId:this.historyProduct(),
   }));
+  readonly appliedHistoryFilters=signal<ReturnType<typeof this.searchFilters> | null>(null);
 
   setHistoryStatus(status:'all'|'paid'|'open'|'cancelled'):void {
     this.statusFilter.set(status);
@@ -125,7 +126,7 @@ export class SalesPage {
     if(!this.historyActive()||!this.historyHasMore()||this.historicalBusy())return;
     this.historicalBusy.set(true);
     try{
-      const page=await this.repository.searchHistoricalPage(this.historicalQuery(),this.searchFilters(),this.historyCursor());
+      const page=await this.repository.searchHistoricalPage(this.historicalQuery(),this.appliedHistoryFilters()??{},this.historyCursor());
       this.historicalMatches.update(old=>[...old,...page.items.filter(item=>!old.some(x=>x.id===item.id))]);
       this.historyHasMore.set(page.hasMore);this.historyCursor.set(page.nextCursor);
     }catch(error){this.toast.error(this.errors.message(error));}
@@ -163,7 +164,9 @@ export class SalesPage {
     this.historicalBusy.set(true);
     this.historySubmitted.set(false);
     try{
-      const page=await this.repository.searchHistoricalPage(value,this.searchFilters());
+      const filters=this.searchFilters();
+      const page=await this.repository.searchHistoricalPage(value,filters);
+      this.appliedHistoryFilters.set(filters);
       this.historicalMatches.set(page.items);this.historyHasMore.set(page.hasMore);
       this.historyCursor.set(page.nextCursor);
       this.historicalQuery.set(value);this.historySubmitted.set(true);

@@ -1,0 +1,131 @@
+<dialog bfDialog #detailsDialog="bfDialog" class="bf-dialog catalog-details-dialog">
+  <div class="bf-dialog-header">
+    <div>
+      <h2><bf-icon name="catalog-browse"/> Detalhes {{kind()==='products'?'do sabonete':kind()==='inputs'?'do insumo':'do adicional'}}</h2>
+      <p>Informações para consultar com rapidez, sem alterar o cadastro.</p>
+    </div>
+    <button class="bf-floating-close" type="button" aria-label="Fechar detalhes" (click)="close()"><bf-icon name="close"/></button>
+  </div>
+  <div class="bf-dialog-body">
+    @if (kind()==='products' && product(); as p) {
+      <div class="details-hero">
+        <div class="details-art">
+          <bf-catalog-image [image]="p.image" [alt]="p.displayName" fit="contain"/>
+          <span class="details-photo-label"><bf-icon name="image"/> Sabonete</span>
+        </div>
+        <div class="details-summary">
+          <span class="details-eyebrow"><bf-icon name="product"/> {{collectionName(p)}} · {{p.code}}</span>
+          <h3>{{p.displayName}}</h3>
+          <p>Informações de fabricação, preço e disponibilidade em um só lugar.</p>
+          <div class="details-chips">
+            <span><bf-icon name="product"/> {{formatName(p)}}</span>
+            <span><bf-icon name="addition"/> {{fragranceName(p)}}</span>
+            @if(weight(p)!==null){<span><bf-icon name="inventory"/> ≈ {{quantity(weight(p)!)}} g</span>}
+            <span [class.status-off]="!p.active"><bf-icon [name]="p.active?'check':'alert'"/> {{p.active?'Ativo':'Inativo'}}</span>
+          </div>
+        </div>
+      </div>
+      <div class="details-section-title">
+        <span class="details-title-icon"><bf-icon name="finance"/></span>
+        <span>Preço e rentabilidade <small>Valores por sabonete</small></span>
+      </div>
+      <div class="details-metrics">
+        <div class="details-metric metric-price"><div class="metric-heading"><bf-icon name="sales"/><span>Preço de venda</span></div><strong>{{currency(p.salePriceCents)}}</strong><small>Preço atual no catálogo</small></div>
+        <div class="details-metric metric-cost"><div class="metric-heading"><bf-icon name="cogs"/><span>Custo da receita</span></div><strong>{{cost()?currency(cost()!.unitCostCents):'Indisponível'}}</strong><small>{{cost()?.costPending?'Cálculo parcial':'Custo unitário estimado'}}</small></div>
+        <div class="details-metric metric-profit"><div class="metric-heading"><bf-icon name="received"/><span>Lucro bruto</span></div><strong>{{profitability().profitCents===null?'Indisponível':currency(profitability().profitCents!)}}</strong><small>Antes das despesas gerais</small></div>
+        <div class="details-metric metric-margin"><div class="metric-heading"><bf-icon name="revenue"/><span>Margem bruta</span></div><strong>{{percent(profitability().marginPercent)}}</strong><small>Sobre o preço de venda</small></div>
+      </div>
+      @if(!cost() || cost()?.costPending){<p class="details-alert"><bf-icon name="alert"/> Custos incompletos: confira os preços dos insumos antes de utilizar a margem para precificar.</p>}
+      <div class="details-section-title">
+        <span class="details-title-icon"><bf-icon name="inventory"/></span>
+        <span>Estoque e encomendas <small>Quantidades em unidades</small></span>
+      </div>
+      <div class="details-stock">
+        <div><bf-icon name="inventory"/><span>Físico</span><strong>{{p.stock}}</strong></div>
+        <div><bf-icon name="order"/><span>Reservado</span><strong>{{p.reservedPhysicalStock??0}}</strong></div>
+        <div class="stock-free"><bf-icon name="check"/><span>Livre</span><strong>{{availableStock(p)}}</strong></div>
+        <div><bf-icon name="production"/><span>A produzir</span><strong>{{(p.committedStock??0)-(p.reservedPhysicalStock??0)>0?(p.committedStock??0)-(p.reservedPhysicalStock??0):0}}</strong></div>
+      </div>
+      <p class="details-hint"><bf-icon name="info"/> Custo calculado pela receita atual. O custo médio histórico das unidades produzidas é {{currency(p.averageUnitCostCents)}} e pode ser diferente.</p>
+      <div class="details-section-title">
+        <span class="details-title-icon"><bf-icon name="kit"/></span>
+        <span>Composição por unidade <small>Insumos e custos estimados</small></span>
+      </div>
+      @if(cost(); as preview){
+        <div class="details-components">
+          @for(part of preview.components;track part.inputId+':'+part.unitId){
+            <div><span><bf-icon name="addition"/><span>{{inputName(part.inputId)}}<small>{{quantity(part.quantity)}} {{unitName(part.unitId)}}</small></span></span><strong>{{currency(part.totalCostCents)}} @if(part.unitCostCents<=0){<small class="pending">Custo pendente</small>}</strong></div>
+          } @empty {<p>Receita não detalhada. Consulte a edição para cadastrar os componentes.</p>}
+          @if(p.additionalCostCents>0){<div><span><bf-icon name="cogs"/><span>Custo adicional do produto</span></span><strong>{{currency(p.additionalCostCents)}}</strong></div>}
+        </div>
+      } @else {<p class="details-hint"><bf-icon name="alert"/> Composição indisponível. Verifique os vínculos de insumos e unidades.</p>}
+    } @else if(kind()==='inputs' && input(); as insumo) {
+      <div class="details-hero">
+        <div class="details-art"><bf-catalog-image [image]="insumo.image" [alt]="insumo.name" fit="contain"/><span class="details-photo-label"><bf-icon name="inventory"/> Insumo</span></div>
+        <div class="details-summary">
+          <span class="details-eyebrow"><bf-icon name="inventory"/> {{insumo.code}}</span>
+          <h3>{{insumo.name}}</h3>
+          <p>Consulte o saldo, o custo médio e os produtos que utilizam este material.</p>
+          <div class="details-chips">
+            <span><bf-icon [name]="tracking(insumo)==='Controlado'?'stock-exact':tracking(insumo)==='Estimado'?'stock-estimated':'stock-untracked'"/> {{tracking(insumo)}}</span>
+            <span><bf-icon name="details"/> {{unitName(insumo.unitId)}}</span>
+            <span [class.status-off]="!insumo.active"><bf-icon [name]="insumo.active?'check':'alert'"/> {{insumo.active?'Ativo':'Inativo'}}</span>
+          </div>
+        </div>
+      </div>
+      <div class="details-section-title"><span class="details-title-icon"><bf-icon name="inventory"/></span><span>Estoque e custo <small>Situação do insumo</small></span></div>
+      <div class="details-metrics">
+        <div class="details-metric metric-cost"><div class="metric-heading"><bf-icon name="cogs"/><span>Custo médio por {{unitName(insumo.unitId)}}</span></div><strong>{{insumo.averageUnitCostCents>0?currency(insumo.averageUnitCostCents):'Não informado'}}</strong><small>Utilizado nas estimativas de produção</small></div>
+        @if(insumo.trackingMode==='untracked'||insumo.minimumStockConfigured===false){
+          <div class="details-metric metric-price"><div class="metric-heading"><bf-icon name="stock-untracked"/><span>Disponibilidade</span></div><strong>{{insumo.availabilityStatus||'Sem medição de volume'}}</strong><small>Insumo sem quantidade controlada</small></div>
+        } @else {
+          <div class="details-metric metric-price"><div class="metric-heading"><bf-icon name="inventory"/><span>{{insumo.trackingMode==='exact'?'Saldo registrado':'Saldo aproximado'}}</span></div><strong>{{quantity(insumo.stock)}} {{unitName(insumo.unitId)}}</strong><small>{{insumo.trackingMode==='exact'?'Quantidade controlada':'Valor aproximado'}}</small></div>
+          <div class="details-metric metric-profit"><div class="metric-heading"><bf-icon name="order"/><span>Reservado</span></div><strong>{{quantity(insumo.reservedPhysicalStock??0)}} {{unitName(insumo.unitId)}}</strong><small>Separado para encomendas</small></div>
+          <div class="details-metric metric-margin"><div class="metric-heading"><bf-icon name="low-stock-input"/><span>Estoque mínimo</span></div><strong>{{quantity(insumo.minimumStock)}} {{unitName(insumo.unitId)}}</strong><small>Referência para reposição</small></div>
+        }
+      </div>
+      <div class="details-section-title"><span class="details-title-icon"><bf-icon name="product"/></span><span>Onde é utilizado <small>{{usedByProducts().length}} produto(s) · {{usedByAdditions().length}} adicional(is)</small></span></div>
+      <div class="details-related">
+        @for(p of usedByProducts();track p.id){<div><bf-icon name="product"/><span>{{p.displayName}}</span></div>}
+        @for(a of usedByAdditions();track a.id){<div><bf-icon name="addition"/><span>{{a.name}} <small>Adicional</small></span></div>}
+        @if(!usedByProducts().length && !usedByAdditions().length){<p class="details-hint"><bf-icon name="info"/> Nenhum produto ou adicional utiliza esse insumo em uma composição cadastrada.</p>}
+      </div>
+    } @else if(kind()==='additions' && addition(); as extra) {
+      <div class="details-hero">
+        <div class="details-art"><bf-catalog-image [image]="extra.image" [alt]="extra.name" fit="contain"/><span class="details-photo-label"><bf-icon name="addition"/> Adicional</span></div>
+        <div class="details-summary">
+          <span class="details-eyebrow"><bf-icon name="addition"/> {{extra.category}}</span>
+          <h3>{{extra.name}}</h3>
+          <p>Veja quanto custa oferecer este adicional e quais materiais ele consome.</p>
+          <div class="details-chips">
+            <span><bf-icon name="kit"/> {{extra.components.length}} componente(s)</span>
+            <span [class.status-off]="!extra.active"><bf-icon [name]="extra.active?'check':'alert'"/> {{extra.active?'Ativo':'Inativo'}}</span>
+          </div>
+        </div>
+      </div>
+      <div class="details-section-title"><span class="details-title-icon"><bf-icon name="finance"/></span><span>Preço e rentabilidade <small>Valores por adicional</small></span></div>
+      <div class="details-metrics">
+        <div class="details-metric metric-price"><div class="metric-heading"><bf-icon name="sales"/><span>Preço de venda</span></div><strong>{{currency(extra.priceCents)}}</strong><small>Valor cadastrado</small></div>
+        <div class="details-metric metric-cost"><div class="metric-heading"><bf-icon name="cogs"/><span>Custo estimado</span></div><strong>{{additionCost()?currency(additionCost()!.unitCostCents):'Indisponível'}}</strong><small>{{additionCost()?.costPending?'Cálculo incompleto':'Composição por unidade'}}</small></div>
+        <div class="details-metric metric-profit"><div class="metric-heading"><bf-icon name="received"/><span>Lucro bruto</span></div><strong>{{additionProfit().profitCents===null?'Indisponível':currency(additionProfit().profitCents!)}}</strong><small>Antes das despesas gerais</small></div>
+        <div class="details-metric metric-margin"><div class="metric-heading"><bf-icon name="revenue"/><span>Margem bruta</span></div><strong>{{percent(additionProfit().marginPercent)}}</strong><small>Sobre o preço de venda</small></div>
+      </div>
+      @if(!additionCost() || additionCost()?.costPending){<p class="details-alert"><bf-icon name="alert"/> Custo incompleto: confira os componentes e o custo dos insumos antes de utilizar a margem.</p>}
+      <div class="details-section-title"><span class="details-title-icon"><bf-icon name="kit"/></span><span>Itens consumidos por venda <small>Composição do adicional</small></span></div>
+      <div class="details-components">
+        @for(c of additionCost()?.components??[];track c.id){
+          <div><span><bf-icon name="addition"/><span>{{inputName(c.inputId)}}<small>{{quantity(c.quantity)}} {{unitName(c.unitId)}}</small></span></span><strong>{{currency(c.totalCostCents)}}</strong></div>
+        } @empty {<p class="details-hint"><bf-icon name="info"/> Nenhum consumo configurado para este adicional.</p>}
+      </div>
+      @if(extra.notes){<div class="details-section-title"><span class="details-title-icon"><bf-icon name="details"/></span><span>Observações</span></div><p class="details-hint">{{extra.notes}}</p>}
+    }
+  </div>
+  <div class="bf-dialog-footer">
+    <button class="bf-button secondary" type="button" (click)="close()">Fechar</button>
+    <button class="bf-button secondary" type="button" (click)="edit()"><bf-icon name="details"/> Editar</button>
+    @if(kind()==='products' && product(); as p){
+      <button class="bf-button secondary" type="button" [disabled]="!p.active" (click)="produce(p)"><bf-icon name="production"/> Produzir</button>
+      <button class="bf-button" type="button" [disabled]="!p.active || availableStock(p)<=0" (click)="sell(p)"><bf-icon name="sales"/> Vender</button>
+    }
+  </div>
+</dialog>

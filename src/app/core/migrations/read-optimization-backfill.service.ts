@@ -11,16 +11,17 @@ import { SaleAnalytics, summarizeSaleItems } from '../../domain/logic/sale-analy
 import { stockStatusForInput, stockStatusForProduct } from '../../domain/logic/stock-status';
 import { InputItem, Product, StockStatus } from '../../domain/models/catalog.model';
 import { Sale } from '../../domain/models/sales.model';
+import { normalizeCustomerSearch } from '../utils/customer-search';
 import { AuthService } from '../auth/auth.service';
 import { DataRevisionService } from '../firebase/data-revision.service';
 import { FIRESTORE } from '../firebase/firebase.providers';
 
-const READ_OPTIMIZATION_VERSION = 1;
+const READ_OPTIMIZATION_VERSION = 2;
 // Protected writes resolve the current profile through Security Rules. Keep client batches
 // safely below the rules document-access budget instead of depending on lookup caching.
 const BATCH_SIZE = 4;
 
-type PendingUpdateData = { stockStatus: StockStatus } | SaleAnalytics;
+type PendingUpdateData = { stockStatus: StockStatus } | (Partial<SaleAnalytics> & { customerSearchKey?: string });
 
 interface PendingUpdate {
   collectionName: 'products' | 'inputs' | 'sales';
@@ -86,11 +87,17 @@ export class ReadOptimizationBackfillService {
 
     for (const snapshot of salesSnapshot.docs) {
       const sale = { id: snapshot.id, ...snapshot.data() } as Sale;
-      if (sale.analyticsVersion === 1) continue;
+      const normalizedName = normalizeCustomerSearch(sale.customerName ?? '');
+      const needsIndex = Boolean(normalizedName) && sale.customerSearchKey !== normalizedName;
+      const needsAnalytics = sale.analyticsVersion !== 1;
+      if (!needsIndex && !needsAnalytics) continue;
       updates.push({
         collectionName: 'sales',
         id: sale.id,
-        data: summarizeSaleItems(sale.items),
+        data: {
+          ...(needsAnalytics ? summarizeSaleItems(sale.items) : {}),
+          ...(needsIndex ? { customerSearchKey: normalizedName } : {}),
+        },
       });
     }
 

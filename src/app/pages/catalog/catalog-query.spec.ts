@@ -11,6 +11,15 @@ describe('catalog search', () => {
     expect(matchesCatalogSearch('Classica mini cubinhos', 'Clássica', 'Mini Cubinhos')).toBe(true);
     expect(normalizeCatalogText('  ÉROS + Aroma  ')).toBe('eros aroma');
   });
+  it('allows a single letter to search inside names, codes and accents', () => {
+    expect(matchesCatalogSearch('a', 'Clássica', 'Lavanda', 'Barra Arredondada')).toBe(true);
+    expect(matchesCatalogSearch('b', 'Clássica', 'Broto de Bambu', 'Massageador')).toBe(true);
+    expect(matchesCatalogSearch('e', '+ Aroma', 'Éros', 'Patinha G')).toBe(true);
+    expect(matchesCatalogSearch('x', 'Clássica', 'Lavanda')).toBe(false);
+    expect(matchesCatalogSearch('g', 'Patinha G')).toBe(true);
+    expect(matchesCatalogSearch('g', 'Patinha M')).toBe(false);
+    expect(matchesCatalogSearch('patinha g', 'Patinha M', 'Grande embalagem')).toBe(false);
+  });
   it('does not confuse M and G variants or unrelated terms', () => {
     expect(matchesCatalogSearch('Patinha M', ...item)).toBe(false);
     expect(matchesCatalogSearch('Lavanda', ...item)).toBe(false);

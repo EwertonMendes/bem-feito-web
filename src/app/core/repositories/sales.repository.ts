@@ -1,6 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import {
   DocumentSnapshot,
+  QueryConstraint,
   collection,
   doc,
   documentId,
@@ -53,26 +54,43 @@ export class SalesRepository {
     return snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as Sale) : null;
   }
 
-  /** Indexed, bounded search across all history rather than only loaded pages. */
-  async searchHistorical(raw: string): Promise<Sale[]> {
-    const text = raw.trim();
-    if (text.length < 2 || text.length > 120) return [];
-    const normalized = normalizeCustomerSearch(text);
-    const code = /^v\d{1,6}$/i.test(text)
-      ? 'V' + text.slice(1).padStart(5,'0') : null;
-    const sales = collection(this.firestore, 'sales');
-    const snapshots = await Promise.all(code
-      ? [getDocs(query(sales,where('code','==',code),limit(1)))]
-      : [
-        getDocs(query(sales,where('customerSearchKey','>=',normalized),
-          where('customerSearchKey','<=',normalized+'\uf8ff'),limit(40))),
-        getDocs(query(sales,where('customerName','==',text),limit(40))),
-      ]);
-    const result = new Map<string,Sale>();
-    for(const snapshot of snapshots){
-      for(const document of snapshot.docs) result.set(document.id,{id:document.id,...document.data()} as Sale);
+  /** All historical pages have an explicit, stable cursor. Never filter only the loaded UI rows. */
+  async searchHistoricalPage(raw:string,filters:{
+    status?:'all'|'paid'|'open'|'cancelled';from?:string;to?:string;productId?:string
+  }={},cursor:BusinessDateCursor|null=null,pageSize=40):Promise<PageResult<Sale>>{
+    const term=normalizeCustomerSearch(raw);
+    if(term.length>120)throw new Error('Pesquisa muito longa.');
+    if(filters.from&&filters.to&&filters.from>filters.to)throw new Error('Intervalo de datas inválido.');
+    const saleCollection=collection(this.firestore,'sales');
+    const code=/^v[0-9]{1,6}$/i.test(raw.trim())?'V'+raw.trim().slice(1).padStart(5,'0'):null;
+    if(code){
+      const one=await getDocs(query(saleCollection,where('code','==',code),limit(1)));
+      return {items:one.docs.map(d=>({id:d.id,...d.data()} as Sale)).filter(s=>matchesHistoryFilters(s,filters)),
+        hasMore:false,nextCursor:null};
     }
-    return [...result.values()].sort((a,b)=>b.businessDate.localeCompare(a.businessDate));
+    if(term.length===1)throw new Error('Digite ao menos duas letras.');
+    const constraints:QueryConstraint[]=[
+      ...(term?[where('customerSearchPrefixes','array-contains',term)]:[]),
+      ...(filters.from?[where('businessDate','>=',filters.from)]:[]),
+      ...(filters.to?[where('businessDate','<=',filters.to)]:[]),
+      orderBy('businessDate','desc'),orderBy(documentId(),'desc'),
+    ];
+    const results:Sale[]=[];
+    let next=cursor;
+    for(let i=0;i<12;i++){
+      const batch=await getDocs(query(saleCollection,...constraints,
+        ...(next?[startAfter(next.businessDate,next.id)]:[]),limit(pageSize+1)));
+      for(const d of batch.docs.slice(0,pageSize)){
+        const row={id:d.id,...d.data()} as Sale;
+        next={businessDate:row.businessDate,id:row.id};
+        if(matchesHistoryFilters(row,filters))results.push(row);
+        if(results.length>=pageSize)break;
+      }
+      const more=batch.docs.length>pageSize || results.length>=pageSize;
+      if(results.length>=pageSize || !more || i===11)
+        return {items:results,hasMore:more,nextCursor:more?next:null};
+    }
+    return {items:results,hasMore:false,nextCursor:null};
   }
 
   async page(pageSize = 40, cursor?: BusinessDateCursor | null): Promise<PageResult<Sale>> {
@@ -806,4 +824,16 @@ export class SalesRepository {
       return { sale, previousBalanceCents: currentSale.balanceCents, reversedPaymentIds, stockChanges };
     });
   }
+}
+
+function matchesHistoryFilters(sale:Sale,filters:{
+  status?:'all'|'paid'|'open'|'cancelled';from?:string;to?:string;productId?:string
+}):boolean{
+  if(filters.from&&sale.businessDate<filters.from)return false;
+  if(filters.to&&sale.businessDate>filters.to)return false;
+  if(filters.status==='paid'&&sale.paymentStatus!=='paid')return false;
+  if(filters.status==='open'&&(sale.status!=='active'||sale.balanceCents<=0))return false;
+  if(filters.status==='cancelled'&&sale.status!=='cancelled')return false;
+  if(filters.productId&&!((sale.productIds??sale.items.filter(x=>x.kind==='product').map(x=>x.sourceId)).includes(filters.productId)))return false;
+  return true;
 }

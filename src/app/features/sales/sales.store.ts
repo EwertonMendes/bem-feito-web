@@ -217,6 +217,18 @@ export class SalesStore {
     }
   }
 
+  async allocateOrderLine(saleId: string, lineId: string, quantity: number): Promise<SaleFulfillmentResult | null> {
+    try {
+      const result = await this.repository.allocateOrderLine(saleId,lineId,quantity);
+      this.patchSale(result.sale);
+      this.toast.success('Unidades reservadas para esta encomenda.');
+      return result;
+    } catch (error) {
+      this.toast.error(this.errors.message(error));
+      return null;
+    }
+  }
+
   async advanceFulfillment(saleId: string, next: 'ready' | 'delivered'): Promise<SaleFulfillmentResult | null> {
     try {
       const result = await this.repository.advanceFulfillment(saleId, next);

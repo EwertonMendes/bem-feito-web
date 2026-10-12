@@ -23,6 +23,7 @@ import { productStockStatus, stockStatusForInput } from '../../domain/logic/stoc
 import { Addition, CollectionDefinition, FormatDefinition, FragranceDefinition, InputItem, Product } from '../../domain/models/catalog.model';
 import { StockMovement } from '../../domain/models/inventory.model';
 import { Payment, Sale, SaleDraft } from '../../domain/models/sales.model';
+import { allocatedQuantity, validatedAllocation } from '../../domain/logic/order-progress';
 import { resolveSaleDraft } from '../../domain/logic/sale-resolution';
 import { AuthService } from '../auth/auth.service';
 import { DataRevisionService } from '../firebase/data-revision.service';
@@ -315,6 +316,11 @@ export class SalesRepository {
         } satisfies Omit<StockMovement, 'id'>);
       }
 
+      const orderAllocations = draft.fulfillmentStatus === 'in-production' || draft.fulfillmentStatus === 'ready'
+        ? lines.filter(line => line.kind === 'product').map(line => ({
+            lineId: line.id, productId: line.sourceId,
+            quantity: draft.fulfillmentStatus === 'ready' ? line.quantity : 0,
+          })) : undefined;
       const sale: Sale = {
         id: saleRef.id,
         code: entityCode('V', saleSequence, 5),
@@ -333,6 +339,7 @@ export class SalesRepository {
         items: lines,
         paymentIds,
         stockEffects,
+        ...(orderAllocations ? { orderAllocations } : {}),
         fulfillmentStatus: draft.fulfillmentStatus ?? 'delivered',
         stockApplied: draft.fulfillmentStatus !== 'ready' && draft.fulfillmentStatus !== 'in-production',
         ...analytics,
@@ -357,6 +364,7 @@ export class SalesRepository {
         items: lines,
         paymentIds,
         stockEffects,
+        ...(orderAllocations ? { orderAllocations } : {}),
         ...analytics,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -507,6 +515,40 @@ export class SalesRepository {
 
 
   /** Advance fulfillment without changing financial settlement. */
+  /** Allocate newly available physical stock to a specific open order line. */
+  async allocateOrderLine(saleId: string, lineId: string, quantity: number): Promise<SaleFulfillmentResult> {
+    const userId = this.auth.user()?.uid;
+    if (!userId) throw new Error('Sessão inválida.');
+    return runTransaction(this.firestore, async tx => {
+      const saleRef = doc(this.firestore, 'sales', saleId);
+      const snapshot = await tx.get(saleRef);
+      if (!snapshot.exists()) throw new Error('Encomenda não encontrada.');
+      const sale = {id:snapshot.id,...snapshot.data()} as Sale;
+      if (sale.status !== 'active' || sale.stockApplied !== false || sale.fulfillmentStatus !== 'in-production')
+        throw new Error('Apenas encomendas em produção podem receber alocações.');
+      if (!sale.orderAllocations) throw new Error('Encomenda anterior ao controle individual: concilie antes de reservar.');
+      const line = sale.items.find(item => item.id === lineId && item.kind === 'product');
+      if (!line) throw new Error('Sabonete não encontrado nesta encomenda.');
+      const current = allocatedQuantity(sale.orderAllocations, line);
+      const next = validatedAllocation(line, current, quantity);
+      const productRef = doc(this.firestore, 'products', line.sourceId);
+      const productSnapshot = await tx.get(productRef);
+      if (!productSnapshot.exists()) throw new Error('Produto não encontrado no estoque.');
+      const product = {id:productSnapshot.id,...productSnapshot.data()} as Product;
+      const reserved = product.reservedPhysicalStock ?? Math.min(product.stock, product.committedStock ?? 0);
+      if (product.stock - reserved < quantity) throw new Error('Não há sabonetes livres suficientes para esta encomenda.');
+      const allocations = sale.orderAllocations.map(a => a.lineId === line.id ? {...a,quantity:next} : a);
+      tx.update(productRef, { reservedPhysicalStock: reserved + quantity,
+        updatedAt: serverTimestamp(), updatedBy:userId });
+      tx.update(saleRef, { orderAllocations: allocations,
+        updatedAt: serverTimestamp(), updatedBy:userId });
+      this.revisions.touchTransaction(tx,'sales','inventory');
+      return {sale:{...sale,orderAllocations:allocations},
+        stockChanges:[{itemType:'product' as const,itemId:product.id,stock:product.stock,
+          committedStock:product.committedStock??0,reservedPhysicalStock:reserved+quantity}]};
+    });
+  }
+
   async advanceFulfillment(saleId: string, next: 'ready' | 'delivered'): Promise<SaleFulfillmentResult> {
     const userId = this.auth.user()?.uid;
     if (!userId) throw new Error('Sessão inválida.');
@@ -520,6 +562,12 @@ export class SalesRepository {
       const previous = current.fulfillmentStatus ?? 'delivered';
       if (next === 'ready' && previous !== 'in-production') throw new Error('A encomenda não está em produção.');
       if (next === 'delivered' && previous !== 'ready') throw new Error('Marque a encomenda como pronta antes da entrega.');
+      if (current.orderAllocations && next === 'ready') {
+        for (const item of current.items.filter(line => line.kind === 'product')) {
+          if (allocatedQuantity(current.orderAllocations, item) !== item.quantity)
+            throw new Error('Ainda faltam unidades alocadas a esta encomenda. Confira os itens.');
+        }
+      }
 
       const refs = new Map<string, DocumentSnapshot>();
       for (const effect of current.stockEffects) {
@@ -537,6 +585,8 @@ export class SalesRepository {
         const physicallyReserved = Number(snapshot.data()['reservedPhysicalStock'] ?? Math.min(physical, committed));
         if (required < 0 || committed < required) throw new Error('Reserva inconsistente. É necessária conciliação.');
         if (next === 'ready') {
+          // Physical stock was already reserved on this exact order by allocateOrderLine.
+          if (current.orderAllocations && effect.itemType === 'product') continue;
           if (physical < committed) throw new Error('Ainda faltam unidades para concluir esta encomenda.');
           // Allocate currently free physical units, but never exceed total active demand.
           if (physicallyReserved < committed) {
@@ -612,9 +662,14 @@ export class SalesRepository {
           ? Math.max(0, Number(snapshot.data()['committedStock'] ?? 0) + effect.quantityDelta)
           : Number(snapshot.data()['committedStock'] ?? 0);
         const originallyReserved = Number(snapshot.data()['reservedPhysicalStock'] ?? Math.min(Number(snapshot.data()['committedStock'] ?? 0), Number(snapshot.data()['stock'] ?? 0)));
+        const allocatedHere = currentSale.orderAllocations && effect.itemType === 'product'
+          ? currentSale.orderAllocations.filter(item => item.productId === effect.itemId)
+            .reduce((total, item) => total + item.quantity, 0) : null;
         const reservedPhysicalStock = currentSale.stockApplied === false
-          ? Math.min(originallyReserved, committedStock)
-          : originallyReserved;
+          ? allocatedHere === null ? Math.min(originallyReserved, committedStock)
+            : originallyReserved - allocatedHere : originallyReserved;
+        if (reservedPhysicalStock < 0 || reservedPhysicalStock > committedStock)
+          throw new Error('Reserva global inconsistente com a encomenda. Faça a conciliação.');
         const stockStatus = effect.itemType === 'product'
           ? productStockStatus(stock, (entity as Product).minimumStock)
           : stockStatusForInput({ ...(entity as InputItem), stock });

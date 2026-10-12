@@ -378,9 +378,8 @@ for (const row of rows('Vendas')) {
         unitCostCents: cents(item['Custo Unit.']),
         totalCents: cents(item['Total Item']),
         totalCostCents: cents(item['Custo Total']),
-        stockEffects: (consumptionsBySale.get(saleId) ?? [])
-          .filter(c => text(c.Origem_ID) === text(item.Adicional_ID) && text(c.Origem) === 'Adicional')
-          .map(c => ({itemType:'input',itemId:text(c.Insumo_ID),quantityDelta:-number(c.Quantidade),unitCostCents:cents(c['Custo Unit.'])})),
+        // The original sheet records aggregate consumption, not per-line provenance.
+        // Never assign the same material to multiple identical additional rows.
       });
       continue;
     }

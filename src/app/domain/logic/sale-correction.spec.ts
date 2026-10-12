@@ -26,6 +26,28 @@ describe('sale corrections',()=>{
   it('rejects a paid amount larger than the corrected order',()=>{
     expect(()=>planSaleProductCorrection(base,draft(1,100))).toThrow('pagamentos');
   });
+  it('uses identical signatures for reordered Firestore map keys and effect array order',()=>{
+    const first={...base,
+      stockEffects:[
+        {itemType:'product' as const,itemId:'soap-1',quantityDelta:-2,unitCostCents:200},
+        {itemType:'input' as const,itemId:'bag',quantityDelta:-1,unitCostCents:30},
+      ],
+      orderAllocations:[{lineId:'line-1',productId:'soap-1',quantity:1}],
+    };
+    const second={...first,stockEffects:[
+      {unitCostCents:30,quantityDelta:-1,itemId:'bag',itemType:'input' as const},
+      {unitCostCents:200,quantityDelta:-2,itemId:'soap-1',itemType:'product' as const},
+    ],orderAllocations:[{quantity:1,productId:'soap-1',lineId:'line-1'}],
+    items:base.items.map(line=>({...line,stockEffects:[
+      {unitCostCents:200,quantityDelta:-2,itemId:'soap-1',itemType:'product' as const},
+    ]}))};
+    const normalized={...first,items:second.items.map(line=>({...line,
+      stockEffects:[{itemType:'product' as const,itemId:'soap-1',quantityDelta:-2,unitCostCents:200}],
+    }))};
+    expect(saleCorrectionSignature(normalized)).toBe(saleCorrectionSignature(second));
+    expect(saleCorrectionSignature({...normalized,receivedCents:300})).not.toBe(saleCorrectionSignature(second));
+    expect(saleCorrectionSignature({...normalized,stockEffects:[]})).not.toBe(saleCorrectionSignature(second));
+  });
   it('rejects stale revisions',()=>{
     expect(()=>planSaleProductCorrection(base,{...draft(3),expectedSignature:'outdated'})).toThrow('mudou');
   });

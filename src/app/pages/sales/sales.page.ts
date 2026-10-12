@@ -6,6 +6,9 @@ import { orderProgress } from '../../domain/logic/order-progress';
 import { CatalogStore } from '../../features/catalog/catalog.store';
 import { ModalActions } from '../../core/services/modal-actions.service';
 import { SalesStore } from '../../features/sales/sales.store';
+import { SalesRepository } from '../../core/repositories/sales.repository';
+import { ToastService } from '../../core/services/toast.service';
+import { ErrorService } from '../../core/services/error.service';
 import { formatBusinessDate } from '../../core/utils/date';
 import { formatCurrency } from '../../core/utils/money';
 import { BfDialog } from '../../shared/ui/dialog/dialog';
@@ -23,6 +26,9 @@ import { BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
 })
 export class SalesPage {
   readonly store = inject(SalesStore);
+  private readonly repository = inject(SalesRepository);
+  private readonly toast = inject(ToastService);
+  private readonly errors = inject(ErrorService);
   readonly catalog = inject(CatalogStore);
   private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
@@ -33,6 +39,10 @@ export class SalesPage {
   readonly currency = formatCurrency;
   readonly date = formatBusinessDate;
   readonly search = signal('');
+  readonly historicalMatches = signal<Sale[]>([]);
+  readonly historicalQuery = signal('');
+  readonly historicalBusy = signal(false);
+  readonly historyActive = computed(()=>this.historicalQuery().length>0 && this.search().trim()===this.historicalQuery());
   readonly statusFilter = signal<'all' | 'paid' | 'open' | 'cancelled'>('all');
   readonly pendingAction = signal<'ready' | 'delivered' | 'cancel' | 'allocate' | null>(null);
   readonly allocatingLineId = signal<string | null>(null);
@@ -46,13 +56,28 @@ export class SalesPage {
 
   readonly filteredSales = computed(() => {
     const term = this.search().trim().toLocaleLowerCase('pt-BR');
-    return this.store.sales().filter((sale) => {
+    return (this.historyActive()?this.historicalMatches():this.store.sales()).filter((sale) => {
       if (this.statusFilter() === 'paid' && sale.paymentStatus !== 'paid') return false;
       if (this.statusFilter() === 'open' && !(sale.status === 'active' && sale.balanceCents > 0)) return false;
       if (this.statusFilter() === 'cancelled' && sale.status !== 'cancelled') return false;
       return !term || (sale.code + ' ' + (sale.customerName ?? '')).toLocaleLowerCase('pt-BR').includes(term);
     });
   });
+
+  async searchAllHistory(): Promise<void> {
+    const value=this.search().trim();
+    if(value.length<2||this.historicalBusy())return;
+    this.historicalBusy.set(true);
+    this.historicalQuery.set('');
+    try {
+      this.historicalMatches.set(await this.repository.searchHistorical(value));
+      this.historicalQuery.set(value);
+    } catch(error) {
+      this.toast.error(this.errors.message(error));
+    } finally {
+      this.historicalBusy.set(false);
+    }
+  }
 
   constructor() {
     this.destroyRef.onDestroy(this.store.activateSales());

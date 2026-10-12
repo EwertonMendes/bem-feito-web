@@ -14,6 +14,7 @@ import { ProductionCorrectionRepository } from '../../src/app/core/repositories/
 import { FinanceRepository } from '../../src/app/core/repositories/finance.repository';
 import { ExpenseCorrectionRepository } from '../../src/app/core/repositories/expense-correction.repository';
 import { CashManagementRepository } from '../../src/app/core/repositories/cash-management.repository';
+import { SaleCorrectionRepository } from '../../src/app/core/repositories/sale-correction.repository';
 import { InventoryRepository } from '../../src/app/core/repositories/inventory.repository';
 
 let env: RulesTestEnvironment;
@@ -25,6 +26,7 @@ let productionCorrection: ProductionCorrectionRepository;
 let finance: FinanceRepository;
 let corrections: ExpenseCorrectionRepository;
 let cash: CashManagementRepository;
+let saleCorrections: SaleCorrectionRepository;
 let inventory: InventoryRepository;
 const day = '2026-10-05';
 const audit = () => ({ createdAt: serverTimestamp(), updatedAt: serverTimestamp(), createdBy: 'operator', updatedBy: 'operator' });
@@ -84,11 +86,33 @@ beforeEach(async () => {
   finance = runInInjectionContext(injector, () => new FinanceRepository());
   corrections = runInInjectionContext(injector, () => new ExpenseCorrectionRepository());
   cash = runInInjectionContext(injector, () => new CashManagementRepository());
+  saleCorrections = runInInjectionContext(injector, () => new SaleCorrectionRepository());
   inventory = runInInjectionContext(injector, () => new InventoryRepository());
 });
 afterAll(async () => { injector?.destroy(); await env?.cleanup(); });
 
 describe('Actual repositories against restrictive emulator rules', () => {
+  it('audits a customer correction without touching inventory, totals or payments', async () => {
+    const created=await sales.create(draft());
+    const beforeStock=(await data('products','p'))?.['stock'];
+    const corrected=await saleCorrections.correctMetadata(created.sale.id,{
+      customerName:'Cliente Atualizado',dueDate:'2026-10-20',notes:'Retirada combinada',
+      reason:'Cliente informou nome errado',
+    });
+    expect(corrected.customerName).toBe('Cliente Atualizado');
+    expect(await data('sales',created.sale.id)).toMatchObject({
+      customerName:'Cliente Atualizado',customerSearchKey:'cliente atualizado',
+      dueDate:'2026-10-20',notes:'Retirada combinada',
+      totalCents:1000,
+    });
+    expect((await data('products','p'))?.['stock']).toBe(beforeStock);
+    expect(await count('saleCorrections')).toBe(1);
+    await expect(saleCorrections.correctMetadata(created.sale.id,{
+      customerName:'Cliente Atualizado',dueDate:'2026-10-20',notes:'Retirada combinada',reason:'Repetição',
+    })).rejects.toThrow('Nenhuma alteração');
+  });
+
+
   it('requires a specific equipment name and preserves it across audited corrections', async () => {
     await expect(finance.createExpense({
       businessDate: day, kind: 'equipment', amountCents: 2790,

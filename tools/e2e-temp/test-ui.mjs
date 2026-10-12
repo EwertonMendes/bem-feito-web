@@ -46,7 +46,9 @@ try {
   await page.getByRole('button',{name:/Editar venda/}).click();
   await page.locator('.advanced-item-row input[type="number"]').first().fill('3');
   await page.locator('.sale-item-correction textarea').fill('Corrigir quantidade no E2E');
-  await page.locator('.advanced-stock-confirm bf-checkbox input').check();
+  await page.getByText('Conferi o estoque físico').click();
+  if(!await page.locator('.advanced-stock-confirm bf-checkbox input').isChecked())
+    throw Error('The shared checkbox label did not toggle its state');
   await page.getByRole('button',{name:/Confirmar edição/}).click();
   await page.getByText('3× Lavanda Barra').waitFor({timeout:35000});
   const stored=(await db.doc('sales/e2e-sale-1').get()).data();

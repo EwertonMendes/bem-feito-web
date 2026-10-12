@@ -16,6 +16,7 @@ import { formatCurrency } from '../../core/utils/money';
 import { downloadCsv, exportCents } from '../../core/utils/csv-export';
 import { BfDialog } from '../../shared/ui/dialog/dialog';
 import { BfSelect } from '../../shared/ui/select/select';
+import { BfCheckbox } from '../../shared/ui/checkbox/checkbox';
 import { BusinessDateCursor } from '../../core/repositories/pagination';
 import { BfIcon } from '../../shared/ui/icon/icon';
 import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
@@ -24,7 +25,7 @@ import { BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
 
 @Component({
   selector: 'bf-sales-page',
-  imports: [BfLoadingButton, BfIcon, BfDialog, BfSelect, BfEmptyState, BfPageRefresh, BfTableSkeleton],
+  imports: [BfLoadingButton, BfIcon, BfDialog, BfSelect, BfCheckbox, BfEmptyState, BfPageRefresh, BfTableSkeleton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sales.page.html',
   styleUrl: './sales.page.scss',

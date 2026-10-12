@@ -316,8 +316,13 @@ export class SalesRepository {
           : stockStatusForInput({ ...(entity as InputItem), stock });
 
         const physicalAllocation = draft.fulfillmentStatus === 'ready' ? required : 0;
+        const explicitCounters = isReservation && effect.itemType === 'product' ? {
+          explicitCommittedStock: (entity as Product).explicitCommittedStock === undefined
+            ? required : (entity as Product).explicitCommittedStock! + required,
+          explicitAllocatedStock: ((entity as Product).explicitAllocatedStock ?? 0) + physicalAllocation,
+        } : {};
         transaction.update(targetRef, { stock, stockStatus,
-          ...(isReservation ? { committedStock: committedStock + required, reservedPhysicalStock: reservedPhysicalStock + physicalAllocation } : {}),
+          ...(isReservation ? { committedStock: committedStock + required, reservedPhysicalStock: reservedPhysicalStock + physicalAllocation, ...explicitCounters } : {}),
           updatedAt: serverTimestamp(), updatedBy: userId });
         stockChanges.push({ itemType: effect.itemType, itemId: effect.itemId, stock, ...(isReservation ? { committedStock: committedStock + required, reservedPhysicalStock: reservedPhysicalStock + physicalAllocation } : {}) });
         if (isReservation) continue;
@@ -563,8 +568,14 @@ export class SalesRepository {
       const reserved = product.reservedPhysicalStock ?? Math.min(product.stock, product.committedStock ?? 0);
       if (product.stock - reserved < quantity) throw new Error('Não há sabonetes livres suficientes para esta encomenda.');
       const allocations = sale.orderAllocations.map(a => a.lineId === line.id ? {...a,quantity:next} : a);
-      tx.update(productRef, { reservedPhysicalStock: reserved + quantity,
-        updatedAt: serverTimestamp(), updatedBy:userId });
+      const allocatedExplicit = product.explicitAllocatedStock ?? 0;
+      const committedExplicit = product.explicitCommittedStock ?? 0;
+      if (allocatedExplicit + quantity > committedExplicit)
+        throw new Error('Os compromissos da encomenda estão inconsistentes.');
+      tx.update(productRef, {
+        reservedPhysicalStock: reserved + quantity, explicitAllocatedStock: allocatedExplicit + quantity,
+        updatedAt: serverTimestamp(), updatedBy:userId,
+      });
       tx.update(saleRef, { orderAllocations: allocations,
         updatedAt: serverTimestamp(), updatedBy:userId });
       const history = doc(collection(this.firestore, 'orderAllocationHistory'));
@@ -636,7 +647,15 @@ export class SalesRepository {
         const stockStatus = effect.itemType === 'product'
           ? productStockStatus(stock, (entity as Product).minimumStock)
           : stockStatusForInput({ ...(entity as InputItem), stock });
-        transaction.update(snapshot.ref, { stock, committedStock, reservedPhysicalStock, stockStatus, updatedAt: serverTimestamp(), updatedBy: userId });
+        const tracked = current.orderAllocations && effect.itemType === 'product';
+        const explicitCounters = tracked ? {
+          explicitCommittedStock: (entity as Product).explicitCommittedStock! - required,
+          explicitAllocatedStock: (entity as Product).explicitAllocatedStock! - required,
+        } : {};
+        if (tracked && (explicitCounters.explicitCommittedStock! < 0 || explicitCounters.explicitAllocatedStock! < 0))
+          throw new Error('Contadores de encomendas inconsistentes.');
+        transaction.update(snapshot.ref, { stock, committedStock, reservedPhysicalStock, stockStatus,
+          ...explicitCounters, updatedAt: serverTimestamp(), updatedBy: userId });
         changes.push({ itemType: effect.itemType, itemId: effect.itemId, stock, committedStock, reservedPhysicalStock });
         const movementRef = doc(collection(this.firestore, 'stockMovements'));
         transaction.set(movementRef, {
@@ -704,11 +723,19 @@ export class SalesRepository {
           ? productStockStatus(stock, (entity as Product).minimumStock)
           : stockStatusForInput({ ...(entity as InputItem), stock });
 
+        const tracked = currentSale.stockApplied === false && currentSale.orderAllocations && effect.itemType === 'product';
+        const trackedCounters = tracked ? {
+          explicitCommittedStock: (entity as Product).explicitCommittedStock! + effect.quantityDelta,
+          explicitAllocatedStock: (entity as Product).explicitAllocatedStock! - (allocatedHere ?? 0),
+        } : {};
+        if (tracked && (trackedCounters.explicitCommittedStock! < 0 || trackedCounters.explicitAllocatedStock! < 0))
+          throw new Error('Contadores de encomendas inconsistentes.');
         transaction.update(snapshot.ref, {
           stock,
           stockStatus,
           committedStock,
           reservedPhysicalStock,
+          ...trackedCounters,
           updatedAt: serverTimestamp(),
           updatedBy: userId,
         });

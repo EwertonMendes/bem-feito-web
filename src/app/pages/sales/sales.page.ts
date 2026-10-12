@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, afterNextRender, comput
 import { ActivatedRoute, Router } from '@angular/router';
 import { Sale } from '../../domain/models/sales.model';
 import { orderProgress } from '../../domain/logic/order-progress';
+import { planSaleProductCorrection, saleCorrectionSignature, SaleProductLineChange } from '../../domain/logic/sale-correction';
 import { CatalogStore } from '../../features/catalog/catalog.store';
 import { ModalActions } from '../../core/services/modal-actions.service';
 import { SalesStore } from '../../features/sales/sales.store';
@@ -44,8 +45,21 @@ export class SalesPage {
   readonly historicalBusy = signal(false);
   readonly historyActive = computed(()=>this.historicalQuery().length>0 && this.search().trim()===this.historicalQuery());
   readonly statusFilter = signal<'all' | 'paid' | 'open' | 'cancelled'>('all');
-  readonly pendingAction = signal<'ready' | 'delivered' | 'cancel' | 'allocate' | 'correct' | null>(null);
+  readonly pendingAction = signal<'ready' | 'delivered' | 'cancel' | 'allocate' | 'correct' | 'correct-items' | null>(null);
   readonly editingDetails = signal(false);
+  readonly editingItems = signal(false);
+  readonly productChanges = signal<SaleProductLineChange[]>([]);
+  readonly correctionDiscountCents = signal(0);
+  readonly correctionReason = signal('');
+  readonly correctionSignature = signal('');
+  readonly correctionPreview = computed(() => {
+    const sale=this.selectedSale();
+    if(!sale || !this.editingItems())return null;
+    try{return {value:planSaleProductCorrection(sale,{
+      expectedSignature:this.correctionSignature(),lines:this.productChanges(),
+      discountCents:this.correctionDiscountCents(),reason:this.correctionReason(),
+    }),error:''};}catch(error){return {value:null,error:error instanceof Error?error.message:'Revisão inválida.'};}
+  });
   readonly metadataDraft = signal({customerName:'',dueDate:'',notes:'',reason:''});
     readonly allocatingLineId = signal<string | null>(null);
   readonly allocationQuantity = signal(1);
@@ -101,8 +115,42 @@ export class SalesPage {
     if (this.pendingAction()) return;
     this.selectedSnapshot.set(sale);
     this.editingDetails.set(false);
+    this.editingItems.set(false);
     this.metadataDraft.set({customerName:sale.customerName??'',dueDate:sale.dueDate??'',notes:sale.notes??'',reason:''});
     this.detailDialog().open();
+  }
+
+  openItemCorrection(sale:Sale):void {
+    this.editingDetails.set(false);
+    this.editingItems.set(true);
+    this.productChanges.set(sale.items.filter(item=>item.kind==='product').map(item=>({
+      lineId:item.id,quantity:item.quantity,unitPriceCents:item.unitPriceCents,
+    })));
+    this.correctionDiscountCents.set(sale.discountCents);
+    this.correctionReason.set('');
+    this.correctionSignature.set(saleCorrectionSignature(sale));
+  }
+
+  patchProductLine(id:string,field:'quantity'|'unitPriceCents',value:number):void {
+    this.productChanges.update(lines=>lines.map(item=>item.lineId===id?{...item,[field]:value}:item));
+  }
+
+  async correctSelectedItems():Promise<void> {
+    if(this.pendingAction())return;
+    const sale=this.selectedSale(), preview=this.correctionPreview();
+    if(!sale||!preview?.value||this.correctionReason().trim().length<4)return;
+    this.pendingAction.set('correct-items');
+    try{
+      const result=await this.store.correctProductLines(sale.id,{
+        expectedSignature:this.correctionSignature(),lines:this.productChanges(),
+        discountCents:this.correctionDiscountCents(),reason:this.correctionReason(),
+      });
+      if(result){
+        this.catalog.applyStockChanges(result.stockChanges);
+        this.selectedSnapshot.set(result.sale);
+        this.editingItems.set(false);
+      }
+    }finally{this.pendingAction.set(null);}
   }
 
   showAllocation(lineId: string): void {

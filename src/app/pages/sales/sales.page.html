@@ -289,7 +289,7 @@
         }
       </div>
       <div class="bf-dialog-footer">
-        @if(sale.status==='active' && !editingDetails() && !editingItems() && hasProductLines(sale)) { <button class="bf-button secondary" type="button" [disabled]="!!pendingAction()" (click)="openItemCorrection(sale)"><bf-icon name="details"/ > Editar venda</button> }
+        @if(sale.status==='active' && !editingDetails() && !editingItems() && hasProductLines(sale)) { <button class="bf-button secondary" type="button" [disabled]="!!pendingAction()" (click)="openItemCorrection(sale)"><bf-icon name="details"/> Editar venda</button> }
         @if(sale.status==='active' && !editingDetails() && !editingItems()) { <button class="bf-button secondary" type="button" [disabled]="!!pendingAction()" (click)="editingDetails.set(true)"><bf-icon name="details"/> Corrigir dados</button> }
         @if (sale.status==='active' && sale.balanceCents>0){<button class="bf-button" type="button" (click)="modals.openReceipt(sale.id)"><bf-icon name="payment"/> Receber</button>}
         @if (sale.status==='active' && sale.fulfillmentStatus==='in-production'){<button class="bf-button" type="button" [disabled]="!!pendingAction()" [bfLoadingButton]="pendingAction()==='ready'" (click)="advanceSelected('ready')">{{pendingAction()==='ready'?'Atualizando...':'Marcar pronta'}}</button>}

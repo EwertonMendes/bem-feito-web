@@ -8,6 +8,7 @@ import {
   getAggregateFromServer,
   getDocs,
   getDoc,
+  getDocFromServer,
   limit,
   orderBy,
   query,
@@ -48,6 +49,12 @@ export class SalesRepository {
   private readonly firestore = inject(FIRESTORE);
   private readonly auth = inject(AuthService);
   private readonly revisions = inject(DataRevisionService);
+
+  /** Read the authoritative server version before entering an auditable edit. */
+  async findByIdFromServer(id: string): Promise<Sale | null> {
+    const snapshot = await getDocFromServer(doc(this.firestore, 'sales', id));
+    return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } as Sale : null;
+  }
 
   async findById(id: string): Promise<Sale | null> {
     const snapshot = await getDoc(doc(this.firestore, 'sales', id));

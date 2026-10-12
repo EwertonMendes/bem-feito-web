@@ -69,8 +69,17 @@ export class SalesRepository {
         hasMore:false,nextCursor:null};
     }
     if(term.length===1)throw new Error('Digite ao menos duas letras.');
+    // Firestore allows only one array-contains per disjunction. Product and
+    // customer can still be combined by using the more selective index,
+    // followed by a bounded, cursored check of the secondary dimension.
+    const indexedProduct=Boolean(filters.productId && !term);
+    const indexedStatus=Boolean(!term && !filters.productId && filters.status && filters.status!=='all');
     const constraints:QueryConstraint[]=[
       ...(term?[where('customerSearchPrefixes','array-contains',term)]:[]),
+      ...(indexedProduct?[where('productIds','array-contains',filters.productId!)]:[]),
+      ...(indexedStatus && filters.status==='cancelled'?[where('status','==','cancelled')]:[]),
+      ...(indexedStatus && filters.status==='paid'?[where('paymentStatus','==','paid')]:[]),
+      ...(indexedStatus && filters.status==='open'?[where('paymentStatus','in',['pending','partial'])]:[]),
       ...(filters.from?[where('businessDate','>=',filters.from)]:[]),
       ...(filters.to?[where('businessDate','<=',filters.to)]:[]),
       orderBy('businessDate','desc'),orderBy(documentId(),'desc'),
@@ -86,7 +95,7 @@ export class SalesRepository {
         if(matchesHistoryFilters(row,filters))results.push(row);
         if(results.length>=pageSize)break;
       }
-      const more=batch.docs.length>pageSize || results.length>=pageSize;
+      const more=batch.docs.length>pageSize;
       if(results.length>=pageSize || !more || i===11)
         return {items:results,hasMore:more,nextCursor:more?next:null};
     }

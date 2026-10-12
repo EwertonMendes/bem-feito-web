@@ -313,6 +313,20 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
+          "fieldPath": "fundingType",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "amountCents",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "expenses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
           "fieldPath": "fundingSource",
           "order": "ASCENDING"
         },

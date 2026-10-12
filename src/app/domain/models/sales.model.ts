@@ -40,6 +40,8 @@ export interface Sale extends AuditFields {
   code: string;
   businessDate: string;
   customerName?: string;
+  /** Indexed normalized key for history search. Legacy documents may not have it yet. */
+  customerSearchKey?: string;
   dueDate?: string;
   discountCents: number;
   subtotalCents: number;

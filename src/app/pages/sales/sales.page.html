@@ -262,11 +262,17 @@
                 <p class="sale-correction-error" role="alert"><bf-icon name="alert"/> {{preview.error}}</p>
               }
             }
+            @if(sale.stockApplied!==false && correctionPreview()?.value?.inventoryDeltas?.length){
+              <label class="advanced-stock-confirm"><input type="checkbox" [checked]="advancedStockConfirmed()"
+                (change)="advancedStockConfirmed.set($any($event.target).checked)"/>
+                <span>Conferi o estoque físico e confirmo que a alteração de sabonetes e insumos reflete a movimentação real.</span>
+              </label>
+            }
             <div class="sale-metadata-actions">
               <button class="bf-button secondary" type="button" [disabled]="!!pendingAction()"
                 (click)="editingItems.set(false)">Cancelar</button>
               <button class="bf-button" type="button"
-                [disabled]="!!pendingAction() || !correctionPreview()?.value || correctionReason().trim().length<4"
+                [disabled]="!!pendingAction() || !correctionPreview()?.value || correctionReason().trim().length<4 || (sale.stockApplied!==false && !!correctionPreview()?.value?.inventoryDeltas?.length && !advancedStockConfirmed())"
                 (click)="correctSelectedItems()">Confirmar edição</button>
             </div>
           </section>

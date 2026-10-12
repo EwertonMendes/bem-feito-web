@@ -542,6 +542,11 @@ export class SalesRepository {
         updatedAt: serverTimestamp(), updatedBy:userId });
       tx.update(saleRef, { orderAllocations: allocations,
         updatedAt: serverTimestamp(), updatedBy:userId });
+      const history = doc(collection(this.firestore, 'orderAllocationHistory'));
+      tx.set(history, { saleId, lineId, productId: line.sourceId, businessDate: todayBusinessDate(),
+        quantityAdded: quantity, before: current, after: next,
+        createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+        createdBy: userId, updatedBy: userId });
       this.revisions.touchTransaction(tx,'sales','inventory');
       return {sale:{...sale,orderAllocations:allocations},
         stockChanges:[{itemType:'product' as const,itemId:product.id,stock:product.stock,

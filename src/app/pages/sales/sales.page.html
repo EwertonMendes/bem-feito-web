@@ -20,7 +20,7 @@
         <label class="search">
           <bf-icon name="search" />
           <input type="search" aria-label="Buscar vendas por cliente ou código"
-            placeholder="Cliente ou código da venda"
+            placeholder="Cliente ou código"
             [value]="search()" (input)="search.set($any($event.target).value)"
             (keydown.enter)="searchAllHistory()" />
         </label>
@@ -87,7 +87,7 @@
   </section>
 
   @if(historyActive()){
-    <p class="history-feedback" role="status">{{historicalMatches().length}} resultado(s) {{historyHasMore()?'nesta página de busca':'encontrado(s)'}}. Consulta em todo o histórico, com filtros cumulativos.</p>
+    <p class="history-feedback" role="status"><bf-icon name="search"/> {{historicalMatches().length}} {{historicalMatches().length===1?'venda encontrada':'vendas encontradas'}}{{historyHasMore()?' nesta etapa da busca':' no histórico'}}.</p>
   }
     @if (!store.initialized()) {
     <bf-table-skeleton [columns]="8" [rows]="7" />
@@ -199,6 +199,7 @@
         <button class="bf-floating-close" type="button" aria-label="Fechar detalhes" (click)="detailDialog.close()"><bf-icon name="close" /></button>
       </div>
       <div class="bf-dialog-body">
+        @if(!editingItems()) {
         <div class="detail-total"><span>Total · {{ fulfillmentLabel(sale) }}</span><strong>{{ currency(sale.totalCents) }}</strong></div>
         <div class="detail-grid">
           <div><span>Recebido</span><strong>{{ currency(sale.receivedCents) }}</strong></div>
@@ -256,6 +257,7 @@
           </section>
         }
         @if (sale.notes && !editingDetails()) { <p class="notes">{{ sale.notes }}</p> }
+        }
         @if(editingItems()){
           <section class="sale-item-correction" aria-label="Editar itens da venda">
             <h3><bf-icon name="details"/> Editar venda</h3>
@@ -359,10 +361,10 @@
       <div class="bf-dialog-footer">
         @if(sale.status==='active' && !editingDetails() && !editingItems() && hasProductLines(sale)) { <button class="bf-button secondary" type="button" [disabled]="!!pendingAction() || openingItemEditor()" [bfLoadingButton]="openingItemEditor()" (click)="openItemCorrection(sale)"><bf-icon name="details"/> {{openingItemEditor()?"Carregando...":"Editar venda"}}</button> }
         @if(sale.status==='active' && !editingDetails() && !editingItems()) { <button class="bf-button secondary" type="button" [disabled]="!!pendingAction()" (click)="editingDetails.set(true)"><bf-icon name="details"/> Corrigir dados</button> }
-        @if (sale.status==='active' && sale.balanceCents>0){<button class="bf-button" type="button" (click)="modals.openReceipt(sale.id)"><bf-icon name="payment"/> Receber</button>}
-        @if (sale.status==='active' && sale.fulfillmentStatus==='in-production'){<button class="bf-button" type="button" [disabled]="!!pendingAction()" [bfLoadingButton]="pendingAction()==='ready'" (click)="advanceSelected('ready')">{{pendingAction()==='ready'?'Atualizando...':'Marcar pronta'}}</button>}
-        @if (sale.status==='active' && sale.fulfillmentStatus==='ready'){<button class="bf-button" type="button" [disabled]="!!pendingAction()" [bfLoadingButton]="pendingAction()==='delivered'" (click)="advanceSelected('delivered')">{{pendingAction()==='delivered'?'Atualizando...':'Entregar / retirar'}}</button>}
-        @if (sale.status!=='cancelled') { <button class="bf-button danger" type="button" [disabled]="!!pendingAction()" [bfLoadingButton]="pendingAction()==='cancel'" (click)="cancelSelected()">{{pendingAction()==='cancel'?'Cancelando...':'Cancelar venda'}}</button> }
+        @if (sale.status==='active' && sale.balanceCents>0 && !editingItems() && !editingDetails()){<button class="bf-button" type="button" (click)="modals.openReceipt(sale.id)"><bf-icon name="payment"/> Receber</button>}
+        @if (sale.status==='active' && sale.fulfillmentStatus==='in-production' && !editingItems() && !editingDetails()){<button class="bf-button" type="button" [disabled]="!!pendingAction()" [bfLoadingButton]="pendingAction()==='ready'" (click)="advanceSelected('ready')">{{pendingAction()==='ready'?'Atualizando...':'Marcar pronta'}}</button>}
+        @if (sale.status==='active' && sale.fulfillmentStatus==='ready' && !editingItems() && !editingDetails()){<button class="bf-button" type="button" [disabled]="!!pendingAction()" [bfLoadingButton]="pendingAction()==='delivered'" (click)="advanceSelected('delivered')">{{pendingAction()==='delivered'?'Atualizando...':'Entregar / retirar'}}</button>}
+        @if (sale.status!=='cancelled' && !editingItems() && !editingDetails()) { <button class="bf-button danger" type="button" [disabled]="!!pendingAction()" [bfLoadingButton]="pendingAction()==='cancel'" (click)="cancelSelected()">{{pendingAction()==='cancel'?'Cancelando...':'Cancelar venda'}}</button> }
         <button class="bf-button secondary" type="button" (click)="detailDialog.close()">Fechar</button>
       </div>
     }

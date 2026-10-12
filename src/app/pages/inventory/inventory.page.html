@@ -1,6 +1,7 @@
 <section class="bf-page">
   <header class="bf-page-header">
     <div><h1>Estoque</h1><p>Produtos acabados com saldo operacional e insumos no nível de controle que faz sentido para cada material.</p></div>
+    <button class="bf-button secondary" type="button" [disabled]="!initialized()" (click)="exportInventory()"><bf-icon name="details"/> Exportar estoque CSV</button>
   </header>
 
   @if (refreshing()) { <bf-page-refresh /> }

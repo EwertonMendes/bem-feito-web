@@ -20,17 +20,22 @@
       <input type="search" placeholder="Cliente ou ID" [value]="search()" (input)="search.set($any($event.target).value)" />
     </label>
 
-    <button type="button" class="bf-button secondary historical-search" [disabled]="search().trim().length < 2 || historicalBusy()" (click)="searchAllHistory()"><bf-icon name="search"/> {{historicalBusy()?'Buscando...':'Buscar no histórico'}}</button>
+    <button type="button" class="bf-button secondary historical-search" [disabled]="search().trim().length===1 || historicalBusy()" (click)="searchAllHistory()"><bf-icon name="search"/> {{historicalBusy()?'Buscando...':'Buscar histórico'}}</button>
+    <div class="sales-history-filters" aria-label="Filtros de busca histórica">
+      <label>De <input class="bf-input" type="date" [value]="historyFrom()" (input)="historyFrom.set($any($event.target).value)"/></label>
+      <label>Até <input class="bf-input" type="date" [min]="historyFrom()" [value]="historyTo()" (input)="historyTo.set($any($event.target).value)"/></label>
+      <bf-select ariaLabel="Filtrar por sabonete" [options]="productFilterOptions()" [value]="historyProduct()" (valueChange)="historyProduct.set($event)"/>
+    </div>
         <div class="bf-segments status-tabs" aria-label="Filtrar vendas por status">
-      <button [class.active]="statusFilter()==='all'" (click)="statusFilter.set('all')">Todas</button>
-      <button [class.active]="statusFilter()==='paid'" (click)="statusFilter.set('paid')">Pagas</button>
-      <button [class.active]="statusFilter()==='open'" (click)="statusFilter.set('open')">Em aberto</button>
-      <button [class.active]="statusFilter()==='cancelled'" (click)="statusFilter.set('cancelled')">Canceladas</button>
+      <button [class.active]="statusFilter()==='all'" (click)="setHistoryStatus('all')">Todas</button>
+      <button [class.active]="statusFilter()==='paid'" (click)="setHistoryStatus('paid')">Pagas</button>
+      <button [class.active]="statusFilter()==='open'" (click)="setHistoryStatus('open')">Em aberto</button>
+      <button [class.active]="statusFilter()==='cancelled'" (click)="setHistoryStatus('cancelled')">Canceladas</button>
     </div>
   </div>
 
   @if(historyActive()){
-    <p class="history-feedback" role="status">{{historicalMatches().length}} resultado(s) do histórico para “{{historicalQuery()}}”. A busca por cliente inclui os registros já indexados; códigos de venda funcionam em todo o histórico.</p>
+    <p class="history-feedback" role="status">{{historicalMatches().length}} resultado(s) {{historyHasMore()?'nesta página de busca':'encontrado(s)'}}. Consulta em todo o histórico, com filtros cumulativos.</p>
   }
     @if (!store.initialized()) {
     <bf-table-skeleton [columns]="8" [rows]="7" />
@@ -110,7 +115,9 @@
         </article>
       }
     </div>
-    @if (store.hasMore()) {
+    @if (historyActive() && historyHasMore()) {
+      <div class="bf-actions"><button class="bf-button secondary" type="button" [disabled]="historicalBusy()" (click)="loadMoreHistory()"><bf-icon name="details"/> {{historicalBusy()?'Carregando...':'Carregar mais resultados'}}</button></div>
+    } @else if (!historyActive() && store.hasMore()) {
       <div class="bf-actions"><button class="bf-button secondary" type="button" [disabled]="store.loadingMore()" (click)="store.loadMore()">{{ store.loadingMore() ? 'Carregando...' : 'Carregar mais' }}</button></div>
     }
   } @else {

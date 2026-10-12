@@ -71,7 +71,7 @@
     </div>
     <div class="compact-metrics" aria-label="Resumo de capital e operações">
     <article class="compact-card"><span class="compact-icon"><bf-icon name="cash-flow" /></span><span>Saldo bancário confirmado</span><strong>{{ store.bankSnapshotCents() === null ? 'Não conciliado' : currency(store.bankSnapshotCents()!) }}</strong></article>
-    <article class="compact-card"><span class="compact-icon"><bf-icon name="received" /></span><span>Aportes em compras</span><strong>{{ currency(store.ownerFundedCents()) }}</strong></article>
+    <article class="compact-card"><span class="compact-icon"><bf-icon name="received" /></span><span>Compras pagas por terceiros</span><strong>{{ currency(store.ownerFundedCents()) }}</strong></article>
     <article class="compact-card"><span class="compact-icon"><bf-icon name="order" /></span><span>Encomendas abertas</span><strong>{{ store.ordersPending() }}</strong></article>
   </div>
   <div class="financial-strip">@for (item of skeletonThree; track item) { <article class="financial-card"><bf-skeleton shape="circle" width="44px" height="44px" /><div style="width:100%"><bf-skeleton width="86px" height="10px" radius="5px" /><div style="height:8px"></div><bf-skeleton width="128px" height="20px" /></div></article> }</div>

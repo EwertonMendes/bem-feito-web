@@ -94,7 +94,14 @@ export class SaleCorrectionRepository {
           const nextCommitted=committed+demandDelta;
           if(nextCommitted<0||reserved>nextCommitted)
             throw new Error('A correção entraria em conflito com unidades já reservadas.');
-          tx.update(record.ref,{committedStock:nextCommitted,updatedAt:serverTimestamp(),updatedBy:userId});
+          const tracked = Boolean(current.orderAllocations);
+          const explicitNext = (product.explicitCommittedStock ?? 0) + (tracked ? demandDelta : 0);
+          if (tracked && (explicitNext < 0 || explicitNext > nextCommitted ||
+              (product.explicitAllocatedStock ?? 0) > explicitNext))
+            throw new Error('A correção conflita com unidades alocadas a encomendas.');
+          tx.update(record.ref,{committedStock:nextCommitted,
+            ...(tracked?{explicitCommittedStock:explicitNext}:{}),
+            updatedAt:serverTimestamp(),updatedBy:userId});
           stockChanges.push({itemType:'product',itemId:productId,stock:product.stock,
             committedStock:nextCommitted,reservedPhysicalStock:reserved});
         }else{

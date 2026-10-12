@@ -155,8 +155,15 @@ export class ProductionCorrectionRepository {
         const reserved = product.reservedPhysicalStock ?? Math.min(product.stock, committed);
         if (stock < 0 || stock + 1e-6 < reserved)
           throw new Error('Não é possível reduzir ' + product.displayName + ': unidades já foram vendidas ou reservadas. Confira o estoque antes de corrigir.');
+        const explicitCommitted = product.explicitCommittedStock ?? 0;
+        const explicitAllocated = product.explicitAllocatedStock ?? 0;
+        if (explicitCommitted > committed || explicitAllocated > reserved ||
+            explicitAllocated > explicitCommitted)
+          throw new Error('Reservas de encomendas inconsistentes: corrija antes de alterar a produção.');
+        const legacyDemand = committed - explicitCommitted;
+        const legacyReserved = reserved - explicitAllocated;
         const nextReserved = quantityDelta > 0
-          ? Math.min(stock, reserved + Math.min(quantityDelta, Math.max(0, committed - reserved))) : reserved;
+          ? Math.min(stock, reserved + Math.min(quantityDelta, Math.max(0, legacyDemand - legacyReserved))) : reserved;
         const item = after.find(x => x.productId === itemId);
         const cost = quantityDelta > 0 ? (item?.unitCostCents ?? product.averageUnitCostCents) : product.averageUnitCostCents;
         impacts.push({ itemType: 'product', itemId, name: product.displayName, quantityDelta, stockBefore: product.stock, stockAfter: stock, unitLabel: 'un.' });

@@ -30,7 +30,7 @@ import { DataRevisionService } from '../firebase/data-revision.service';
 import { FIRESTORE } from '../firebase/firebase.providers';
 import { todayBusinessDate } from '../utils/date';
 import { entityCode } from '../utils/ids';
-import { normalizeCustomerSearch } from '../utils/customer-search';
+import { customerSearchPrefixes, normalizeCustomerSearch } from '../utils/customer-search';
 import { allocatePayments, paymentStatus } from '../utils/sale-calculations';
 import {
   SaleCancellationResult,

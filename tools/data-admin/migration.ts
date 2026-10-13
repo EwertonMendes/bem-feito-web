@@ -54,8 +54,8 @@ export async function prepareMigration(request: Request, db: Firestore, env: any
     Number.isSafeInteger(bank.ownerFundedCents) && bank.ownerFundedCents >= 0 &&
     bank.reimbursementDueCents === 0 && /^\d{4}-\d{2}-\d{2}$/.test(bank.businessDate),
     'Bank snapshot is invalid');
-  for (const [name, total] of Object.entries({ sales: 25, payments: 25, productions: 48, expenses: 16 })) invariant(data[name]?.length === total, 'Approved source counts differ');
-  for (const [id, state] of [['V00024', 'delivered'], ['V00025', 'ready']]) invariant(data.sales.find((sale: any) => sale.id === id)?.fulfillmentStatus === state, 'Order reconciliation differs');
+  for (const [name, total] of Object.entries({ sales: 29, payments: 29, productions: 72, expenses: 16 })) invariant(data[name]?.length === total, 'Approved source counts differ');
+  for (const [id, state] of [['V00024', 'delivered'], ['V00025', 'delivered'], ['V00029', 'in-production']]) invariant(data.sales.find((sale: any) => sale.id === id)?.fulfillmentStatus === state, 'Order reconciliation differs');
   invariant(data.kits.length === 0 && !data.formats.some((format: any) => format.name === 'Kit Mini') &&
     !data.products.some((p: any) => String(p.displayName).includes('Kit Mini')) &&
     data.sales.every((s: any) => s.items.every((item: any) => item.kind === 'product' || item.kind === 'addition')),

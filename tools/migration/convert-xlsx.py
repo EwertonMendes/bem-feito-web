@@ -22,6 +22,17 @@ keys = {
     'Preços de Formato':'Preço_ID','Adicionais':'Adicional_ID',
     'Itens do Adicional':'Adicional_Item_ID','Consumos da Venda':'Consumo_ID'
 }
+# Source tables contain many preallocated IDs without actual business records.
+# Skip these rows, and never import zero-quantity, explicitly annulled production.
+record_discriminator = {
+    'Vendas': 'Cliente', 'Itens da Venda': 'Venda_ID',
+    'Recebimentos': 'Venda_ID', 'Produção': 'Produto_ID',
+    'Compras e Despesas': 'Tipo', 'Produtos': 'Nome de Exibição',
+    'Insumos': 'Insumo', 'Receitas': 'Produto_ID',
+    'Ajustes de Estoque': 'Motivo', 'Cadastros': 'Tipo',
+    'Preços de Formato': 'Formato', 'Adicionais': 'Nome',
+    'Itens do Adicional': 'Adicional_ID', 'Consumos da Venda': 'Venda_ID'
+}
 required = {
     'Vendas','Itens da Venda','Recebimentos','Produção','Compras e Despesas','Produtos',
     'Insumos','Adicionais','Itens do Adicional','Cadastros','Preços de Formato'
@@ -56,6 +67,12 @@ for page in workbook.worksheets:
         if page.title in keys:
             if not str(record.get(keys[page.title], '')).strip():
                 continue
+            if not str(record.get(record_discriminator[page.title], '')).strip():
+                continue
+            if page.title == 'Produção':
+                quantity = record.get('Quantidade')
+                if not isinstance(quantity, (int, float)) or quantity <= 0:
+                    continue
         results.append(record)
     if page.title in keys:
         sheets[page.title] = results

@@ -15,7 +15,7 @@
       "provider": "projects/312978463343/locations/global/workloadIdentityPools/github-data/providers/github",
       "reader": "github-data-dev-read@bem-feito-dev.iam.gserviceaccount.com",
       "writer": "github-data-dev@bem-feito-dev.iam.gserviceaccount.com",
-      "snapshotId": "1yl2UmNXgElZgCAGDx-srlKDUfn3ovWHPANkL9jOl6gA"
+      "snapshotId": "1IIJVNNSfkF3AXVPUW_ndqHnjVKoyx0Q4d4hHjOQJlsw"
     },
     "prod": null
   }

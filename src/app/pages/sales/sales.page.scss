@@ -52,7 +52,7 @@
 }
 
 .sales-table-wrap {
-  overflow: hidden;
+  overflow-x: auto;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: var(--surface);
@@ -60,7 +60,11 @@
 }
 
 .sales-table {
-  min-width: 1000px;
+  min-width: 1060px;
+}
+
+.sales-table .sale-status-cell {
+  white-space: nowrap;
 }
 
 .sales-table th {
@@ -213,7 +217,7 @@
 
 @media (max-width: 980px) {
   .sales-table {
-    min-width: 900px;
+    min-width: 1060px;
   }
 }
 
@@ -286,6 +290,29 @@
   .mobile-client-copy span {
     color: var(--muted);
     font-size: 0.7rem;
+  }
+
+  .mobile-sale-statuses {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 9px 16px;
+    margin-top: 14px;
+    min-width: 0;
+  }
+
+  .mobile-sale-status {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 7px;
+    min-width: 0;
+  }
+
+  .mobile-sale-status-label {
+    color: var(--muted);
+    font-size: 0.69rem;
+    font-weight: 600;
   }
 
   .mobile-values {

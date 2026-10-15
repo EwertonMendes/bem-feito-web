@@ -22,10 +22,11 @@ import { BfIcon } from '../../shared/ui/icon/icon';
 import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
 import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
 import { BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
+import { BfSaleStatusChip } from '../../features/sales/components/sale-status-chip/sale-status-chip';
 
 @Component({
   selector: 'bf-sales-page',
-  imports: [BfLoadingButton, BfIcon, BfDialog, BfSelect, BfCheckbox, BfEmptyState, BfPageRefresh, BfTableSkeleton],
+  imports: [BfLoadingButton, BfIcon, BfDialog, BfSelect, BfCheckbox, BfEmptyState, BfPageRefresh, BfTableSkeleton, BfSaleStatusChip],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sales.page.html',
   styleUrl: './sales.page.scss',
@@ -373,13 +374,6 @@ export class SalesPage {
     } finally {
       this.pendingAction.set(null);
     }
-  }
-
-  paymentStatusLabel(sale: Sale): string {
-    if (sale.status === 'cancelled') return 'Cancelada';
-    if (sale.paymentStatus === 'paid') return 'Pago';
-    if (sale.paymentStatus === 'partial') return 'Parcial';
-    return 'Pendente';
   }
 
   clientInitial(sale: Sale): string {

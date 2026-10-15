@@ -16,6 +16,7 @@ import {
   LucideCircleCheck,
   LucideCircleDollarSign,
   LucideCirclePlus,
+  LucideCircleX,
   LucideClipboardList,
   LucideClipboardCheck,
   LucideGauge,
@@ -72,6 +73,8 @@ export type BfIconName =
   // Commerce and catalog concepts
   | 'product' | 'kit' | 'addition' | 'order' | 'catalog-browse' | 'customer'
   | 'payment' | 'details' | 'confirm-sale'
+  | 'sale-in-production' | 'sale-ready' | 'sale-delivered' | 'sale-cancelled'
+  | 'sale-paid' | 'sale-partial' | 'sale-pending'
   // Dashboard and financial concepts
   | 'revenue' | 'received' | 'receivable' | 'average-ticket' | 'sold-items' | 'tips'
   | 'low-stock-product' | 'low-stock-input' | 'overdue' | 'missing-cost'
@@ -104,6 +107,13 @@ const ICONS = {
   payment: LucideCreditCard,
   details: LucideClipboardList,
   'confirm-sale': LucideCircleCheck,
+  'sale-in-production': LucideFactory,
+  'sale-ready': LucidePackage,
+  'sale-delivered': LucidePackageCheck,
+  'sale-cancelled': LucideCircleX,
+  'sale-paid': LucideCircleCheck,
+  'sale-partial': LucideCircleDollarSign,
+  'sale-pending': LucideClock3,
 
   revenue: LucideChartNoAxesColumnIncreasing,
   received: LucideBanknote,

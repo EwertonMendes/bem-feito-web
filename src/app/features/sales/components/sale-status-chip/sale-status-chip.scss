@@ -1,0 +1,59 @@
+:host {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  min-width: 0;
+}
+
+.sale-status-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+  border-radius: 999px;
+  font-size: 0.73rem;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.sale-status-chip bf-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.sale-status-chip[data-tone='production'],
+.sale-status-chip[data-tone='partial'] {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.sale-status-chip[data-tone='ready'] {
+  color: var(--info);
+  background: var(--info-soft);
+}
+
+.sale-status-chip[data-tone='delivered'],
+.sale-status-chip[data-tone='paid'] {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.sale-status-chip[data-tone='cancelled'] {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.sale-status-chip[data-tone='pending'] {
+  color: var(--muted-strong);
+  background: var(--surface-2);
+}
+
+.status-not-applicable {
+  padding-inline: 8px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}

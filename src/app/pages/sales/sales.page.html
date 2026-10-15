@@ -90,7 +90,7 @@
     <p class="history-feedback" role="status"><bf-icon name="search"/> {{historicalMatches().length}} {{historicalMatches().length===1?'venda encontrada':'vendas encontradas'}}{{historyHasMore()?' nesta etapa da busca':' no histórico'}}.</p>
   }
     @if (!store.initialized()) {
-    <bf-table-skeleton [columns]="8" [rows]="7" />
+    <bf-table-skeleton [columns]="9" [rows]="7" />
   } @else if (filteredSales().length) {
     <div class="sales-table-wrap">
       <table class="bf-table sales-table">
@@ -102,7 +102,8 @@
             <th>Total</th>
             <th>Recebido</th>
             <th>Saldo</th>
-            <th>Status</th>
+            <th>Andamento</th>
+            <th>Pagamento</th>
             <th>Ação</th>
           </tr>
         </thead>
@@ -120,13 +121,8 @@
               <td>{{ currency(sale.totalCents) }}</td>
               <td>{{ currency(sale.receivedCents) }}</td>
               <td>{{ currency(sale.balanceCents) }}</td>
-              <td>
-                <small>{{ fulfillmentLabel(sale) }}</small> <span
-                  class="bf-badge"
-                  [class.warning]="sale.paymentStatus!=='paid' && sale.status!=='cancelled'"
-                  [class.muted]="sale.status==='cancelled'"
-                >{{ paymentStatusLabel(sale) }}</span>
-              </td>
+              <td class="sale-status-cell"><bf-sale-status-chip [sale]="sale" kind="fulfillment" /></td>
+              <td class="sale-status-cell"><bf-sale-status-chip [sale]="sale" kind="payment" /></td>
               <td>
                 <button class="view-sale" type="button" (click)="openDetails(sale)">
                   <bf-icon name="eye" /> <span>Ver</span>
@@ -150,11 +146,16 @@
                   <span>{{ sale.code }} · {{ date(sale.businessDate) }}</span>
                 </div>
               </div>
-              <small>{{ fulfillmentLabel(sale) }}</small> <span
-                class="bf-badge"
-                [class.warning]="sale.paymentStatus!=='paid' && sale.status!=='cancelled'"
-                [class.muted]="sale.status==='cancelled'"
-              >{{ paymentStatusLabel(sale) }}</span>
+            </div>
+            <div class="mobile-sale-statuses" aria-label="Andamento e pagamento da venda">
+              <div class="mobile-sale-status">
+                <span class="mobile-sale-status-label">Andamento</span>
+                <bf-sale-status-chip [sale]="sale" kind="fulfillment" />
+              </div>
+              <div class="mobile-sale-status">
+                <span class="mobile-sale-status-label">Pagamento</span>
+                <bf-sale-status-chip [sale]="sale" kind="payment" />
+              </div>
             </div>
 
             <div class="mobile-values">

@@ -2,6 +2,7 @@ import { BfLoadingButton } from '../../../shared/ui/button/loading-button';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { FormField, form, required } from '@angular/forms/signals';
 import { standardCostForProduct, trackingModeForInput } from '../../../domain/logic/costing';
+import { productCategoryId } from '../../../domain/logic/product-category';
 import { ProductionDraftItem, ProductionConsumption } from '../../../domain/models/production.model';
 import { CatalogStore } from '../../catalog/catalog.store';
 import { CatalogReferenceStore } from '../../catalog/catalog-reference.store';
@@ -61,9 +62,9 @@ export class BfProductionEditor {
       const product = this.catalog.products().find(item => item.id === line.productId);
       if (!product) continue;
       const refs = {
-        collection: this.references.collections().find(item => item.id === product.collectionId),
-        fragrance: this.references.fragrances().find(item => item.id === product.fragranceId),
-        format: this.references.formats().find(item => item.id === product.formatId),
+        collection: productCategoryId(product) === 'soap' ? this.references.collections().find(item => item.id === product.collectionId) : undefined,
+        fragrance: productCategoryId(product) === 'soap' ? this.references.fragrances().find(item => item.id === product.fragranceId) : undefined,
+        format: productCategoryId(product) === 'soap' ? this.references.formats().find(item => item.id === product.formatId) : undefined,
       };
       try {
         const cost = standardCostForProduct(product, refs, inputMap);

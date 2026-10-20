@@ -21,6 +21,7 @@ import {
 } from 'firebase/firestore';
 import { summarizeSaleItems } from '../../domain/logic/sale-analytics';
 import { productCostComponents, standardCostForProduct } from '../../domain/logic/costing';
+import { productCategoryId } from '../../domain/logic/product-category';
 import { productStockStatus, stockStatusForInput } from '../../domain/logic/stock-status';
 import { Addition, CollectionDefinition, FormatDefinition, FragranceDefinition, InputItem, Product } from '../../domain/models/catalog.model';
 import { StockMovement } from '../../domain/models/inventory.model';
@@ -224,19 +225,19 @@ export class SalesRepository {
       }
 
       const collections = new Map<string, CollectionDefinition>();
-      for (const id of new Set([...products.values()].map((item) => item.collectionId))) {
+      for (const id of new Set([...products.values()].filter(item => productCategoryId(item) === 'soap').map(item => item.collectionId).filter(Boolean))) {
         const snapshot = await transaction.get(doc(this.firestore, 'collections', id));
         if (snapshot.exists()) collections.set(id, { id, ...snapshot.data() } as CollectionDefinition);
       }
 
       const fragrances = new Map<string, FragranceDefinition>();
-      for (const id of new Set([...products.values()].map((item) => item.fragranceId))) {
+      for (const id of new Set([...products.values()].filter(item => productCategoryId(item) === 'soap').map(item => item.fragranceId).filter(Boolean))) {
         const snapshot = await transaction.get(doc(this.firestore, 'fragrances', id));
         if (snapshot.exists()) fragrances.set(id, { id, ...snapshot.data() } as FragranceDefinition);
       }
 
       const formats = new Map<string, FormatDefinition>();
-      for (const id of new Set([...products.values()].map((item) => item.formatId))) {
+      for (const id of new Set([...products.values()].filter(item => productCategoryId(item) === 'soap').map(item => item.formatId).filter(Boolean))) {
         const snapshot = await transaction.get(doc(this.firestore, 'formats', id));
         if (snapshot.exists()) formats.set(id, { id, ...snapshot.data() } as FormatDefinition);
       }
@@ -244,9 +245,9 @@ export class SalesRepository {
       const requiredInputIds = new Set<string>(additionInputIds);
       for (const [id, product] of products) {
         const components = productCostComponents(product, {
-          collection: collections.get(product.collectionId),
-          fragrance: fragrances.get(product.fragranceId),
-          format: formats.get(product.formatId),
+          collection: productCategoryId(product) === 'soap' ? collections.get(product.collectionId) : undefined,
+          fragrance: productCategoryId(product) === 'soap' ? fragrances.get(product.fragranceId) : undefined,
+          format: productCategoryId(product) === 'soap' ? formats.get(product.formatId) : undefined,
         });
         components.forEach((component) => requiredInputIds.add(component.inputId));
       }
@@ -265,9 +266,9 @@ export class SalesRepository {
       const productUnitCosts = new Map<string, number>();
       for (const [id, product] of products) {
         const cost = standardCostForProduct(product, {
-          collection: collections.get(product.collectionId),
-          fragrance: fragrances.get(product.fragranceId),
-          format: formats.get(product.formatId),
+          collection: productCategoryId(product) === 'soap' ? collections.get(product.collectionId) : undefined,
+          fragrance: productCategoryId(product) === 'soap' ? fragrances.get(product.fragranceId) : undefined,
+          format: productCategoryId(product) === 'soap' ? formats.get(product.formatId) : undefined,
         }, inputs);
         productUnitCosts.set(id, cost.unitCostCents);
       }
@@ -602,7 +603,7 @@ export class SalesRepository {
       if (!productSnapshot.exists()) throw new Error('Produto não encontrado no estoque.');
       const product = {id:productSnapshot.id,...productSnapshot.data()} as Product;
       const reserved = product.reservedPhysicalStock ?? Math.min(product.stock, product.committedStock ?? 0);
-      if (product.stock - reserved < quantity) throw new Error('Não há sabonetes livres suficientes para esta encomenda.');
+      if (product.stock - reserved < quantity) throw new Error('Não há produtos livres suficientes para esta encomenda.');
       const allocations = sale.orderAllocations.map(a => a.lineId === line.id ? {...a,quantity:next} : a);
       const allocatedExplicit = product.explicitAllocatedStock ?? 0;
       const committedExplicit = product.explicitCommittedStock ?? 0;

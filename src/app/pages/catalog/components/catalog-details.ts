@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, output, signal, viewChild } from '@angular/core';
 import { standardCostForProduct, productCostComponents, trackingModeForInput } from '../../../domain/logic/costing';
+import { productCategoryId, productCategoryName } from '../../../domain/logic/product-category';
 import { Addition, InputItem, Product } from '../../../domain/models/catalog.model';
 import { CatalogImageEntityKind } from '../../../domain/models/image.model';
 import { formatCurrency } from '../../../core/utils/money';
@@ -93,6 +94,8 @@ export class CatalogDetails {
   edit(): void { const kind=this.kind(),id=this.selectedId();this.close();this.editRequested.emit({kind,id}); }
   produce(product: Product): void { this.close();this.modals.openProduction(product.id); }
   sell(product: Product): void { this.close();this.modals.openSale(product.id); }
+  categoryName(p: Product): string { return productCategoryName(productCategoryId(p)); }
+  isSoap(p: Product): boolean { return productCategoryId(p) === 'soap'; }
   collectionName(p: Product): string { return this.refs.collections().find(v=>v.id===p.collectionId)?.name??'Linha não cadastrada'; }
   fragranceName(p: Product): string { return this.refs.fragrances().find(v=>v.id===p.fragranceId)?.name??'Fragrância não cadastrada'; }
   formatName(p: Product): string { return this.refs.formats().find(v=>v.id===p.formatId)?.name??'Formato não cadastrado'; }

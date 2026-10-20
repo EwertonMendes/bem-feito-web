@@ -1,5 +1,6 @@
 import { Sale, Payment, SaleLineSnapshot } from '../models/sales.model';
 import { Expense } from '../models/finance.model';
+import { PRODUCT_CATEGORIES } from './product-category';
 
 /** Pure report math: money is always integer cents, dates are ISO business dates. */
 export interface ReportGroup {
@@ -28,6 +29,7 @@ export interface ManagementReport {
   missingCostItems:number;
   marginPercent:number|null;
   averageTicketCents:number;
+  byCategory:ReportGroup[];
   byProduct:ReportGroup[];
   byCollection:ReportGroup[];
   byFragrance:ReportGroup[];
@@ -106,6 +108,11 @@ export function buildManagementReport(
     equipmentCents:byKind('equipment'),missingCostItems,
     marginPercent:missingCostItems?null:pct(revenueCents,grossProfitCents),
     averageTicketCents:active.length?Math.round(revenueCents/active.length):0,
+    byCategory:groups(active,(_sale,line)=>{
+      if (line.kind === 'addition') return ['addition', 'Adicionais'];
+      const id = line.categoryId ?? 'soap';
+      return [id, PRODUCT_CATEGORIES.find(category => category.id === id)?.label ?? id];
+    }),
     byProduct:groups(active,(_sale,line)=>[line.kind+':'+line.sourceId,line.name]),
     byCollection:groups(active,keyFor('collection')),
     byFragrance:groups(active,keyFor('fragrance')),

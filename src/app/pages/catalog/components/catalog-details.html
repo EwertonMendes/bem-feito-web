@@ -1,7 +1,7 @@
 <dialog bfDialog #detailsDialog="bfDialog" class="bf-dialog catalog-details-dialog">
   <div class="bf-dialog-header">
     <div>
-      <h2><bf-icon name="catalog-browse"/> Detalhes {{kind()==='products'?'do sabonete':kind()==='inputs'?'do insumo':'do adicional'}}</h2>
+      <h2><bf-icon name="catalog-browse"/> Detalhes {{kind()==='products'?'do produto':kind()==='inputs'?'do insumo':'do adicional'}}</h2>
       <p>Informações para consultar com rapidez, sem alterar o cadastro.</p>
     </div>
     <button class="bf-floating-close" type="button" aria-label="Fechar detalhes" (click)="close()"><bf-icon name="close"/></button>
@@ -11,15 +11,15 @@
       <div class="details-hero">
         <div class="details-art">
           <bf-catalog-image [image]="p.image" [alt]="p.displayName" fit="contain"/>
-          <span class="details-photo-label"><bf-icon name="image"/> Sabonete</span>
+          <span class="details-photo-label"><bf-icon name="image"/> {{categoryName(p)}}</span>
         </div>
         <div class="details-summary">
-          <span class="details-eyebrow"><bf-icon name="product"/> {{collectionName(p)}} · {{p.code}}</span>
+          <span class="details-eyebrow"><bf-icon name="product"/> {{categoryName(p)}} · {{p.code}}</span>
           <h3>{{p.displayName}}</h3>
           <p>Informações de fabricação, preço e disponibilidade em um só lugar.</p>
           <div class="details-chips">
-            <span><bf-icon name="product"/> {{formatName(p)}}</span>
-            <span><bf-icon name="addition"/> {{fragranceName(p)}}</span>
+            @if(isSoap(p)){<span><bf-icon name="product"/> {{formatName(p)}}</span>}
+            @if(isSoap(p)){<span><bf-icon name="addition"/> {{fragranceName(p)}}</span>} @else if(p.variantName){<span><bf-icon name="addition"/> {{p.variantName}}</span>}
             @if(weight(p)!==null){<span><bf-icon name="inventory"/> ≈ {{quantity(weight(p)!)}} g</span>}
             <span [class.status-off]="!p.active"><bf-icon [name]="p.active?'check':'alert'"/> {{p.active?'Ativo':'Inativo'}}</span>
           </div>
@@ -27,7 +27,7 @@
       </div>
       <div class="details-section-title">
         <span class="details-title-icon"><bf-icon name="finance"/></span>
-        <span>Preço e rentabilidade <small>Valores por sabonete</small></span>
+        <span>Preço e rentabilidade <small>Valores por produto</small></span>
       </div>
       <div class="details-metrics">
         <div class="details-metric metric-price"><div class="metric-heading"><bf-icon name="sales"/><span>Preço de venda</span></div><strong>{{currency(p.salePriceCents)}}</strong><small>Preço atual no catálogo</small></div>

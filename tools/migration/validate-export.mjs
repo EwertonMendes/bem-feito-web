@@ -56,10 +56,16 @@ for (const item of list('inputs')) {
   if (item.stockStatus !== expectedStatus) errors.push(`inputs/${item.id}: stockStatus divergente.`);
 }
 for (const item of list('products')) {
-  if (!collections.has(item.collectionId)) errors.push(`products/${item.id}: collectionId inválido.`);
+  if (!['soap', 'creative-kit', 'scented-candle'].includes(item.categoryId ?? 'soap')) errors.push(`products/${item.id}: categoria inválida.`);
+  if ((item.categoryId ?? 'soap') === 'soap' && !collections.has(item.collectionId)) errors.push(`products/${item.id}: collectionId inválido.`);
   if (item.stockStatus !== productStockStatus(item.stock, item.minimumStock)) errors.push(`products/${item.id}: stockStatus divergente.`);
-  if (!fragrances.has(item.fragranceId)) errors.push(`products/${item.id}: fragranceId inválido.`);
-  if (!formats.has(item.formatId)) errors.push(`products/${item.id}: formatId inválido.`);
+  if ((item.categoryId ?? 'soap') === 'soap') {
+    if (!fragrances.has(item.fragranceId)) errors.push(`products/${item.id}: fragranceId inválido.`);
+    if (!formats.has(item.formatId)) errors.push(`products/${item.id}: formatId inválido.`);
+  } else if (item.collectionId || item.fragranceId || item.formatId || !item.modelName ||
+             (item.categoryId === 'scented-candle' && (!item.variantName || !(item.volumeMl > 0)))) {
+    errors.push(`products/${item.id}: atributos da categoria inválidos.`);
+  }
   if (item.stock < 0) warnings.push(`products/${item.id}: estoque negativo ${item.stock}.`);
   if (!item.averageUnitCostCents) warnings.push(`products/${item.id}: custo unitário ausente.`);
   for (const component of item.recipe ?? []) {
@@ -123,7 +129,7 @@ for (const [name, records] of Object.entries(data)) {
   }
 }
 for (const product of list('products')) {
-  if (fragrances.get(product.fragranceId)?.collectionId !== product.collectionId) errors.push(`products/${product.id}: fragrância de outra coleção.`);
+  if ((product.categoryId ?? 'soap') === 'soap' && fragrances.get(product.fragranceId)?.collectionId !== product.collectionId) errors.push(`products/${product.id}: fragrância de outra coleção.`);
   for (const component of product.recipe ?? []) {
     if (!positive(component.quantity) || inputs.get(component.inputId)?.unitId !== component.unitId) errors.push(`products/${product.id}: consumo/unidade inválido.`);
   }

@@ -4,6 +4,7 @@ import { FIREBASE_AUTH } from '../firebase/firebase.providers';
 import { DataRevisionService } from '../firebase/data-revision.service';
 import { catalogEntityCode } from '../utils/ids';
 import { stockStatusForProduct } from '../../domain/logic/stock-status';
+import { productIdentity } from '../../domain/logic/product-category';
 import {
   Addition, CollectionDefinition, FormatDefinition, FormatPrice, FragranceDefinition,
   InputItem, Product, UnitDefinition,
@@ -29,7 +30,7 @@ export class ProductRepository extends FirestoreRepository<Product> {
     const batch = writeBatch(this.firestore);
     const created: Product[] = [];
     for (const product of products) {
-      const uniqueKey = [product.collectionId,product.fragranceId,product.formatId].join(':');
+      const uniqueKey = productIdentity(product);
       if (seen.has(uniqueKey)) throw new Error('Há produtos repetidos no lote.');
       seen.add(uniqueKey);
       const target = doc(collection(this.firestore, 'products'));

@@ -14,6 +14,12 @@ export interface Product extends AuditFields {
   id: string;
   code: string;
   active: boolean;
+  /** Historical documents without this field are soap products. */
+  categoryId?: 'soap' | 'creative-kit' | 'scented-candle';
+  modelName?: string;
+  variantName?: string;
+  description?: string;
+  volumeMl?: number;
   collectionId: string;
   fragranceId: string;
   formatId: string;

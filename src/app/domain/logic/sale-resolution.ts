@@ -1,4 +1,5 @@
 import { trackingModeForInput } from './costing';
+import { productCategoryId } from './product-category';
 import { Addition, InputItem, Product } from '../models/catalog.model';
 import { SaleDraft, SaleLineSnapshot, StockEffect } from '../models/sales.model';
 
@@ -50,8 +51,8 @@ export function resolveSaleDraft(
         quantity: line.quantity,
         unitPriceCents,
         unitCostCents,
-        collectionId: product.collectionId, fragranceId: product.fragranceId,
-        formatId: product.formatId,
+        categoryId: productCategoryId(product),
+        ...(productCategoryId(product) === 'soap' ? { collectionId: product.collectionId, fragranceId: product.fragranceId, formatId: product.formatId } : {}),
         stockEffects: [{ itemType: 'product', itemId: product.id, quantityDelta: -line.quantity,
           unitCostCents, ...(product.unitCostDeciCents !== undefined ? { unitCostDeciCents: product.unitCostDeciCents } : {}) }],
         totalCents: Math.round(unitPriceCents * line.quantity),

@@ -7,7 +7,7 @@
         <bf-catalog-image [image]="productImage(option.value)" [alt]="option.label" [thumbnail]="true" />
       </ng-template>
       <section class="production-lines">
-        <div class="section-head"><strong>Sabonetes fabricados</strong><span>{{previews().units}} unidades</span></div>
+        <div class="section-head"><strong>Produtos fabricados</strong><span>{{previews().units}} unidades</span></div>
         @for(line of lines(); track line.id) {
           <div class="production-line">
             <label class="bf-field product-picker"><span>Produto</span><bf-select-search [value]="line.productId" (valueChange)="changeProduct(line.id,$event)" [options]="productOptions()" [imageTemplate]="productThumb" ariaLabel="Produto produzido" /></label>

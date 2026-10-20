@@ -46,7 +46,7 @@ export function normalizeProductionDraft(lines: readonly ProductionDraftItem[]):
   const totals = new Map<string, number>();
   for (const line of lines) {
     if (!line.productId || !Number.isSafeInteger(line.quantity) || line.quantity <= 0)
-      throw new Error('Selecione o sabonete e informe uma quantidade inteira positiva.');
+      throw new Error('Selecione o produto e informe uma quantidade inteira positiva.');
     totals.set(line.productId, (totals.get(line.productId) ?? 0) + line.quantity);
   }
   if ([...totals.values()].some(q => !Number.isSafeInteger(q) || q > 1000000))

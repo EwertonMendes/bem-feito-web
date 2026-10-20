@@ -36,10 +36,72 @@ function stableSource(value: any): any {
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([k]) => k !== 'exportedAt').map(([k, v]) => [k, stableSource(v)]));
   return value;
 }
+/**
+ * Registered non-destructive DEV catalog upgrade.
+ * Only product classification and the ten new product documents may change;
+ * all existing prices, stock, order reservations, sales and movements remain untouched.
+ * The private snapshot is read at execution, not embedded in the repository.
+ */
+async function prepareCategoryMigration(request: Request, db: Firestore, env: any): Promise<Plan> {
+  invariant(typeof env.categorySnapshotId === 'string' && /^[A-Za-z0-9_-]+$/.test(env.categorySnapshotId), 'Immutable category snapshot required');
+  runRegisteredScript('tools/migration/fetch-sheets.mjs', [], { MIGRATION_SNAPSHOT_ID: env.categorySnapshotId });
+  runRegisteredScript('tools/migration/normalize-legacy.mjs');
+  runRegisteredScript('tools/migration/reconcile-legacy.mjs');
+  runRegisteredScript('tools/migration/validate-export.mjs', [], { MIGRATION_SAFE_DIAGNOSTICS: '1' });
+  const raw = JSON.parse(await readFile('tools/migration/legacy-raw.json', 'utf8'));
+  const data = stableSource(JSON.parse(await readFile('tools/migration/migration-data.json', 'utf8')));
+  invariant(raw.spreadsheetId === env.categorySnapshotId && data.source?.spreadsheetId === env.categorySnapshotId, 'Category source mismatch');
+  const newPrices: Record<string, [string, number]> = {
+    'PROD-094': ['creative-kit', 800], 'PROD-095': ['creative-kit', 750],
+    'PROD-096': ['creative-kit', 900], 'PROD-097': ['creative-kit', 1100],
+    'PROD-098': ['scented-candle', 2000], 'PROD-099': ['scented-candle', 2000],
+    'PROD-100': ['scented-candle', 2000], 'PROD-101': ['scented-candle', 2000],
+    'PROD-102': ['scented-candle', 2000], 'PROD-103': ['scented-candle', 2000],
+  };
+  const all = data.products as any[];
+  const newItems = all.filter(p => p.categoryId !== 'soap');
+  const soaps = all.filter(p => p.categoryId === 'soap');
+  invariant(newItems.length === 10 && soaps.length === 82, 'Approved category inventory count differs');
+  for (const [id, [category, cents]] of Object.entries(newPrices)) {
+    const product = newItems.find(p => p.id === id);
+    invariant(product?.code === id && product.categoryId === category && product.salePriceCents === cents
+      && product.stock === 0 && product.minimumStock === 0 && product.active === true
+      && Array.isArray(product.recipe) && product.recipe.length === 0, 'Approved new product differs');
+  }
+  // An incremental migration must never delete, recreate or silently overwrite a legacy product.
+  const snapshots = await db.collection('products').get();
+  invariant(snapshots.size === soaps.length, 'DEV catalog differs from historical source; reconcile existing migration first');
+  const soapById = new Map(soaps.map(p => [p.id, p]));
+  for (const doc of snapshots.docs) {
+    const source = soapById.get(doc.id);
+    invariant(source && doc.data().code === source.code && doc.data().collectionId && doc.data().fragranceId
+      && doc.data().formatId && (!doc.data().categoryId || doc.data().categoryId === 'soap'),
+      'DEV historical product identities differ; abort without writes');
+  }
+  const sourceHash = hash({ raw: stableSource(raw), productCategories: all });
+  const rows: Row[] = snapshots.docs.map(doc => {
+    const current = snapshotRow(doc);
+    return { ...current, after: encode({ ...doc.data(), categoryId: 'soap' }) };
+  });
+  const newRefs = newItems.map(p => db.doc('products/' + p.id));
+  const pending = await db.getAll(...newRefs);
+  for (let i = 0; i < newItems.length; i++) {
+    const row = snapshotRow(pending[i]!);
+    invariant(row.before === null, 'New product ID already exists; no partial reimport');
+    const { id, ...payload } = newItems[i];
+    rows.push({ ...row, after: encode(payload) });
+  }
+  assertPlanCapacity(rows);
+  const scope = ['products'];
+  assertScope(request, scope);
+  return { schemaVersion: 1, requestHash: requestHash(request), projectId: request.projectId,
+    environment: 'dev', operation: 'migrate', scope, rows, dependencies: [], sourceHash };
+}
 export async function prepareMigration(request: Request, db: Firestore, env: any): Promise<Plan> {
   invariant(request.environment === 'dev' && request.projectId === 'bem-feito-dev', 'DEV-only migration');
   const deployment = await fetch('https://bem-feito-dev.web.app/deployment.json', { cache: 'no-store' });
   invariant(deployment.ok && (await deployment.json() as any).commit === request.deploymentSha, 'Exact application commit must already be deployed in DEV');
+  if (request.migration === 'product-categories-v1') return prepareCategoryMigration(request, db, env);
   runRegisteredScript('tools/migration/fetch-sheets.mjs', [], { MIGRATION_SNAPSHOT_ID: env.snapshotId });
   runRegisteredScript('tools/migration/normalize-legacy.mjs');
   runRegisteredScript('tools/migration/reconcile-legacy.mjs');

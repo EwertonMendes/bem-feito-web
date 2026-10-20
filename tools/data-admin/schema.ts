@@ -7,7 +7,7 @@ export type Change = Target & { action: 'create' | 'update' | 'delete'; expected
 export type Request = {
   schemaVersion: 1; id: string; environment: Environment; projectId: string;
   operation: 'read' | 'inspect' | 'verify' | 'create' | 'update' | 'delete' | 'batch-update' | 'backup' | 'restore' | 'migrate';
-  targets?: Target[]; changes?: Change[]; backup?: string; migration?: 'unit-products-v2';
+  targets?: Target[]; changes?: Change[]; backup?: string; migration?: 'unit-products-v2' | 'product-categories-v1';
   deploymentSha?: string; destructive?: { projectId: string; paths: string[] };
 };
 
@@ -88,7 +88,7 @@ export function validateRequest(value: unknown): Request {
     invariant(value.targets === undefined && value.changes === undefined && value.migration === undefined && value.deploymentSha === undefined, 'Incompatible restore fields');
   } else if (op === 'migrate') {
     invariant(value.environment === 'dev' && value.projectId === 'bem-feito-dev', 'Migration is DEV only');
-    invariant(value.migration === 'unit-products-v2', 'Unknown registered migration'); sha(value.deploymentSha);
+    invariant(['unit-products-v2', 'product-categories-v1'].includes(String(value.migration)), 'Unknown registered migration'); sha(value.deploymentSha);
     invariant(value.changes === undefined && value.targets === undefined && value.backup === undefined, 'Migration accepts no code or custom data');
   } else {
     invariant(Array.isArray(value.changes) && value.changes.length > 0 && value.changes.length <= 200, 'Expected 1..200 changes');

@@ -19,6 +19,7 @@ export interface SaleLineSnapshot {
   totalCents: number;
   totalCostCents: number;
   /** Immutable classification at sale time, unaffected by later catalog changes. */
+  categoryId?: 'soap' | 'creative-kit' | 'scented-candle';
   collectionId?: string;
   fragranceId?: string;
   formatId?: string;

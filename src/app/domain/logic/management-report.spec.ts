@@ -32,6 +32,14 @@ describe('Management report uses exact-cent historical calculations',()=>{
       inventoryPurchasesCents:500,operationalResultCents:150,unitsSold:3});
     expect(report.byProduct.reduce((total,g)=>total+g.revenueCents,0)).toBe(299);
   });
+  it('groups historical soap and new candles without retroactively recategorizing sales',()=>{
+    const lines=items([100,200]);
+    const sale={...base,items:[{...lines[0]!,categoryId:undefined},
+      {...lines[1]!,categoryId:'scented-candle' as const}]} as Sale;
+    const report=buildManagementReport([sale],[],[]);
+    expect(report.byCategory.map(item=>item.label)).toEqual(['Velas Aromáticas','Sabonetes']);
+    expect(report.byCategory.reduce((sum,item)=>sum+item.revenueCents,0)).toBe(299);
+  });
   it('marks unknown costs explicitly, not as 100% profit',()=>{
     const sale={...base,items:[{...items([300])[0]!,totalCostCents:0}]} as Sale;
     const report=buildManagementReport([sale],[],[]);

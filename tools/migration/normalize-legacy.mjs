@@ -183,16 +183,31 @@ for (const row of rows('Receitas')) {
   recipeByProduct.set(productId, list);
 }
 
+const productCategory = (label) => {
+  const name = lower(label);
+  if (!name || name === 'sabonetes') return 'soap';
+  if (name === 'kits criativos') return 'creative-kit';
+  if (name === 'velas aromáticas' || name === 'velas aromaticas') return 'scented-candle';
+  throw new Error('Categoria de produto não reconhecida na origem.');
+};
 const products = rows('Produtos').map((row) => {
+  const categoryId = productCategory(row['Categoria de Produto']);
+  const soap = categoryId === 'soap';
+  const modelName = text(row['Modelo / Nome Base']);
+  const variantName = text(row['Variação']);
+  const volumeMl = categoryId === 'scented-candle' ? Number(modelName.match(/(\d+)\s*ml/i)?.[1] ?? 0) : 0;
+  if (!soap && (!modelName || (categoryId === 'scented-candle' && (!variantName || volumeMl <= 0)))) throw new Error('Produto multicategoria sem modelo, aroma ou volume válido.');
   const stock = number(row['Estoque Atual']);
   const minimumStock = number(row['Estoque Mínimo']);
   return {
     id: text(row.Produto_ID),
     code: text(row.Produto_ID),
     active: active(row.Ativo),
-    collectionId: collectionIds.get(lower(row.Coleção)) ?? '',
-    fragranceId: fragranceId(row.Fragrância, row.Coleção),
-    formatId: formatIds.get(lower(row.Formato)) ?? '',
+    categoryId,
+    ...(!soap ? { modelName, ...(variantName ? { variantName } : {}), ...(volumeMl ? { volumeMl } : {}), ...(text(row['Descrição Comercial']) ? { description: text(row['Descrição Comercial']) } : {}) } : {}),
+    collectionId: soap ? (collectionIds.get(lower(row.Coleção)) ?? '') : '',
+    fragranceId: soap ? fragranceId(row.Fragrância, row.Coleção) : '',
+    formatId: soap ? (formatIds.get(lower(row.Formato)) ?? '') : '',
     displayName: text(row['Nome de Exibição']),
     salePriceCents: cents(row['Preço de Venda']),
     additionalCostCents: cents(row['Custo Adicional Unit.']),
@@ -395,9 +410,12 @@ for (const row of rows('Vendas')) {
       unitCostCents: cents(item['Custo Unit.']),
       totalCents: cents(item['Total Item']),
       totalCostCents: cents(item['Custo Total']),
-      collectionId: productById.get(productId)?.collectionId,
-      fragranceId: productById.get(productId)?.fragranceId,
-      formatId: productById.get(productId)?.formatId,
+      categoryId: productById.get(productId)?.categoryId ?? 'soap',
+      ...(productById.get(productId)?.categoryId === 'soap' ? {
+        collectionId: productById.get(productId)?.collectionId,
+        fragranceId: productById.get(productId)?.fragranceId,
+        formatId: productById.get(productId)?.formatId,
+      } : {}),
       stockEffects:[{itemType:'product',itemId:productId,quantityDelta:-number(item.Quantidade),unitCostCents:cents(item['Custo Unit.'])}],
     });
     addEffect('product', productId, -number(item.Quantidade), cents(item['Custo Unit.']));

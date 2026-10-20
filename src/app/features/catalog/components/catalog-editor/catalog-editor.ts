@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signa
 import { FormField, form, min, required } from '@angular/forms/signals';
 import { Addition, AdditionComponent, InputItem, InputTrackingMode, Product, RecipeComponent } from '../../../../domain/models/catalog.model';
 import { standardCostForProduct, trackingModeForInput } from '../../../../domain/logic/costing';
+import { PRODUCT_CATEGORIES, productCategoryId, productIdentity } from '../../../../domain/logic/product-category';
 import { CatalogImageEntityKind, CatalogImageRef } from '../../../../domain/models/image.model';
 import { ErrorService } from '../../../../core/services/error.service';
 import { ImageService } from '../../../../core/services/image.service';
@@ -20,7 +21,7 @@ import { BfImageUpload } from '../../../../shared/ui/image-upload/image-upload';
 import { CatalogImage } from '../../../../shared/media/catalog-image/catalog-image';
 import { BfNumberInput } from '../../../../shared/ui/number-input/number-input';
 
-interface ProductFormModel { collectionId: string; fragranceId: string; formatId: string; salePrice: number; additionalCost: number; minimumStock: number; active: boolean; }
+interface ProductFormModel { categoryId: 'soap' | 'creative-kit' | 'scented-candle'; modelName: string; variantName: string; description: string; volumeMl: number; collectionId: string; fragranceId: string; formatId: string; salePrice: number; additionalCost: number; minimumStock: number; active: boolean; }
 interface InputFormModel { name: string; unitId: string; trackingMode: InputTrackingMode; availabilityStatus: string; minimumStock: number; active: boolean; }
 interface AdditionFormModel { name: string; category: string; price: number; notes: string; active: boolean; }
 
@@ -51,7 +52,7 @@ export class CatalogEditor {
       ? [...new Set([...current, id])] : current.filter(item => item !== id));
   }
   readonly bulkCostPreviews = computed(() => {
-    if (!this.bulkVariants() || this.kind() !== 'products') return [];
+    if (!this.bulkVariants() || this.kind() !== 'products' || this.productModel().categoryId !== 'soap') return [];
     const model = this.productModel();
     const inputs = new Map(this.store.inputs().map(input => [input.id, input]));
     const collection = this.references.collections().find(item => item.id === model.collectionId);
@@ -74,6 +75,7 @@ export class CatalogEditor {
 
   readonly suggestedPrice = computed(() => {
     const model = this.productModel();
+    if (model.categoryId !== 'soap') return undefined;
     return this.references.formatPrices().find(item =>
       item.active && item.collectionId === model.collectionId && item.formatId === model.formatId);
   });
@@ -114,11 +116,11 @@ export class CatalogEditor {
     return this.store.additions().find((item) => item.id === id)?.image;
   });
 
-  readonly productModel = signal<ProductFormModel>({ collectionId: '', fragranceId: '', formatId: '', salePrice: 0, additionalCost: 0, minimumStock: 0, active: true });
+  readonly categoryOptions: BfSelectOption[] = PRODUCT_CATEGORIES.map(item => ({ value: item.id, label: item.label }));
+  readonly productModel = signal<ProductFormModel>({ categoryId: 'soap', modelName: '', variantName: '', description: '', volumeMl: 40, collectionId: '', fragranceId: '', formatId: '', salePrice: 0, additionalCost: 0, minimumStock: 0, active: true });
+  readonly selectedCategoryLabel = computed(() => PRODUCT_CATEGORIES.find(c => c.id === this.productModel().categoryId)?.label ?? 'Produto');
   readonly productForm = form(this.productModel, (p) => {
-    required(p.collectionId, { message: 'Selecione a coleção.' });
-    required(p.fragranceId, { message: 'Selecione a fragrância.' });
-    required(p.formatId, { message: 'Selecione o formato.' });
+    required(p.categoryId);
     min(p.salePrice, 0);
     min(p.minimumStock, 0);
   });
@@ -187,9 +189,9 @@ export class CatalogEditor {
         additionalCostCents: toCents(model.additionalCost),
         averageUnitCostCents: existing?.averageUnitCostCents ?? 0,
       }, {
-        collection: this.references.collections().find((item) => item.id === model.collectionId),
-        fragrance: this.references.fragrances().find((item) => item.id === model.fragranceId),
-        format: this.references.formats().find((item) => item.id === model.formatId),
+        collection: model.categoryId === 'soap' ? this.references.collections().find((item) => item.id === model.collectionId) : undefined,
+        fragrance: model.categoryId === 'soap' ? this.references.fragrances().find((item) => item.id === model.fragranceId) : undefined,
+        format: model.categoryId === 'soap' ? this.references.formats().find((item) => item.id === model.formatId) : undefined,
       }, new Map(this.store.inputs().map((item) => [item.id, item])));
     } catch {
       return null;
@@ -217,7 +219,7 @@ export class CatalogEditor {
     this.selectedVariantFragranceIds.set([]);
     this.resetImageChange();
     if (kind === 'products') {
-      this.productModel.set({ collectionId: '', fragranceId: '', formatId: '', salePrice: 0, additionalCost: 0, minimumStock: 0, active: true });
+      this.productModel.set({ categoryId: 'soap', modelName: '', variantName: '', description: '', volumeMl: 40, collectionId: '', fragranceId: '', formatId: '', salePrice: 0, additionalCost: 0, minimumStock: 0, active: true });
       this.recipe.set([]);
     } else if (kind === 'inputs') {
       this.inputModel.set({ name: '', unitId: '', trackingMode: 'estimated', availabilityStatus: '', minimumStock: 0, active: true });
@@ -234,7 +236,7 @@ export class CatalogEditor {
     this.kind.set('products');
     this.editingId.set(item.id);
     this.resetImageChange();
-    this.productModel.set({ collectionId: item.collectionId, fragranceId: item.fragranceId, formatId: item.formatId, salePrice: fromCents(item.salePriceCents), additionalCost: fromCents(item.additionalCostCents), minimumStock: item.minimumStock, active: item.active });
+    this.productModel.set({ categoryId: productCategoryId(item), modelName: item.modelName ?? '', variantName: item.variantName ?? '', description: item.description ?? '', volumeMl: item.volumeMl ?? 40, collectionId: item.collectionId, fragranceId: item.fragranceId, formatId: item.formatId, salePrice: fromCents(item.salePriceCents), additionalCost: fromCents(item.additionalCostCents), minimumStock: item.minimumStock, active: item.active });
     this.recipe.set(item.recipe.map((component) => ({ ...component })));
     this.dialog().open();
   }
@@ -323,20 +325,27 @@ export class CatalogEditor {
   }
 
   private async saveProduct(): Promise<void> {
-    if (this.bulkVariants() && !this.editingId()) {
+    if (this.bulkVariants() && !this.editingId() && this.productModel().categoryId === 'soap') {
       await this.saveProductVariants();
       return;
     }
     if (this.productForm().invalid()) throw new Error('Revise os campos obrigatórios.');
     const model = this.productModel();
+    const soap = model.categoryId === 'soap';
     const collection = this.references.collections().find((item) => item.id === model.collectionId);
     const fragrance = this.references.fragrances().find((item) => item.id === model.fragranceId);
     const format = this.references.formats().find((item) => item.id === model.formatId);
-    if (!collection || !fragrance || !format) throw new Error('Coleção, fragrância ou formato inválido.');
+    if (soap && (!collection || !fragrance || !format || fragrance.collectionId !== collection.id)) throw new Error('Coleção, fragrância ou formato inválido.');
+    if (!soap && (!model.modelName.trim() || (model.categoryId === 'scented-candle' && (!model.variantName.trim() || !Number.isFinite(model.volumeMl) || model.volumeMl <= 0)))) throw new Error('Informe modelo, aroma e volume válidos para a categoria.');
     const existing = this.store.products().find((item) => item.id === this.editingId());
+    if (existing && productCategoryId(existing) !== model.categoryId) throw new Error('A categoria de um produto existente não pode ser alterada.');
+    const identity = productIdentity({ categoryId: model.categoryId, collectionId: soap ? model.collectionId : '', fragranceId: soap ? model.fragranceId : '', formatId: soap ? model.formatId : '', modelName: soap ? undefined : model.modelName, variantName: model.categoryId === 'scented-candle' ? model.variantName : '' });
+    if (this.store.products().some(item => item.id !== existing?.id && productIdentity(item) === identity)) throw new Error('Já existe um produto com estas características.');
     const product: Product = {
-      id: existing?.id ?? '', code: existing?.code ?? '', active: model.active, collectionId: model.collectionId,
-      fragranceId: model.fragranceId, formatId: model.formatId, displayName: `${collection.name} · ${fragrance.name} · ${format.name}`,
+      id: existing?.id ?? '', code: existing?.code ?? '', active: model.active, categoryId: model.categoryId,
+      ...(soap ? {} : { modelName: model.modelName.trim(), ...(model.categoryId === 'scented-candle' ? { variantName: model.variantName.trim(), volumeMl: model.volumeMl } : {}), ...(model.description.trim() ? { description: model.description.trim() } : {}) }),
+      collectionId: soap ? model.collectionId : '', fragranceId: soap ? model.fragranceId : '', formatId: soap ? model.formatId : '',
+      displayName: soap ? `${collection!.name} · ${fragrance!.name} · ${format!.name}` : [model.modelName.trim(), model.categoryId === 'scented-candle' ? model.variantName.trim() : ''].filter(Boolean).join(' · '),
       salePriceCents: toCents(model.salePrice), additionalCostCents: toCents(model.additionalCost), averageUnitCostCents: existing?.averageUnitCostCents ?? 0,
       stock: existing?.stock ?? 0, minimumStock: model.minimumStock, image: existing?.image,
       recipe: this.recipe().filter((item) => item.inputId && item.quantity > 0 && item.unitId),
@@ -349,6 +358,7 @@ export class CatalogEditor {
 
   private async saveProductVariants(): Promise<void> {
     const model = this.productModel();
+    if (model.categoryId !== 'soap') throw new Error('Variações em lote disponíveis somente para sabonetes.');
     const collection = this.references.collections().find(item => item.id === model.collectionId && item.active);
     const format = this.references.formats().find(item => item.id === model.formatId && item.active);
     const fragranceIds = [...new Set(this.selectedVariantFragranceIds())];
@@ -366,7 +376,7 @@ export class CatalogEditor {
       if (exists) throw new Error('O produto ' + fragrance!.name + ' já está cadastrado neste formato.');
     }
     const products: Product[] = fragrances.map(fragrance => ({
-      id: '', code: '', active: model.active,
+      id: '', code: '', active: model.active, categoryId: 'soap',
       collectionId: model.collectionId, fragranceId: fragrance!.id, formatId: model.formatId,
       displayName: collection.name + ' · ' + fragrance!.name + ' · ' + format.name,
       salePriceCents: toCents(model.salePrice), additionalCostCents: toCents(model.additionalCost),

@@ -129,6 +129,26 @@ describe('sale resolution', () => {
     })).toThrow('Estoque insuficiente de Produto p1.');
   });
 
+  it('keeps candle and creative-kit classification in immutable sale snapshots', () => {
+    const draft = emptyDraft();
+    draft.fulfillmentStatus = 'in-production';
+    draft.lines = [{kind:'product',sourceId:'candle',quantity:1},{kind:'product',sourceId:'kit',quantity:2}];
+    const candle = {...product('candle',0),categoryId:'scented-candle' as const,
+      collectionId:'',fragranceId:'',formatId:'',modelName:'Vela 40 ml',variantName:'Éros',volumeMl:40,
+      salePriceCents:2000,averageUnitCostCents:0};
+    const kit = {...product('kit',0),categoryId:'creative-kit' as const,
+      collectionId:'',fragranceId:'',formatId:'',modelName:'Kit Florzinhas',
+      salePriceCents:800,averageUnitCostCents:0};
+    const resolved = resolveSaleDraft(draft,{
+      products:new Map([['candle',candle],['kit',kit]]),
+      additions:new Map(),inputs:new Map(),productUnitCosts:new Map(),
+    },()=> 'line');
+    expect(resolved.lines.map(item=>item.categoryId)).toEqual(['scented-candle','creative-kit']);
+    expect(resolved.lines.every(item=>item.kind==='product' && !item.collectionId)).toBe(true);
+    expect(resolved.totalCents).toBe(3600);
+    expect(resolved.stockEffects.map(effect=>effect.quantityDelta)).toEqual([-1,-2]);
+  });
+
   it('caps discount at subtotal', () => {
     const draft = emptyDraft();
     draft.discountCents = 5000;

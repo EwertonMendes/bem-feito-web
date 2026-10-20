@@ -5,17 +5,23 @@
   "ownerId": "33728924",
   "branch": "master",
   "workflow": "data-admin.yml",
-  "productionApprovers": ["33728924"],
+  "productionApprovers": [
+    "33728924"
+  ],
   "environments": {
     "dev": {
       "projectId": "bem-feito-dev",
       "projectNumber": "312978463343",
       "databaseId": "(default)",
-      "archive": { "kind": "firestore", "projectId": "bem-feito-archive-dev", "databaseId": "(default)" },
+      "archive": {
+        "kind": "firestore",
+        "projectId": "bem-feito-archive-dev",
+        "databaseId": "(default)"
+      },
       "provider": "projects/312978463343/locations/global/workloadIdentityPools/github-data/providers/github",
       "reader": "github-data-dev-read@bem-feito-dev.iam.gserviceaccount.com",
       "writer": "github-data-dev@bem-feito-dev.iam.gserviceaccount.com",
-      "snapshotId": "1IIJVNNSfkF3AXVPUW_ndqHnjVKoyx0Q4d4hHjOQJlsw"
+      "snapshotId": "1NOm_Jr-poLwvo0lZxAXlXz-njEK-h7JcjREna0EClkw"
     },
     "prod": null
   }

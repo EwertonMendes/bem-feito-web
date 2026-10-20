@@ -4,7 +4,7 @@
     <div class="bf-dialog-body">
       @if (kind() === 'products') {
         <div class="bf-grid two">
-          <label class="bf-field full"><span>Categoria</span><bf-select [formField]="productForm.categoryId" [options]="categoryOptions" ariaLabel="Categoria do produto" /></label>
+          <label class="bf-field full"><span>Categoria</span>@if(editingId()){<input class="bf-input" [value]="selectedCategoryLabel()" disabled aria-label="Categoria do produto" />}@else{<bf-select [formField]="productForm.categoryId" [options]="categoryOptions" ariaLabel="Categoria do produto" />}</label>
           @if(productModel().categoryId !== 'soap'){
             <label class="bf-field"><span>Nome / modelo</span><input class="bf-input" [formField]="productForm.modelName" placeholder="Ex.: Kit Florzinhas ou Vela 40 ml" /></label>
             @if(productModel().categoryId === 'scented-candle'){

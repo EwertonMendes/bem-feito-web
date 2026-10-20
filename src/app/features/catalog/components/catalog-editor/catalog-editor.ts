@@ -118,6 +118,7 @@ export class CatalogEditor {
 
   readonly categoryOptions: BfSelectOption[] = PRODUCT_CATEGORIES.map(item => ({ value: item.id, label: item.label }));
   readonly productModel = signal<ProductFormModel>({ categoryId: 'soap', modelName: '', variantName: '', description: '', volumeMl: 40, collectionId: '', fragranceId: '', formatId: '', salePrice: 0, additionalCost: 0, minimumStock: 0, active: true });
+  readonly selectedCategoryLabel = computed(() => PRODUCT_CATEGORIES.find(c => c.id === this.productModel().categoryId)?.label ?? 'Produto');
   readonly productForm = form(this.productModel, (p) => {
     required(p.categoryId);
     min(p.salePrice, 0);
@@ -337,6 +338,7 @@ export class CatalogEditor {
     if (soap && (!collection || !fragrance || !format || fragrance.collectionId !== collection.id)) throw new Error('Coleção, fragrância ou formato inválido.');
     if (!soap && (!model.modelName.trim() || (model.categoryId === 'scented-candle' && (!model.variantName.trim() || !Number.isFinite(model.volumeMl) || model.volumeMl <= 0)))) throw new Error('Informe modelo, aroma e volume válidos para a categoria.');
     const existing = this.store.products().find((item) => item.id === this.editingId());
+    if (existing && productCategoryId(existing) !== model.categoryId) throw new Error('A categoria de um produto existente não pode ser alterada.');
     const identity = productIdentity({ categoryId: model.categoryId, collectionId: soap ? model.collectionId : '', fragranceId: soap ? model.fragranceId : '', formatId: soap ? model.formatId : '', modelName: soap ? undefined : model.modelName, variantName: model.categoryId === 'scented-candle' ? model.variantName : '' });
     if (this.store.products().some(item => item.id !== existing?.id && productIdentity(item) === identity)) throw new Error('Já existe um produto com estas características.');
     const product: Product = {

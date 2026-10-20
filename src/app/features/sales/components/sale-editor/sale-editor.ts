@@ -11,7 +11,6 @@ import {
 } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
 import { Addition, Product } from '../../../../domain/models/catalog.model';
-import { PRODUCT_CATEGORIES, productCategoryId } from '../../../../domain/logic/product-category';
 import { CatalogImageRef } from '../../../../domain/models/image.model';
 import { PaymentDraft, SaleDraft, SaleDraftLine } from '../../../../domain/models/sales.model';
 import { ToastService } from '../../../../core/services/toast.service';
@@ -102,7 +101,7 @@ export class SaleEditor {
     const category = this.catalogCategory();
     return this.catalog.activeProducts().filter((product) =>
       (!term || (product.displayName + ' ' + product.code).toLocaleLowerCase('pt-BR').includes(term)) &&
-      (!category || productCategoryId(product) === category)
+      (!category || product.collectionId === category)
     );
   });
 
@@ -123,7 +122,9 @@ export class SaleEditor {
     if (this.catalogTab() === 'products') {
       return [
         all,
-        ...PRODUCT_CATEGORIES.map((item) => ({ value: item.id, label: item.label })),
+        ...this.references.collections()
+          .filter((item) => item.active)
+          .map((item) => ({ value: item.id, label: item.name })),
       ];
     }
 
@@ -219,6 +220,7 @@ export class SaleEditor {
     this.catalogCategory.set('');
   }
 
+  productCategoryName(product: Product): string { return PRODUCT_CATEGORIES.find(category => category.id === productCategoryId(product))?.label ?? 'Produto'; }
   collectionName(collectionId: string): string {
     return this.references.collections().find((item) => item.id === collectionId)?.name ?? 'Produto';
   }

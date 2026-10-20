@@ -10,7 +10,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { BfIcon } from '../../shared/ui/icon/icon';
 import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
 
-type GroupKind='byProduct'|'byCollection'|'byFragrance'|'byFormat';
+type GroupKind='byCategory'|'byProduct'|'byCollection'|'byFragrance'|'byFormat';
 @Component({
   selector:'bf-management-reports-page',
   imports:[BfIcon,BfEmptyState],
@@ -38,7 +38,7 @@ export class ReportsPage {
   readonly groups=computed<ReportGroup[]>(()=>this.report()?.[this.selectedGroup()]??[]);
   readonly maxRevenue=computed(()=>Math.max(1,...this.groups().map(g=>g.revenueCents)));
   readonly groupOptions:{key:GroupKind;label:string}[]=[
-    {key:'byProduct',label:'Produtos'},{key:'byCollection',label:'Linhas'},
+    {key:'byCategory',label:'Categorias'}, {key:'byProduct',label:'Produtos'},{key:'byCollection',label:'Linhas'},
     {key:'byFragrance',label:'Fragrâncias'},{key:'byFormat',label:'Formatos'},
   ];
   private requestId=0;

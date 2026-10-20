@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signa
 import { CatalogImageEntityKind } from '../../domain/models/image.model';
 import { Product, Addition, InputItem } from '../../domain/models/catalog.model';
 import { standardCostForProduct, trackingModeForInput } from '../../domain/logic/costing';
+import { PRODUCT_CATEGORIES, productCategoryId, productCategoryName, ProductCategoryId } from '../../domain/logic/product-category';
 import { CatalogStore } from '../../features/catalog/catalog.store';
 import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
 import { ModalActions } from '../../core/services/modal-actions.service';
@@ -43,6 +44,9 @@ export class CatalogPage {
   readonly showFilters = signal(false);
   readonly viewMode = signal<'grid'|'list'>('grid');
   readonly sort = signal<SortMode>('name');
+  readonly categoryFilter = signal('');
+  readonly categoryOptions = [{value:'',label:'Todas as categorias'},...PRODUCT_CATEGORIES.map(c=>({value:c.id,label:c.label}))];
+  readonly categoryName = (item: Product) => productCategoryName(productCategoryId(item));
   readonly collectionFilter = signal('');
   readonly fragranceFilter = signal('');
   readonly formatFilter = signal('');
@@ -136,11 +140,12 @@ export class CatalogPage {
   });
   readonly filteredProducts = computed(() => {
     const products=this.store.products().filter(p=>
-      matchesCatalogSearch(this.search(),p.displayName,p.code,this.collectionNames().get(p.collectionId),
+      matchesCatalogSearch(this.search(),p.displayName,p.code,this.categoryName(p),p.modelName,p.variantName,this.collectionNames().get(p.collectionId),
         this.fragranceNames().get(p.fragranceId),this.formatNames().get(p.formatId)) &&
-      (!this.collectionFilter() || p.collectionId===this.collectionFilter()) &&
-      (!this.fragranceFilter() || p.fragranceId===this.fragranceFilter()) &&
-      (!this.formatFilter() || p.formatId===this.formatFilter()) &&
+      (!this.categoryFilter() || productCategoryId(p)===this.categoryFilter()) &&
+      (productCategoryId(p)!=='soap' || (!this.collectionFilter() || p.collectionId===this.collectionFilter())) &&
+      (productCategoryId(p)!=='soap' || (!this.fragranceFilter() || p.fragranceId===this.fragranceFilter())) &&
+      (productCategoryId(p)!=='soap' || (!this.formatFilter() || p.formatId===this.formatFilter())) &&
       matchesCatalogAvailability(p,this.productAvailability()));
     return this.sortItems(products,p=>p.salePriceCents,p=>p.stock,p=>this.productFinancials().get(p.id)?.marginPercent??null,p=>p.displayName);
   });
@@ -163,7 +168,7 @@ export class CatalogPage {
   readonly count = computed(() => this.tab()==='products'?this.filteredProducts().length:
     this.tab()==='inputs'?this.filteredInputs().length:this.filteredAdditions().length);
   readonly filterCount = computed(() => {
-    if (this.tab()==='products') return [this.collectionFilter(),this.fragranceFilter(),this.formatFilter(),
+    if (this.tab()==='products') return [this.categoryFilter(),this.collectionFilter(),this.fragranceFilter(),this.formatFilter(),
       this.productAvailability()==='all'?'':this.productAvailability()].filter(Boolean).length;
     if(this.tab()==='inputs')return [this.inputTrackingFilter(),this.inputAvailability()==='all'?'':this.inputAvailability()].filter(Boolean).length;
     return [this.additionCategoryFilter(),this.additionStatus()==='all'?'':this.additionStatus()].filter(Boolean).length;
@@ -196,7 +201,7 @@ export class CatalogPage {
   }
   clearFilters():void{
     this.search.set('');
-    if(this.tab()==='products'){this.collectionFilter.set('');this.fragranceFilter.set('');this.formatFilter.set('');this.productAvailability.set('all');}
+    if(this.tab()==='products'){this.categoryFilter.set('');this.collectionFilter.set('');this.fragranceFilter.set('');this.formatFilter.set('');this.productAvailability.set('all');}
     else if(this.tab()==='inputs'){this.inputTrackingFilter.set('');this.inputAvailability.set('all');}
     else{this.additionCategoryFilter.set('');this.additionStatus.set('all');}
     this.sort.set('name');

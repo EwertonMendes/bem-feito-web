@@ -20,9 +20,12 @@
     </button>
     <div class="catalog-filter-row" [class.filters-expanded]="showFilters()">
       @if(tab()==='products'){
+        <div class="catalog-field"><span>Categoria</span><bf-select [value]="categoryFilter()" (valueChange)="categoryFilter.set($event);collectionFilter.set('');fragranceFilter.set('');formatFilter.set('')" [options]="categoryOptions" ariaLabel="Filtrar por categoria" /></div>
+        @if(!categoryFilter() || categoryFilter()==='soap'){
         <div class="catalog-field"><span>Linha</span><bf-select [value]="collectionFilter()" (valueChange)="setCollection($event)" [options]="collectionOptions()" ariaLabel="Filtrar por linha" /></div>
         <div class="catalog-field"><span>Fragrância</span><bf-select-search [value]="fragranceFilter()" (valueChange)="fragranceFilter.set($event)" [options]="fragranceOptions()" ariaLabel="Filtrar por fragrância" /></div>
         <div class="catalog-field"><span>Formato</span><bf-select [value]="formatFilter()" (valueChange)="formatFilter.set($event)" [options]="formatOptions()" ariaLabel="Filtrar por formato" /></div>
+        }
         <div class="catalog-field"><span>Disponibilidade</span><bf-select [value]="productAvailability()" (valueChange)="productAvailability.set($any($event))" [options]="availabilityOptions" ariaLabel="Filtrar disponibilidade" /></div>
       } @else if(tab()==='inputs'){
         <div class="catalog-field"><span>Tipo de controle</span><bf-select [value]="inputTrackingFilter()" (valueChange)="inputTrackingFilter.set($event)" [options]="inputTrackingOptions" ariaLabel="Filtrar tipo de estoque"/></div>
@@ -59,7 +62,7 @@
             <div class="catalog-card-body">
               <div class="catalog-meta"><span>{{item.code}}</span><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></div>
               <h2>{{item.displayName}}</h2>
-              <p class="catalog-subtitle">{{collectionNames().get(item.collectionId) || 'Linha'}} @if(weight(item)!==null){ · ≈ {{weight(item)}} g}</p>
+              <p class="catalog-subtitle">{{categoryName(item)}}{{item.categoryId===undefined || item.categoryId==='soap' ? ' · '+(collectionNames().get(item.collectionId)||'Linha') : ''}} @if(weight(item)!==null){ · ≈ {{weight(item)}} g}</p>
               <div class="catalog-stats"><strong>{{currency(item.salePriceCents)}}</strong>
                 <span [class.stock-danger]="freeStock(item)===0">{{freeStock(item)>0?freeStock(item)+' livre(s)':'Sem estoque livre'}}</span>
               </div>

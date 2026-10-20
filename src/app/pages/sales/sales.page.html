@@ -71,7 +71,7 @@
         </label>
         <div class="sales-product-field">
           <span>Sabonete</span>
-          <bf-select ariaLabel="Filtrar por sabonete" [options]="productFilterOptions()"
+          <bf-select ariaLabel="Filtrar por produto" [options]="productFilterOptions()"
             [value]="historyProduct()" (valueChange)="historyProduct.set($event)"/>
         </div>
         <div class="sales-advanced-actions">
@@ -283,7 +283,7 @@
               <h4>Adicionar item</h4>
               <div class="bf-segments" aria-label="Tipo de item">
                 <button type="button" [class.active]="newLineKind()==='product'"
-                  (click)="newLineKind.set('product');newLineSource.set('')">Sabonete</button>
+                  (click)="newLineKind.set('product');newLineSource.set('')">Produto</button>
                 <button type="button" [class.active]="newLineKind()==='addition'"
                   (click)="newLineKind.set('addition');newLineSource.set('')">Adicional</button>
               </div>
@@ -317,7 +317,7 @@
                   <div class="advanced-impact">
                     <strong>Impacto de estoque</strong>
                     @for(change of preview.value.inventoryDeltas;track change.itemType+change.itemId){
-                      <span>{{change.itemType==='product'?'Sabonete':'Insumo'}} · {{change.itemId}}:
+                      <span>{{change.itemType==='product'?'Produto':'Insumo'}} · {{change.itemId}}:
                         {{change.quantityDelta>0?'+':''}}{{change.quantityDelta}} {{sale.stockApplied===false?'(compromisso inverso)':'no estoque'}}</span>
                     }
                   </div>

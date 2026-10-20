@@ -188,9 +188,9 @@ export class CatalogEditor {
         additionalCostCents: toCents(model.additionalCost),
         averageUnitCostCents: existing?.averageUnitCostCents ?? 0,
       }, {
-        collection: this.references.collections().find((item) => item.id === model.collectionId),
-        fragrance: this.references.fragrances().find((item) => item.id === model.fragranceId),
-        format: this.references.formats().find((item) => item.id === model.formatId),
+        collection: model.categoryId === 'soap' ? this.references.collections().find((item) => item.id === model.collectionId) : undefined,
+        fragrance: model.categoryId === 'soap' ? this.references.fragrances().find((item) => item.id === model.fragranceId) : undefined,
+        format: model.categoryId === 'soap' ? this.references.formats().find((item) => item.id === model.formatId) : undefined,
       }, new Map(this.store.inputs().map((item) => [item.id, item])));
     } catch {
       return null;
@@ -324,7 +324,7 @@ export class CatalogEditor {
   }
 
   private async saveProduct(): Promise<void> {
-    if (this.bulkVariants() && !this.editingId()) {
+    if (this.bulkVariants() && !this.editingId() && this.productModel().categoryId === 'soap') {
       await this.saveProductVariants();
       return;
     }

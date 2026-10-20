@@ -143,9 +143,9 @@ export class CatalogPage {
       matchesCatalogSearch(this.search(),p.displayName,p.code,this.categoryName(p),p.modelName,p.variantName,this.collectionNames().get(p.collectionId),
         this.fragranceNames().get(p.fragranceId),this.formatNames().get(p.formatId)) &&
       (!this.categoryFilter() || productCategoryId(p)===this.categoryFilter()) &&
-      (productCategoryId(p)!=='soap' || (!this.collectionFilter() || p.collectionId===this.collectionFilter())) &&
-      (productCategoryId(p)!=='soap' || (!this.fragranceFilter() || p.fragranceId===this.fragranceFilter())) &&
-      (productCategoryId(p)!=='soap' || (!this.formatFilter() || p.formatId===this.formatFilter())) &&
+      (!this.collectionFilter() || (productCategoryId(p)==='soap' && p.collectionId===this.collectionFilter())) &&
+      (!this.fragranceFilter() || (productCategoryId(p)==='soap' && p.fragranceId===this.fragranceFilter())) &&
+      (!this.formatFilter() || (productCategoryId(p)==='soap' && p.formatId===this.formatFilter())) &&
       matchesCatalogAvailability(p,this.productAvailability()));
     return this.sortItems(products,p=>p.salePriceCents,p=>p.stock,p=>this.productFinancials().get(p.id)?.marginPercent??null,p=>p.displayName);
   });

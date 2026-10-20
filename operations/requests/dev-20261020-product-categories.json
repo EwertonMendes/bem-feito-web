@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "dev-product-categories-20261020-v1",
+  "environment": "dev",
+  "projectId": "bem-feito-dev",
+  "operation": "migrate",
+  "migration": "product-categories-v1",
+  "deploymentSha": "bf98630c59f9efdd2e402e9f8e4230ed61f3c502",
+  "destructive": {
+    "projectId": "bem-feito-dev",
+    "paths": [
+      "products"
+    ]
+  }
+}

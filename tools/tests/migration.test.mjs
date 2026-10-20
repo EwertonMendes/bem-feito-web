@@ -151,3 +151,26 @@ test('Reconciliation ignores already-released reservations and uses the current 
     assert.equal(result.sales[1].fulfillmentStatus, 'ready');
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+
+test('Voided stock adjustments keep audit records without zero-delta stock movements', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'bem-feito-void-adjustment-test-'));
+  try {
+    const rawPath = join(dir, 'raw.json');
+    const dataPath = join(dir, 'data.json');
+    await writeFile(rawPath, JSON.stringify({ sheets: {
+      'Ajustes de Estoque': [
+        { Ajuste_ID: 'AJ99991', Data: '20/10/2026', Tipo: 'Produto',
+          Produto_ID: 'PROD-TEST', 'Quantidade (+/-)': 0, Motivo: 'Anulado para auditoria' },
+        { Ajuste_ID: 'AJ99992', Data: '20/10/2026', Tipo: 'Produto',
+          Produto_ID: 'PROD-TEST', 'Quantidade (+/-)': -1, Motivo: 'Contagem real' },
+      ],
+    } }));
+    const normalized = run('normalize-legacy.mjs', rawPath, dataPath);
+    assert.equal(normalized.status, 0, normalized.stderr);
+    const result = JSON.parse(await readFile(dataPath, 'utf8'));
+    assert.equal(result.stockAdjustments.length, 2);
+    assert.equal(result.stockAdjustments[0].quantityDelta, 0);
+    assert.deepEqual(result.stockMovements.filter(row => row.sourceType === 'adjustment').map(row => row.quantityDelta), [-1]);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});

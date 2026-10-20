@@ -13,6 +13,7 @@ import {
   startAfter,
 } from 'firebase/firestore';
 import { productCostComponents, standardCostForProduct, trackingModeForInput } from '../../domain/logic/costing';
+import { productCategoryId } from '../../domain/logic/product-category';
 import { productStockStatus, stockStatusForInput } from '../../domain/logic/stock-status';
 import { CollectionDefinition, FormatDefinition, FragranceDefinition, InputItem, Product } from '../../domain/models/catalog.model';
 import { StockMovement } from '../../domain/models/inventory.model';
@@ -93,9 +94,9 @@ export class ProductionRepository {
         products.set(product.id, product);
       }
 
-      const collectionIds = new Set([...products.values()].map((item) => item.collectionId));
-      const fragranceIds = new Set([...products.values()].map((item) => item.fragranceId));
-      const formatIds = new Set([...products.values()].map((item) => item.formatId));
+      const collectionIds = new Set([...products.values()].filter(item => productCategoryId(item) === 'soap').map(item => item.collectionId).filter(Boolean));
+      const fragranceIds = new Set([...products.values()].filter(item => productCategoryId(item) === 'soap').map(item => item.fragranceId).filter(Boolean));
+      const formatIds = new Set([...products.values()].filter(item => productCategoryId(item) === 'soap').map(item => item.formatId).filter(Boolean));
       const readMap = async (name: string, ids: Set<string>) => {
         const result = new Map<string, DocumentSnapshot>();
         const snapshots = await Promise.all([...ids].map((id) => transaction.get(doc(this.firestore, name, id))));
@@ -105,14 +106,14 @@ export class ProductionRepository {
       const collections = await readMap('collections', collectionIds);
       const fragrances = await readMap('fragrances', fragranceIds);
       const formats = await readMap('formats', formatIds);
-      const referenceFor = (product: Product) => ({
+      const referenceFor = (product: Product) => productCategoryId(product) === 'soap' ? ({
         collection: collections.get(product.collectionId)?.exists()
           ? ({ id: product.collectionId, ...collections.get(product.collectionId)!.data() } as CollectionDefinition) : undefined,
         fragrance: fragrances.get(product.fragranceId)?.exists()
           ? ({ id: product.fragranceId, ...fragrances.get(product.fragranceId)!.data() } as FragranceDefinition) : undefined,
         format: formats.get(product.formatId)?.exists()
           ? ({ id: product.formatId, ...formats.get(product.formatId)!.data() } as FormatDefinition) : undefined,
-      });
+      }) : ({}); 
       const inputIds = new Set<string>();
       for (const product of products.values()) {
         for (const component of productCostComponents(product, referenceFor(product))) inputIds.add(component.inputId);

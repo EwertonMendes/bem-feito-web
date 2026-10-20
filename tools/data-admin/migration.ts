@@ -87,7 +87,7 @@ async function prepareCategoryMigration(request: Request, db: Firestore, env: an
   const pending = await db.getAll(...newRefs);
   for (let i = 0; i < newItems.length; i++) {
     const row = snapshotRow(pending[i]!);
-    invariant(row.before === null, 'New product ID already exists; no partial reimport');
+    invariant(!pending[i]!.exists, 'New product ID already exists; no partial reimport');
     const { id, ...payload } = newItems[i];
     rows.push({ ...row, after: encode(payload) });
   }

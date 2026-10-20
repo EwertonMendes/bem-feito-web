@@ -1,6 +1,6 @@
 <section class="bf-page catalog-page">
   <header class="bf-page-header">
-    <div><h1>Catálogo</h1><p>Encontre, consulte e gerencie sabonetes, insumos e adicionais.</p></div>
+    <div><h1>Catálogo</h1><p>Encontre, consulte e gerencie produtos, insumos e adicionais.</p></div>
     <div class="bf-actions"><button class="bf-button" type="button" (click)="editor.openNew(tab())"><bf-icon name="plus"/> Novo</button></div>
   </header>
   @if(store.initialized() && store.loading()){<bf-page-refresh/>}
@@ -12,7 +12,7 @@
     </nav>
     <bf-search-field class="catalog-search" [value]="search()" (valueChange)="search.set($event)"
       [placeholder]="tab()==='products'?'Ex.: Massageador Éros, Patinha G':tab()==='inputs'?'Buscar insumo por nome ou código':'Buscar adicional ou categoria'"
-      [ariaLabel]="'Buscar '+(tab()==='products'?'sabonetes':tab()==='inputs'?'insumos':'adicionais')"/>
+      [ariaLabel]="'Buscar '+(tab()==='products'?'produtos':tab()==='inputs'?'insumos':'adicionais')"/>
   </div>
   <div class="catalog-controls">
     <button type="button" class="bf-button secondary filters-toggle" [attr.aria-expanded]="showFilters()" (click)="showFilters.set(!showFilters())">
@@ -78,7 +78,7 @@
             <button bfButton type="button" [disabled]="!item.active || freeStock(item)<=0" [attr.title]="freeStock(item)<=0?'Sem estoque livre para venda':null" (click)="modals.openSale(item.id)"><bf-icon name="sales"/> Vender</button>
           </div>
         </article>
-      } @empty {<bf-empty-state title="Nenhum sabonete encontrado" description="Experimente remover algum filtro ou alterar a pesquisa."/>}
+      } @empty {<bf-empty-state title="Nenhum produto encontrado" description="Experimente remover algum filtro ou alterar a pesquisa."/>}
     </div>
   } @else if(tab()==='inputs'){
     <div class="catalog-grid" [class.list-view]="viewMode()==='list'">

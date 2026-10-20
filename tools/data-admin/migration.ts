@@ -54,8 +54,21 @@ export async function prepareMigration(request: Request, db: Firestore, env: any
     Number.isSafeInteger(bank.ownerFundedCents) && bank.ownerFundedCents >= 0 &&
     bank.reimbursementDueCents === 0 && /^\d{4}-\d{2}-\d{2}$/.test(bank.businessDate),
     'Bank snapshot is invalid');
-  for (const [name, total] of Object.entries({ sales: 29, payments: 29, productions: 72, expenses: 16 })) invariant(data[name]?.length === total, 'Approved source counts differ');
-  for (const [id, state] of [['V00024', 'delivered'], ['V00025', 'delivered'], ['V00029', 'in-production']]) invariant(data.sales.find((sale: any) => sale.id === id)?.fulfillmentStatus === state, 'Order reconciliation differs');
+  // Pin aggregate counts for the private 2026-10-20 source; never silently import an older snapshot.
+  for (const [name, total] of Object.entries({ sales: 31, payments: 30, productions: 86, expenses: 27 })) invariant(data[name]?.length === total, 'Approved source counts differ');
+  for (const [id, state] of [['V00024', 'delivered'], ['V00025', 'delivered'], ['V00029', 'in-production'], ['V00030', 'ready'], ['V00031', 'ready']]) invariant(data.sales.find((sale: any) => sale.id === id)?.fulfillmentStatus === state, 'Order reconciliation differs');
+  // Reservations have to survive the full DEV replacement without prematurely delivering orders.
+  const order30 = data.sales.find((sale: any) => sale.id === 'V00030');
+  const order31 = data.sales.find((sale: any) => sale.id === 'V00031');
+  const hearts = data.products.find((item: any) => item.id === 'PROD-083');
+  invariant(order30 && order30.receivedCents === order30.totalCents && order30.balanceCents === 0 &&
+    order30.items.some((item: any) => item.sourceId === 'PROD-083' && item.quantity === 20) &&
+    hearts?.stock === 41 && hearts?.reservedPhysicalStock === 20 && hearts?.committedStock === 20,
+    'Prepared historical order or heart-shaped production differs');
+  invariant(order31 && order31.receivedCents === 0 && order31.balanceCents === order31.totalCents &&
+    order31.items.filter((item: any) => item.kind === 'product').length === 10 &&
+    order31.items.filter((item: any) => item.kind === 'product').every((item: any) => item.quantity === 2),
+    'Reserved unpaid order differs');
   invariant(data.kits.length === 0 && !data.formats.some((format: any) => format.name === 'Kit Mini') &&
     !data.products.some((p: any) => String(p.displayName).includes('Kit Mini')) &&
     data.sales.every((s: any) => s.items.every((item: any) => item.kind === 'product' || item.kind === 'addition')),

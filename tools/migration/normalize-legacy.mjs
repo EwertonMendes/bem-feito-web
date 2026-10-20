@@ -516,6 +516,8 @@ for (const expense of expenses.filter((item) => item.kind === 'input-purchase' &
 }
 
 for (const adjustment of stockAdjustments) {
+  // Preserve voided zero-quantity audit rows without fabricating physical stock movements.
+  if (adjustment.quantityDelta === 0) continue;
   const entity = adjustment.itemType === 'product' ? productById.get(adjustment.itemId) : inputById.get(adjustment.itemId);
   stockMovements.push({
     id: `migration-adjustment-${adjustment.id}`,

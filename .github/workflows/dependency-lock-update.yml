@@ -1,0 +1,28 @@
+name: Update safe dependency lockfile (temporary)
+on:
+  push:
+    branches: [feat/catalog-multiple-product-categories-20261020]
+    paths:
+      - .github/workflows/dependency-lock-update.yml
+permissions:
+  contents: write
+jobs:
+  regenerate-lockfile:
+    if: github.repository == 'EwertonMendes/bem-feito-web'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.22.3
+      - name: Regenerate lockfile using npm (no scripts)
+        run: npm install --package-lock-only --ignore-scripts --no-fund --no-audit
+      - name: Commit lockfile to this feature branch only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(deps): lock patched MCP SDK and Vite"
+            git push origin HEAD:refs/heads/feat/catalog-multiple-product-categories-20261020
+          fi

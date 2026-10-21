@@ -16,7 +16,7 @@ export type DirectRequest = {
   /** Public sale code only, not a customer identifier. */
   saleCode?: string;
   /** A single stock-backed paid/fulfilled sale; no direct ledger write input. */
-  paymentCode?: string; productId?: string; paymentMethodId?: string;
+  paymentCode?: string; lineItemId?: string; productId?: string; paymentMethodId?: string;
   quantity?: number; unitPriceCents?: number; expectedAvailableStock?: number;
   customerName?: string;
 };
@@ -73,7 +73,7 @@ export function validateDirectRequest(input: string): DirectRequest {
   try { raw = JSON.parse(input); } catch { throw Error('Invalid direct request JSON'); }
   const o = props(raw, ['schemaVersion','id','environment','projectId','action','collection','documentId',
     'expected','expectedAbsent','values','itemType','itemId','quantityDelta','reason','businessDate','saleCode',
-    'paymentCode','productId','paymentMethodId','quantity','unitPriceCents','expectedAvailableStock','customerName']);
+    'paymentCode','lineItemId','productId','paymentMethodId','quantity','unitPriceCents','expectedAvailableStock','customerName']);
   invariant(o.schemaVersion === 1 && o.environment === 'dev' && o.projectId === 'bem-feito-dev',
     'Direct administration is DEV-only');
   identifier(o.id);
@@ -81,7 +81,7 @@ export function validateDirectRequest(input: string): DirectRequest {
   invariant(['create','patch','delete','reverseProduction','adjustStock','deliverSale','recordPaidSale'].includes(String(o.action)), 'Unknown direct action');
   const action = o.action;
   if (action !== 'recordPaidSale') invariant(
-    ['paymentCode','productId','paymentMethodId','quantity','unitPriceCents',
+    ['paymentCode','lineItemId','productId','paymentMethodId','quantity','unitPriceCents',
       'expectedAvailableStock','customerName'].every(k => o[k] === undefined),
     'Paid sale fields cannot be used in other actions');
   if (['create','patch','delete'].includes(String(action))) {
@@ -118,8 +118,9 @@ export function validateDirectRequest(input: string): DirectRequest {
       'Paid sale accepts only validated order parameters');
     invariant(typeof o.saleCode === 'string' && /^V[0-9]{5}$/.test(o.saleCode), 'Sale code required');
     invariant(typeof o.paymentCode === 'string' && /^P[0-9]{6}$/.test(o.paymentCode), 'Payment code required');
+    invariant(typeof o.lineItemId === 'string' && /^I[0-9]{6}$/.test(o.lineItemId), 'Sale item code required');
     identifier(o.productId); identifier(o.paymentMethodId);
-    invariant(typeof o.customerName === 'string' && /^[\\p{L} .'-]{2,80}$/u.test(o.customerName.trim()),
+    invariant(typeof o.customerName === 'string' && /^[\p{L} .'-]{2,80}$/u.test(o.customerName.trim()),
       'Customer name required');
     invariant(typeof o.businessDate === 'string' && DAY.test(o.businessDate) &&
       !Number.isNaN(Date.parse(o.businessDate)), 'Valid business date required');
@@ -461,7 +462,7 @@ async function recordPaidSale(db: Firestore, input: DirectRequest): Promise<Row[
   const costTotal=Math.round(qty * (costDeci===undefined?cost*10:costDeci)/10);
   const effect={itemType:'product',itemId:input.productId!,quantityDelta:-qty,
     unitCostCents:cost,...(costDeci===undefined?{}:{unitCostDeciCents:costDeci})};
-  const line={id:'I'+String(Number(saleCode.slice(1))+68).padStart(6,'0'),
+  const line={id:input.lineItemId!,
     kind:'product',sourceId:input.productId!,name:String(p.displayName),
     ...(p.image?{image:p.image}:{}),
     quantity:qty,unitPriceCents:input.unitPriceCents!,unitCostCents:cost,
@@ -471,8 +472,8 @@ async function recordPaidSale(db: Firestore, input: DirectRequest): Promise<Row[
     stockEffects:[effect]};
   invariant(typeof p.displayName==='string' && p.displayName.length>0,'Product name missing');
   const name=input.customerName!.trim();
-  const normalized=name.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'')
-    .toLocaleLowerCase('pt-BR').replace(/\\s+/g,' ').trim();
+  const normalized=name.normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toLocaleLowerCase('pt-BR').replace(/\s+/g,' ').trim();
   const prefixes=new Set<string>();
   for(const word of [normalized,...normalized.split(' ')].filter(Boolean))
     for(let i=2;i<=Math.min(word.length,60);i++) prefixes.add(word.slice(0,i));

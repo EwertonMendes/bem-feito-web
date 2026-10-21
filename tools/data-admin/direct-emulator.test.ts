@@ -119,3 +119,52 @@ test('generic expense receipt changes only the requested fields and preserves ca
   await assert.rejects(prepareDirect(req({id:'direct-receipt-stale-317',action:'patch',collection:'expenses',
     documentId:id,expected:{receiptStatus:'pending'},values:{receiptStatus:'received'}}),db),/precondition/i);
 });
+
+test('delivers a ready order atomically, clears allocations and preserves unpaid balance',async()=>{
+  const code='V00981', sid='test-sale-delivery-981';
+  const productId='test-delivery-product-981', inputId='test-delivery-input-981';
+  const sale=tracked('sales/'+sid), product=tracked('products/'+productId),
+    input=tracked('inputs/'+inputId);
+  const m1=tracked('stockMovements/admin-delivery-'+code+'-01');
+  const m2=tracked('stockMovements/admin-delivery-'+code+'-02');
+  await product.set({stock:5,committedStock:2,reservedPhysicalStock:2,
+    explicitCommittedStock:2,explicitAllocatedStock:2,minimumStock:0,stockStatus:'ok'});
+  await input.set({stock:7,committedStock:5,reservedPhysicalStock:5,
+    minimumStock:0,minimumStockConfigured:true,trackingMode:'exact',stockStatus:'ok'});
+  await sale.set({code,businessDate:'2026-10-20',status:'active',fulfillmentStatus:'ready',
+    stockApplied:false,paymentStatus:'pending',totalCents:3800,receivedCents:0,
+    balanceCents:3800,paymentIds:[],
+    items:[{id:'line-1',kind:'product',sourceId:productId,quantity:2}],
+    orderAllocations:[{lineId:'line-1',productId,quantity:2}],
+    stockEffects:[
+      {itemType:'product',itemId:productId,quantityDelta:-2,unitCostCents:115},
+      {itemType:'input',itemId:inputId,quantityDelta:-5,unitCostCents:20},
+    ]});
+  await run(req({id:'direct-delivery-981',action:'deliverSale',saleCode:code}));
+  const sd=(await sale.get()).data()!,pd=(await product.get()).data()!,ind=(await input.get()).data()!;
+  assert.equal(sd.fulfillmentStatus,'delivered');
+  assert.equal(sd.stockApplied,true);
+  assert.equal(sd.paymentStatus,'pending');
+  assert.equal(sd.balanceCents,3800);
+  assert.deepEqual(sd.paymentIds,[]);
+  assert.deepEqual([pd.stock,pd.committedStock,pd.reservedPhysicalStock,
+    pd.explicitCommittedStock,pd.explicitAllocatedStock],[3,0,0,0,0]);
+  assert.deepEqual([ind.stock,ind.committedStock,ind.reservedPhysicalStock],[2,0,0]);
+  assert.deepEqual([(await m1.get()).data()?.quantityDelta,(await m2.get()).data()?.quantityDelta],[-2,-5]);
+  assert.equal((await m1.get()).data()?.sourceId,sid);
+  await assert.rejects(prepareDirect(req({id:'direct-delivery-second-981',action:'deliverSale',saleCode:code}),db),
+    /Only ready and unfulfilled/);
+});
+test('delivery refuses inconsistent reservations without changing ledger or finances',async()=>{
+  const code='V00982',sid='test-sale-delivery-982',productId='test-delivery-product-982';
+  const sale=tracked('sales/'+sid),product=tracked('products/'+productId);
+  await product.set({stock:5,committedStock:2,reservedPhysicalStock:1,minimumStock:0});
+  await sale.set({code,status:'active',fulfillmentStatus:'ready',stockApplied:false,
+    balanceCents:2000,paymentStatus:'pending',items:[{id:'line-1',kind:'product',
+      sourceId:productId,quantity:2}],stockEffects:[{itemType:'product',itemId:productId,
+      quantityDelta:-2,unitCostCents:100}]});
+  await assert.rejects(prepareDirect(req({id:'direct-delivery-blocked-982',action:'deliverSale',saleCode:code}),db),
+    /Physical inventory or delivery reservation inconsistent/);
+  assert.equal((await sale.get()).data()?.fulfillmentStatus,'ready');
+  assert.equal((await product.get()).data()?.stock,5);
+});

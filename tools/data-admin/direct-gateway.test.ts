@@ -18,6 +18,10 @@ test('direct gateway accepts reusable safe requests, never hard-coded production
   assert.equal(validateDirectRequest(json({...base,action:'delete',collection:'dataAdminSmoke',
     documentId:'smoke-direct'})).action,'delete');
   assert.equal(validateDirectRequest(json({...base,action:'deliverSale',saleCode:'V00030'})).action,'deliverSale');
+  assert.equal(validateDirectRequest(json({...base,action:'recordPaidSale',saleCode:'V00032',
+    paymentCode:'P000031',lineItemId:'I000100',productId:'PROD-077',paymentMethodId:'CAD-0017',
+    quantity:1,unitPriceCents:1600,expectedAvailableStock:1,
+    customerName:'Isabele',businessDate:'2026-10-21'})).action,'recordPaidSale');
 });
 test('direct rejects invalid payloads, protected infrastructure and unrelated projects',()=>{
   for(const p of [
@@ -37,6 +41,13 @@ test('direct rejects invalid payloads, protected infrastructure and unrelated pr
     {...base,action:'deliverSale',saleCode:'amanda'},
     {...base,action:'deliverSale',saleCode:'V00030',values:{fulfillmentStatus:'delivered'}},
     {...base,action:'deliverSale',saleCode:'V00030',documentId:'sale-id'},
+    {...base,action:'recordPaidSale',saleCode:'V00032',paymentCode:'P000031',
+      lineItemId:'I000100',productId:'PROD-077',paymentMethodId:'CAD-0017',
+      customerName:'X',quantity:1,unitPriceCents:1600,businessDate:'2026-10-21',expectedAvailableStock:1},
+    {...base,action:'recordPaidSale',saleCode:'V00032',paymentCode:'P000031',
+      lineItemId:'I000100',productId:'PROD-077',paymentMethodId:'CAD-0017',
+      customerName:'Isabele',quantity:1,unitPriceCents:1600,businessDate:'2026-10-21',
+      expectedAvailableStock:1,values:{paymentStatus:'paid'}},
   ]) assert.throws(()=>validateDirectRequest(json(p)));
 });
 test('direct authorization requires trusted owner, master and exact dispatch',async()=>{

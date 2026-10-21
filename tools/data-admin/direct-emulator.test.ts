@@ -168,3 +168,76 @@ test('delivery refuses inconsistent reservations without changing ledger or fina
   assert.equal((await sale.get()).data()?.fulfillmentStatus,'ready');
   assert.equal((await product.get()).data()?.stock,5);
 });
+
+test('atomic fully paid sale creates receipt, sale, ledger, stock decrement and sequence counters',async()=>{
+  const code='V00983',paymentCode='P000983',id='sale-fixture-983',
+    productId='paid-product-983',methodId='pix-method-983',itemId='I000983';
+  const sc=tracked('counters/sale'),pc=tracked('counters/payment');
+  const beforeSC=await sc.get(),beforePC=await pc.get();
+  const product=tracked('products/'+productId),method=tracked('paymentMethods/'+methodId),
+    sale=tracked('sales/'+code),payment=tracked('payments/'+paymentCode),
+    movement=tracked('stockMovements/admin-sale-'+code);
+  await sc.set({value:982});
+  await pc.set({value:982});
+  await product.set({active:true,displayName:'Mais Aroma · Tropical · Floral',
+    categoryId:'soap',collectionId:'col1',fragranceId:'fr1',formatId:'fmt1',
+    salePriceCents:1600,stock:1,committedStock:0,reservedPhysicalStock:0,
+    minimumStock:3,averageUnitCostCents:0,stockStatus:'low'});
+  await method.set({name:'Pix',active:true});
+  try {
+    await run(req({id,action:'recordPaidSale',saleCode:code,paymentCode,
+      lineItemId:itemId,productId,paymentMethodId:methodId,quantity:1,
+      unitPriceCents:1600,expectedAvailableStock:1,customerName:'Isabele',
+      businessDate:'2026-10-21'}));
+    const a=(await sale.get()).data()!,p=(await payment.get()).data()!,
+      pr=(await product.get()).data()!,m=(await movement.get()).data()!;
+    assert.deepEqual([a.code,a.customerName,a.fulfillmentStatus,a.stockApplied,
+      a.paymentStatus,a.totalCents,a.receivedCents,a.balanceCents],
+      [code,'Isabele','delivered',true,'paid',1600,1600,0]);
+    assert.deepEqual(a.paymentIds,[paymentCode]);
+    assert.equal(a.items[0].id,itemId);
+    assert.equal(a.items[0].sourceId,productId);
+    assert.equal(a.items[0].categoryId,'soap');
+    assert.equal(a.missingCostItems,1);
+    assert.equal(a.customerSearchKey,'isabele');
+    assert.equal(a.customerSearchPrefixes.includes('isab'),true);
+    assert.deepEqual([p.code,p.methodId,p.appliedCents,p.status,p.saleId],
+      [paymentCode,methodId,1600,'active',code]);
+    assert.deepEqual([pr.stock,pr.reservedPhysicalStock,pr.committedStock],[0,0,0]);
+    assert.deepEqual([m.itemId,m.quantityDelta,m.sourceId,m.sourceType],
+      [productId,-1,code,'sale']);
+    assert.equal((await sc.get()).data()?.value,983);
+    assert.equal((await pc.get()).data()?.value,983);
+    await assert.rejects(prepareDirect(req({id:'sale-fixture-983-duplicate',action:'recordPaidSale',
+      saleCode:code,paymentCode,lineItemId:itemId,productId,paymentMethodId:methodId,
+      quantity:1,unitPriceCents:1600,expectedAvailableStock:1,
+      customerName:'Isabele',businessDate:'2026-10-21'}),db),/Spreadsheet codes disagree/);
+  } finally {
+    if(beforeSC.exists)await sc.set(beforeSC.data()!);else await sc.delete();
+    if(beforePC.exists)await pc.set(beforePC.data()!);else await pc.delete();
+    clean.delete('counters/sale');clean.delete('counters/payment');
+  }
+});
+test('paid sale refuses selling a physically reserved unit',async()=>{
+  const sc=tracked('counters/sale'),pc=tracked('counters/payment');
+  const bsc=await sc.get(),bpc=await pc.get();
+  const productId='paid-product-reserved-984',methodId='pix-method-984';
+  const product=tracked('products/'+productId),method=tracked('paymentMethods/'+methodId);
+  await sc.set({value:983}); await pc.set({value:983});
+  await product.set({active:true,displayName:'Floral Tropical',salePriceCents:1600,
+    stock:1,committedStock:1,reservedPhysicalStock:1,minimumStock:0,averageUnitCostCents:0});
+  await method.set({name:'Pix',active:true});
+  try {
+    await assert.rejects(prepareDirect(req({id:'sale-fixture-reserved-984',
+      action:'recordPaidSale',saleCode:'V00984',paymentCode:'P000984',
+      lineItemId:'I000984',productId,paymentMethodId:methodId,quantity:1,
+      unitPriceCents:1600,expectedAvailableStock:1,customerName:'Isabele',
+      businessDate:'2026-10-21'}),db),/Physical inventory or reserved quantities changed/);
+    assert.equal((await product.get()).data()?.stock,1);
+    assert.equal((await db.doc('sales/V00984').get()).exists,false);
+  } finally {
+    if(bsc.exists)await sc.set(bsc.data()!);else await sc.delete();
+    if(bpc.exists)await pc.set(bpc.data()!);else await pc.delete();
+    clean.delete('counters/sale');clean.delete('counters/payment');
+  }
+});

@@ -348,7 +348,7 @@ async function deliverSale(db: Firestore, saleCode: string): Promise<Row[]> {
     const afterCommitted = committed-req.required;
     const afterReserved = physicalReserved-req.required;
     const tracked = before.orderAllocations !== undefined && req.type === 'product';
-    const explicit = tracked ? {
+    const explicit:Record<string,number> = tracked ? {
       explicitCommittedStock:Number(data.explicitCommittedStock)-req.required,
       explicitAllocatedStock:Number(data.explicitAllocatedStock)-req.required,
     } : {};

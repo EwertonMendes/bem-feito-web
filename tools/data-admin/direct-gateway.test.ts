@@ -17,6 +17,7 @@ test('direct gateway accepts reusable safe requests, never hard-coded production
     documentId:'my-collection',values:{name:'New collection',active:true}})).action,'create');
   assert.equal(validateDirectRequest(json({...base,action:'delete',collection:'dataAdminSmoke',
     documentId:'smoke-direct'})).action,'delete');
+  assert.equal(validateDirectRequest(json({...base,action:'deliverSale',saleCode:'V00030'})).action,'deliverSale');
 });
 test('direct rejects invalid payloads, protected infrastructure and unrelated projects',()=>{
   for(const p of [
@@ -33,6 +34,9 @@ test('direct rejects invalid payloads, protected infrastructure and unrelated pr
     {...base,action:'reverseProduction',documentId:'production/invalid'},
     {...base,action:'create',collection:'counters',documentId:'p1',values:{quantity:300}},
     {...base,action:'adjustStock',itemType:'product',itemId:'p1',quantityDelta:0,reason:'x',businessDate:'2026-10-10'},
+    {...base,action:'deliverSale',saleCode:'amanda'},
+    {...base,action:'deliverSale',saleCode:'V00030',values:{fulfillmentStatus:'delivered'}},
+    {...base,action:'deliverSale',saleCode:'V00030',documentId:'sale-id'},
   ]) assert.throws(()=>validateDirectRequest(json(p)));
 });
 test('direct authorization requires trusted owner, master and exact dispatch',async()=>{

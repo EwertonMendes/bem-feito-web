@@ -5,7 +5,7 @@ import type { Request, Payload } from './schema.ts';
 import { snapshotRow, type Plan, type Row } from './engine.ts';
 
 type Value = string | number | boolean | null | Value[] | { [key: string]: Value };
-type DirectAction = 'create' | 'patch' | 'delete' | 'reverseProduction' | 'adjustStock';
+type DirectAction = 'create' | 'patch' | 'delete' | 'reverseProduction' | 'adjustStock' | 'deliverSale';
 export type DirectRequest = {
   schemaVersion: 1; id: string; environment: 'dev'; projectId: 'bem-feito-dev';
   action: DirectAction;
@@ -13,6 +13,8 @@ export type DirectRequest = {
   expected?: Record<string, Value>; expectedAbsent?: string[]; values?: Record<string, Value>;
   itemType?: 'product' | 'input'; itemId?: string; quantityDelta?: number;
   reason?: string; businessDate?: string;
+  /** Public sale code only, not a customer identifier. */
+  saleCode?: string;
 };
 
 // Field names and collection names are not business allowlists. Only infrastructure
@@ -66,19 +68,19 @@ export function validateDirectRequest(input: string): DirectRequest {
   let raw: unknown;
   try { raw = JSON.parse(input); } catch { throw Error('Invalid direct request JSON'); }
   const o = props(raw, ['schemaVersion','id','environment','projectId','action','collection','documentId',
-    'expected','expectedAbsent','values','itemType','itemId','quantityDelta','reason','businessDate']);
+    'expected','expectedAbsent','values','itemType','itemId','quantityDelta','reason','businessDate','saleCode']);
   invariant(o.schemaVersion === 1 && o.environment === 'dev' && o.projectId === 'bem-feito-dev',
     'Direct administration is DEV-only');
   identifier(o.id);
   invariant((o.id as string).length <= 80, 'Operation ID too long');
-  invariant(['create','patch','delete','reverseProduction','adjustStock'].includes(String(o.action)), 'Unknown direct action');
+  invariant(['create','patch','delete','reverseProduction','adjustStock','deliverSale'].includes(String(o.action)), 'Unknown direct action');
   const action = o.action;
   if (['create','patch','delete'].includes(String(action))) {
     identifier(o.collection);
     invariant(!RESERVED_COLLECTIONS.has(o.collection), 'Protected infrastructure collection');
     identifier(o.documentId);
     if (o.collection === 'dataAdminSmoke') invariant(String(o.documentId).startsWith('smoke-'), 'Protected test namespace');
-    invariant(['itemType','itemId','quantityDelta','reason','businessDate'].every(k => o[k] === undefined), 'Unexpected stock parameters');
+    invariant(['itemType','itemId','quantityDelta','reason','businessDate','saleCode'].every(k => o[k] === undefined), 'Unexpected stock parameters');
     if (action === 'create') {
       invariant(o.expected === undefined && o.expectedAbsent === undefined, 'Create cannot provide preconditions');
       fieldValues(o.values);
@@ -99,9 +101,16 @@ export function validateDirectRequest(input: string): DirectRequest {
   } else if (action === 'reverseProduction') {
     invariant(o.collection === undefined && o.expected === undefined && o.expectedAbsent === undefined && o.values === undefined &&
       o.itemType === undefined && o.itemId === undefined && o.quantityDelta === undefined &&
-      o.reason === undefined && o.businessDate === undefined, 'Unexpected reversal parameters');
+      o.reason === undefined && o.businessDate === undefined && o.saleCode === undefined, 'Unexpected reversal parameters');
     identifier(o.documentId);
+  } else if (action === 'deliverSale') {
+    invariant(['collection','documentId','expected','expectedAbsent','values','itemType',
+      'itemId','quantityDelta','reason','businessDate'].every(k => o[k] === undefined),
+      'Delivery cannot contain raw writes or payment changes');
+    invariant(typeof o.saleCode === 'string' && /^V[0-9]{5}$/.test(o.saleCode),
+      'Exact sale code required');
   } else {
+    invariant(o.saleCode === undefined, 'Stock adjustment cannot specify a sale');
     invariant(o.collection === undefined && o.documentId === undefined && o.expected === undefined &&
       o.expectedAbsent === undefined && o.values === undefined, 'Stock adjustment does not accept raw field writes');
     invariant(['product','input'].includes(String(o.itemType)), 'Invalid item type');
@@ -275,11 +284,116 @@ async function adjustStock(db: Firestore, input: DirectRequest): Promise<Row[]> 
     sourceType:'adjustment',sourceId:adjustmentId,businessDate:input.businessDate!});
   return rows;
 }
+
+/**
+ * Audited DEV delivery, equivalent to SalesRepository.advanceFulfillment(..., 'delivered').
+ * A pure status patch would leave committed/reserved quantities and stock movements
+ * inconsistent. This planner includes every dependent document in the atomic plan.
+ */
+async function deliverSale(db: Firestore, saleCode: string): Promise<Row[]> {
+  const result = await db.collection('sales').where('code','==',saleCode).limit(2).get();
+  invariant(result.size === 1, 'Expected exactly one sale with the supplied code');
+  const saleSnap = result.docs[0]!;
+  const before = saleSnap.data();
+  invariant(before.status === 'active' && before.stockApplied === false &&
+    before.fulfillmentStatus === 'ready', 'Only ready and unfulfilled active sales may be delivered');
+  const effects = before.stockEffects;
+  invariant(Array.isArray(effects) && effects.length > 0 && effects.length <= 60,
+    'Delivery requires a bounded, known stock effect ledger');
+  const aggregates = new Map<string, {type:'product'|'input'; itemId:string; required:number}>();
+  for (const effect of effects) {
+    invariant(effect && ['product','input'].includes(effect.itemType), 'Unknown stock effect type');
+    identifier(effect.itemId);
+    invariant(typeof effect.quantityDelta === 'number' && Number.isFinite(effect.quantityDelta) &&
+      effect.quantityDelta < 0 && Math.abs(effect.quantityDelta) <= 1_000_000,
+      'Invalid delivery stock quantity');
+    invariant(effect.itemType !== 'product' || Number.isSafeInteger(effect.quantityDelta),
+      'Product quantity must be an integer');
+    invariant(Number.isSafeInteger(effect.unitCostCents) && effect.unitCostCents >= 0,
+      'Invalid unit cost in stock effect');
+    const path = (effect.itemType === 'product' ? 'products/' : 'inputs/') + effect.itemId;
+    const old = aggregates.get(path);
+    aggregates.set(path,{type:effect.itemType,itemId:effect.itemId,
+      required:(old?.required ?? 0)-effect.quantityDelta});
+  }
+  // An order marked ready with explicit allocations must have allocated every item.
+  if (before.orderAllocations !== undefined) {
+    invariant(Array.isArray(before.orderAllocations) && Array.isArray(before.items),
+      'Malformed individual order allocation ledger');
+    for (const line of before.items.filter((x:any)=>x.kind === 'product')) {
+      const allocated = before.orderAllocations
+        .filter((x:any)=>x.lineId === line.id && x.productId === line.sourceId)
+        .reduce((sum:number,x:any)=>sum+Number(x.quantity),0);
+      invariant(Number.isSafeInteger(line.quantity) && allocated === line.quantity,
+        'Delivery requires complete physical allocation for each product line');
+    }
+  }
+  const paths = [...aggregates.keys()];
+  const snapshots = await db.getAll(...paths.map(p=>db.doc(p)));
+  const rows:Row[] = [snapshotRow(saleSnap)];
+  snapshotData(rows[0]!,{...before,fulfillmentStatus:'delivered',stockApplied:true});
+  for (let i=0;i<paths.length;i++) {
+    const snapshot = snapshots[i]!;
+    const req = aggregates.get(paths[i]!)!;
+    invariant(snapshot.exists, 'Delivery stock item missing');
+    const data = snapshot.data()!;
+    const stock = Number(data.stock), committed = Number(data.committedStock ?? 0);
+    const physicalReserved = Number(data.reservedPhysicalStock ?? Math.min(stock,committed));
+    invariant(Number.isFinite(stock) && Number.isFinite(committed) &&
+      Number.isFinite(physicalReserved) && stock >= req.required &&
+      committed >= req.required && physicalReserved >= req.required &&
+      physicalReserved <= stock && physicalReserved <= committed,
+      'Physical inventory or delivery reservation inconsistent');
+    const afterStock = stock-req.required;
+    const afterCommitted = committed-req.required;
+    const afterReserved = physicalReserved-req.required;
+    const tracked = before.orderAllocations !== undefined && req.type === 'product';
+    const explicit:Record<string,number> = tracked ? {
+      explicitCommittedStock:Number(data.explicitCommittedStock)-req.required,
+      explicitAllocatedStock:Number(data.explicitAllocatedStock)-req.required,
+    } : {};
+    if (tracked) invariant(
+      Number.isSafeInteger(explicit.explicitCommittedStock!) &&
+      Number.isSafeInteger(explicit.explicitAllocatedStock!) &&
+      explicit.explicitCommittedStock! >= 0 && explicit.explicitAllocatedStock! >= 0 &&
+      explicit.explicitAllocatedStock! <= explicit.explicitCommittedStock!,
+      'Tracked order reservation counters inconsistent');
+    const row=snapshotRow(snapshot);
+    snapshotData(row,{...data,stock:afterStock,committedStock:afterCommitted,
+      reservedPhysicalStock:afterReserved,...explicit,
+      stockStatus:req.type === 'product'
+        ? statusProduct(afterStock,Number(data.minimumStock ?? 0))
+        : statusInput(data,afterStock)});
+    rows.push(row);
+  }
+  // The app posts movements using the date of accounting/posting, not a guessed
+  // historical delivery date. No payment record is created or changed.
+  const businessDate = new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});
+  invariant(DAY.test(businessDate), 'Cannot resolve local posting date');
+  for (let i=0;i<effects.length;i++) {
+    const effect=effects[i];
+    const movementRef=db.doc('stockMovements/admin-delivery-'+saleCode+'-'+String(i+1).padStart(2,'0'));
+    const old=await movementRef.get();
+    invariant(!old.exists, 'Delivery stock movement already exists');
+    const row=snapshotRow(old);
+    snapshotData(row,{
+      itemType:effect.itemType,itemId:effect.itemId,quantityDelta:effect.quantityDelta,
+      unitCostCents:effect.unitCostCents,
+      totalCostCents:Math.round(-effect.quantityDelta *
+        (effect.unitCostDeciCents ?? effect.unitCostCents*10)/10),
+      sourceType:'sale',sourceId:saleSnap.id,businessDate,
+    });
+    rows.push(row);
+  }
+  return rows;
+}
+
 export async function prepareDirect(input: DirectRequest, db: Firestore): Promise<{request:Request;plan:Plan}> {
   const request=directAsRequest(input);
   const rows = input.action === 'reverseProduction' ? await reverseProduction(db,input.documentId!) :
     input.action === 'adjustStock' ? await adjustStock(db,input) :
-      await createOrPatchOrDelete(db,input);
+      input.action === 'deliverSale' ? await deliverSale(db,input.saleCode!) :
+        await createOrPatchOrDelete(db,input);
   invariant(rows.length <= 120, 'Operation exceeds safe direct limit');
   return {request,plan:{schemaVersion:1,requestHash:requestHash(request),projectId:'bem-feito-dev',
     environment:'dev',operation:input.action,scope:rows.map(r=>r.path),rows,dependencies:[]}};

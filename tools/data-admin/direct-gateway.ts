@@ -5,7 +5,7 @@ import type { Request, Payload } from './schema.ts';
 import { snapshotRow, type Plan, type Row } from './engine.ts';
 
 type Value = string | number | boolean | null | Value[] | { [key: string]: Value };
-type DirectAction = 'create' | 'patch' | 'delete' | 'reverseProduction' | 'adjustStock' | 'deliverSale';
+type DirectAction = 'create' | 'patch' | 'delete' | 'reverseProduction' | 'adjustStock' | 'deliverSale' | 'recordPaidSale';
 export type DirectRequest = {
   schemaVersion: 1; id: string; environment: 'dev'; projectId: 'bem-feito-dev';
   action: DirectAction;
@@ -15,6 +15,10 @@ export type DirectRequest = {
   reason?: string; businessDate?: string;
   /** Public sale code only, not a customer identifier. */
   saleCode?: string;
+  /** A single stock-backed paid/fulfilled sale; no direct ledger write input. */
+  paymentCode?: string; lineItemId?: string; productId?: string; paymentMethodId?: string;
+  quantity?: number; unitPriceCents?: number; expectedAvailableStock?: number;
+  customerName?: string;
 };
 
 // Field names and collection names are not business allowlists. Only infrastructure
@@ -68,13 +72,18 @@ export function validateDirectRequest(input: string): DirectRequest {
   let raw: unknown;
   try { raw = JSON.parse(input); } catch { throw Error('Invalid direct request JSON'); }
   const o = props(raw, ['schemaVersion','id','environment','projectId','action','collection','documentId',
-    'expected','expectedAbsent','values','itemType','itemId','quantityDelta','reason','businessDate','saleCode']);
+    'expected','expectedAbsent','values','itemType','itemId','quantityDelta','reason','businessDate','saleCode',
+    'paymentCode','lineItemId','productId','paymentMethodId','quantity','unitPriceCents','expectedAvailableStock','customerName']);
   invariant(o.schemaVersion === 1 && o.environment === 'dev' && o.projectId === 'bem-feito-dev',
     'Direct administration is DEV-only');
   identifier(o.id);
   invariant((o.id as string).length <= 80, 'Operation ID too long');
-  invariant(['create','patch','delete','reverseProduction','adjustStock','deliverSale'].includes(String(o.action)), 'Unknown direct action');
+  invariant(['create','patch','delete','reverseProduction','adjustStock','deliverSale','recordPaidSale'].includes(String(o.action)), 'Unknown direct action');
   const action = o.action;
+  if (action !== 'recordPaidSale') invariant(
+    ['paymentCode','lineItemId','productId','paymentMethodId','quantity','unitPriceCents',
+      'expectedAvailableStock','customerName'].every(k => o[k] === undefined),
+    'Paid sale fields cannot be used in other actions');
   if (['create','patch','delete'].includes(String(action))) {
     identifier(o.collection);
     invariant(!RESERVED_COLLECTIONS.has(o.collection), 'Protected infrastructure collection');
@@ -103,6 +112,24 @@ export function validateDirectRequest(input: string): DirectRequest {
       o.itemType === undefined && o.itemId === undefined && o.quantityDelta === undefined &&
       o.reason === undefined && o.businessDate === undefined && o.saleCode === undefined, 'Unexpected reversal parameters');
     identifier(o.documentId);
+  } else if (action === 'recordPaidSale') {
+    invariant(['collection','documentId','expected','expectedAbsent','values','itemType',
+      'itemId','quantityDelta','reason'].every(k=>o[k]===undefined),
+      'Paid sale accepts only validated order parameters');
+    invariant(typeof o.saleCode === 'string' && /^V[0-9]{5}$/.test(o.saleCode), 'Sale code required');
+    invariant(typeof o.paymentCode === 'string' && /^P[0-9]{6}$/.test(o.paymentCode), 'Payment code required');
+    invariant(typeof o.lineItemId === 'string' && /^I[0-9]{6}$/.test(o.lineItemId), 'Sale item code required');
+    identifier(o.productId); identifier(o.paymentMethodId);
+    invariant(typeof o.customerName === 'string' && /^[\p{L} .'-]{2,80}$/u.test(o.customerName.trim()),
+      'Customer name required');
+    invariant(typeof o.businessDate === 'string' && DAY.test(o.businessDate) &&
+      !Number.isNaN(Date.parse(o.businessDate)), 'Valid business date required');
+    invariant(Number.isSafeInteger(o.quantity) && Number(o.quantity) >= 1 && Number(o.quantity) <= 200,
+      'Positive integer quantity required');
+    invariant(Number.isSafeInteger(o.unitPriceCents) && Number(o.unitPriceCents) >= 0 && Number(o.unitPriceCents) <= 1_000_000,
+      'Price in integer cents required');
+    invariant(Number.isSafeInteger(o.expectedAvailableStock) && Number(o.expectedAvailableStock) >= Number(o.quantity),
+      'Expected available stock must cover the sale');
   } else if (action === 'deliverSale') {
     invariant(['collection','documentId','expected','expectedAbsent','values','itemType',
       'itemId','quantityDelta','reason','businessDate'].every(k => o[k] === undefined),
@@ -388,12 +415,99 @@ async function deliverSale(db: Firestore, saleCode: string): Promise<Row[]> {
   return rows;
 }
 
+
+/** Register one fully paid, immediately fulfilled product sale without partial updates.
+ * All writes (sale, Pix, inventory movement, product balance, sequential counters)
+ * use the same audited transaction and its independent pre-commit backup.
+ */
+async function recordPaidSale(db: Firestore, input: DirectRequest): Promise<Row[]> {
+  const saleCode=input.saleCode!, paymentCode=input.paymentCode!;
+  const saleSeq=Number(saleCode.slice(1)), paymentSeq=Number(paymentCode.slice(1));
+  const [saleCounter,paymentCounter,product,method,sale,payment,movement]=await db.getAll(
+    db.doc('counters/sale'),db.doc('counters/payment'),
+    db.doc('products/'+input.productId!),db.doc('paymentMethods/'+input.paymentMethodId!),
+    db.doc('sales/'+saleCode),db.doc('payments/'+paymentCode),
+    db.doc('stockMovements/admin-sale-'+saleCode));
+  invariant(saleCounter.exists && paymentCounter.exists, 'Sale/payment counters missing');
+  invariant(Number(saleCounter.data()?.value) + 1 === saleSeq &&
+    Number(paymentCounter.data()?.value) + 1 === paymentSeq,
+    'Spreadsheet codes disagree with DEV counters; reconcile before posting');
+  invariant(product.exists && product.data()?.active === true, 'Product missing or inactive');
+  const p=product.data()!;
+  invariant(p.salePriceCents === input.unitPriceCents, 'Sale price differs from active product');
+  invariant(method.exists && method.data()?.active === true &&
+    String(method.data()?.name).trim().toLocaleLowerCase('pt-BR')==='pix',
+    'Payment method is not active Pix');
+  invariant(!sale.exists && !payment.exists && !movement.exists, 'Duplicate sale, payment or inventory entry');
+  const matching=await db.collection('sales').where('code','==',saleCode).limit(1).get();
+  invariant(matching.empty, 'Duplicate sale code already registered');
+  const matchingPayment=await db.collection('payments').where('code','==',paymentCode).limit(1).get();
+  invariant(matchingPayment.empty, 'Duplicate payment code already registered');
+  const stock=Number(p.stock), committed=Number(p.committedStock??0);
+  const physical=Number(p.reservedPhysicalStock??Math.min(stock,committed));
+  const available=stock-physical;
+  const qty=input.quantity!;
+  invariant(Number.isSafeInteger(stock) && Number.isSafeInteger(committed) &&
+    Number.isSafeInteger(physical) && stock>=0 && committed>=0 &&
+    physical>=0 && physical<=stock && physical<=committed &&
+    available===input.expectedAvailableStock && available>=qty,
+    'Physical inventory or reserved quantities changed; reconcile before sale');
+  const total=qty*input.unitPriceCents!;
+  invariant(Number.isSafeInteger(total) && total<=1_000_000_000, 'Invalid sale total');
+  const cost=Number(p.averageUnitCostCents??p.additionalCostCents??0);
+  invariant(Number.isSafeInteger(cost) && cost>=0 && cost<=1_000_000,
+    'Unit cost must be a nonnegative integer');
+  const costDeci=p.unitCostDeciCents;
+  invariant(costDeci===undefined || Number.isSafeInteger(costDeci), 'Invalid stored fractional cost');
+  const costTotal=Math.round(qty * (costDeci===undefined?cost*10:costDeci)/10);
+  const effect={itemType:'product',itemId:input.productId!,quantityDelta:-qty,
+    unitCostCents:cost,...(costDeci===undefined?{}:{unitCostDeciCents:costDeci})};
+  const line={id:input.lineItemId!,
+    kind:'product',sourceId:input.productId!,name:String(p.displayName),
+    ...(p.image?{image:p.image}:{}),
+    quantity:qty,unitPriceCents:input.unitPriceCents!,unitCostCents:cost,
+    totalCents:total,totalCostCents:costTotal,categoryId:p.categoryId??'soap',
+    ...(p.categoryId===undefined || p.categoryId==='soap'?
+      {collectionId:p.collectionId,fragranceId:p.fragranceId,formatId:p.formatId}:{}),
+    stockEffects:[effect]};
+  invariant(typeof p.displayName==='string' && p.displayName.length>0,'Product name missing');
+  const name=input.customerName!.trim();
+  const normalized=name.normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toLocaleLowerCase('pt-BR').replace(/\s+/g,' ').trim();
+  const prefixes=new Set<string>();
+  for(const word of [normalized,...normalized.split(' ')].filter(Boolean))
+    for(let i=2;i<=Math.min(word.length,60);i++) prefixes.add(word.slice(0,i));
+  const order={code:saleCode,businessDate:input.businessDate!,customerName:name,
+    customerSearchKey:normalized,customerSearchPrefixes:[...prefixes],
+    productIds:[input.productId!],discountCents:0,subtotalCents:total,totalCents:total,
+    receivedCents:total,tipCents:0,balanceCents:0,paymentStatus:'paid',status:'active',
+    fulfillmentStatus:'delivered',stockApplied:true,
+    notes:'Venda presencial quitada por Pix, entregue no mesmo dia.',items:[line],
+    paymentIds:[paymentCode],stockEffects:[effect],
+    analyticsVersion:1,cogsCents:costTotal,itemsSold:qty,missingCostItems:costTotal<=0?1:0};
+  const receipt={code:paymentCode,saleId:saleCode,businessDate:input.businessDate!,
+    methodId:input.paymentMethodId!,amountReceivedCents:total,appliedCents:total,
+    tipCents:0,status:'active'};
+  const rows=[snapshotRow(saleCounter),snapshotRow(paymentCounter),snapshotRow(product),
+    snapshotRow(sale),snapshotRow(payment),snapshotRow(movement)];
+  snapshotData(rows[0]!,{...saleCounter.data(),value:saleSeq});
+  snapshotData(rows[1]!,{...paymentCounter.data(),value:paymentSeq});
+  snapshotData(rows[2]!,{...p,stock:stock-qty,
+    stockStatus:statusProduct(stock-qty,Number(p.minimumStock??0))});
+  snapshotData(rows[3]!,order);
+  snapshotData(rows[4]!,receipt);
+  snapshotData(rows[5]!,{...effect,totalCostCents:costTotal,sourceType:'sale',
+    sourceId:saleCode,businessDate:input.businessDate!});
+  return rows;
+}
+
 export async function prepareDirect(input: DirectRequest, db: Firestore): Promise<{request:Request;plan:Plan}> {
   const request=directAsRequest(input);
   const rows = input.action === 'reverseProduction' ? await reverseProduction(db,input.documentId!) :
     input.action === 'adjustStock' ? await adjustStock(db,input) :
       input.action === 'deliverSale' ? await deliverSale(db,input.saleCode!) :
-        await createOrPatchOrDelete(db,input);
+        input.action === 'recordPaidSale' ? await recordPaidSale(db,input) :
+          await createOrPatchOrDelete(db,input);
   invariant(rows.length <= 120, 'Operation exceeds safe direct limit');
   return {request,plan:{schemaVersion:1,requestHash:requestHash(request),projectId:'bem-feito-dev',
     environment:'dev',operation:input.action,scope:rows.map(r=>r.path),rows,dependencies:[]}};

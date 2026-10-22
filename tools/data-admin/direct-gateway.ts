@@ -143,7 +143,7 @@ export function validateDirectRequest(input: string): DirectRequest {
     invariant(typeof o.paymentCode === 'string' && /^P[0-9]{6}$/.test(o.paymentCode),
       'Payment code required');
     identifier(o.productId); identifier(o.paymentMethodId);
-    invariant(typeof o.customerName === 'string' && /^[\\p{L} .'-]{2,80}$/u.test(o.customerName.trim()),
+    invariant(typeof o.customerName === 'string' && /^[\p{L} .'-]{2,80}$/u.test(o.customerName.trim()),
       'Customer name required');
     invariant(typeof o.businessDate === 'string' && DAY.test(o.businessDate) &&
       !Number.isNaN(Date.parse(o.businessDate)), 'Business date required');

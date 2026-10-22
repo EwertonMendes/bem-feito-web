@@ -218,7 +218,7 @@ test('atomic fully paid sale creates receipt, sale, ledger, stock decrement and 
     clean.delete('counters/sale');clean.delete('counters/payment');
   }
 });
-test('paid cash sale supports a documented price override without modifying catalog',async()=>{
+test('paid cash sale requires catalog price and writes money plus a single stock movement',async()=>{
   const code='V00985',paymentCode='P000985',id='sale-fixture-cash-985',
     productId='cash-product-985',methodId='cash-method-985',itemId='I000985';
   const sc=tracked('counters/sale'),pc=tracked('counters/payment');
@@ -234,21 +234,20 @@ test('paid cash sale supports a documented price override without modifying cata
   await method.set({name:'Dinheiro',active:true});
   const params={id,action:'recordPaidSale',saleCode:code,paymentCode,
     lineItemId:itemId,productId,paymentMethodId:methodId,quantity:1,
-    unitPriceCents:750,expectedAvailableStock:1,customerName:'Rafael',
+    unitPriceCents:600,expectedAvailableStock:1,customerName:'Rafael',
     businessDate:'2026-10-22'};
   try {
-    await assert.rejects(prepareDirect(req(params),db),/Manual price must include/);
-    await run(req({...params,priceOverrideReason:'Preço comercial vigente para Patinha M Clássica'}));
+    await assert.rejects(prepareDirect(req({...params,unitPriceCents:750}),db),/Sale price differs from active catalog/);
+    await run(req(params));
     const a=(await sale.get()).data()!,p=(await payment.get()).data()!,
       pr=(await product.get()).data()!,m=(await movement.get()).data()!;
     assert.deepEqual([a.code,a.customerName,a.fulfillmentStatus,a.paymentStatus,a.totalCents,
       a.receivedCents,a.balanceCents,a.stockApplied],
-      [code,'Rafael','delivered','paid',750,750,0,true]);
+      [code,'Rafael','delivered','paid',600,600,0,true]);
     assert.match(a.notes,/Dinheiro/);
-    assert.match(a.notes,/Preço manual/);
-    assert.equal(a.items[0].unitPriceCents,750);
+    assert.equal(a.items[0].unitPriceCents,600);
     assert.equal(p.methodId,methodId);
-    assert.equal(p.appliedCents,750);
+    assert.equal(p.appliedCents,600);
     assert.equal(pr.stock,0);
     assert.equal(pr.salePriceCents,600);
     assert.deepEqual([m.quantityDelta,m.sourceType,m.sourceId],[-1,'sale',code]);
@@ -257,6 +256,48 @@ test('paid cash sale supports a documented price override without modifying cata
     if(beforePC.exists)await pc.set(beforePC.data()!);else await pc.delete();
     clean.delete('counters/sale');clean.delete('counters/payment');
   }
+});
+
+test('corrects an already recorded cash sale to catalog price atomically without another stock debit',async()=>{
+  const code='V00986',paymentCode='P000986',productId='correction-product-986',
+    methodId='cash-correction-method-986',id='correct-cash-986';
+  const sale=tracked('sales/'+code),receipt=tracked('payments/'+paymentCode),
+    product=tracked('products/'+productId),method=tracked('paymentMethods/'+methodId),
+    movement=tracked('stockMovements/admin-sale-'+code);
+  await product.set({active:true,displayName:'Clássica · Mel · Patinha M',
+    salePriceCents:600,stock:0,minimumStock:0,averageUnitCostCents:128,
+    committedStock:0,reservedPhysicalStock:0});
+  await method.set({name:'Dinheiro',active:true});
+  const effect={itemType:'product',itemId:productId,quantityDelta:-1,unitCostCents:128};
+  const line={id:'I000986',kind:'product',sourceId:productId,quantity:1,
+    unitPriceCents:750,totalCents:750,totalCostCents:128,unitCostCents:128,
+    stockEffects:[effect]};
+  await sale.set({code,customerName:'Rafael',businessDate:'2026-10-22',
+    status:'active',fulfillmentStatus:'delivered',stockApplied:true,paymentStatus:'paid',
+    discountCents:0,tipCents:0,balanceCents:0,itemsSold:1,
+    subtotalCents:750,totalCents:750,receivedCents:750,
+    paymentIds:[paymentCode],items:[line],stockEffects:[effect],cogsCents:128,
+    notes:'Preço manual incorreto'});
+  await receipt.set({code:paymentCode,saleId:code,businessDate:'2026-10-22',
+    methodId,amountReceivedCents:750,appliedCents:750,tipCents:0,status:'active'});
+  await movement.set({...effect,sourceType:'sale',sourceId:code,businessDate:'2026-10-22'});
+  const params={id,action:'correctPaidSalePrice',saleCode:code,paymentCode,
+    productId,paymentMethodId:methodId,customerName:'Rafael',businessDate:'2026-10-22',
+    expectedOriginalTotalCents:750,unitPriceCents:600};
+  await assert.rejects(prepareDirect(req({...params,expectedOriginalTotalCents:800}),db),
+    /Sale state differs/);
+  await run(req(params));
+  const [a,p,pr,m]=await Promise.all([sale.get(),receipt.get(),product.get(),movement.get()]);
+  assert.deepEqual([a.data()!.subtotalCents,a.data()!.totalCents,
+    a.data()!.receivedCents,a.data()!.balanceCents,a.data()!.items[0].totalCents,
+    a.data()!.items[0].unitPriceCents,p.data()!.amountReceivedCents,p.data()!.appliedCents],
+    [600,600,600,0,600,600,600,600]);
+  assert.match(a.data()!.notes,/corrigido/);
+  assert.deepEqual([pr.data()!.stock,pr.data()!.salePriceCents,m.data()!.quantityDelta],
+    [0,600,-1]);
+  assert.deepEqual(a.data()!.stockEffects,[effect]);
+  assert.equal(a.data()!.cogsCents,128);
+  await assert.rejects(prepareDirect(req(params),db),/Sale state differs/);
 });
 
 test('paid sale refuses selling a physically reserved unit',async()=>{

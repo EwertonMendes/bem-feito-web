@@ -218,6 +218,47 @@ test('atomic fully paid sale creates receipt, sale, ledger, stock decrement and 
     clean.delete('counters/sale');clean.delete('counters/payment');
   }
 });
+test('paid cash sale supports a documented price override without modifying catalog',async()=>{
+  const code='V00985',paymentCode='P000985',id='sale-fixture-cash-985',
+    productId='cash-product-985',methodId='cash-method-985',itemId='I000985';
+  const sc=tracked('counters/sale'),pc=tracked('counters/payment');
+  const beforeSC=await sc.get(),beforePC=await pc.get();
+  const product=tracked('products/'+productId),method=tracked('paymentMethods/'+methodId),
+    sale=tracked('sales/'+code),payment=tracked('payments/'+paymentCode),
+    movement=tracked('stockMovements/admin-sale-'+code);
+  await sc.set({value:984}); await pc.set({value:984});
+  await product.set({active:true,displayName:'Clássica · Mel · Patinha M',
+    categoryId:'soap',collectionId:'col1',fragranceId:'fr1',formatId:'fmt1',
+    salePriceCents:600,stock:1,committedStock:0,reservedPhysicalStock:0,
+    minimumStock:0,averageUnitCostCents:128,stockStatus:'ok'});
+  await method.set({name:'Dinheiro',active:true});
+  const params={id,action:'recordPaidSale',saleCode:code,paymentCode,
+    lineItemId:itemId,productId,paymentMethodId:methodId,quantity:1,
+    unitPriceCents:750,expectedAvailableStock:1,customerName:'Rafael',
+    businessDate:'2026-10-22'};
+  try {
+    await assert.rejects(prepareDirect(req(params),db),/Manual price must include/);
+    await run(req({...params,priceOverrideReason:'Preço comercial vigente para Patinha M Clássica'}));
+    const a=(await sale.get()).data()!,p=(await payment.get()).data()!,
+      pr=(await product.get()).data()!,m=(await movement.get()).data()!;
+    assert.deepEqual([a.code,a.customerName,a.fulfillmentStatus,a.paymentStatus,a.totalCents,
+      a.receivedCents,a.balanceCents,a.stockApplied],
+      [code,'Rafael','delivered','paid',750,750,0,true]);
+    assert.match(a.notes,/Dinheiro/);
+    assert.match(a.notes,/Preço manual/);
+    assert.equal(a.items[0].unitPriceCents,750);
+    assert.equal(p.methodId,methodId);
+    assert.equal(p.appliedCents,750);
+    assert.equal(pr.stock,0);
+    assert.equal(pr.salePriceCents,600);
+    assert.deepEqual([m.quantityDelta,m.sourceType,m.sourceId],[-1,'sale',code]);
+  } finally {
+    if(beforeSC.exists)await sc.set(beforeSC.data()!);else await sc.delete();
+    if(beforePC.exists)await pc.set(beforePC.data()!);else await pc.delete();
+    clean.delete('counters/sale');clean.delete('counters/payment');
+  }
+});
+
 test('paid sale refuses selling a physically reserved unit',async()=>{
   const sc=tracked('counters/sale'),pc=tracked('counters/payment');
   const bsc=await sc.get(),bpc=await pc.get();

@@ -19,6 +19,8 @@ export type DirectRequest = {
   paymentCode?: string; lineItemId?: string; productId?: string; paymentMethodId?: string;
   quantity?: number; unitPriceCents?: number; expectedAvailableStock?: number;
   customerName?: string;
+  /** Documented commercial price override, only for fully paid stock-backed sales. */
+  priceOverrideReason?: string;
 };
 
 // Field names and collection names are not business allowlists. Only infrastructure
@@ -73,7 +75,7 @@ export function validateDirectRequest(input: string): DirectRequest {
   try { raw = JSON.parse(input); } catch { throw Error('Invalid direct request JSON'); }
   const o = props(raw, ['schemaVersion','id','environment','projectId','action','collection','documentId',
     'expected','expectedAbsent','values','itemType','itemId','quantityDelta','reason','businessDate','saleCode',
-    'paymentCode','lineItemId','productId','paymentMethodId','quantity','unitPriceCents','expectedAvailableStock','customerName']);
+    'paymentCode','lineItemId','productId','paymentMethodId','quantity','unitPriceCents','expectedAvailableStock','customerName','priceOverrideReason']);
   invariant(o.schemaVersion === 1 && o.environment === 'dev' && o.projectId === 'bem-feito-dev',
     'Direct administration is DEV-only');
   identifier(o.id);
@@ -82,7 +84,7 @@ export function validateDirectRequest(input: string): DirectRequest {
   const action = o.action;
   if (action !== 'recordPaidSale') invariant(
     ['paymentCode','lineItemId','productId','paymentMethodId','quantity','unitPriceCents',
-      'expectedAvailableStock','customerName'].every(k => o[k] === undefined),
+      'expectedAvailableStock','customerName','priceOverrideReason'].every(k => o[k] === undefined),
     'Paid sale fields cannot be used in other actions');
   if (['create','patch','delete'].includes(String(action))) {
     identifier(o.collection);
@@ -130,6 +132,10 @@ export function validateDirectRequest(input: string): DirectRequest {
       'Price in integer cents required');
     invariant(Number.isSafeInteger(o.expectedAvailableStock) && Number(o.expectedAvailableStock) >= Number(o.quantity),
       'Expected available stock must cover the sale');
+    invariant(o.priceOverrideReason === undefined ||
+      (typeof o.priceOverrideReason === 'string' && o.priceOverrideReason.trim().length >= 8 &&
+        o.priceOverrideReason.length <= 160 && !/[\x00-\x1f]/.test(o.priceOverrideReason)),
+      'Invalid manual price override reason');
   } else if (action === 'deliverSale') {
     invariant(['collection','documentId','expected','expectedAbsent','values','itemType',
       'itemId','quantityDelta','reason','businessDate'].every(k => o[k] === undefined),
@@ -434,10 +440,15 @@ async function recordPaidSale(db: Firestore, input: DirectRequest): Promise<Row[
     'Spreadsheet codes disagree with DEV counters; reconcile before posting');
   invariant(product.exists && product.data()?.active === true, 'Product missing or inactive');
   const p=product.data()!;
-  invariant(p.salePriceCents === input.unitPriceCents, 'Sale price differs from active product');
+  invariant(Number.isSafeInteger(p.salePriceCents) && p.salePriceCents >= 0,
+    'Active product price must be valid');
+  const priceOverridden=p.salePriceCents !== input.unitPriceCents;
+  invariant(priceOverridden === Boolean(input.priceOverrideReason),
+    'Manual price must include an explicit reason, and catalog prices must not be marked overridden');
+  const methodName=String(method.data()?.name??'').trim();
   invariant(method.exists && method.data()?.active === true &&
-    String(method.data()?.name).trim().toLocaleLowerCase('pt-BR')==='pix',
-    'Payment method is not active Pix');
+    ['pix','dinheiro'].includes(methodName.toLocaleLowerCase('pt-BR')),
+    'Payment method must be active Pix or Dinheiro');
   invariant(!sale.exists && !payment.exists && !movement.exists, 'Duplicate sale, payment or inventory entry');
   const matching=await db.collection('sales').where('code','==',saleCode).limit(1).get();
   invariant(matching.empty, 'Duplicate sale code already registered');
@@ -482,7 +493,9 @@ async function recordPaidSale(db: Firestore, input: DirectRequest): Promise<Row[
     productIds:[input.productId!],discountCents:0,subtotalCents:total,totalCents:total,
     receivedCents:total,tipCents:0,balanceCents:0,paymentStatus:'paid',status:'active',
     fulfillmentStatus:'delivered',stockApplied:true,
-    notes:'Venda presencial quitada por Pix, entregue no mesmo dia.',items:[line],
+    notes:`Venda presencial quitada por ${methodName}, entregue no mesmo dia.${priceOverridden ?
+      ` Preço manual de R$ ${(input.unitPriceCents!/100).toFixed(2)} (catálogo: R$ ${(p.salePriceCents/100).toFixed(2)}). Motivo: ${input.priceOverrideReason}` : ''}`,
+    items:[line],
     paymentIds:[paymentCode],stockEffects:[effect],
     analyticsVersion:1,cogsCents:costTotal,itemsSold:qty,missingCostItems:costTotal<=0?1:0};
   const receipt={code:paymentCode,saleId:saleCode,businessDate:input.businessDate!,

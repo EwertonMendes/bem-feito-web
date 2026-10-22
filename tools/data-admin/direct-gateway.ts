@@ -5,7 +5,7 @@ import type { Request, Payload } from './schema.ts';
 import { snapshotRow, type Plan, type Row } from './engine.ts';
 
 type Value = string | number | boolean | null | Value[] | { [key: string]: Value };
-type DirectAction = 'create' | 'patch' | 'delete' | 'reverseProduction' | 'adjustStock' | 'deliverSale' | 'recordPaidSale';
+type DirectAction = 'create' | 'patch' | 'delete' | 'reverseProduction' | 'adjustStock' | 'deliverSale' | 'recordPaidSale' | 'correctPaidSalePrice';
 export type DirectRequest = {
   schemaVersion: 1; id: string; environment: 'dev'; projectId: 'bem-feito-dev';
   action: DirectAction;
@@ -19,8 +19,8 @@ export type DirectRequest = {
   paymentCode?: string; lineItemId?: string; productId?: string; paymentMethodId?: string;
   quantity?: number; unitPriceCents?: number; expectedAvailableStock?: number;
   customerName?: string;
-  /** Documented commercial price override, only for fully paid stock-backed sales. */
-  priceOverrideReason?: string;
+  /** Original amount required as a compare-and-swap guard for a financial correction. */
+  expectedOriginalTotalCents?: number;
 };
 
 // Field names and collection names are not business allowlists. Only infrastructure
@@ -75,16 +75,16 @@ export function validateDirectRequest(input: string): DirectRequest {
   try { raw = JSON.parse(input); } catch { throw Error('Invalid direct request JSON'); }
   const o = props(raw, ['schemaVersion','id','environment','projectId','action','collection','documentId',
     'expected','expectedAbsent','values','itemType','itemId','quantityDelta','reason','businessDate','saleCode',
-    'paymentCode','lineItemId','productId','paymentMethodId','quantity','unitPriceCents','expectedAvailableStock','customerName','priceOverrideReason']);
+    'paymentCode','lineItemId','productId','paymentMethodId','quantity','unitPriceCents','expectedAvailableStock','customerName','expectedOriginalTotalCents']);
   invariant(o.schemaVersion === 1 && o.environment === 'dev' && o.projectId === 'bem-feito-dev',
     'Direct administration is DEV-only');
   identifier(o.id);
   invariant((o.id as string).length <= 80, 'Operation ID too long');
-  invariant(['create','patch','delete','reverseProduction','adjustStock','deliverSale','recordPaidSale'].includes(String(o.action)), 'Unknown direct action');
+  invariant(['create','patch','delete','reverseProduction','adjustStock','deliverSale','recordPaidSale','correctPaidSalePrice'].includes(String(o.action)), 'Unknown direct action');
   const action = o.action;
-  if (action !== 'recordPaidSale') invariant(
+  if (action !== 'recordPaidSale' && action !== 'correctPaidSalePrice') invariant(
     ['paymentCode','lineItemId','productId','paymentMethodId','quantity','unitPriceCents',
-      'expectedAvailableStock','customerName','priceOverrideReason'].every(k => o[k] === undefined),
+      'expectedAvailableStock','customerName','expectedOriginalTotalCents'].every(k => o[k] === undefined),
     'Paid sale fields cannot be used in other actions');
   if (['create','patch','delete'].includes(String(action))) {
     identifier(o.collection);
@@ -116,7 +116,7 @@ export function validateDirectRequest(input: string): DirectRequest {
     identifier(o.documentId);
   } else if (action === 'recordPaidSale') {
     invariant(['collection','documentId','expected','expectedAbsent','values','itemType',
-      'itemId','quantityDelta','reason'].every(k=>o[k]===undefined),
+      'itemId','quantityDelta','reason','expectedOriginalTotalCents'].every(k=>o[k]===undefined),
       'Paid sale accepts only validated order parameters');
     invariant(typeof o.saleCode === 'string' && /^V[0-9]{5}$/.test(o.saleCode), 'Sale code required');
     invariant(typeof o.paymentCode === 'string' && /^P[0-9]{6}$/.test(o.paymentCode), 'Payment code required');
@@ -132,10 +132,28 @@ export function validateDirectRequest(input: string): DirectRequest {
       'Price in integer cents required');
     invariant(Number.isSafeInteger(o.expectedAvailableStock) && Number(o.expectedAvailableStock) >= Number(o.quantity),
       'Expected available stock must cover the sale');
-    invariant(o.priceOverrideReason === undefined ||
-      (typeof o.priceOverrideReason === 'string' && o.priceOverrideReason.trim().length >= 8 &&
-        o.priceOverrideReason.length <= 160 && !/[\x00-\x1f]/.test(o.priceOverrideReason)),
-      'Invalid manual price override reason');
+
+  } else if (action === 'correctPaidSalePrice') {
+    invariant(['collection','documentId','expected','expectedAbsent','values','itemType',
+      'itemId','quantityDelta','reason','lineItemId','quantity','expectedAvailableStock']
+      .every(k=>o[k]===undefined),
+      'Correction accepts only validated sale and payment identifiers');
+    invariant(typeof o.saleCode === 'string' && /^V[0-9]{5}$/.test(o.saleCode),
+      'Sale code required');
+    invariant(typeof o.paymentCode === 'string' && /^P[0-9]{6}$/.test(o.paymentCode),
+      'Payment code required');
+    identifier(o.productId); identifier(o.paymentMethodId);
+    invariant(typeof o.customerName === 'string' && /^[\\p{L} .'-]{2,80}$/u.test(o.customerName.trim()),
+      'Customer name required');
+    invariant(typeof o.businessDate === 'string' && DAY.test(o.businessDate) &&
+      !Number.isNaN(Date.parse(o.businessDate)), 'Business date required');
+    invariant(Number.isSafeInteger(o.unitPriceCents) && Number(o.unitPriceCents) >= 0 &&
+      Number(o.unitPriceCents) <= 1_000_000, 'Valid catalog price required');
+    invariant(Number.isSafeInteger(o.expectedOriginalTotalCents) &&
+      Number(o.expectedOriginalTotalCents) >= 0 &&
+      Number(o.expectedOriginalTotalCents) <= 1_000_000 &&
+      o.expectedOriginalTotalCents !== o.unitPriceCents,
+      'Explicit original amount and a different catalog price required');
   } else if (action === 'deliverSale') {
     invariant(['collection','documentId','expected','expectedAbsent','values','itemType',
       'itemId','quantityDelta','reason','businessDate'].every(k => o[k] === undefined),
@@ -440,11 +458,8 @@ async function recordPaidSale(db: Firestore, input: DirectRequest): Promise<Row[
     'Spreadsheet codes disagree with DEV counters; reconcile before posting');
   invariant(product.exists && product.data()?.active === true, 'Product missing or inactive');
   const p=product.data()!;
-  invariant(Number.isSafeInteger(p.salePriceCents) && p.salePriceCents >= 0,
-    'Active product price must be valid');
-  const priceOverridden=p.salePriceCents !== input.unitPriceCents;
-  invariant(priceOverridden === Boolean(input.priceOverrideReason),
-    'Manual price must include an explicit reason, and catalog prices must not be marked overridden');
+  invariant(p.salePriceCents === input.unitPriceCents,
+    'Sale price differs from active catalog product');
   const methodName=String(method.data()?.name??'').trim();
   invariant(method.exists && method.data()?.active === true &&
     ['pix','dinheiro'].includes(methodName.toLocaleLowerCase('pt-BR')),
@@ -493,8 +508,7 @@ async function recordPaidSale(db: Firestore, input: DirectRequest): Promise<Row[
     productIds:[input.productId!],discountCents:0,subtotalCents:total,totalCents:total,
     receivedCents:total,tipCents:0,balanceCents:0,paymentStatus:'paid',status:'active',
     fulfillmentStatus:'delivered',stockApplied:true,
-    notes:`Venda presencial quitada por ${methodName}, entregue no mesmo dia.${priceOverridden ?
-      ` Preço manual de R$ ${(input.unitPriceCents!/100).toFixed(2)} (catálogo: R$ ${(p.salePriceCents/100).toFixed(2)}). Motivo: ${input.priceOverrideReason}` : ''}`,
+    notes:`Venda presencial quitada por ${methodName}, entregue no mesmo dia.`,
     items:[line],
     paymentIds:[paymentCode],stockEffects:[effect],
     analyticsVersion:1,cogsCents:costTotal,itemsSold:qty,missingCostItems:costTotal<=0?1:0};
@@ -514,13 +528,72 @@ async function recordPaidSale(db: Firestore, input: DirectRequest): Promise<Row[
   return rows;
 }
 
+/** Corrects only the financial value of a single delivered, fully-paid sale.
+ * Stock, cost, reservations, counters and existing movements are intentionally immutable.
+ * The archived plan and atomic readback provide auditability and safe retries.
+ */
+async function correctPaidSalePrice(db: Firestore, input: DirectRequest): Promise<Row[]> {
+  const code=input.saleCode!, paymentCode=input.paymentCode!;
+  const [sale,receipt,product,method,movement]=await db.getAll(
+    db.doc('sales/'+code),
+    db.doc('payments/'+paymentCode),
+    db.doc('products/'+input.productId!),
+    db.doc('paymentMethods/'+input.paymentMethodId!),
+    db.doc('stockMovements/admin-sale-'+code));
+  invariant(sale.exists && receipt.exists && product.exists && method.exists && movement.exists,
+    'Sale, payment, catalog or inventory audit record missing');
+  const v=sale.data()!, r=receipt.data()!, p=product.data()!, m=method.data()!, mv=movement.data()!;
+  const before=input.expectedOriginalTotalCents!, after=input.unitPriceCents!;
+  invariant(v.code===code && v.customerName===input.customerName!.trim() &&
+    v.businessDate===input.businessDate && v.status==='active' &&
+    v.fulfillmentStatus==='delivered' && v.stockApplied===true &&
+    v.paymentStatus==='paid' && v.balanceCents===0 &&
+    v.discountCents===0 && v.tipCents===0 && v.itemsSold===1 &&
+    v.subtotalCents===before && v.totalCents===before &&
+    v.receivedCents===before &&
+    Array.isArray(v.paymentIds) && v.paymentIds.length===1 &&
+    v.paymentIds[0]===paymentCode, 'Sale state differs from expected single paid sale');
+  invariant(Array.isArray(v.items) && v.items.length===1 &&
+    v.items[0].kind==='product' && v.items[0].sourceId===input.productId &&
+    v.items[0].quantity===1 && v.items[0].unitPriceCents===before &&
+    v.items[0].totalCents===before &&
+    Array.isArray(v.items[0].stockEffects) &&
+    v.items[0].stockEffects.length===1 &&
+    v.items[0].stockEffects[0].itemType==='product' &&
+    v.items[0].stockEffects[0].itemId===input.productId &&
+    v.items[0].stockEffects[0].quantityDelta===-1 &&
+    Array.isArray(v.stockEffects) && v.stockEffects.length===1,
+    'Line item or inventory history differs');
+  invariant(r.code===paymentCode && r.saleId===code &&
+    r.businessDate===input.businessDate &&
+    r.methodId===input.paymentMethodId && r.status==='active' &&
+    r.tipCents===0 && r.amountReceivedCents===before &&
+    r.appliedCents===before, 'Payment state differs from expected amount');
+  invariant(p.active===true && p.salePriceCents===after,
+    'Corrected price must exactly match the active catalog');
+  invariant(m.active===true && String(m.name).trim().toLocaleLowerCase('pt-BR')==='dinheiro',
+    'Expected cash payment method missing');
+  invariant(mv.sourceType==='sale' && mv.sourceId===code &&
+    mv.itemType==='product' && mv.itemId===input.productId &&
+    mv.quantityDelta===-1, 'Original stock movement differs');
+  const rows=[snapshotRow(sale),snapshotRow(receipt)];
+  const oldLabel=(before/100).toFixed(2), newLabel=(after/100).toFixed(2);
+  snapshotData(rows[0]!,{...v,
+    subtotalCents:after,totalCents:after,receivedCents:after,
+    items:[{...v.items[0],unitPriceCents:after,totalCents:after}],
+    notes:`Venda presencial quitada em dinheiro e entregue no mesmo dia. Valor corrigido de R$ ${oldLabel} para R$ ${newLabel} conforme preço de catálogo, após erro de lançamento. Estoque e custo preservados.`});
+  snapshotData(rows[1]!,{...r,amountReceivedCents:after,appliedCents:after});
+  return rows;
+}
+
 export async function prepareDirect(input: DirectRequest, db: Firestore): Promise<{request:Request;plan:Plan}> {
   const request=directAsRequest(input);
   const rows = input.action === 'reverseProduction' ? await reverseProduction(db,input.documentId!) :
     input.action === 'adjustStock' ? await adjustStock(db,input) :
       input.action === 'deliverSale' ? await deliverSale(db,input.saleCode!) :
         input.action === 'recordPaidSale' ? await recordPaidSale(db,input) :
-          await createOrPatchOrDelete(db,input);
+          input.action === 'correctPaidSalePrice' ? await correctPaidSalePrice(db,input) :
+            await createOrPatchOrDelete(db,input);
   invariant(rows.length <= 120, 'Operation exceeds safe direct limit');
   return {request,plan:{schemaVersion:1,requestHash:requestHash(request),projectId:'bem-feito-dev',
     environment:'dev',operation:input.action,scope:rows.map(r=>r.path),rows,dependencies:[]}};

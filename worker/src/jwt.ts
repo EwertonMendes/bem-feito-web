@@ -1,7 +1,7 @@
 import { decode } from './crypto.ts';
 import { ApiError } from './types.ts';
 interface JwtHeader { alg?: string; kid?: string; typ?: string; }
-export type Claims = Record<string, unknown> & { sub?: string; iss?: string; aud?: string | string[]; exp?: number; iat?: number; };
+export type Claims = Record<string, unknown> & { sub?: string; iss?: string; aud?: string | string[]; exp?: number; iat?: number; nonce?: string; email?: string; email_verified?: boolean; auth_time?: number; firebase?: unknown; };
 type Jwk = JsonWebKey & {kid?: string};
 const jwksCache = new Map<string, { expiresAt: number; keys: Jwk[] }>();
 async function keys(url: string, reload = false): Promise<Jwk[]> {
@@ -20,7 +20,7 @@ export async function verifyJwt(
   try {
     const parts = raw.split('.');
     if (parts.length !== 3 || raw.length > 8192) throw new Error('format');
-    const header = JSON.parse(new TextDecoder().decode(decode(parts[0]))) as JwtHeader;
+    const header = JSON.parse(new TextDecoder().decode(decode(parts[0]!))) as JwtHeader;
     if (header.alg !== 'RS256' || typeof header.kid !== 'string') throw new Error('algorithm');
     let jwks = await keys(url);
     let candidate = jwks.find(k => k.kid === header.kid && k.kty === 'RSA');
@@ -30,9 +30,9 @@ export async function verifyJwt(
     }
     if (!candidate) throw new Error('key');
     const key = await crypto.subtle.importKey('jwk', candidate, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
-    const signature = decode(parts[2]);
-    if (!await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, signature, new TextEncoder().encode(parts[0] + '.' + parts[1]))) throw new Error('signature');
-    const payload = JSON.parse(new TextDecoder().decode(decode(parts[1]))) as Claims;
+    const signature = decode(parts[2]!);
+    if (!await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, signature, new TextEncoder().encode(parts[0]! + '.' + parts[1]!))) throw new Error('signature');
+    const payload = JSON.parse(new TextDecoder().decode(decode(parts[1]!))) as Claims;
     const now = Math.floor(Date.now() / 1000);
     const validIssuers = Array.isArray(issuer) ? issuer : [issuer];
     if (!validIssuers.includes(String(payload.iss)) ||

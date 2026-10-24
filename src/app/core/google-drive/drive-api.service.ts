@@ -114,11 +114,12 @@ export class DriveApiService {
 
   private async request(url: string, init: RequestInit = {}): Promise<Response> {
     const token = await this.auth.accessToken();
+    const rejectedVersion = this.auth.versionForToken(token);
     const headers = new Headers(init.headers);
     headers.set('Authorization', `Bearer ${token}`);
     let response = await fetch(url, { ...init, headers });
     if (response.status === 401) {
-      await this.auth.rejectAccessToken();
+      await this.auth.rejectAccessToken(rejectedVersion);
       const renewed = await this.auth.accessToken(true);
       headers.set('Authorization', `Bearer ${renewed}`);
       response = await fetch(url, { ...init, headers });

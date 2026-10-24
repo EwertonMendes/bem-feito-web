@@ -118,7 +118,7 @@ export class DriveApiService {
     headers.set('Authorization', `Bearer ${token}`);
     let response = await fetch(url, { ...init, headers });
     if (response.status === 401) {
-      this.auth.expireAccessToken();
+      await this.auth.rejectAccessToken();
       const renewed = await this.auth.accessToken(true);
       headers.set('Authorization', `Bearer ${renewed}`);
       response = await fetch(url, { ...init, headers });

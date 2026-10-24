@@ -32,6 +32,8 @@ export class DriveIntegrationService {
   private readonly configRevision = signal(0);
   private loaded = false;
   private connectPending?: Promise<void>;
+  private loadPending?: Promise<void>;
+  private ensurePending?: Promise<void>;
 
   readonly enabled = environment.googleDrive.enabled;
   readonly config = this.configState.asReadonly();
@@ -60,7 +62,14 @@ export class DriveIntegrationService {
     });
   }
 
-  async load(force = false): Promise<void> {
+  load(force = false): Promise<void> {
+    if (this.loadPending) return this.loadPending;
+    const pending = this.loadInternal(force).finally(() => { this.loadPending = undefined; });
+    this.loadPending = pending;
+    return pending;
+  }
+
+  private async loadInternal(force = false): Promise<void> {
     if (!this.enabled || (this.loaded && !force)) return;
 
     this.statusState.set('loading');
@@ -193,7 +202,15 @@ export class DriveIntegrationService {
     }
   }
 
-  async ensureConnected(): Promise<void> {
+  ensureConnected(): Promise<void> {
+    if (this.connected() && this.driveAuth.currentToken()) return Promise.resolve();
+    if (this.ensurePending) return this.ensurePending;
+    const pending = this.ensureConnectedInternal().finally(() => { this.ensurePending = undefined; });
+    this.ensurePending = pending;
+    return pending;
+  }
+
+  private async ensureConnectedInternal(): Promise<void> {
     if (this.connected() && this.driveAuth.currentToken()) return;
     if (!this.loaded) await this.load();
     const config = this.configState();

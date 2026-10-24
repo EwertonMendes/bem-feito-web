@@ -154,6 +154,7 @@ try {
     fragrances: { ...named, collectionId: 'c' }, formats: { ...named, approximateWeightGrams: 100 },
     expenseTypes: { ...named, kind: 'operating-expense' },
     formatPrices: { collectionId: 'c', formatId: 'fmt', priceCents: 1000, active: true },
+    candleModels: { name: 'Vela 40 ml', volumeMl: 40, priceCents: 2000, sourceCollectionId: 'c', active: true },
     inputs: { ...named, code: 'I1', unitId: 'u', stock: 10, minimumStock: 1, averageUnitCostCents: 100 },
     products: product,
     additions: { ...named, category: 'fixture', priceCents: 100, components: [] },
@@ -171,7 +172,21 @@ try {
     const numericField = Object.keys(payload).find((field) => field.endsWith('Cents') || ['quantity', 'quantityDelta', 'approximateWeightGrams'].includes(field));
     if (numericField) await deny(setDoc(doc(operator, collection, 'bad-number'), { ...payload, [numericField]: numericField === 'quantityDelta' ? 0 : -1, ...audit('operator') }));
   }
-  await deny(setDoc(doc(operator, 'expenseTypes', 'bad-kind'), { ...fixtures.expenseTypes, kind: 'invalid', ...audit('operator') }));
+  await pass(setDoc(doc(operator, 'products', 'linked-candle'), {
+    ...product, categoryId:'scented-candle', modelName:'Vela 40 ml', variantName:'Ocean',
+    candleFragranceId:'fragrance-ocean', volumeMl:40, collectionId:'', fragranceId:'', formatId:'',
+    stock:0,minimumStock:0,...audit('operator'),
+  }));
+  await deny(setDoc(doc(operator, 'products', 'invalid-candle-link'), {
+    ...product, candleFragranceId:'fragrance-ocean', ...audit('operator'),
+  }));
+  await deny(setDoc(doc(operator, 'candleModels', 'bad-volume'), {
+    ...fixtures.candleModels,volumeMl:0,...audit('operator'),
+  }));
+  await deny(setDoc(doc(viewer, 'candleModels', 'viewer-no-write'), {
+    ...fixtures.candleModels,...audit('viewer'),
+  }));
+    await deny(setDoc(doc(operator, 'expenseTypes', 'bad-kind'), { ...fixtures.expenseTypes, kind: 'invalid', ...audit('operator') }));
   await deny(setDoc(doc(operator, 'stockMovements', 'bad-source'), { ...fixtures.stockMovements, sourceType: 'invalid', ...audit('operator') }));
   await deny(setDoc(doc(operator, 'productions', 'bad-flag'), { ...fixtures.productions, costPending: 'false', ...audit('operator') }));
   const batch = writeBatch(operator);

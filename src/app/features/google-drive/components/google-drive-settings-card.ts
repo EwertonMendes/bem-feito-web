@@ -61,7 +61,7 @@ import { ToastService } from '../../../core/services/toast.service';
               {{ connectLabel() }}
             </button>
           }
-          @if (integration.linked() && !confirmDisconnect()) {
+          @if ((integration.linked() || integration.status() === 'error') && !confirmDisconnect()) {
             <button class="bf-button secondary" type="button" [disabled]="!!busy()"
               (click)="confirmDisconnect.set(true)">Desconectar</button>
           }

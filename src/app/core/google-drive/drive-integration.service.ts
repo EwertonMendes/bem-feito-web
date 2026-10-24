@@ -213,6 +213,13 @@ export class DriveIntegrationService {
     }
   }
 
+  async disconnect(): Promise<void> {
+    await this.driveAuth.revoke();
+    this.statusState.set('disconnected');
+    this.authorizationNeededState.set(false);
+    this.errorState.set(null);
+  }
+
   requestAuthorization(): void {
     if (!this.configState()?.enabled || this.connectingState()) return;
     this.markAuthorizationNeeded();

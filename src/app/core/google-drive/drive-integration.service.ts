@@ -5,7 +5,7 @@ import { GoogleDriveIntegration } from '../../domain/models/integration.model';
 import { AuthService } from '../auth/auth.service';
 import { DriveIntegrationRepository } from '../repositories/drive-integration.repository';
 import { DriveApiError, DriveApiService } from './drive-api.service';
-import { DriveAuthService, DriveAuthorizationRequiredError } from './drive-auth.service';
+import { DriveAuthService, DriveAuthorizationRequiredError, DriveRedirectStartedError } from './drive-auth.service';
 import { DrivePickerService } from './drive-picker.service';
 
 export type DriveIntegrationStatus =
@@ -83,14 +83,8 @@ export class DriveIntegrationService {
         return;
       }
 
-      if (!this.driveAuth.currentToken()) {
-        const linked = this.driveAuth.linked();
-        this.statusState.set(linked ? 'ready' : 'disconnected');
-        // Token temporário expirado: pedir renovação em vez de ocultar silenciosamente as imagens.
-        this.authorizationNeededState.set(linked);
-        return;
-      }
-
+      // Recover access silently through the Worker. Never require a user gesture for refresh.
+      await this.driveAuth.accessToken();
       await this.verifyAccount();
       await this.verifyConfiguredFolder(config);
       this.statusState.set('connected');
@@ -184,6 +178,10 @@ export class DriveIntegrationService {
       this.errorState.set(null);
       this.authorizationNeededState.set(false);
     } catch (error) {
+      if (error instanceof DriveRedirectStartedError) {
+        // Top-level navigation to Google's consent is already underway.
+        throw error;
+      }
       if (error instanceof DriveAuthorizationRequiredError) {
         this.markAuthorizationNeeded();
       } else if (error instanceof DriveApiError && error.status === 401) {
@@ -197,7 +195,22 @@ export class DriveIntegrationService {
 
   async ensureConnected(): Promise<void> {
     if (this.connected() && this.driveAuth.currentToken()) return;
-    await this.connect();
+    if (!this.loaded) await this.load();
+    const config = this.configState();
+    if (!config?.enabled) throw new Error('A pasta de imagens não está configurada.');
+    try {
+      await this.driveAuth.accessToken();
+      await this.verifyAccount();
+      await this.verifyConfiguredFolder(config);
+      this.statusState.set('connected');
+      this.authorizationNeededState.set(false);
+      this.errorState.set(null);
+    } catch (error) {
+      if (error instanceof DriveAuthorizationRequiredError) this.markAuthorizationNeeded();
+      else if (error instanceof DriveApiError && error.status === 401) this.markAccessExpired(true);
+      else this.fail(error);
+      throw error;
+    }
   }
 
   requestAuthorization(): void {

@@ -5,6 +5,7 @@ export const environment = {
   name: "development",
   googleDrive: {
     enabled: true,
+    workerUrl: "https://bem-feito-drive-dev.ewertonmendes9.workers.dev",
     clientId:
       "312978463343-2nr1f82ne1mfjv51jbf9nl7dnt3chhhg.apps.googleusercontent.com",
     pickerApiKey: "AIzaSyDt7lBCbkCeAV-hbZ6LGL2UJ-A9XwLfeIM",

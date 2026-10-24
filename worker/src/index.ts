@@ -1,7 +1,7 @@
 import { ApiError, type Env } from './types.ts';
 import { principal, sameOrigin } from './auth.ts';
 import { start, launch, callback } from './oauth.ts';
-import { state, token, disconnect } from './tokens.ts';
+import { state, token, disconnect, rejectToken } from './tokens.ts';
 const SECURITY_HEADERS: Record<string,string> = {
   'X-Content-Type-Options':'nosniff',
   'Content-Security-Policy':"default-src 'none'; frame-ancestors 'none'",
@@ -43,12 +43,13 @@ export default {
         response = await launch(request,env);
       } else if (request.method === 'GET' && path === '/oauth/drive/callback') {
         response = await callback(request,env);
-      } else if (['/oauth/drive/start','/drive/token','/drive/disconnect','/drive/connection'].includes(path)) {
+      } else if (['/oauth/drive/start','/drive/token','/drive/disconnect','/drive/connection','/drive/token/reject'].includes(path)) {
         // No state-changing operation is accepted cross-origin without the intended browser Origin.
         if (request.method === 'POST') sameOrigin(request,env);
         const user = await principal(request,env);
         if (path === '/oauth/drive/start' && request.method === 'POST') response = await start(env,user);
         else if (path === '/drive/token' && request.method === 'POST') response = await token(env,user);
+        else if (path === '/drive/token/reject' && request.method === 'POST') response = await rejectToken(env,user,request);
         else if (path === '/drive/connection' && request.method === 'GET') response = await state(env,user);
         else if (path === '/drive/disconnect' && request.method === 'POST') response = await disconnect(env,user);
         else throw new ApiError(405,'method_not_allowed');

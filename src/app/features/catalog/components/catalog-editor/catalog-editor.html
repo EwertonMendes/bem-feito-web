@@ -1,6 +1,6 @@
 <ng-template #inputThumb let-option><bf-catalog-image [image]="inputImage(option.value)" [alt]="option.label" [thumbnail]="true" /></ng-template>
-<dialog bfDialog #dialog="bfDialog" class="bf-dialog" [class.soap-create-dialog]="isCreatingSoap()" [busy]="saving()">
-    <div class="bf-dialog-header"><h2>{{ isCreatingSoap() ? 'Novos sabonetes' : (editingId() ? 'Editar' : 'Novo') + ' ' + (kind() === 'products' ? 'produto' : kind() === 'inputs' ? 'insumo' : 'adicional') }}</h2><button type="button" class="bf-floating-close" (click)="dialog.close()" aria-label="Fechar janela"><bf-icon name="close" /></button></div>
+<dialog bfDialog #dialog="bfDialog" class="bf-dialog" [class.soap-create-dialog]="isCreatingSoap() || isCreatingCandle()" [busy]="saving()">
+    <div class="bf-dialog-header"><h2>{{ isCreatingSoap() ? 'Novos sabonetes' : isCreatingCandle() ? 'Novas velas aromáticas' : (editingId() ? 'Editar' : 'Novo') + ' ' + (kind() === 'products' ? 'produto' : kind() === 'inputs' ? 'insumo' : 'adicional') }}</h2><button type="button" class="bf-floating-close" (click)="dialog.close()" aria-label="Fechar janela"><bf-icon name="close" /></button></div>
     <div class="bf-dialog-body">
       @if (kind() === 'products') {
         <div class="bf-grid two">
@@ -8,6 +8,8 @@
         </div>
         @if(isCreatingSoap()){
           <bf-soap-creation-form #soapCreator (createReference)="openQuickReference($event)" />
+        } @else if(isCreatingCandle()){
+          <bf-candle-creation-form #candleCreator (createFragrance)="openCandleFragrance($event)" />
         } @else {
           <div class="bf-grid two product-fields">
             @if(productModel().categoryId !== 'soap'){
@@ -63,7 +65,7 @@
         </section>
       }
 
-      @if (imagesEnabled && (!isCreatingSoap() || soapCreator()?.candidateCount() === 1)) {
+      @if (imagesEnabled && ((!isCreatingSoap() && !isCreatingCandle()) || (isCreatingSoap() && soapCreator()?.candidateCount() === 1) || (isCreatingCandle() && candleCreator()?.fragranceIds()?.length === 1))) {
         <div class="image-field">
           <bf-image-upload
             label="Imagem"
@@ -85,6 +87,6 @@
         </div>
       }
     </div>
-    <div class="bf-dialog-footer"><button class="bf-button secondary" type="button" (click)="dialog.close()">Cancelar</button><button class="bf-button" type="button" [disabled]="saving() || (isCreatingSoap() && !soapCreator()?.canSave())" [bfLoadingButton]="saving()" (click)="save()">{{saving() ? 'Salvando...' : isCreatingSoap() ? 'Criar ' + (soapCreator()?.freshRows()?.length ?? 0) + ' produto(s)' : 'Salvar'}}</button></div>
+    <div class="bf-dialog-footer"><button class="bf-button secondary" type="button" (click)="dialog.close()">Cancelar</button><button class="bf-button" type="button" [disabled]="saving() || (isCreatingSoap() && !soapCreator()?.canSave()) || (isCreatingCandle() && !candleCreator()?.canSave())" [bfLoadingButton]="saving()" (click)="save()">{{saving() ? 'Salvando...' : isCreatingSoap() ? 'Criar ' + (soapCreator()?.freshRows()?.length ?? 0) + ' produto(s)' : isCreatingCandle() ? 'Criar ' + (candleCreator()?.freshRows()?.length ?? 0) + ' vela(s)' : 'Salvar'}}</button></div>
   </dialog>
 <bf-settings-editor #referenceEditor (saved)="onReferenceSaved($event)" />

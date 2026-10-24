@@ -28,7 +28,7 @@ jobs:
           node-version: 22.22.3
       - run: npm ci --no-fund
       - run: npx tsc -p worker/tsconfig.json
-      - run: node --experimental-strip-types --test worker/tests/security.test.mjs
+      - run: node --experimental-strip-types --test worker/tests/*.test.mjs
       - name: Publish a Worker version without editing workers.dev routing
         working-directory: worker
         env:

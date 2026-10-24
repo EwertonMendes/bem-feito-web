@@ -114,26 +114,42 @@ export async function rejectToken(env: Env, user: Principal, request: Request): 
   return Response.json({status:'invalidated'});
 }
 export async function disconnect(env: Env, user: Principal): Promise<Response> {
-  const c = await row(env,user.uid);
-  validateOwner(c,user);
-  const updated = await env.DB.prepare(
-    `UPDATE drive_connections SET status='revocation_pending',encrypted_access_token=NULL,
-      access_token_expires_at=0,access_token_version=NULL,refresh_lease_id=NULL,refresh_lease_until=0,
-      revision=revision+1,updated_at=? WHERE owner_uid=? AND revision=? AND status='connected'`
-  ).bind(Date.now(),user.uid,c.revision).run();
-  if (updated.meta.changes !== 1) throw new ApiError(409,'connection_changed');
+  const existing = await env.DB.prepare('SELECT * FROM drive_connections WHERE owner_uid=?')
+    .bind(user.uid).first<Connection>();
+  if (!existing) return Response.json({status:'disconnected'});
+  validateOwner(existing,user);
+  if (existing.status === 'reconnect_required') {
+    await env.DB.prepare('DELETE FROM drive_connections WHERE owner_uid=? AND revision=?')
+      .bind(user.uid,existing.revision).run();
+    return Response.json({status:'disconnected'});
+  }
+  if (existing.status === 'connected') {
+    const changed = await env.DB.prepare(
+      `UPDATE drive_connections SET status='revocation_pending',encrypted_access_token=NULL,
+       access_token_expires_at=0,access_token_version=NULL,refresh_lease_id=NULL,refresh_lease_until=0,
+       revision=revision+1,updated_at=? WHERE owner_uid=? AND revision=? AND status='connected'`
+    ).bind(Date.now(),user.uid,existing.revision).run();
+    if (changed.meta.changes !== 1) throw new ApiError(409,'connection_changed');
+  } else if (existing.status !== 'revocation_pending') throw new ApiError(409,'connection_changed');
+
+  const pendingRevision = existing.revision + (existing.status === 'connected' ? 1 : 0);
+  // The grant is disabled before contacting Google. A failed upstream revoke remains
+  // explicitly retryable, never silently marked disconnected.
   try {
-    const value = await decrypt(env,c.encrypted_refresh_token!,context(env,c.owner_uid,c.google_subject));
-    const response = await fetch('https://oauth2.googleapis.com/revoke',{
-      method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
-      body:new URLSearchParams({token:value}),redirect:'manual',signal:AbortSignal.timeout(10000)
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(()=>null) as {error?:string}|null;
-      if (error?.error !== 'invalid_token') throw new ApiError(503,'revocation_pending');
+    if (existing.encrypted_refresh_token) {
+      const value = await decrypt(env,existing.encrypted_refresh_token,
+        context(env,existing.owner_uid,existing.google_subject));
+      const response = await fetch('https://oauth2.googleapis.com/revoke',{
+        method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body:new URLSearchParams({token:value}),redirect:'manual',signal:AbortSignal.timeout(10000)
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(()=>null) as {error?:string}|null;
+        if (payload?.error !== 'invalid_token') throw new ApiError(503,'revocation_pending');
+      }
     }
     await env.DB.prepare('DELETE FROM drive_connections WHERE owner_uid=? AND revision=? AND status=?')
-      .bind(user.uid,c.revision+1,'revocation_pending').run();
+      .bind(user.uid,pendingRevision,'revocation_pending').run();
     return Response.json({status:'disconnected'});
   } catch (error) {
     if (error instanceof ApiError) throw error;

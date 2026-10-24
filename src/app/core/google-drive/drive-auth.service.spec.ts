@@ -54,8 +54,29 @@ describe('DriveAuthService (backend token broker)',()=>{
     });
     const service=setup();mocks.callbacks.at(-1)?.(auth.currentUser);
     await expect(service.accessToken()).rejects.toBeInstanceOf(DriveAuthorizationRequiredError);
+    // Once a grant is known absent, avoid another Worker POST for every image.
+    await expect(service.accessToken()).rejects.toBeInstanceOf(DriveAuthorizationRequiredError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     await expect(service.connect()).rejects.toBeInstanceOf(DriveRedirectStartedError);
     expect(window.location.assign).toHaveBeenCalledTimes(1);
+  });
+  it('never evicts a newer access token on a stale Google 401',async()=>{
+    let counter=0;
+    fetchMock.mockImplementation(async(url:string)=>{
+      if(url.endsWith('/drive/token/reject'))return Response.json({status:'invalidated'});
+      counter++;
+      return Response.json({accessToken:'token-'+counter,expiresAt:Date.now()+3600000,
+        email:'user@example.com',version:counter===1?'x'.repeat(43):'y'.repeat(43)});
+    });
+    const service=setup();mocks.callbacks.at(-1)?.(auth.currentUser);
+    const old=await service.accessToken();
+    const oldVersion=service.versionForToken(old);
+    service.expireAccessToken();
+    const latest=await service.accessToken();
+    expect(latest).toBe('token-2');
+    await service.rejectAccessToken(oldVersion);
+    expect(service.currentToken()).toBe('token-2');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
   it('version-guards rejection of a Google 401 before requesting fresh access',async()=>{
     fetchMock.mockImplementation(async(url:string)=>{

@@ -85,6 +85,33 @@ describe('Firebase JWT verification failure stages',()=>{
   });
 });
 
+describe('DEV-only Google signing keys diagnostic',()=>{
+  it('returns only key count for reachable Google JWKs',async()=>{
+    const previous=globalThis.fetch;
+    globalThis.fetch=async(url)=> {
+      assert.equal(url,'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com');
+      return Response.json({keys:[{kty:'RSA',kid:'test-kid',n:'rsa-public-modulus',e:'AQAB'}]});
+    };
+    try{
+      const result=await worker.fetch(new Request(
+        'https://bem-feito-drive-dev.ewertonmendes9.workers.dev/health/identity-keys'),env);
+      assert.equal(result.status,200);
+      assert.deepEqual(await result.json(),{reachable:true,stage:'ok',keyCount:1});
+    }finally{globalThis.fetch=previous;}
+  });
+  it('reports upstream non-200 safely without revealing body',async()=>{
+    const previous=globalThis.fetch;
+    globalThis.fetch=async()=>new Response('private error details',{status:403});
+    try{
+      const result=await worker.fetch(new Request(
+        'https://bem-feito-drive-dev.ewertonmendes9.workers.dev/health/identity-keys'),env);
+      assert.equal(result.status,503);
+      const data=await result.json();
+      assert.deepEqual(data,{reachable:false,stage:'http',upstreamStatus:403});
+      assert.equal(JSON.stringify(data).includes('private error details'),false);
+    }finally{globalThis.fetch=previous;}
+  });
+});
 describe('Worker HTTP security',()=>{
   it('responds to health without exposing credentials',async()=>{
     const r=await worker.fetch(new Request('https://bem-feito-drive-dev.ewertonmendes9.workers.dev/health'),env);

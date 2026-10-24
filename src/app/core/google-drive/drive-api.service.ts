@@ -113,19 +113,20 @@ export class DriveApiService {
   }
 
   private async request(url: string, init: RequestInit = {}): Promise<Response> {
-    const token = this.auth.requireToken();
+    const token = await this.auth.accessToken();
     const headers = new Headers(init.headers);
     headers.set('Authorization', `Bearer ${token}`);
-    const response = await fetch(url, { ...init, headers });
-
-    if (response.status === 401) this.auth.expireAccessToken();
+    let response = await fetch(url, { ...init, headers });
+    if (response.status === 401) {
+      this.auth.expireAccessToken();
+      const renewed = await this.auth.accessToken(true);
+      headers.set('Authorization', `Bearer ${renewed}`);
+      response = await fetch(url, { ...init, headers });
+      if (response.status === 401) this.auth.expireAccessToken();
+    }
 
     if (!response.ok) {
-      const body = await response.text().catch(() => '');
-      throw new DriveApiError(
-        response.status,
-        `Google Drive respondeu ${response.status}.${body ? ` ${body.slice(0, 300)}` : ''}`,
-      );
+      throw new DriveApiError(response.status, `Google Drive respondeu ${response.status}.`);
     }
     return response;
   }

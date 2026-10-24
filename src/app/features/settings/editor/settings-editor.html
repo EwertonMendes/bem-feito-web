@@ -5,8 +5,8 @@
       @if(tab()==='candleModels'){
         <div class="bf-grid two">
           <label class="bf-field"><span>Nome do modelo</span><input class="bf-input" [formField]="candleForm.name" placeholder="Ex.: Vela 100 ml" /></label>
-          <label class="bf-field"><span>Volume (ml)</span><bf-number-input kind="integer" [min]="1" [formField]="candleForm.volumeMl" ariaLabel="Volume da vela" /></label>
-          <label class="bf-field"><span>Preço padrão</span><bf-number-input kind="currency" [min]="0" [formField]="candleForm.price" ariaLabel="Preço padrão da vela" /></label>
+          <label class="bf-field"><span>Volume (ml)</span><bf-number-input kind="integer" [formField]="candleForm.volumeMl" ariaLabel="Volume da vela" /></label>
+          <label class="bf-field"><span>Preço padrão</span><bf-number-input kind="currency" [formField]="candleForm.price" ariaLabel="Preço padrão da vela" /></label>
           <label class="bf-field"><span>Coleção dos aromas</span><bf-select [formField]="candleForm.sourceCollectionId" [options]="collectionOptions()" ariaLabel="Coleção de aromas das velas" /></label>
           <bf-checkbox class="toggle" [formField]="candleForm.active" label="Modelo ativo" />
         </div>

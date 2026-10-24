@@ -78,6 +78,28 @@ Esta correção confirma a disponibilidade das chaves públicas, mas não
 substitui o teste OAuth de ponta a ponta com uma conta Firebase real,
 as verificações Firestore, a seleção da pasta e o refresh de concessões.
 
+
+### Perfil Firestore no Worker
+
+Após a descoberta das chaves Firebase ser corrigida, a próxima falha observada
+na tela DEV foi `HTTP 503 user_profile_unavailable`. A rota REST que lê o
+documento `users/{uid}` utilizava `redirect:'error'`, impedindo o Worker
+de seguir um redirecionamento da API do Google. O código agora utiliza
+`redirect:'follow'`, mantendo a própria credencial Firebase ID token do
+usuário — **não** introduz uma conta de serviço que ignore Firestore Rules.
+
+A checagem continua exigindo perfil ativo, papel válido e e-mail do perfil
+coincidente com o e-mail verificado no token. Respostas `401/403/404` do
+Firestore continuam sendo tratadas como negação de acesso; falhas
+transitórias e respostas inesperadas recebem códigos de diagnóstico
+sanitizados, sem dados da conta ou do token.
+
+Testes verificam a consulta com Bearer ID token, a política de redirecionamentos,
+a rejeição de usuários inativos, e-mails divergentes, negação de acesso,
+e a diferenciação de erros de transporte, upstream e JSON inválido.
+O deploy do Worker passou após essa correção; a autenticação real no
+navegador ainda precisa ser homologada antes do merge.
+
 ### Validar localmente
 
 ```sh

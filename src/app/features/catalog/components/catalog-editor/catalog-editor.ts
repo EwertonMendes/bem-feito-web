@@ -20,6 +20,7 @@ import { BfCheckbox } from '../../../../shared/ui/checkbox/checkbox';
 import { BfImageUpload } from '../../../../shared/ui/image-upload/image-upload';
 import { CatalogImage } from '../../../../shared/media/catalog-image/catalog-image';
 import { BfNumberInput } from '../../../../shared/ui/number-input/number-input';
+import { SoapCreationForm } from '../soap-creation-form/soap-creation-form';
 
 interface ProductFormModel { categoryId: 'soap' | 'creative-kit' | 'scented-candle'; modelName: string; variantName: string; description: string; volumeMl: number; collectionId: string; fragranceId: string; formatId: string; salePrice: number; additionalCost: number; minimumStock: number; active: boolean; }
 interface InputFormModel { name: string; unitId: string; trackingMode: InputTrackingMode; availabilityStatus: string; minimumStock: number; active: boolean; }
@@ -27,7 +28,7 @@ interface AdditionFormModel { name: string; category: string; price: number; not
 
 @Component({
   selector: 'bf-catalog-editor',
-  imports: [BfLoadingButton, FormField, BfDialog, BfIcon, BfSelect, BfSelectSearch, CatalogImage, BfCheckbox, BfImageUpload, CatalogImage, BfNumberInput, BfSettingsEditor],
+  imports: [BfLoadingButton, FormField, BfDialog, BfIcon, BfSelect, BfSelectSearch, CatalogImage, BfCheckbox, BfImageUpload, CatalogImage, BfNumberInput, BfSettingsEditor, SoapCreationForm],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './catalog-editor.html',
   styleUrl: './catalog-editor.scss',
@@ -41,38 +42,12 @@ export class CatalogEditor {
   private readonly errors = inject(ErrorService);
   private readonly dialog = viewChild.required<BfDialog>('dialog');
   private readonly referenceEditor = viewChild.required<BfSettingsEditor>('referenceEditor');
+  readonly soapCreator = viewChild<SoapCreationForm>('soapCreator');
+  readonly isCreatingSoap = computed(() => this.kind() === 'products' && !this.editingId() && this.productModel().categoryId === 'soap');
 
   readonly currency = formatCurrency;
   readonly imagesEnabled = this.images.enabled;
   readonly kind = signal<CatalogImageEntityKind>('products');
-  readonly bulkVariants = signal(false);
-  readonly selectedVariantFragranceIds = signal<string[]>([]);
-  toggleVariantFragrance(id: string, checked: boolean): void {
-    this.selectedVariantFragranceIds.update(current => checked
-      ? [...new Set([...current, id])] : current.filter(item => item !== id));
-  }
-  readonly bulkCostPreviews = computed(() => {
-    if (!this.bulkVariants() || this.kind() !== 'products' || this.productModel().categoryId !== 'soap') return [];
-    const model = this.productModel();
-    const inputs = new Map(this.store.inputs().map(input => [input.id, input]));
-    const collection = this.references.collections().find(item => item.id === model.collectionId);
-    const format = this.references.formats().find(item => item.id === model.formatId);
-    return this.availableFragrances()
-      .filter(fragrance => this.selectedVariantFragranceIds().includes(fragrance.id))
-      .map(fragrance => {
-        try {
-          const cost = standardCostForProduct({
-            recipe: this.recipe(),
-            additionalCostCents: toCents(model.additionalCost),
-            averageUnitCostCents: 0,
-          }, { collection, format, fragrance }, inputs);
-          return { id: fragrance.id, name: fragrance.name, costCents: cost.unitCostCents, pending: cost.costPending };
-        } catch {
-          return { id: fragrance.id, name: fragrance.name, costCents: 0, pending: true };
-        }
-      });
-  });
-
   readonly suggestedPrice = computed(() => {
     const model = this.productModel();
     if (model.categoryId !== 'soap') return undefined;
@@ -84,18 +59,23 @@ export class CatalogEditor {
     if (price) this.productModel.update(model => ({ ...model, salePrice: fromCents(price.priceCents) }));
   }
   openQuickReference(kind: 'collection' | 'fragrance' | 'format'): void {
-    if (kind === 'fragrance' && !this.productModel().collectionId) {
+    const collectionId = this.isCreatingSoap() ? (this.soapCreator()?.collectionId() ?? '') : this.productModel().collectionId;
+    if (kind === 'fragrance' && !collectionId) {
       this.toast.error('Selecione ou crie uma coleção antes da fragrância.');
       return;
     }
     this.referenceEditor().openNew(
       kind === 'collection' ? 'collections' : kind === 'fragrance' ? 'fragrances' : 'formats',
-      this.productModel().collectionId,
+      collectionId,
     );
   }
 
   onReferenceSaved(event: ReferenceSaved): void {
     if (!event.id) return;
+    if (this.isCreatingSoap() && (event.kind === 'collections' || event.kind === 'fragrances' || event.kind === 'formats')) {
+      this.soapCreator()?.onReferenceSaved(event.kind, event.id);
+      return;
+    }
     if (event.kind === 'collections') this.productModel.update(model => ({ ...model, collectionId: event.id, fragranceId: '' }));
     if (event.kind === 'fragrances') this.productModel.update(model => ({ ...model, fragranceId: event.id }));
     if (event.kind === 'formats') this.productModel.update(model => ({ ...model, formatId: event.id }));
@@ -215,8 +195,6 @@ export class CatalogEditor {
   openNew(kind: CatalogImageEntityKind): void {
     this.kind.set(kind);
     this.editingId.set('');
-    this.bulkVariants.set(false);
-    this.selectedVariantFragranceIds.set([]);
     this.resetImageChange();
     if (kind === 'products') {
       this.productModel.set({ categoryId: 'soap', modelName: '', variantName: '', description: '', volumeMl: 40, collectionId: '', fragranceId: '', formatId: '', salePrice: 0, additionalCost: 0, minimumStock: 0, active: true });
@@ -231,8 +209,6 @@ export class CatalogEditor {
   }
 
   editProduct(item: Product): void {
-    this.bulkVariants.set(false);
-    this.selectedVariantFragranceIds.set([]);
     this.kind.set('products');
     this.editingId.set(item.id);
     this.resetImageChange();
@@ -308,14 +284,21 @@ export class CatalogEditor {
 
   async save(): Promise<void> {
     if (this.saving()) return;
-    const variantCount = this.kind() === 'products' && this.bulkVariants() && !this.editingId()
-      ? this.selectedVariantFragranceIds().length : 0;
     this.saving.set(true);
     try {
-      if (this.kind() === 'products') await this.saveProduct();
-      else if (this.kind() === 'inputs') await this.saveInput();
-      else await this.saveAddition();
-      this.toast.success(variantCount > 0 ? variantCount + ' variações criadas com sucesso.' : 'Cadastro salvo com sucesso.');
+      if (this.isCreatingSoap()) {
+        const count = await this.soapCreator()!.save();
+        this.toast.success(count + (count === 1 ? ' produto criado com sucesso.' : ' produtos criados com sucesso.'));
+      } else if (this.kind() === 'products') {
+        await this.saveProduct();
+        this.toast.success('Cadastro salvo com sucesso.');
+      } else if (this.kind() === 'inputs') {
+        await this.saveInput();
+        this.toast.success('Cadastro salvo com sucesso.');
+      } else {
+        await this.saveAddition();
+        this.toast.success('Cadastro salvo com sucesso.');
+      }
       this.dialog().closeAfterSuccess();
     } catch (error) {
       this.toast.error(this.errors.message(error));
@@ -325,10 +308,6 @@ export class CatalogEditor {
   }
 
   private async saveProduct(): Promise<void> {
-    if (this.bulkVariants() && !this.editingId() && this.productModel().categoryId === 'soap') {
-      await this.saveProductVariants();
-      return;
-    }
     if (this.productForm().invalid()) throw new Error('Revise os campos obrigatórios.');
     const model = this.productModel();
     const soap = model.categoryId === 'soap';
@@ -354,36 +333,6 @@ export class CatalogEditor {
     // Se a imagem falhar após salvar o cadastro, a próxima tentativa atualiza o mesmo documento.
     this.editingId.set(id);
     await this.applyImageChange('products', id, existing?.image, (image) => this.store.setProductImage(id, image));
-  }
-
-  private async saveProductVariants(): Promise<void> {
-    const model = this.productModel();
-    if (model.categoryId !== 'soap') throw new Error('Variações em lote disponíveis somente para sabonetes.');
-    const collection = this.references.collections().find(item => item.id === model.collectionId && item.active);
-    const format = this.references.formats().find(item => item.id === model.formatId && item.active);
-    const fragranceIds = [...new Set(this.selectedVariantFragranceIds())];
-    if (!collection || !format || !fragranceIds.length || fragranceIds.length > 30 ||
-        model.salePrice < 0 || model.additionalCost < 0 ||
-        !Number.isSafeInteger(model.minimumStock) || model.minimumStock < 0) {
-      throw new Error('Selecione coleção, formato e até 30 fragrâncias, com valores válidos.');
-    }
-    const fragrances = fragranceIds.map(id => this.references.fragrances().find(
-      item => item.id === id && item.active && item.collectionId === model.collectionId));
-    if (fragrances.some(item => !item)) throw new Error('Uma das fragrâncias não pertence à coleção.');
-    for (const fragrance of fragrances) {
-      const exists = this.store.products().some(item => item.collectionId === model.collectionId &&
-        item.fragranceId === fragrance!.id && item.formatId === model.formatId);
-      if (exists) throw new Error('O produto ' + fragrance!.name + ' já está cadastrado neste formato.');
-    }
-    const products: Product[] = fragrances.map(fragrance => ({
-      id: '', code: '', active: model.active, categoryId: 'soap',
-      collectionId: model.collectionId, fragranceId: fragrance!.id, formatId: model.formatId,
-      displayName: collection.name + ' · ' + fragrance!.name + ' · ' + format.name,
-      salePriceCents: toCents(model.salePrice), additionalCostCents: toCents(model.additionalCost),
-      averageUnitCostCents: 0, stock: 0, minimumStock: model.minimumStock,
-      recipe: this.recipe().filter(part => part.inputId && part.quantity > 0 && part.unitId),
-    }));
-    await this.store.createProductVariations(products);
   }
 
   private async saveInput(): Promise<void> {

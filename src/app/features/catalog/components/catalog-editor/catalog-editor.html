@@ -1,65 +1,44 @@
 <ng-template #inputThumb let-option><bf-catalog-image [image]="inputImage(option.value)" [alt]="option.label" [thumbnail]="true" /></ng-template>
-<dialog bfDialog #dialog="bfDialog" class="bf-dialog" [busy]="saving()">
-    <div class="bf-dialog-header"><h2>{{ editingId() ? 'Editar' : 'Novo' }} {{ kind() === 'products' ? 'produto' : kind() === 'inputs' ? 'insumo' : 'adicional' }}</h2><button type="button" class="bf-floating-close" (click)="dialog.close()" aria-label="Fechar janela"><bf-icon name="close" /></button></div>
+<dialog bfDialog #dialog="bfDialog" class="bf-dialog" [class.soap-create-dialog]="isCreatingSoap()" [busy]="saving()">
+    <div class="bf-dialog-header"><h2>{{ isCreatingSoap() ? 'Novos sabonetes' : (editingId() ? 'Editar' : 'Novo') + ' ' + (kind() === 'products' ? 'produto' : kind() === 'inputs' ? 'insumo' : 'adicional') }}</h2><button type="button" class="bf-floating-close" (click)="dialog.close()" aria-label="Fechar janela"><bf-icon name="close" /></button></div>
     <div class="bf-dialog-body">
       @if (kind() === 'products') {
         <div class="bf-grid two">
           <label class="bf-field full"><span>Categoria</span>@if(editingId()){<input class="bf-input" [value]="selectedCategoryLabel()" disabled aria-label="Categoria do produto" />}@else{<bf-select [formField]="productForm.categoryId" [options]="categoryOptions" ariaLabel="Categoria do produto" />}</label>
-          @if(productModel().categoryId !== 'soap'){
-            <label class="bf-field"><span>Nome / modelo</span><input class="bf-input" [formField]="productForm.modelName" placeholder="Ex.: Kit Florzinhas ou Vela 40 ml" /></label>
-            @if(productModel().categoryId === 'scented-candle'){
-              <label class="bf-field"><span>Aroma</span><input class="bf-input" [formField]="productForm.variantName" placeholder="Ex.: Tropical" /></label>
-              <label class="bf-field"><span>Volume (ml)</span><bf-number-input kind="integer" [formField]="productForm.volumeMl" ariaLabel="Volume da vela em mililitros" /></label>
-            }
-            <label class="bf-field full"><span>Descrição comercial</span><input class="bf-input" [formField]="productForm.description" /></label>
-          }
-          <label class="bf-field"><span>Preço</span><bf-number-input kind="currency" [formField]="productForm.salePrice" ariaLabel="Preço do produto" />@if(suggestedPrice()){<button class="bf-link-action" type="button" (click)="applySuggestedPrice()">Usar preço padrão: {{currency(suggestedPrice()!.priceCents)}}</button>}</label>
-          @if(productModel().categoryId === 'soap'){
-          <label class="bf-field"><span>Coleção</span><bf-select [formField]="productForm.collectionId" [options]="productCollectionOptions()" ariaLabel="Coleção" /><button class="bf-link-action" type="button" (click)="openQuickReference('collection')"><bf-icon name="plus"/> Criar coleção</button></label>
-          @if(!bulkVariants() || editingId()){
-            <label class="bf-field"><span>Fragrância</span><bf-select-search [formField]="productForm.fragranceId" [options]="productFragranceOptions()" ariaLabel="Fragrância" /><button class="bf-link-action" type="button" (click)="openQuickReference('fragrance')"><bf-icon name="plus"/> Criar fragrância</button></label>
-          }
-          <label class="bf-field"><span>Formato</span><bf-select [formField]="productForm.formatId" [options]="productFormatOptions()" ariaLabel="Formato" /><button class="bf-link-action" type="button" (click)="openQuickReference('format')"><bf-icon name="plus"/> Criar formato</button></label>
-          }
-          <label class="bf-field"><span>Estoque mínimo</span><bf-number-input kind="integer" [formField]="productForm.minimumStock" ariaLabel="Estoque mínimo" /></label>
-          <label class="bf-field"><span>Custo adicional unitário</span><bf-number-input kind="currency" [formField]="productForm.additionalCost" ariaLabel="Custo adicional unitário" /></label>
-          <bf-checkbox class="toggle" [formField]="productForm.active" label="Produto ativo" />
-          @if(!editingId() && productModel().categoryId === 'soap') {
-            <bf-checkbox class="toggle full" [checked]="bulkVariants()" (checkedChange)="bulkVariants.set($event)" label="Criar várias fragrâncias deste produto de uma vez" description="Uma linha para cada fragrância, com a mesma coleção, formato e preço." />
-          }
         </div>
-        @if(bulkVariants() && !editingId() && productModel().categoryId === 'soap') {
-          <section class="bulk-variants">
-            <div class="bulk-variants-head"><strong>Fragrâncias a cadastrar</strong><span>{{selectedVariantFragranceIds().length}} selecionada(s)</span></div>
-            @for(fragrance of availableFragrances();track fragrance.id){
-              <bf-checkbox
-                [checked]="selectedVariantFragranceIds().includes(fragrance.id)"
-                (checkedChange)="toggleVariantFragrance(fragrance.id,$event)"
-                [label]="fragrance.name" />
-            } @empty {<p class="hint">Cadastre uma fragrância para esta coleção antes de criar as variações.</p>}
-          </section>
-        }
-        @if(productModel().categoryId === 'soap'){
-        <section class="composition"><div class="subhead"><div><strong>Ajustes de custo deste produto</strong><small>Opcional. Os padrões de coleção, fragrância e formato são aplicados automaticamente. Use apenas para exceções deste produto.</small></div><button class="bf-button secondary" type="button" (click)="addRecipeComponent()">+ Insumo</button></div>
-          @for (component of recipe(); track $index; let i = $index) {
-            <div class="component-row"><bf-select-search [value]="component.inputId" (valueChange)="patchRecipeInput(i,$event)" [options]="activeInputOptions()" [imageTemplate]="inputThumb" ariaLabel="Insumo" /><bf-number-input kind="decimal" [decimals]="3" [min]="0" [value]="component.quantity" (valueChange)="patchRecipe(i,{quantity:$event})" ariaLabel="Quantidade do insumo" /><span class="component-unit">{{unitName(component.unitId)}}</span><button class="bf-icon-button" type="button" (click)="removeRecipe(i)"><bf-icon name="trash" /></button></div>
-          } @empty { <p class="hint">Sem ajuste específico. O custo será calculado pelos padrões reutilizáveis.</p> }
-        </section>
-        }
-        @if(bulkVariants() && !editingId() && productModel().categoryId === 'soap'){
-          <section class="bulk-cost-preview">
-            <strong>Prévia de custos por fragrância</strong>
-            @for(preview of bulkCostPreviews();track preview.id){
-              <div><span>{{preview.name}}</span><strong>{{currency(preview.costCents)}} {{preview.pending?'· custo parcial':''}}</strong></div>
-            } @empty {<small>Selecione as fragrâncias para pré-visualizar o custo de cada uma.</small>}
-          </section>
-          <p class="hint">As variações são criadas sem foto e com estoque zero. Você poderá adicionar imagens e registrar a produção depois.</p>
+        @if(isCreatingSoap()){
+          <bf-soap-creation-form #soapCreator (createReference)="openQuickReference($event)" />
         } @else {
-                  <div class="product-cost-preview" [class.pending]="productCostPreview()?.costPending">
-          <span>Custo padrão atual</span>
-          <strong>{{productCostSummary()}}</strong>
-          <small>{{productModel().categoryId === 'soap' ? 'Formato + coleção + fragrância + ajustes deste produto.' : 'Custos ainda não definidos nesta etapa.'}}</small>
-        </div>
+          <div class="bf-grid two product-fields">
+            @if(productModel().categoryId !== 'soap'){
+              <label class="bf-field"><span>Nome / modelo</span><input class="bf-input" [formField]="productForm.modelName" placeholder="Ex.: Kit Florzinhas ou Vela 40 ml" /></label>
+              @if(productModel().categoryId === 'scented-candle'){
+                <label class="bf-field"><span>Aroma</span><input class="bf-input" [formField]="productForm.variantName" placeholder="Ex.: Tropical" /></label>
+                <label class="bf-field"><span>Volume (ml)</span><bf-number-input kind="integer" [formField]="productForm.volumeMl" ariaLabel="Volume da vela em mililitros" /></label>
+              }
+              <label class="bf-field full"><span>Descrição comercial</span><input class="bf-input" [formField]="productForm.description" /></label>
+            }
+            <label class="bf-field"><span>Preço</span><bf-number-input kind="currency" [formField]="productForm.salePrice" ariaLabel="Preço do produto" />@if(suggestedPrice()){<button class="bf-link-action" type="button" (click)="applySuggestedPrice()">Usar preço padrão: {{currency(suggestedPrice()!.priceCents)}}</button>}</label>
+            @if(productModel().categoryId === 'soap'){
+              <label class="bf-field"><span>Coleção</span><bf-select [formField]="productForm.collectionId" [options]="productCollectionOptions()" ariaLabel="Coleção" /><button class="bf-link-action" type="button" (click)="openQuickReference('collection')"><bf-icon name="plus" /> Criar coleção</button></label>
+              <label class="bf-field"><span>Fragrância</span><bf-select-search [formField]="productForm.fragranceId" [options]="productFragranceOptions()" ariaLabel="Fragrância" /><button class="bf-link-action" type="button" (click)="openQuickReference('fragrance')"><bf-icon name="plus" /> Criar fragrância</button></label>
+              <label class="bf-field"><span>Formato</span><bf-select [formField]="productForm.formatId" [options]="productFormatOptions()" ariaLabel="Formato" /><button class="bf-link-action" type="button" (click)="openQuickReference('format')"><bf-icon name="plus" /> Criar formato</button></label>
+            }
+            <label class="bf-field"><span>Estoque mínimo</span><bf-number-input kind="integer" [formField]="productForm.minimumStock" ariaLabel="Estoque mínimo" /></label>
+            <label class="bf-field"><span>Custo adicional unitário</span><bf-number-input kind="currency" [formField]="productForm.additionalCost" ariaLabel="Custo adicional unitário" /></label>
+            <bf-checkbox class="toggle" [formField]="productForm.active" label="Produto ativo" />
+          </div>
+          @if(productModel().categoryId === 'soap'){
+            <section class="composition"><div class="subhead"><div><strong>Ajustes de custo deste produto</strong><small>Opcional. Os padrões de coleção, fragrância e formato são aplicados automaticamente. Use apenas para exceções deste produto.</small></div><button class="bf-button secondary" type="button" (click)="addRecipeComponent()">+ Insumo</button></div>
+              @for (component of recipe(); track $index; let i = $index) {
+                <div class="component-row"><bf-select-search [value]="component.inputId" (valueChange)="patchRecipeInput(i,$event)" [options]="activeInputOptions()" [imageTemplate]="inputThumb" ariaLabel="Insumo" /><bf-number-input kind="decimal" [decimals]="3" [min]="0" [value]="component.quantity" (valueChange)="patchRecipe(i,{quantity:$event})" ariaLabel="Quantidade do insumo" /><span class="component-unit">{{unitName(component.unitId)}}</span><button class="bf-icon-button" type="button" (click)="removeRecipe(i)" aria-label="Remover insumo"><bf-icon name="trash" /></button></div>
+              } @empty { <p class="hint">Sem ajuste específico. O custo será calculado pelos padrões reutilizáveis.</p> }
+            </section>
+          }
+          <div class="product-cost-preview" [class.pending]="productCostPreview()?.costPending">
+            <span>Custo padrão atual</span><strong>{{productCostSummary()}}</strong>
+            <small>{{productModel().categoryId === 'soap' ? 'Formato + coleção + fragrância + ajustes deste produto.' : 'Custos ainda não definidos nesta etapa.'}}</small>
+          </div>
         }
       } @else if (kind() === 'inputs') {
         <div class="bf-grid two">
@@ -84,7 +63,7 @@
         </section>
       }
 
-      @if (imagesEnabled && !(kind()==='products' && bulkVariants() && !editingId())) {
+      @if (imagesEnabled && !isCreatingSoap()) {
         <div class="image-field">
           <bf-image-upload
             label="Imagem"
@@ -106,6 +85,6 @@
         </div>
       }
     </div>
-    <div class="bf-dialog-footer"><button class="bf-button secondary" type="button" (click)="dialog.close()">Cancelar</button><button class="bf-button" type="button" [disabled]="saving()" [bfLoadingButton]="saving()" (click)="save()">{{saving() ? 'Salvando...' : kind()==='products' && bulkVariants() && !editingId() ? 'Criar ' + selectedVariantFragranceIds().length + ' variações' : 'Salvar'}}</button></div>
+    <div class="bf-dialog-footer"><button class="bf-button secondary" type="button" (click)="dialog.close()">Cancelar</button><button class="bf-button" type="button" [disabled]="saving() || (isCreatingSoap() && !soapCreator()?.canSave())" [bfLoadingButton]="saving()" (click)="save()">{{saving() ? 'Salvando...' : isCreatingSoap() ? 'Criar ' + (soapCreator()?.freshRows()?.length ?? 0) + ' produto(s)' : 'Salvar'}}</button></div>
   </dialog>
 <bf-settings-editor #referenceEditor (saved)="onReferenceSaved($event)" />

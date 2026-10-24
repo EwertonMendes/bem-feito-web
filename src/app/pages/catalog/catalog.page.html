@@ -56,20 +56,24 @@
   } @else if(tab()==='products'){
     <div class="catalog-grid" [class.list-view]="viewMode()==='list'">
       @for(item of filteredProducts();track item.id){
-        <article class="catalog-card" [class.inactive]="!item.active" [class.has-photo]="!!item.image">
+        <article class="catalog-card product-card" [class.inactive]="!item.active" [class.has-photo]="!!item.image">
           <button class="catalog-card-open" type="button" (click)="openDetails('products',item.id)" [attr.aria-label]="'Ver detalhes de '+item.displayName">
-            <div class="catalog-card-image"><bf-catalog-image [image]="item.image" [alt]="item.displayName" fit="contain"/></div>
+            <div class="catalog-card-image">
+              <bf-catalog-image [image]="item.image" [alt]="item.displayName" fit="contain" [backdrop]="true"/>
+            </div>
             <div class="catalog-card-body">
-              <div class="catalog-meta"><span>{{item.code}}</span><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></div>
-              <h2>{{item.displayName}}</h2>
-              <p class="catalog-subtitle">{{categoryName(item)}}{{item.categoryId===undefined || item.categoryId==='soap' ? ' · '+(collectionNames().get(item.collectionId)||'Linha') : ''}} @if(weight(item)!==null){ · ≈ {{weight(item)}} g}</p>
-              <div class="catalog-stats"><strong>{{currency(item.salePriceCents)}}</strong>
-                <span [class.stock-danger]="freeStock(item)===0">{{freeStock(item)>0?freeStock(item)+' livre(s)':'Sem estoque livre'}}</span>
+              <div class="catalog-topline">
+                <span class="catalog-eyebrow">{{productEyebrow(item)}}</span>
+                @if(!item.active){<span class="catalog-state">Inativo</span>}
               </div>
-              <div class="catalog-secondary"><span>Custo {{productFinancials().get(item.id)?.costCents!==null ? currency(productFinancials().get(item.id)!.costCents!) : 'indisponível'}}</span>
-                <span [class.catalog-pending]="productFinancials().get(item.id)?.incomplete">Margem {{margin(productFinancials().get(item.id)?.marginPercent)}}</span>
+              <div class="catalog-product-identity">
+                <h2>{{productTitle(item)}}</h2>
+                @if(productVariant(item)){<p class="catalog-fragrance">{{productVariant(item)}}</p>}
               </div>
-              <span class="catalog-details-cta">Ver detalhes <bf-icon name="chevron-right"/></span>
+              <div class="catalog-card-bottom">
+                <strong class="catalog-price">{{currency(item.salePriceCents)}}</strong>
+                <span class="catalog-stock" [class.stock-danger]="freeStock(item)===0">{{freeStock(item)>0?freeStock(item)+(freeStock(item)===1?' disponível':' disponíveis'):'Sem estoque'}}</span>
+              </div>
             </div>
           </button>
           <div class="catalog-card-actions">
@@ -85,7 +89,7 @@
       @for(item of filteredInputs();track item.id){
         <article class="catalog-card input-card" [class.inactive]="!item.active" [class.has-photo]="!!item.image">
           <button class="catalog-card-open" type="button" (click)="openDetails('inputs',item.id)" [attr.aria-label]="'Ver detalhes do insumo '+item.name">
-            <div class="catalog-card-image"><bf-catalog-image [image]="item.image" [alt]="item.name" fit="contain"/></div>
+            <div class="catalog-card-image"><bf-catalog-image [image]="item.image" [alt]="item.name" fit="contain" [backdrop]="true"/></div>
             <div class="catalog-card-body">
               <div class="catalog-meta"><span>{{item.code}}</span><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></div>
               <h2>{{item.name}}</h2><p class="catalog-subtitle">{{inputMode(item)}}</p>
@@ -104,7 +108,7 @@
       @for(item of filteredAdditions();track item.id){
         <article class="catalog-card" [class.inactive]="!item.active" [class.has-photo]="!!item.image">
           <button class="catalog-card-open" type="button" (click)="openDetails('additions',item.id)" [attr.aria-label]="'Ver detalhes do adicional '+item.name">
-            <div class="catalog-card-image"><bf-catalog-image [image]="item.image" [alt]="item.name" fit="contain"/></div>
+            <div class="catalog-card-image"><bf-catalog-image [image]="item.image" [alt]="item.name" fit="contain" [backdrop]="true"/></div>
             <div class="catalog-card-body">
               <div class="catalog-meta"><span>{{item.category}}</span><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></div>
               <h2>{{item.name}}</h2><p class="catalog-subtitle">{{item.components.length}} componente(s)</p>

@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { DriveRedirectStartedError } from '../../../core/google-drive/drive-auth.service';
 import { BfLoadingButton } from '../../../shared/ui/button/loading-button';
 import { AuthService } from '../../../core/auth/auth.service';
 import { DriveIntegrationService } from '../../../core/google-drive/drive-integration.service';
@@ -117,7 +118,7 @@ export class GoogleDriveSettingsCard {
       await this.integration.connect();
       this.toast.success('Google Drive conectado.');
     } catch (error) {
-      this.toast.error(this.errors.message(error));
+      if (!(error instanceof DriveRedirectStartedError)) this.toast.error(this.errors.message(error));
     } finally {
       this.busy.set(null);
     }

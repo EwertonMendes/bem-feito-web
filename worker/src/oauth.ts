@@ -81,7 +81,7 @@ export async function callback(request: Request, env: Env): Promise<Response> {
     'DELETE FROM oauth_transactions WHERE state_hash=? AND browser_hash=? AND expires_at>? RETURNING *'
   ).bind(stateHash, await sha(cookie), Date.now()).first<Transaction>();
   if (!tx) throw new ApiError(400,'expired_or_used_oauth_state');
-  if (url.hasOwnProperty('error') || url.searchParams.has('error')) return redirect(env,'cancelled');
+  if (url.searchParams.has('error')) return redirect(env,'cancelled');
   const code = url.searchParams.get('code');
   if (!code || code.length > 4096) return redirect(env,'invalid_code');
   try {
@@ -108,14 +108,15 @@ export async function callback(request: Request, env: Env): Promise<Response> {
       'SELECT encrypted_refresh_token,status,google_subject FROM drive_connections WHERE owner_uid=?'
     ).bind(tx.owner_uid).first<{encrypted_refresh_token:string|null;status:string;google_subject:string}>();
     // Never reuse a refresh token that belongs to another Google account or an invalidated grant.
+    if (previous?.status === 'revocation_pending') throw new ApiError(409,'revocation_pending');
     const retained = previous?.status === 'connected' && previous.google_subject === id.sub
       ? previous.encrypted_refresh_token : null;
     if (!tokens.refresh_token && !retained) throw new ApiError(409,'offline_access_unavailable');
     const encryptedRefresh = tokens.refresh_token
       ? await encrypt(env,tokens.refresh_token,context(env,tx.owner_uid,id.sub!))
       : retained!;
-    const now = Date.now(), expiry = now + Math.floor(tokens.expires_in*1000);
-    await env.DB.prepare(
+    const now = Date.now();
+    const saved = await env.DB.prepare(
       `INSERT INTO drive_connections
         (owner_uid,google_subject,google_email,encrypted_refresh_token,encrypted_access_token,access_token_expires_at,
          access_token_version,status,revision,refresh_lease_id,refresh_lease_until,refresh_retry_after,created_at,updated_at)
@@ -123,8 +124,10 @@ export async function callback(request: Request, env: Env): Promise<Response> {
        ON CONFLICT(owner_uid) DO UPDATE SET google_subject=excluded.google_subject,google_email=excluded.google_email,
        encrypted_refresh_token=excluded.encrypted_refresh_token,encrypted_access_token=NULL,access_token_expires_at=0,
        access_token_version=NULL,status='connected',revision=drive_connections.revision+1,
-       refresh_lease_id=NULL,refresh_lease_until=0,refresh_retry_after=0,updated_at=excluded.updated_at`
+       refresh_lease_id=NULL,refresh_lease_until=0,refresh_retry_after=0,updated_at=excluded.updated_at
+       WHERE drive_connections.status!='revocation_pending'`
     ).bind(tx.owner_uid,id.sub,tx.firebase_email,encryptedRefresh,now,now).run();
+    if (saved.meta.changes !== 1) throw new ApiError(409,'connection_changed');
     return redirect(env,'connected');
   } catch (error) {
     const allowed = new Set(['offline_access_unavailable','google_identity_mismatch','drive_scope_missing',

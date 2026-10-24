@@ -57,6 +57,27 @@ Com o novo cliente OAuth é esperada a autorização uma única vez de cada
 conta Google. As imagens e subpastas pré-existentes permanecem no mesmo Drive.
 O acesso efetivo precisa ser homologado antes do deploy do frontend.
 
+
+## Diagnóstico Firebase JWT (DEV)
+
+Em 24/10, a integração inicialmente apresentou `401 invalid_identity` e,
+após detalhar a verificação, `503 identity_keys_unavailable`: o Worker
+precisava resolver um redirecionamento HTTP antes de ler as chaves públicas
+do serviço Firebase. A consulta JWKS passou a permitir redirecionamentos
+HTTPS gerenciados pelo Google, conservando a verificação RS256, `kid`,
+assinatura e claims. Um smoke test remoto confirmou HTTP 200 e um conjunto
+não vazio de chaves públicas consultado **de dentro do Worker**.
+
+O endpoint DEV `GET /health/identity-keys` é apenas diagnóstico e devolve
+estado e quantidade de chaves; não divulga chaves, contas ou tokens.
+O pipeline `Deploy Drive Worker DEV` o verifica após cada publicação e
+falha caso a descoberta de chaves esteja indisponível. Esse endpoint não
+é ativado em PROD.
+
+Esta correção confirma a disponibilidade das chaves públicas, mas não
+substitui o teste OAuth de ponta a ponta com uma conta Firebase real,
+as verificações Firestore, a seleção da pasta e o refresh de concessões.
+
 ### Validar localmente
 
 ```sh

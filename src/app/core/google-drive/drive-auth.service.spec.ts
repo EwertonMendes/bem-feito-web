@@ -2,181 +2,72 @@ import '@angular/compiler';
 import { Injector, runInInjectionContext } from '@angular/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FIREBASE_AUTH } from '../firebase/firebase.providers';
-import { DriveAuthService } from './drive-auth.service';
-import { ExternalScriptLoaderService } from './external-script-loader.service';
-
-const mocks = vi.hoisted(() => ({
-  authCallbacks: [] as Array<(user: { uid: string; email?: string } | null) => void>,
-}));
-
-vi.mock('firebase/auth', () => ({
-  onAuthStateChanged: vi.fn((_auth, callback) => {
-    mocks.authCallbacks.push(callback);
-    return () => {};
-  }),
-}));
-
+import { DriveAuthService, DriveAuthorizationRequiredError, DriveRedirectStartedError } from './drive-auth.service';
+const mocks = vi.hoisted(() => ({ callbacks: [] as Array<(user: {uid:string}|null)=>void> }));
+vi.mock('firebase/auth', () => ({ onAuthStateChanged: vi.fn((_auth,callback)=>{mocks.callbacks.push(callback);return ()=>{};}) }));
 class MemoryStorage {
-  private readonly values = new Map<string, string>();
-
-  get length(): number {
-    return this.values.size;
-  }
-
-  clear(): void {
-    this.values.clear();
-  }
-
-  getItem(key: string): string | null {
-    return this.values.get(key) ?? null;
-  }
-
-  key(index: number): string | null {
-    return [...this.values.keys()][index] ?? null;
-  }
-
-  removeItem(key: string): void {
-    this.values.delete(key);
-  }
-
-  setItem(key: string, value: string): void {
-    this.values.set(key, value);
-  }
+  private readonly map = new Map<string,string>();
+  getItem(key:string):string|null { return this.map.get(key)??null; }
+  setItem(key:string,value:string):void { this.map.set(key,value); }
+  removeItem(key:string):void { this.map.delete(key); }
 }
-
-describe('DriveAuthService', () => {
-  let auth: { currentUser: { uid: string; email?: string } | null };
-  let prompts: string[];
-  let tokenSequence: number;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.authCallbacks.length = 0;
-    prompts = [];
-    tokenSequence = 0;
-    auth = { currentUser: null };
-
-    vi.stubGlobal('sessionStorage', new MemoryStorage());
-    vi.stubGlobal('localStorage', new MemoryStorage());
-    vi.stubGlobal('window', {
-      google: {
-        accounts: {
-          oauth2: {
-            initTokenClient: vi.fn((config: { callback: (response: { access_token: string; expires_in: number }) => void }) => ({
-              requestAccessToken: vi.fn(({ prompt }: { prompt?: string } = {}) => {
-                prompts.push(prompt ?? '');
-                tokenSequence += 1;
-                config.callback({ access_token: `token-${tokenSequence}`, expires_in: 3600 });
-              }),
-            })),
-          },
-        },
-      },
-    });
-  });
-
-  function createService(): DriveAuthService {
-    const scripts = { load: vi.fn().mockResolvedValue(undefined) };
-    const injector = Injector.create({
-      providers: [
-        { provide: FIREBASE_AUTH, useValue: auth },
-        { provide: ExternalScriptLoaderService, useValue: scripts },
-      ],
-    });
-    const service = runInInjectionContext(injector, () => new DriveAuthService());
-    return service;
+describe('DriveAuthService (backend token broker)',()=>{
+  let auth: { currentUser: {uid:string; email:string;getIdToken:ReturnType<typeof vi.fn>}|null };
+  let fetchMock: ReturnType<typeof vi.fn>;
+  const environmentUrl = 'https://bem-feito-drive-dev.ewertonmendes9.workers.dev';
+  function setup() {
+    const injector = Injector.create({providers:[{provide:FIREBASE_AUTH,useValue:auth}]});
+    return runInInjectionContext(injector,()=>new DriveAuthService());
   }
-
-  function signIn(service: DriveAuthService): void {
-    auth.currentUser = { uid: 'user-1', email: 'user@example.com' };
-    expect(mocks.authCallbacks.length).toBeGreaterThan(0);
-    mocks.authCallbacks.at(-1)?.(auth.currentUser);
-    expect(service.linked()).toBe(false);
-  }
-
-  it('remembers the grant separately from the short-lived access token', async () => {
-    const service = createService();
-    signIn(service);
-
-    expect(await service.connect()).toBe('token-1');
-    service.setAccountEmail('user@example.com');
-
-    expect(service.connected()).toBe(true);
-    expect(service.linked()).toBe(true);
-    expect(prompts).toEqual(['consent']);
-    expect(localStorage.getItem('bem-feito:google-drive:development')).toContain('token-1');
-    expect(localStorage.getItem('bem-feito:google-drive-grant:development')).toContain('user-1');
-
-    service.expireAccessToken();
-
-    expect(service.connected()).toBe(false);
-    expect(service.linked()).toBe(true);
-    expect(service.accountEmail()).toBe('user@example.com');
+  beforeEach(()=>{
+    vi.clearAllMocks(); mocks.callbacks.length=0;
+    auth={currentUser:{uid:'user-1',email:'user@example.com',getIdToken:vi.fn().mockResolvedValue('firebase-id-token')}};
+    const local=new MemoryStorage(),session=new MemoryStorage();
+    local.setItem('bem-feito:google-drive:development','very-old-credential');
+    vi.stubGlobal('localStorage',local);vi.stubGlobal('sessionStorage',session);
+    vi.stubGlobal('window',{location:{assign:vi.fn()}});
+    fetchMock=vi.fn();vi.stubGlobal('fetch',fetchMock);
+  });
+  it('cleans legacy browser storage and holds tokens only in memory',async()=>{
+    fetchMock.mockResolvedValue(Response.json({accessToken:'drive-token',expiresAt:Date.now()+3600000,email:'user@example.com',version:'v'.repeat(43)}));
+    const service=setup();mocks.callbacks.at(-1)?.(auth.currentUser);
     expect(localStorage.getItem('bem-feito:google-drive:development')).toBeNull();
-    expect(localStorage.getItem('bem-feito:google-drive-grant:development')).not.toBeNull();
-
-    expect(await service.connect()).toBe('token-2');
-    expect(prompts).toEqual(['consent', '']);
+    expect(await service.accessToken()).toBe('drive-token');
+    expect(await service.accessToken()).toBe('drive-token');
     expect(service.connected()).toBe(true);
-  });
-
-  it('restores a still-valid access token after closing and reopening the tab', async () => {
-    const service = createService();
-    signIn(service);
-    await service.connect();
-    service.setAccountEmail('user@example.com');
-
-    const persistentStorage = localStorage;
-    vi.stubGlobal('sessionStorage', new MemoryStorage());
-    auth.currentUser = { uid: 'user-1', email: 'user@example.com' };
-
-    const reopened = createService();
-
-    expect(localStorage).toBe(persistentStorage);
-    expect(reopened.currentToken()).toBe('token-1');
-    expect(reopened.connected()).toBe(true);
-    expect(reopened.linked()).toBe(true);
-    expect(prompts).toEqual(['consent']);
-  });
-
-  it('resumes a remembered grant in a new tab even before the Drive auth listener fires', async () => {
-    localStorage.setItem('bem-feito:google-drive-grant:development', JSON.stringify({
-      firebaseUid: 'user-1',
-      accountEmail: 'user@example.com',
-      grantedAt: Date.now() - 60_000,
-    }));
-    auth.currentUser = { uid: 'user-1', email: 'user@example.com' };
-
-    const service = createService();
-
-    expect(service.linked()).toBe(false);
-    expect(await service.connect()).toBe('token-1');
-
-    expect(prompts).toEqual(['']);
-    expect(service.linked()).toBe(true);
-    expect(service.connected()).toBe(true);
-    expect(service.currentToken()).toBe('token-1');
-  });
-
-  it('expires the access token on logout but can resume the remembered grant for the same Firebase user', async () => {
-    const service = createService();
-    signIn(service);
-    await service.connect();
-    service.setAccountEmail('user@example.com');
-
-    auth.currentUser = null;
-    mocks.authCallbacks.at(-1)?.(null);
-
-    expect(service.connected()).toBe(false);
-    expect(service.linked()).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(localStorage.getItem('bem-feito:google-drive:development')).toBeNull();
-    expect(localStorage.getItem('bem-feito:google-drive-grant:development')).toContain('user-1');
-
-    auth.currentUser = { uid: 'user-1', email: 'user@example.com' };
-    mocks.authCallbacks.at(-1)?.(auth.currentUser);
-
-    expect(service.linked()).toBe(true);
-    expect(await service.connect()).toBe('token-2');
-    expect(prompts).toEqual(['consent', '']);
+  });
+  it('deduplicates concurrent refresh and clears memory on logout',async()=>{
+    fetchMock.mockResolvedValue(Response.json({accessToken:'drive-token',expiresAt:Date.now()+3600000,email:'user@example.com',version:'v'.repeat(43)}));
+    const service=setup();mocks.callbacks.at(-1)?.(auth.currentUser);
+    expect(await Promise.all(Array.from({length:12},()=>service.accessToken()))).toHaveLength(12);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    auth.currentUser=null;mocks.callbacks.at(-1)?.(null);
+    expect(service.currentToken()).toBeNull();
+    expect(service.linked()).toBe(false);
+  });
+  it('prompts interactive OAuth only when Worker confirms missing grant',async()=>{
+    fetchMock.mockImplementation(async(url:string)=>{
+      if(url.endsWith('/drive/token'))return Response.json({error:{code:'reconnect_required'}},{status:409});
+      return Response.json({launchUrl:environmentUrl+'/oauth/drive/launch?ticket=abc'});
+    });
+    const service=setup();mocks.callbacks.at(-1)?.(auth.currentUser);
+    await expect(service.accessToken()).rejects.toBeInstanceOf(DriveAuthorizationRequiredError);
+    await expect(service.connect()).rejects.toBeInstanceOf(DriveRedirectStartedError);
+    expect(window.location.assign).toHaveBeenCalledTimes(1);
+  });
+  it('version-guards rejection of a Google 401 before requesting fresh access',async()=>{
+    fetchMock.mockImplementation(async(url:string)=>{
+      if(url.endsWith('/drive/token/reject'))return Response.json({status:'invalidated'});
+      return Response.json({accessToken:'drive-token',expiresAt:Date.now()+3600000,email:'user@example.com',version:'z'.repeat(43)});
+    });
+    const service=setup();mocks.callbacks.at(-1)?.(auth.currentUser);
+    await service.accessToken();
+    await service.rejectAccessToken();
+    expect(service.currentToken()).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const request=fetchMock.mock.calls[1][1] as RequestInit;
+    expect(request.body).toContain('z'.repeat(43));
   });
 });

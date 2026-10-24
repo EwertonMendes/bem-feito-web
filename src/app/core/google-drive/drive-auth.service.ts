@@ -4,8 +4,8 @@ import { environment } from '../../../environments/environment';
 import { FIREBASE_AUTH } from '../firebase/firebase.providers';
 
 const EXPIRY_MARGIN = 60_000;
-interface CachedToken { value: string; expiresAt: number; uid: string; }
-interface TokenReply { accessToken: string; expiresAt: number; email: string; }
+interface CachedToken { value: string; expiresAt: number; uid: string; version: string; }
+interface TokenReply { accessToken: string; expiresAt: number; email: string; version: string; }
 interface BrokerError { error?: { code?: string }; }
 
 export class DriveAuthorizationRequiredError extends Error {
@@ -71,10 +71,10 @@ export class DriveAuthService {
     this.tokenPending = (async () => {
       const result = await this.call<TokenReply>('/drive/token', 'POST');
       if (this.firebaseAuth.currentUser?.uid !== uid) throw new Error('Sua sessão foi alterada.');
-      if (!result.accessToken || !Number.isFinite(result.expiresAt) || result.expiresAt <= Date.now()+EXPIRY_MARGIN) {
+      if (!result.accessToken || !result.version || !Number.isFinite(result.expiresAt) || result.expiresAt <= Date.now()+EXPIRY_MARGIN) {
         throw new Error('A credencial recebida do Drive é inválida.');
       }
-      this.tokenState.set({uid,value:result.accessToken,expiresAt:result.expiresAt});
+      this.tokenState.set({uid,value:result.accessToken,expiresAt:result.expiresAt,version:result.version});
       this.accountState.set(result.email);
       this.linkedState.set(true);
       return result.accessToken;
@@ -90,6 +90,15 @@ export class DriveAuthService {
       if (!this.startPending) this.startPending = this.startOAuth().finally(() => { this.startPending = undefined; });
       return this.startPending;
     }
+  }
+
+  async rejectAccessToken(): Promise<void> {
+    const current = this.tokenState();
+    if (current && current.uid === this.firebaseAuth.currentUser?.uid) {
+      // Version guarded on the Worker: a late 401 cannot invalidate a newly issued token.
+      await this.call('/drive/token/reject','POST',{version:current.version});
+    }
+    this.expireAccessToken();
   }
 
   async revoke(): Promise<void> {
@@ -112,14 +121,15 @@ export class DriveAuthService {
     throw new DriveRedirectStartedError();
   }
 
-  private async call<T>(path: string, method: 'GET'|'POST'): Promise<T> {
+  private async call<T>(path: string, method: 'GET'|'POST', payload?: unknown): Promise<T> {
     const user = this.firebaseAuth.currentUser;
     if (!user) throw new Error('A sessão do Bem Feito expirou.');
     let response: Response | undefined;
     for (let attempt=0;attempt<2;attempt++) {
       const token = await user.getIdToken(attempt === 1);
       response = await fetch(environment.googleDrive.workerUrl+path,{
-        method, headers:{Authorization:'Bearer '+token},cache:'no-store'
+        method, headers:{Authorization:'Bearer '+token,...(payload===undefined?{}:{'Content-Type':'application/json'})},
+        ...(payload===undefined?{}:{body:JSON.stringify(payload)}),cache:'no-store'
       });
       if (response.status !== 401) break;
     }

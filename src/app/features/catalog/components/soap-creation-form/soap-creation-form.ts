@@ -83,7 +83,7 @@ export class SoapCreationForm {
   readonly canSave = computed(() =>
     !!this.collectionId() && this.fragranceIds().length > 0 && this.formatIds().length > 0 &&
     this.rows().length === this.candidateCount() && this.freshRows().length > 0 &&
-    this.freshRows().length <= 30 && this.missingPrices() === 0 &&
+    this.candidateCount() <= 30 && this.freshRows().length <= 30 && this.missingPrices() === 0 &&
     Number.isSafeInteger(this.minimumStock()) && this.minimumStock() >= 0 &&
     Number.isFinite(this.additionalCost()) && this.additionalCost() >= 0 &&
     this.freshRows().every(row=>row.priceCents !== null && Number.isSafeInteger(row.priceCents) && row.priceCents >= 0));

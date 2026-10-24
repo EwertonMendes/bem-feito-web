@@ -1,0 +1,91 @@
+<div class="soap-create">
+  <section class="step">
+    <div class="step-heading"><span class="step-number">1</span><div><strong>Informações básicas</strong><small>Escolha a coleção para carregar as fragrâncias e preços correspondentes.</small></div></div>
+    <div class="field-stack">
+      <label class="bf-field"><span>Coleção</span><bf-select [value]="collectionId()" (valueChange)="setCollection($event)" [options]="collectionOptions()" ariaLabel="Coleção dos novos sabonetes" /></label>
+      <button type="button" class="bf-link-action" (click)="createReference.emit('collection')"><bf-icon name="plus" /> Criar coleção</button>
+    </div>
+  </section>
+  <section class="step">
+    <div class="step-heading"><span class="step-number">2</span><div><strong>Escolha as variações</strong><small>Selecione uma ou várias opções em cada grupo.</small></div></div>
+    <div class="variation-grid">
+      <div class="field-stack">
+        <bf-multi-select label="Fragrâncias" placeholder="Selecionar fragrâncias" [options]="fragranceOptions()" [value]="fragranceIds()" (valueChange)="fragranceIds.set($event)" />
+        <button type="button" class="bf-link-action" (click)="createReference.emit('fragrance')" [disabled]="!collectionId()"><bf-icon name="plus" /> Criar fragrância</button>
+        @if(!collectionId()){<small class="hint">Escolha a coleção primeiro.</small>}
+      </div>
+      <div class="field-stack">
+        <bf-multi-select label="Formatos" placeholder="Selecionar formatos" [options]="formatOptions()" [value]="formatIds()" (valueChange)="formatIds.set($event)" />
+        <button type="button" class="bf-link-action" (click)="createReference.emit('format')"><bf-icon name="plus" /> Criar formato</button>
+      </div>
+    </div>
+  </section>
+  @if(formatIds().length && collectionId()){
+    <section class="step">
+      <div class="step-heading"><span class="step-number">3</span><div><strong>Preços por formato</strong><small>Os valores padrão são preenchidos automaticamente. Você pode personalizá-los sem alterar a tabela de preços.</small></div></div>
+      <div class="prices">
+        @for(formatId of formatIds();track formatId){
+          <div class="price-row">
+            <div class="price-description"><strong>{{formatName(formatId)}}</strong>
+              @switch(priceSource(formatId)){
+                @case('default'){<small>Preço padrão desta coleção</small>}
+                @case('custom'){<small class="custom">Preço personalizado</small>}
+                @default {<small class="missing">Preço não configurado — informe um valor</small>}
+              }
+            </div>
+            <bf-number-input kind="currency" [min]="0" [value]="priceFor(formatId)" (valueChange)="setPrice(formatId,$event)" [ariaLabel]="'Preço de ' + formatName(formatId)" />
+            @if(priceSource(formatId)==='custom'){
+              <button class="reset-price" type="button" (click)="restorePrice(formatId)" [attr.aria-label]="'Restaurar preço padrão de ' + formatName(formatId)">Padrão</button>
+            } @else {<span class="reset-slot"></span>}
+          </div>
+        }
+      </div>
+    </section>
+  }
+  <section class="step">
+    <button class="advanced-toggle" type="button" [attr.aria-expanded]="advancedExpanded()" (click)="advancedExpanded.set(!advancedExpanded())">
+      <span><strong>Configurações adicionais</strong><small>Estoque mínimo, custos adicionais e ajustes excepcionais.</small></span><bf-icon name="chevron-right" [class.rotated]="advancedExpanded()" />
+    </button>
+    @if(advancedExpanded()){
+      <div class="advanced-body">
+        <div class="advanced-grid">
+          <label class="bf-field"><span>Estoque mínimo</span><bf-number-input kind="integer" [min]="0" [value]="minimumStock()" (valueChange)="minimumStock.set($event)" ariaLabel="Estoque mínimo dos produtos" /></label>
+          <label class="bf-field"><span>Custo adicional por unidade</span><bf-number-input kind="currency" [min]="0" [value]="additionalCost()" (valueChange)="additionalCost.set($event)" ariaLabel="Custo adicional unitário" /></label>
+        </div>
+        <bf-checkbox label="Produtos ativos" [checked]="active()" (checkedChange)="active.set($event)" />
+        <div class="recipe-head"><div><strong>Ajustes específicos de insumos</strong><small>Aplicados a todas as combinações; os custos padrão de coleção, formato e fragrância já são considerados.</small></div><button class="bf-button secondary" type="button" (click)="addComponent()">+ Insumo</button></div>
+        @for(item of recipe();track $index;let i=$index){
+          <div class="recipe-row">
+            <bf-select-search [options]="activeInputOptions()" [value]="item.inputId" (valueChange)="changeComponentInput(i,$event)" ariaLabel="Insumo" />
+            <bf-number-input kind="decimal" [min]="0" [decimals]="3" [value]="item.quantity" (valueChange)="changeComponent(i,{quantity:$event})" ariaLabel="Quantidade de insumo" />
+            <small>{{inputUnitName(item.inputId)}}</small>
+            <button class="bf-icon-button" type="button" (click)="removeComponent(i)" aria-label="Remover insumo"><bf-icon name="trash" /></button>
+          </div>
+        }
+      </div>
+    }
+  </section>
+  <section class="step review">
+    <div class="step-heading"><span class="step-number">4</span><div><strong>Revisão do cadastro</strong><small>Confira os produtos antes de confirmar. Cada combinação vira um produto independente, com estoque inicial zero. Imagens de lotes maiores podem ser adicionadas individualmente depois.</small></div></div>
+    <div class="review-stats">
+      <div><strong>{{candidateCount()}}</strong><small>Combinações</small></div>
+      <div><strong>{{freshRows().length}}</strong><small>Novos produtos</small></div>
+      <div><strong>{{duplicateCount()}}</strong><small>Já cadastrados</small></div>
+    </div>
+    @if(candidateCount()>30){<p class="review-alert" role="alert">Limite de 30 combinações por cadastro. Reduza a seleção antes de continuar.</p>}
+    @if(missingPrices()){<p class="review-alert" role="alert">{{missingPrices()}} combinação(ões) sem preço configurado. Defina um valor para cada formato pendente.</p>}
+    @if(duplicateCount()){<p class="review-note">{{duplicateCount()}} combinação(ões) já existem e serão ignoradas, sem alterações nos produtos atuais.</p>}
+    @if(rows().length){
+      <div class="preview-list" aria-label="Prévia de produtos">
+        @for(row of rows();track row.fragranceId + ':' + row.formatId){
+          <div class="preview-row" [class.existing]="row.duplicate">
+            <div class="preview-name"><strong>{{row.displayName}}</strong><small>{{row.duplicate?'Já cadastrado — ignorado':row.priceSource==='custom'?'Preço personalizado':'Preço padrão'}}</small></div>
+            <div class="preview-values"><strong>{{row.priceCents===null?'Sem preço':currency(row.priceCents)}}</strong>
+              <small>@if(!row.duplicate){Custo {{currency(row.costCents)}}@if(row.costPending){ · parcial} @else { @if(previewMargin(row)!==null){ · Margem {{previewMargin(row)}}%} }} </small>
+            </div>
+          </div>
+        }
+      </div>
+    } @else {<div class="preview-empty">Selecione a coleção, fragrâncias e formatos para visualizar os produtos.</div>}
+  </section>
+</div>

@@ -35,6 +35,7 @@ service cloud.firestore {
         'fragrances',
         'formats',
         'formatPrices',
+        'candleModels',
         'units',
         'paymentMethods',
         'expenseCategories',
@@ -129,11 +130,16 @@ service cloud.firestore {
         || (name == 'expenseTypes'
           && fields(data, ['name', 'active', 'kind'], []) && text(data.name) && data.active is bool
           && data.kind in ['input-purchase', 'operating-expense', 'equipment', 'other'])
+        || (name == 'candleModels'
+          && fields(data, ['name', 'volumeMl', 'priceCents', 'sourceCollectionId', 'active'], [])
+          && text(data.name) && data.name.size() <= 120
+          && data.volumeMl is int && data.volumeMl > 0 && data.volumeMl <= 10000
+          && money(data.priceCents) && text(data.sourceCollectionId) && data.active is bool)
         || (name == 'formatPrices'
           && fields(data, ['collectionId', 'formatId', 'priceCents', 'active'], [])
           && text(data.collectionId) && text(data.formatId) && money(data.priceCents) && data.active is bool)
         || (name == 'products'
-          && fields(data, ['code', 'active', 'collectionId', 'fragranceId', 'formatId', 'displayName', 'salePriceCents', 'additionalCostCents', 'averageUnitCostCents', 'stock', 'minimumStock', 'recipe'], ['image', 'stockStatus', 'committedStock', 'reservedPhysicalStock', 'explicitCommittedStock', 'explicitAllocatedStock', 'unitCostDeciCents', 'categoryId', 'modelName', 'variantName', 'description', 'volumeMl'])
+          && fields(data, ['code', 'active', 'collectionId', 'fragranceId', 'formatId', 'displayName', 'salePriceCents', 'additionalCostCents', 'averageUnitCostCents', 'stock', 'minimumStock', 'recipe'], ['image', 'stockStatus', 'committedStock', 'reservedPhysicalStock', 'explicitCommittedStock', 'explicitAllocatedStock', 'unitCostDeciCents', 'categoryId', 'modelName', 'variantName', 'description', 'volumeMl', 'candleFragranceId'])
           && text(data.code) && text(data.displayName) && data.active is bool
           && (!('categoryId' in data) || data.categoryId in ['soap', 'creative-kit', 'scented-candle'])
           && ((!('categoryId' in data) || data.categoryId == 'soap')
@@ -142,6 +148,7 @@ service cloud.firestore {
                && 'modelName' in data && text(data.modelName)
                && (!('variantName' in data) || data.variantName is string)
                && (data.categoryId != 'scented-candle' || ('volumeMl' in data && data.volumeMl is number && data.volumeMl > 0))))
+          && (!('candleFragranceId' in data) || (data.categoryId == 'scented-candle' && text(data.candleFragranceId)))
           && (!('description' in data) || data.description is string)
           && money(data.salePriceCents) && money(data.additionalCostCents) && money(data.averageUnitCostCents)
           && stock(data.stock) && quantity(data.minimumStock) && data.recipe is list
@@ -504,7 +511,7 @@ service cloud.firestore {
       allow update: if operationalCollection(collectionName) && canOperate()
         && auditUpdate(request.resource.data)
         && (validCatalog(collectionName, request.resource.data) || validOperation(collectionName, request.resource.data));
-      allow delete: if collectionName in ['collections', 'fragrances', 'formats', 'formatPrices', 'units', 'paymentMethods', 'expenseCategories', 'expenseTypes', 'inputs', 'products', 'additions'] && canAdminister();
+      allow delete: if collectionName in ['collections', 'fragrances', 'formats', 'formatPrices', 'candleModels', 'units', 'paymentMethods', 'expenseCategories', 'expenseTypes', 'inputs', 'products', 'additions'] && canAdminister();
     }
 
     match /{document=**} {

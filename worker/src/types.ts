@@ -20,7 +20,9 @@ export interface D1Database {
   };
 }
 export class ApiError extends Error {
-  constructor(public readonly status: number, public readonly code: string) { super(code); }
+  readonly status: number;
+  readonly code: string;
+  constructor(status: number, code: string) { super(code); this.status = status; this.code = code; }
 }
 export interface Principal { uid: string; email: string; googleSub: string; role: 'owner' | 'operator' | 'viewer'; }
 export interface Connection {

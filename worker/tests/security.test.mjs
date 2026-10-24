@@ -39,7 +39,7 @@ describe('Worker cryptographic boundaries',()=>{
       const signed=header+'.'+claims;
       const sig=b64url(new Uint8Array(await webcrypto.subtle.sign('RSASSA-PKCS1-v1_5',pair.privateKey,new TextEncoder().encode(signed))));
       assert.equal((await verifyJwt(signed+'.'+sig,'https://test.bem-feito.invalid/jwks','accounts.google.com','fake-client')).sub,'user');
-      await assert.rejects(verifyJwt(signed+'.'+sig.slice(0,-1)+'A','https://test.bem-feito.invalid/jwks','accounts.google.com','fake-client'));
+      await assert.rejects(verifyJwt(header+'.'+claims.slice(0,-2)+'QQ'+'.'+sig,'https://test.bem-feito.invalid/jwks','accounts.google.com','fake-client'));
       await assert.rejects(verifyJwt(signed+'.'+sig,'https://test.bem-feito.invalid/jwks','accounts.google.com','wrong-client'));
     } finally {globalThis.fetch=before;}
   });

@@ -36,8 +36,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           TAG="bf-${GITHUB_SHA:0:12}"
-          npx --yes wrangler@4.45.0 versions upload --env dev --keep-vars --tag "$TAG" --message "Bem Feito Drive DEV ${GITHUB_SHA}"
-          npx --yes wrangler@4.45.0 versions deploy --env dev --version-tag "$TAG" --yes
+          npx --yes wrangler@4.152.0 versions upload --env dev --keep-vars --tag "$TAG" --message "Bem Feito Drive DEV ${GITHUB_SHA}"
+          npx --yes wrangler@4.152.0 versions deploy --env dev --version-tag "$TAG" --yes
 
       - name: Verify Worker response
         run: |

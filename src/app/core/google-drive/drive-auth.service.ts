@@ -2,446 +2,160 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Auth, onAuthStateChanged } from 'firebase/auth';
 import { environment } from '../../../environments/environment';
 import { FIREBASE_AUTH } from '../firebase/firebase.providers';
-import { ExternalScriptLoaderService } from './external-script-loader.service';
 
-const GOOGLE_IDENTITY_SCRIPT_ID = 'google-identity-services';
-const GOOGLE_IDENTITY_SCRIPT_URL = 'https://accounts.google.com/gsi/client';
-const TOKEN_EXPIRY_SKEW_MS = 5 * 60_000;
-
-interface OAuthTokenResponse {
-  access_token?: string;
-  expires_in?: number;
-  error?: string;
-  error_description?: string;
-}
-
-interface OAuthTokenClient {
-  requestAccessToken(options?: { prompt?: string }): void;
-}
-
-interface GoogleOAuth {
-  initTokenClient(config: {
-    client_id: string;
-    scope: string;
-    login_hint?: string;
-    callback: (response: OAuthTokenResponse) => void;
-    error_callback?: () => void;
-  }): OAuthTokenClient;
-}
-
-interface GoogleIdentityWindow {
-  google?: {
-    accounts?: {
-      oauth2?: GoogleOAuth;
-    };
-  };
-}
-
-interface DriveTokenSession {
-  value: string;
-  expiresAt: number;
-  firebaseUid: string;
-}
-
-interface StoredDriveTokenSession {
-  accessToken: string;
-  expiresAt: number;
-  firebaseUid: string;
-  accountEmail?: string;
-}
-
-interface StoredDriveGrant {
-  firebaseUid: string;
-  accountEmail?: string;
-  grantedAt: number;
-}
-
-class DriveOAuthError extends Error {
-  constructor(readonly code: string, message: string) {
-    super(message);
-  }
-}
+const EXPIRY_MARGIN = 60_000;
+interface CachedToken { value: string; expiresAt: number; uid: string; }
+interface TokenReply { accessToken: string; expiresAt: number; email: string; }
+interface BrokerError { error?: { code?: string }; }
 
 export class DriveAuthorizationRequiredError extends Error {
-  constructor() {
-    super('Confirme o acesso ao Google Drive para continuar.');
-  }
+  constructor() { super('Conecte sua conta Google Drive para carregar as imagens.'); }
+}
+export class DriveRedirectStartedError extends Error {
+  constructor() { super('Redirecionando para autorizar o Google Drive.'); }
 }
 
 @Injectable({ providedIn: 'root' })
 export class DriveAuthService {
-  private readonly scripts = inject(ExternalScriptLoaderService);
   private readonly firebaseAuth = inject<Auth>(FIREBASE_AUTH);
-  private readonly tokenState = signal<DriveTokenSession | null>(null);
-  private readonly grantState = signal<StoredDriveGrant | null>(null);
+  private readonly tokenState = signal<CachedToken | null>(null);
   private readonly accountState = signal<string | null>(null);
-  private readonly firebaseUidState = signal<string | null | undefined>(undefined);
+  private readonly linkedState = signal(false);
+  private readonly uidState = signal<string | null>(null);
   private readonly revisionState = signal(0);
-  private readonly tokenStorageKey = `bem-feito:google-drive:${environment.name}`;
-  private readonly grantStorageKey = `bem-feito:google-drive-grant:${environment.name}`;
-  private pending?: Promise<string>;
-  private scriptReady?: Promise<void>;
-
+  private tokenPending?: Promise<string>;
+  private startPending?: Promise<never>;
+  private readonly legacyTokenKey = `bem-feito:google-drive:${environment.name}`;
+  private readonly legacyGrantKey = `bem-feito:google-drive-grant:${environment.name}`;
   readonly enabled = environment.googleDrive.enabled;
-  readonly linked = computed(() => {
-    const grant = this.grantState();
-    const firebaseUid = this.firebaseUidState();
-    return Boolean(grant && firebaseUid && grant.firebaseUid === firebaseUid);
-  });
+  readonly linked = this.linkedState.asReadonly();
   readonly connected = computed(() => {
     const token = this.tokenState();
-    const firebaseUid = this.firebaseUidState();
-    return Boolean(
-      token &&
-      firebaseUid &&
-      token.firebaseUid === firebaseUid &&
-      token.expiresAt > Date.now() + TOKEN_EXPIRY_SKEW_MS
-    );
+    return Boolean(token && this.uidState() === token.uid && token.expiresAt > Date.now()+EXPIRY_MARGIN);
   });
   readonly accountEmail = this.accountState.asReadonly();
   readonly revision = this.revisionState.asReadonly();
 
   constructor() {
-    this.restoreState();
-    if (this.enabled) void this.prepare().catch(() => undefined);
-
+    this.removeLegacyCredentials();
     onAuthStateChanged(this.firebaseAuth, (user) => {
-      if (!user) {
-        this.firebaseUidState.set(null);
-        this.endSession();
-        return;
-      }
-
-      this.synchronizeFirebaseUser(user.uid);
-
-      const restoredToken = this.tokenState();
-      if (restoredToken?.firebaseUid === user.uid && !this.grantState()) {
-        this.rememberGrant(user.uid, this.accountState() ?? undefined);
+      if (this.uidState() !== (user?.uid ?? null)) {
+        this.uidState.set(user?.uid ?? null);
+        this.reset();
       }
     });
   }
-
-  prepare(): Promise<void> {
-    if (!this.enabled) return Promise.resolve();
-    if (this.scriptReady) return this.scriptReady;
-
-    const load = this.scripts
-      .load(GOOGLE_IDENTITY_SCRIPT_ID, GOOGLE_IDENTITY_SCRIPT_URL)
-      .catch((error) => {
-        this.scriptReady = undefined;
-        throw error;
-      });
-    this.scriptReady = load;
-    return load;
-  }
+  prepare(): Promise<void> { return Promise.resolve(); }
 
   currentToken(): string | null {
-    const firebaseUser = this.firebaseAuth.currentUser;
-    if (!firebaseUser) return null;
-
-    this.synchronizeFirebaseUser(firebaseUser.uid);
-
-    const token = this.tokenState();
-    if (!token) return null;
-
-    if (token.firebaseUid !== firebaseUser.uid) {
-      this.clearAccessToken();
-      return null;
-    }
-
-    if (token.expiresAt <= Date.now() + TOKEN_EXPIRY_SKEW_MS) {
+    const uid = this.firebaseAuth.currentUser?.uid;
+    const cached = this.tokenState();
+    if (!uid || !cached || cached.uid !== uid) return null;
+    if (cached.expiresAt <= Date.now()+EXPIRY_MARGIN) {
       this.expireAccessToken();
       return null;
     }
-
-    return token.value;
+    return cached.value;
   }
 
-  requireToken(): string {
-    const token = this.currentToken();
-    if (!token) throw new DriveAuthorizationRequiredError();
-    return token;
-  }
-
-  connect(): Promise<string> {
-    if (!this.enabled) return Promise.reject(new Error('A integração com Google Drive ainda não foi configurada.'));
-
-    const firebaseUser = this.firebaseAuth.currentUser;
-    if (!firebaseUser) return Promise.reject(new Error('Entre no Bem Feito antes de conectar o Google Drive.'));
-
-    this.synchronizeFirebaseUser(firebaseUser.uid);
-
-    const current = this.currentToken();
-    if (current) return Promise.resolve(current);
-    if (this.pending) return this.pending;
-
-    const initialPrompt = this.linked() ? '' : 'consent';
-    const request = this.requestToken(initialPrompt).catch((error) => {
-      if (
-        initialPrompt === '' &&
-        error instanceof DriveOAuthError &&
-        ['consent_required', 'interaction_required'].includes(error.code)
-      ) {
-        return this.requestToken('consent');
-      }
-      throw error;
-    });
-
-    this.pending = request.finally(() => {
-      this.pending = undefined;
-    });
-    return this.pending;
-  }
-
-  setAccountEmail(email: string): void {
-    const normalized = email.trim();
-    this.accountState.set(normalized || null);
-
-    const grant = this.grantState();
-    if (grant) {
-      this.grantState.set({ ...grant, accountEmail: normalized || undefined });
-      this.persistGrant();
+  async accessToken(force = false): Promise<string> {
+    if (!this.enabled) throw new Error('Google Drive desativado neste ambiente.');
+    const user = this.firebaseAuth.currentUser;
+    if (!user) throw new Error('Entre no Bem Feito para acessar o Google Drive.');
+    if (!force) {
+      const current = this.currentToken();
+      if (current) return current;
     }
-    this.persistTokenSession();
+    if (this.tokenPending) return this.tokenPending;
+    const uid = user.uid;
+    this.tokenPending = (async () => {
+      const result = await this.call<TokenReply>('/drive/token', 'POST');
+      if (this.firebaseAuth.currentUser?.uid !== uid) throw new Error('Sua sessão foi alterada.');
+      if (!result.accessToken || !Number.isFinite(result.expiresAt) || result.expiresAt <= Date.now()+EXPIRY_MARGIN) {
+        throw new Error('A credencial recebida do Drive é inválida.');
+      }
+      this.tokenState.set({uid,value:result.accessToken,expiresAt:result.expiresAt});
+      this.accountState.set(result.email);
+      this.linkedState.set(true);
+      return result.accessToken;
+    })().finally(() => { this.tokenPending = undefined; });
+    return this.tokenPending;
   }
 
-  expireAccessToken(): void {
-    this.clearAccessToken();
+  async connect(): Promise<string> {
+    try {
+      return await this.accessToken();
+    } catch (error) {
+      if (!(error instanceof DriveAuthorizationRequiredError)) throw error;
+      if (!this.startPending) this.startPending = this.startOAuth().finally(() => { this.startPending = undefined; });
+      return this.startPending;
+    }
   }
 
-  private endSession(): void {
-    const hadSessionData = Boolean(this.tokenState() || this.grantState() || this.accountState());
-    this.clearAccessToken();
-    if (hadSessionData) this.revisionState.update((value) => value + 1);
+  async revoke(): Promise<void> {
+    await this.call('/drive/disconnect','POST');
+    this.reset();
   }
 
-  disconnect(): void {
-    const hadIdentity = Boolean(this.tokenState() || this.grantState() || this.accountState());
-    this.clearAccessToken();
-    this.clearGrant(false);
-    if (hadIdentity) this.revisionState.update((value) => value + 1);
+  // Local-only reset: never revoke a server-side grant merely because the browser logged out.
+  disconnect(): void { this.reset(); }
+  setAccountEmail(email: string): void { this.accountState.set(email.trim() || null); }
+  expireAccessToken(): void { this.tokenState.set(null); }
+
+  private async startOAuth(): Promise<never> {
+    const reply = await this.call<{launchUrl:string}>('/oauth/drive/start','POST');
+    const url = new URL(reply.launchUrl);
+    if (url.origin !== environment.googleDrive.workerUrl || url.pathname !== '/oauth/drive/launch') {
+      throw new Error('A URL de autorização recebida não é confiável.');
+    }
+    window.location.assign(url.toString());
+    throw new DriveRedirectStartedError();
   }
 
-  private requestToken(prompt: string): Promise<string> {
-    const oauth = this.oauth();
-    if (oauth) return this.startTokenRequest(oauth, prompt);
-
-    return this.prepare().then(() => {
-      const loadedOAuth = this.oauth();
-      if (!loadedOAuth) throw new Error('Google Identity Services indisponível.');
-      return this.startTokenRequest(loadedOAuth, prompt);
-    });
-  }
-
-  private startTokenRequest(oauth: GoogleOAuth, prompt: string): Promise<string> {
-    const firebaseUser = this.firebaseAuth.currentUser;
-    if (!firebaseUser) return Promise.reject(new Error('Entre no Bem Feito antes de conectar o Google Drive.'));
-
-    this.synchronizeFirebaseUser(firebaseUser.uid);
-
-    return new Promise<string>((resolve, reject) => {
-      const client = oauth.initTokenClient({
-        client_id: environment.googleDrive.clientId,
-        scope: 'https://www.googleapis.com/auth/drive.file',
-        login_hint: firebaseUser.email ?? undefined,
-        callback: (response) => {
-          if (!response.access_token) {
-            reject(new DriveOAuthError(
-              response.error ?? 'oauth_failed',
-              response.error_description || 'Autorização do Google Drive não concluída.',
-            ));
-            return;
-          }
-
-          const expiresIn = Math.max(60, Number(response.expires_in ?? 3600));
-          this.tokenState.set({
-            value: response.access_token,
-            expiresAt: Date.now() + expiresIn * 1000,
-            firebaseUid: firebaseUser.uid,
-          });
-          this.rememberGrant(firebaseUser.uid, this.accountState() ?? undefined);
-          this.persistTokenSession();
-          resolve(response.access_token);
-        },
-        error_callback: () => reject(
-          new DriveOAuthError('popup_failed', 'A autorização do Google Drive foi cancelada ou bloqueada.'),
-        ),
+  private async call<T>(path: string, method: 'GET'|'POST'): Promise<T> {
+    const user = this.firebaseAuth.currentUser;
+    if (!user) throw new Error('A sessão do Bem Feito expirou.');
+    let response: Response | undefined;
+    for (let attempt=0;attempt<2;attempt++) {
+      const token = await user.getIdToken(attempt === 1);
+      response = await fetch(environment.googleDrive.workerUrl+path,{
+        method, headers:{Authorization:'Bearer '+token},cache:'no-store'
       });
-      client.requestAccessToken({ prompt });
-    });
-  }
-
-  private oauth(): GoogleOAuth | undefined {
-    return (window as unknown as GoogleIdentityWindow).google?.accounts?.oauth2;
-  }
-
-  private synchronizeFirebaseUser(firebaseUid: string): void {
-    if (this.firebaseUidState() === firebaseUid) return;
-
-    this.firebaseUidState.set(firebaseUid);
-
-    const token = this.tokenState();
-    if (token && token.firebaseUid !== firebaseUid) this.clearAccessToken();
-
-    const grant = this.grantState();
-    if (grant && grant.firebaseUid !== firebaseUid) this.clearGrant();
-  }
-
-  private rememberGrant(firebaseUid: string, accountEmail?: string): void {
-    const current = this.grantState();
-    const identityChanged = !current || current.firebaseUid !== firebaseUid;
-    const grant: StoredDriveGrant = {
-      firebaseUid,
-      accountEmail: accountEmail ?? current?.accountEmail,
-      grantedAt: current?.firebaseUid === firebaseUid ? current.grantedAt : Date.now(),
-    };
-
-    this.grantState.set(grant);
-    if (grant.accountEmail) this.accountState.set(grant.accountEmail);
-    this.persistGrant();
-
-    if (identityChanged) this.revisionState.update((value) => value + 1);
-  }
-
-  private restoreState(): void {
-    this.restoreGrant();
-    this.restoreTokenSession();
-
-    const token = this.tokenState();
-    if (token && !this.grantState()) {
-      this.rememberGrant(token.firebaseUid, this.accountState() ?? undefined);
+      if (response.status !== 401) break;
     }
-  }
-
-  private restoreGrant(): void {
-    try {
-      const raw = localStorage.getItem(this.grantStorageKey);
-      if (!raw) return;
-      const stored = JSON.parse(raw) as Partial<StoredDriveGrant>;
-      if (typeof stored.firebaseUid !== 'string') {
-        localStorage.removeItem(this.grantStorageKey);
-        return;
+    if (!response?.ok) {
+      const details = await response?.json().catch(()=>null) as BrokerError | null;
+      const code = details?.error?.code ?? 'service_unavailable';
+      if (code === 'reconnect_required' || code === 'google_identity_mismatch') {
+        this.reset();
+        throw new DriveAuthorizationRequiredError();
       }
-
-      const grant: StoredDriveGrant = {
-        firebaseUid: stored.firebaseUid,
-        accountEmail: typeof stored.accountEmail === 'string' ? stored.accountEmail : undefined,
-        grantedAt: typeof stored.grantedAt === 'number' ? stored.grantedAt : Date.now(),
+      const messages: Record<string,string> = {
+        oauth_not_enabled:'O Google Drive ainda está sendo configurado.',
+        user_not_authorized:'Esta conta não tem permissão para usar o Google Drive no Bem Feito.',
+        google_identity_required:'Entre no Bem Feito com a conta Google autorizada.',
+        user_identity_mismatch:'O e-mail do seu perfil não corresponde à sua conta Google.',
+        refresh_busy:'O Drive está processando uma renovação. Tente novamente.',
+        google_temporarily_unavailable:'O Google está temporariamente indisponível.',
+        refresh_retry_later:'O acesso ao Google Drive está sendo restabelecido.',
+        connection_changed:'A conexão do Drive foi atualizada. Tente novamente.'
       };
-      this.grantState.set(grant);
-      if (grant.accountEmail) this.accountState.set(grant.accountEmail);
-    } catch {
-      try {
-        localStorage.removeItem(this.grantStorageKey);
-      } catch {
-        return;
-      }
+      throw new Error(messages[code] ?? 'Não foi possível comunicar com o serviço do Google Drive.');
     }
+    return response.json() as Promise<T>;
   }
 
-  private restoreTokenSession(): void {
-    try {
-      const persistentRaw = localStorage.getItem(this.tokenStorageKey);
-      const legacyRaw = sessionStorage.getItem(this.tokenStorageKey);
-      const raw = persistentRaw ?? legacyRaw;
-      if (!raw) return;
-      const stored = JSON.parse(raw) as Partial<StoredDriveTokenSession>;
-
-      if (
-        typeof stored.accessToken !== 'string' ||
-        typeof stored.expiresAt !== 'number' ||
-        typeof stored.firebaseUid !== 'string'
-      ) {
-        this.removeStoredToken();
-        return;
-      }
-
-      if (stored.expiresAt <= Date.now() + TOKEN_EXPIRY_SKEW_MS) {
-        this.removeStoredToken();
-        if (!this.grantState()) {
-          this.rememberGrant(
-            stored.firebaseUid,
-            typeof stored.accountEmail === 'string' ? stored.accountEmail : undefined,
-          );
-        } else if (typeof stored.accountEmail === 'string' && !this.accountState()) {
-          this.accountState.set(stored.accountEmail);
-        }
-        return;
-      }
-
-      this.tokenState.set({
-        value: stored.accessToken,
-        expiresAt: stored.expiresAt,
-        firebaseUid: stored.firebaseUid,
-      });
-      if (typeof stored.accountEmail === 'string') this.accountState.set(stored.accountEmail);
-
-      if (!persistentRaw && legacyRaw) this.persistTokenSession();
-      try {
-        sessionStorage.removeItem(this.tokenStorageKey);
-      } catch {
-        // Legacy session cleanup is best-effort only.
-      }
-    } catch {
-      this.removeStoredToken();
-    }
-  }
-
-  private persistTokenSession(): void {
-    const token = this.tokenState();
-    if (!token) return;
-
-    try {
-      const stored: StoredDriveTokenSession = {
-        accessToken: token.value,
-        expiresAt: token.expiresAt,
-        firebaseUid: token.firebaseUid,
-        accountEmail: this.accountState() ?? undefined,
-      };
-      localStorage.setItem(this.tokenStorageKey, JSON.stringify(stored));
-    } catch {
-      return;
-    }
-  }
-
-  private persistGrant(): void {
-    const grant = this.grantState();
-    if (!grant) return;
-
-    try {
-      localStorage.setItem(this.grantStorageKey, JSON.stringify(grant));
-    } catch {
-      return;
-    }
-  }
-
-  private clearAccessToken(): void {
+  private reset(): void {
+    const had = this.tokenState() || this.linkedState() || this.accountState();
     this.tokenState.set(null);
-    this.removeStoredToken();
-  }
-
-  private clearGrant(incrementRevision = true): void {
-    const hadGrant = Boolean(this.grantState() || this.accountState());
-    this.grantState.set(null);
+    this.linkedState.set(false);
     this.accountState.set(null);
-    try {
-      localStorage.removeItem(this.grantStorageKey);
-    } catch {
-      // Storage is optional; in-memory state is already cleared.
-    }
-    if (hadGrant && incrementRevision) this.revisionState.update((value) => value + 1);
+    if (had) this.revisionState.update(value=>value+1);
   }
 
-  private removeStoredToken(): void {
-    try {
-      localStorage.removeItem(this.tokenStorageKey);
-    } catch {
-      // Continue and also clear the legacy per-tab copy when possible.
-    }
-    try {
-      sessionStorage.removeItem(this.tokenStorageKey);
-    } catch {
-      return;
-    }
+  private removeLegacyCredentials(): void {
+    try { localStorage.removeItem(this.legacyTokenKey); } catch { /* ignore browser restrictions */ }
+    try { sessionStorage.removeItem(this.legacyTokenKey); } catch { /* ignore browser restrictions */ }
+    try { localStorage.removeItem(this.legacyGrantKey); } catch { /* ignore browser restrictions */ }
   }
 }

@@ -158,7 +158,11 @@ export class DriveAuthService {
         revocation_pending:'A desconexão anterior está pendente. Conclua a desconexão nas configurações do Google Drive.',
         connection_changed:'A conexão do Drive foi atualizada. Tente novamente.'
       };
-      throw new Error(messages[code] ?? 'Não foi possível comunicar com o serviço do Google Drive.');
+      const safeCode = /^[a-z][a-z0-9_]{1,63}$/.test(code) ? code : 'unexpected_error';
+      const fallback = environment.production
+        ? 'Não foi possível comunicar com o serviço do Google Drive.'
+        : `Não foi possível comunicar com o serviço do Google Drive (HTTP ${response?.status ?? 0}; ${safeCode}).`;
+      throw new Error(messages[code] ?? fallback);
     }
     return response.json() as Promise<T>;
   }

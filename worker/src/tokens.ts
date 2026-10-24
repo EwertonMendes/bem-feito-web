@@ -25,14 +25,15 @@ function validateOwner(connection: Connection, user: Principal): void {
     throw new ApiError(409, 'google_identity_mismatch');
   }
 }
-async function cached(env: Env, c: Connection): Promise<{accessToken: string;expiresAt:number;email:string}|null> {
+async function cached(env: Env, c: Connection): Promise<{accessToken: string;expiresAt:number;email:string;version:string}|null> {
   if (!c.encrypted_access_token || !c.access_token_version || c.access_token_expires_at < Date.now() + EXPIRY_SKEW_MS) return null;
   return {
+    version: c.access_token_version,
     accessToken: await decrypt(env,c.encrypted_access_token,context(env,c.owner_uid,c.google_subject,'access:'+c.revision+':'+c.access_token_version)),
     expiresAt:c.access_token_expires_at,email:c.google_email
   };
 }
-async function grant(env: Env, user: Principal): Promise<{accessToken:string;expiresAt:number;email:string}> {
+async function grant(env: Env, user: Principal): Promise<{accessToken:string;expiresAt:number;email:string;version:string}> {
   const started = Date.now();
   let attempt = 0;
   while (Date.now() - started < MAX_WAIT_MS) {
@@ -71,7 +72,7 @@ async function grant(env: Env, user: Principal): Promise<{accessToken:string;exp
           user.uid,c.revision,lease,Date.now()).run();
         if (update.meta.changes !== 1) throw new ApiError(409,'connection_changed');
         published = true;
-        return {accessToken:tokens.access_token,expiresAt,email:c.google_email};
+        return {accessToken:tokens.access_token,expiresAt,email:c.google_email,version};
       } catch (error) {
         if (error instanceof ApiError && error.code === 'reconnect_required') {
           await env.DB.prepare(
@@ -96,6 +97,21 @@ async function grant(env: Env, user: Principal): Promise<{accessToken:string;exp
 export async function token(env: Env, user: Principal): Promise<Response> {
   const result = await grant(env,user);
   return Response.json(result);
+}
+export async function rejectToken(env: Env, user: Principal, request: Request): Promise<Response> {
+  let payload: {version?: unknown};
+  try { payload = await request.json() as {version?:unknown}; }
+  catch { throw new ApiError(400,'invalid_request'); }
+  if (typeof payload.version !== 'string' || !/^[a-zA-Z0-9_-]{43}$/.test(payload.version)) {
+    throw new ApiError(400,'invalid_request');
+  }
+  const current = await row(env,user.uid);
+  validateOwner(current,user);
+  await env.DB.prepare(
+    `UPDATE drive_connections SET encrypted_access_token=NULL,access_token_expires_at=0,
+       access_token_version=NULL WHERE owner_uid=? AND status='connected' AND access_token_version=?`
+  ).bind(user.uid,payload.version).run();
+  return Response.json({status:'invalidated'});
 }
 export async function disconnect(env: Env, user: Principal): Promise<Response> {
   const c = await row(env,user.uid);

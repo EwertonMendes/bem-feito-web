@@ -2,6 +2,8 @@ name: Deploy Drive Worker DEV
 
 on:
   workflow_dispatch:
+  push:
+    branches: [feat/drive-offline-oauth-worker-dev]
 
 permissions:
   contents: read
@@ -12,7 +14,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.repository == 'EwertonMendes/bem-feito-web' && github.actor == github.repository_owner
+    if: github.repository == 'EwertonMendes/bem-feito-web' && github.actor == github.repository_owner && (github.ref == 'refs/heads/feat/drive-offline-oauth-worker-dev' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
     environment:
       name: dev

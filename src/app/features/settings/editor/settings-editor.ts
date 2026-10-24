@@ -2,7 +2,7 @@ import { BfLoadingButton } from '../../../shared/ui/button/loading-button';
 import { CatalogImage } from '../../../shared/media/catalog-image/catalog-image';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild, output } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
-import { CollectionDefinition, ExpenseCategory, ExpenseType, FormatDefinition, FormatPrice, FragranceDefinition, PaymentMethod, RecipeComponent, UnitDefinition } from '../../../domain/models/catalog.model';
+import { CandleModel, CollectionDefinition, ExpenseCategory, ExpenseType, FormatDefinition, FormatPrice, FragranceDefinition, PaymentMethod, RecipeComponent, UnitDefinition } from '../../../domain/models/catalog.model';
 import { CatalogReferenceStore } from '../../../features/catalog/catalog-reference.store';
 import { CatalogStore } from '../../../features/catalog/catalog.store';
 import { SettingsStore } from '../../../features/settings/settings.store';
@@ -17,12 +17,13 @@ import { BfCheckbox } from '../../../shared/ui/checkbox/checkbox';
 import { BfNumberInput } from '../../../shared/ui/number-input/number-input';
 import { CatalogImageRef } from '../../../domain/models/image.model';
 
-export type SettingTab = 'collections' | 'fragrances' | 'formats' | 'prices' | 'units' | 'payments' | 'expenseCategories' | 'expenseTypes';
+export type SettingTab = 'candleModels' | 'collections' | 'fragrances' | 'formats' | 'prices' | 'units' | 'payments' | 'expenseCategories' | 'expenseTypes';
 export type ReferenceSaved = { kind: SettingTab; id: string };
 type SimpleSetting = UnitDefinition | PaymentMethod | ExpenseCategory;
 interface SimpleModel { name: string; active: boolean; }
 interface FragranceModel extends SimpleModel { collectionId: string; }
 interface FormatModel extends SimpleModel { approximateWeightGrams: number; }
+interface CandleModelForm { name: string; volumeMl: number; price: number; sourceCollectionId: string; active: boolean; }
 interface PriceModel { collectionId: string; formatId: string; price: number; active: boolean; }
 interface ExpenseTypeModel extends SimpleModel { kind: ExpenseType['kind']; }
 
@@ -56,6 +57,8 @@ export class BfSettingsEditor {
   readonly fragranceForm = form(this.fragranceModel, (p) => { required(p.name); required(p.collectionId); });
   readonly formatModel = signal<FormatModel>({ name: '', approximateWeightGrams: 0, active: true });
   readonly formatForm = form(this.formatModel, (p) => { required(p.name); min(p.approximateWeightGrams, 0); });
+  readonly candleModel = signal<CandleModelForm>({name:'',volumeMl:40,price:0,sourceCollectionId:'',active:true});
+  readonly candleForm = form(this.candleModel,(p)=>{required(p.name);required(p.sourceCollectionId);min(p.volumeMl,1);min(p.price,0);});
   readonly priceModel = signal<PriceModel>({ collectionId: '', formatId: '', price: 0, active: true });
   readonly priceForm = form(this.priceModel, (p) => { required(p.collectionId); required(p.formatId); min(p.price, 0); });
   readonly expenseTypeModel = signal<ExpenseTypeModel>({ name: '', kind: 'operating-expense', active: true });
@@ -101,7 +104,19 @@ export class BfSettingsEditor {
     this.fragranceModel.set({ name: '', collectionId, active: true });
     this.formatModel.set({ name: '', approximateWeightGrams: 0, active: true });
     this.priceModel.set({ collectionId: '', formatId: '', price: 0, active: true });
+    this.candleModel.set({name:'',volumeMl:40,price:0,sourceCollectionId:this.references.candleModels()[0]?.sourceCollectionId??'',active:true});
     this.expenseTypeModel.set({ name: '', kind: 'operating-expense', active: true });
+    this.dialog().open();
+  }
+
+  editCandleModel(item: CandleModel): void {
+    this.tab.set('candleModels');
+    this.editingId.set(item.id);
+    this.candleModel.set({
+      name:item.name,volumeMl:item.volumeMl,price:fromCents(item.priceCents),
+      sourceCollectionId:item.sourceCollectionId,active:item.active,
+    });
+    this.costComponents.set([]);
     this.dialog().open();
   }
 
@@ -225,7 +240,15 @@ export class BfSettingsEditor {
       const id = this.editingId();
       let savedId = id;
       const costComponents = this.costComponents().filter((item) => item.inputId && item.quantity > 0 && item.unitId);
-      if (this.tab() === 'collections') {
+      if (this.tab() === 'candleModels') {
+        const model=this.candleModel();
+        if(this.candleForm().invalid() || !Number.isSafeInteger(model.volumeMl) || model.volumeMl <= 0 ||
+          !Number.isFinite(model.price) || model.price < 0) throw new Error('Revise nome, volume, coleção e preço.');
+        savedId=await this.references.saveCandleModel({
+          id,name:model.name.trim(),volumeMl:model.volumeMl,priceCents:toCents(model.price),
+          sourceCollectionId:model.sourceCollectionId,active:model.active,
+        });
+      } else if (this.tab() === 'collections') {
         savedId = await this.references.saveCollection({ id, ...this.simpleModel(), costComponents } as CollectionDefinition);
       } else if (this.tab() === 'fragrances') {
         savedId = await this.references.saveFragrance({ id, ...this.fragranceModel(), costComponents } as FragranceDefinition);

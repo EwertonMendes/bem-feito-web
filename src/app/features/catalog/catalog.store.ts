@@ -118,11 +118,11 @@ export class CatalogStore {
     }, true).catch(() => undefined);
   }
 
-  async saveProduct(product: Product): Promise<string> {
+  async saveProduct(product: Product, unlinkCandleFragrance = false): Promise<string> {
     const base = { ...product, stockStatus: stockStatusForProduct(product) };
     if (base.id) {
       const normalized = this.normalizeProduct(base);
-      await this.productRepository.replace(normalized);
+      await this.productRepository.replace(normalized, unlinkCandleFragrance ? ['candleFragranceId'] : []);
       this.upsertProduct(normalized);
       return normalized.id;
     }

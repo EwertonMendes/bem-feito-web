@@ -21,6 +21,7 @@ import { BfImageUpload } from '../../../../shared/ui/image-upload/image-upload';
 import { CatalogImage } from '../../../../shared/media/catalog-image/catalog-image';
 import { BfNumberInput } from '../../../../shared/ui/number-input/number-input';
 import { SoapCreationForm } from '../soap-creation-form/soap-creation-form';
+import { CandleCreationForm } from '../candle-creation-form/candle-creation-form';
 
 interface ProductFormModel { categoryId: 'soap' | 'creative-kit' | 'scented-candle'; modelName: string; variantName: string; description: string; volumeMl: number; collectionId: string; fragranceId: string; formatId: string; salePrice: number; additionalCost: number; minimumStock: number; active: boolean; }
 interface InputFormModel { name: string; unitId: string; trackingMode: InputTrackingMode; availabilityStatus: string; minimumStock: number; active: boolean; }
@@ -28,7 +29,7 @@ interface AdditionFormModel { name: string; category: string; price: number; not
 
 @Component({
   selector: 'bf-catalog-editor',
-  imports: [BfLoadingButton, FormField, BfDialog, BfIcon, BfSelect, BfSelectSearch, CatalogImage, BfCheckbox, BfImageUpload, CatalogImage, BfNumberInput, BfSettingsEditor, SoapCreationForm],
+  imports: [BfLoadingButton, FormField, BfDialog, BfIcon, BfSelect, BfSelectSearch, CatalogImage, BfCheckbox, BfImageUpload, CatalogImage, BfNumberInput, BfSettingsEditor, SoapCreationForm, CandleCreationForm],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './catalog-editor.html',
   styleUrl: './catalog-editor.scss',
@@ -43,6 +44,8 @@ export class CatalogEditor {
   private readonly dialog = viewChild.required<BfDialog>('dialog');
   private readonly referenceEditor = viewChild.required<BfSettingsEditor>('referenceEditor');
   readonly soapCreator = viewChild<SoapCreationForm>('soapCreator');
+  readonly candleCreator = viewChild<CandleCreationForm>('candleCreator');
+  readonly isCreatingCandle = computed(() => this.kind() === 'products' && !this.editingId() && this.productModel().categoryId === 'scented-candle');
   readonly isCreatingSoap = computed(() => this.kind() === 'products' && !this.editingId() && this.productModel().categoryId === 'soap');
 
   readonly currency = formatCurrency;
@@ -70,8 +73,16 @@ export class CatalogEditor {
     );
   }
 
+  openCandleFragrance(collectionId:string):void {
+    this.referenceEditor().openNew('fragrances',collectionId);
+  }
+
   onReferenceSaved(event: ReferenceSaved): void {
     if (!event.id) return;
+    if (this.isCreatingCandle() && event.kind === 'fragrances') {
+      this.candleCreator()?.onFragranceSaved(event.id);
+      return;
+    }
     if (this.isCreatingSoap() && (event.kind === 'collections' || event.kind === 'fragrances' || event.kind === 'formats')) {
       this.soapCreator()?.onReferenceSaved(event.kind, event.id);
       return;
@@ -299,6 +310,17 @@ export class CatalogEditor {
         }
         const count = result.createdCount;
         this.toast.success(count + (count === 1 ? ' produto criado com sucesso.' : ' produtos criados com sucesso.'));
+      } else if (this.isCreatingCandle()) {
+        const result = await this.candleCreator()!.save();
+        if (result.singleProductId && this.candleCreator()!.fragranceIds().length === 1 && this.imageFile()) {
+          try {
+            const id=result.singleProductId;
+            await this.applyImageChange('products',id,undefined,image=>this.store.setProductImage(id,image));
+          } catch {
+            this.toast.error('Vela cadastrada, mas a imagem não foi salva. Adicione-a pela edição.');
+          }
+        }
+        this.toast.success(result.createdCount + (result.createdCount===1?' vela cadastrada.':' velas cadastradas.'));
       } else if (this.kind() === 'products') {
         await this.saveProduct();
         this.toast.success('Cadastro salvo com sucesso.');
@@ -332,14 +354,18 @@ export class CatalogEditor {
     if (this.store.products().some(item => item.id !== existing?.id && productIdentity(item) === identity)) throw new Error('Já existe um produto com estas características.');
     const product: Product = {
       id: existing?.id ?? '', code: existing?.code ?? '', active: model.active, categoryId: model.categoryId,
-      ...(soap ? {} : { modelName: model.modelName.trim(), ...(model.categoryId === 'scented-candle' ? { variantName: model.variantName.trim(), volumeMl: model.volumeMl } : {}), ...(model.description.trim() ? { description: model.description.trim() } : {}) }),
+      ...(soap ? {} : { modelName: model.modelName.trim(), ...(model.categoryId === 'scented-candle' ? { variantName: model.variantName.trim(), volumeMl: model.volumeMl } : {}), ...(model.description.trim() ? { description: model.description.trim() } : {}), ...(model.categoryId === 'scented-candle' && existing?.candleFragranceId && existing.variantName === model.variantName ? { candleFragranceId: existing.candleFragranceId } : {}) }),
       collectionId: soap ? model.collectionId : '', fragranceId: soap ? model.fragranceId : '', formatId: soap ? model.formatId : '',
       displayName: soap ? `${collection!.name} · ${fragrance!.name} · ${format!.name}` : [model.modelName.trim(), model.categoryId === 'scented-candle' ? model.variantName.trim() : ''].filter(Boolean).join(' · '),
       salePriceCents: toCents(model.salePrice), additionalCostCents: toCents(model.additionalCost), averageUnitCostCents: existing?.averageUnitCostCents ?? 0,
       stock: existing?.stock ?? 0, minimumStock: model.minimumStock, image: existing?.image,
       recipe: this.recipe().filter((item) => item.inputId && item.quantity > 0 && item.unitId),
     };
-    const id = await this.store.saveProduct(product);
+    // When a linked candle aroma is edited manually, clear the obsolete reference
+    // atomically with the product update, never leaving a stale fragrance link.
+    const unlinkCandleFragrance = model.categoryId === 'scented-candle' &&
+      !!existing?.candleFragranceId && existing.variantName !== model.variantName.trim();
+    const id = await this.store.saveProduct(product, unlinkCandleFragrance);
     // Se a imagem falhar após salvar o cadastro, a próxima tentativa atualiza o mesmo documento.
     this.editingId.set(id);
     await this.applyImageChange('products', id, existing?.image, (image) => this.store.setProductImage(id, image));

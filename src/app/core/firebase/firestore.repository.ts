@@ -64,7 +64,7 @@ export abstract class FirestoreRepository<T extends { id: string }> {
     return target.id;
   }
 
-  async replace(value: T): Promise<void> {
+  async replace(value: T, removeFields: readonly (keyof T)[] = []): Promise<void> {
     const { id, ...data } = value;
     const { createdAt: _createdAt, createdBy: _createdBy, ...editable } = data as typeof data & {
       createdAt?: unknown;
@@ -73,6 +73,7 @@ export abstract class FirestoreRepository<T extends { id: string }> {
     const batch = writeBatch(this.firestore);
     batch.set(this.documentRef(id), {
       ...editable,
+      ...Object.fromEntries(removeFields.map(field => [field, deleteField()])),
       updatedAt: serverTimestamp(),
       updatedBy: this.actor(),
     }, { merge: true });

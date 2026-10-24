@@ -20,6 +20,8 @@ export interface Product extends AuditFields {
   variantName?: string;
   description?: string;
   volumeMl?: number;
+  /** Reference to Mais Aroma fragrance for candle variants; historical names remain in variantName. */
+  candleFragranceId?: string;
   collectionId: string;
   fragranceId: string;
   formatId: string;
@@ -105,6 +107,16 @@ export interface FormatDefinition extends AuditFields {
   active: boolean;
   approximateWeightGrams?: number;
   costComponents?: RecipeComponent[];
+}
+
+/** Commercial candle configuration, independent of soap recipes/pricing. */
+export interface CandleModel extends AuditFields {
+  id: string;
+  name: string;
+  volumeMl: number;
+  priceCents: number;
+  sourceCollectionId: string;
+  active: boolean;
 }
 
 export interface FormatPrice extends AuditFields {

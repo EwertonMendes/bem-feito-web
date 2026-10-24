@@ -1,10 +1,11 @@
-import { effect, inject, Injectable, signal } from '@angular/core';
-import { CollectionDefinition, FormatDefinition, FormatPrice, FragranceDefinition, UnitDefinition } from '../../domain/models/catalog.model';
-import { CollectionRepository, FormatPriceRepository, FormatRepository, FragranceRepository, UnitRepository } from '../../core/repositories/catalog.repository';
+import { computed, effect, inject, Injectable, signal } from '@angular/core';
+import { CandleModel, CollectionDefinition, FormatDefinition, FormatPrice, FragranceDefinition, UnitDefinition } from '../../domain/models/catalog.model';
+import { CandleModelRepository, CollectionRepository, FormatPriceRepository, FormatRepository, FragranceRepository, UnitRepository } from '../../core/repositories/catalog.repository';
 import { DataRevisionService } from '../../core/firebase/data-revision.service';
 import { ErrorService } from '../../core/services/error.service';
 import { ToastService } from '../../core/services/toast.service';
 import { AsyncLoadGate } from '../../core/state/async-load-gate';
+import { DEFAULT_CANDLE_MODEL, normalizedCatalogName } from '../../domain/logic/candle-model';
 
 @Injectable({ providedIn: 'root' })
 export class CatalogReferenceStore {
@@ -13,6 +14,7 @@ export class CatalogReferenceStore {
   private readonly formatRepository = inject(FormatRepository);
   private readonly formatPriceRepository = inject(FormatPriceRepository);
   private readonly unitRepository = inject(UnitRepository);
+  private readonly candleModelRepository = inject(CandleModelRepository);
   private readonly revisions = inject(DataRevisionService);
   private readonly errors = inject(ErrorService);
   private readonly toast = inject(ToastService);
@@ -26,6 +28,7 @@ export class CatalogReferenceStore {
   private readonly formatsState = signal<FormatDefinition[]>([]);
   private readonly formatPricesState = signal<FormatPrice[]>([]);
   private readonly unitsState = signal<UnitDefinition[]>([]);
+  private readonly candleModelsState = signal<CandleModel[]>([]);
   private readonly loadingState = signal(false);
   private readonly initializedState = signal(false);
 
@@ -34,6 +37,16 @@ export class CatalogReferenceStore {
   readonly formats = this.formatsState.asReadonly();
   readonly formatPrices = this.formatPricesState.asReadonly();
   readonly units = this.unitsState.asReadonly();
+  /** The default preset is available even before it is customized in Settings. */
+  readonly candleModels = computed(() => {
+    const stored = this.candleModelsState();
+    return stored.some(item => item.id === DEFAULT_CANDLE_MODEL.id)
+      ? stored : [this.defaultCandleModel(), ...stored];
+  });
+  private defaultCandleModel(): CandleModel {
+    const sourceCollectionId = this.collectionsState().find(c => normalizedCatalogName(c.name) === 'mais aroma')?.id ?? '';
+    return { ...DEFAULT_CANDLE_MODEL, sourceCollectionId };
+  }
   readonly loading = this.loadingState.asReadonly();
   readonly initialized = this.initializedState.asReadonly();
 
@@ -57,18 +70,20 @@ export class CatalogReferenceStore {
     return this.gate.run(async () => {
       this.loadingState.set(true);
       try {
-        const [collections, fragrances, formats, formatPrices, units] = await Promise.all([
+        const [collections, fragrances, formats, formatPrices, units, candleModels] = await Promise.all([
           this.collectionRepository.list(),
           this.fragranceRepository.list(),
           this.formatRepository.list(),
           this.formatPriceRepository.list(),
           this.unitRepository.list(),
+          this.candleModelRepository.list(),
         ]);
         this.collectionsState.set(collections);
         this.fragrancesState.set(fragrances);
         this.formatsState.set(formats);
         this.formatPricesState.set(formatPrices);
         this.unitsState.set(units);
+        this.candleModelsState.set(candleModels);
       } catch (error) {
         this.toast.error(this.errors.message(error));
         throw error;
@@ -77,6 +92,29 @@ export class CatalogReferenceStore {
         this.loadingState.set(false);
       }
     }, force).catch(() => undefined);
+  }
+
+  async saveCandleModel(item: CandleModel): Promise<string> {
+    if (!item.name.trim() || !Number.isSafeInteger(item.volumeMl) || item.volumeMl <= 0 ||
+        !Number.isSafeInteger(item.priceCents) || item.priceCents < 0 ||
+        !this.collectionsState().some(c => c.id === item.sourceCollectionId && c.active)) {
+      throw new Error('Informe nome, volume, preço e uma coleção de aromas válida.');
+    }
+    if (this.candleModels().some(other => other.id !== item.id && other.volumeMl === item.volumeMl)) {
+      throw new Error('Já existe um modelo de vela para este volume.');
+    }
+    // Preserve stable ID of the built-in preset, but create other models normally.
+    const alreadyStored = this.candleModelsState().some(model => model.id === item.id);
+    let id = item.id;
+    if (alreadyStored) await this.candleModelRepository.replace(item);
+    else {
+      const { id: _id, ...data } = item;
+      id = await this.candleModelRepository.create(data, item.id === DEFAULT_CANDLE_MODEL.id ? item.id : undefined);
+    }
+    const saved = { ...item, id };
+    this.candleModelsState.update(items => items.some(model => model.id === id)
+      ? items.map(model => model.id === id ? saved : model) : [...items, saved]);
+    return id;
   }
 
   async saveCollection(item: CollectionDefinition): Promise<string> {

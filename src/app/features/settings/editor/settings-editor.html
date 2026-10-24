@@ -2,7 +2,16 @@
 <dialog bfDialog #editor="bfDialog" class="bf-dialog" [busy]="saving()">
     <div class="bf-dialog-header"><h2>{{editingId()?'Editar':'Novo cadastro'}}</h2><button class="bf-floating-close" (click)="editor.close()" type="button" aria-label="Fechar janela"><bf-icon name="close" /></button></div>
     <div class="bf-dialog-body">
-      @if(tab()==='fragrances'){
+      @if(tab()==='candleModels'){
+        <div class="bf-grid two">
+          <label class="bf-field"><span>Nome do modelo</span><input class="bf-input" [formField]="candleForm.name" placeholder="Ex.: Vela 100 ml" /></label>
+          <label class="bf-field"><span>Volume (ml)</span><bf-number-input kind="integer" [formField]="candleForm.volumeMl" ariaLabel="Volume da vela" /></label>
+          <label class="bf-field"><span>Preço padrão</span><bf-number-input kind="currency" [formField]="candleForm.price" ariaLabel="Preço padrão da vela" /></label>
+          <label class="bf-field"><span>Coleção dos aromas</span><bf-select [formField]="candleForm.sourceCollectionId" [options]="collectionOptions()" ariaLabel="Coleção de aromas das velas" /></label>
+          <bf-checkbox class="toggle" [formField]="candleForm.active" label="Modelo ativo" />
+        </div>
+        <p class="hint">Alterar o preço do modelo afeta somente futuros cadastros. O preço das velas existentes permanece inalterado.</p>
+      } @else if(tab()==='fragrances'){
         <div class="bf-grid two"><label class="bf-field"><span>Nome</span><input class="bf-input" [formField]="fragranceForm.name" /></label><label class="bf-field"><span>Coleção</span><bf-select [formField]="fragranceForm.collectionId" [options]="collectionOptions()" ariaLabel="Coleção" /></label><bf-checkbox class="toggle" [formField]="fragranceForm.active" label="Ativo" /></div>
       } @else if(tab()==='formats') {
         <div class="bf-grid two"><label class="bf-field"><span>Nome</span><input class="bf-input" [formField]="formatForm.name" /></label><label class="bf-field"><span>Peso aproximado</span><bf-number-input kind="decimal" [decimals]="2" suffix="g" [formField]="formatForm.approximateWeightGrams" ariaLabel="Peso aproximado" /></label><bf-checkbox class="toggle" [formField]="formatForm.active" label="Ativo" /></div>

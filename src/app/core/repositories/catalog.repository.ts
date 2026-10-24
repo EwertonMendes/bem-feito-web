@@ -6,7 +6,7 @@ import { catalogEntityCode } from '../utils/ids';
 import { stockStatusForProduct } from '../../domain/logic/stock-status';
 import { productIdentity } from '../../domain/logic/product-category';
 import {
-  Addition, CollectionDefinition, FormatDefinition, FormatPrice, FragranceDefinition,
+  Addition, CandleModel, CollectionDefinition, FormatDefinition, FormatPrice, FragranceDefinition,
   InputItem, Product, UnitDefinition,
 } from '../../domain/models/catalog.model';
 import { FirestoreRepository } from '../firebase/firestore.repository';
@@ -76,6 +76,11 @@ export class FragranceRepository extends FirestoreRepository<FragranceDefinition
 @Injectable({ providedIn: 'root' })
 export class FormatRepository extends FirestoreRepository<FormatDefinition> {
   constructor() { super('formats', 'references'); }
+}
+
+@Injectable({ providedIn: 'root' })
+export class CandleModelRepository extends FirestoreRepository<CandleModel> {
+  constructor() { super('candleModels', 'references'); }
 }
 
 @Injectable({ providedIn: 'root' })

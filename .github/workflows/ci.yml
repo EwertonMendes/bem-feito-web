@@ -44,6 +44,8 @@ jobs:
       - run: npm ci --no-fund
       - run: npm run check:data-admin
       - run: npm run test:data-admin
+      - run: npx tsc -p worker/tsconfig.json
+      - run: node --experimental-strip-types --test worker/tests/security.test.mjs
       - run: npm run test:migration
       - run: npm run test:data-admin:emulator
       - run: npm run security:audit

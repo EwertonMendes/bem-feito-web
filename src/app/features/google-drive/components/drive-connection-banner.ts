@@ -5,6 +5,7 @@ import { filter } from 'rxjs';
 import { DriveIntegrationService } from '../../../core/google-drive/drive-integration.service';
 import { ErrorService } from '../../../core/services/error.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { DriveRedirectStartedError } from '../../../core/google-drive/drive-auth.service';
 import { BfLoadingButton } from '../../../shared/ui/button/loading-button';
 import { BfIcon } from '../../../shared/ui/icon/icon';
 
@@ -96,7 +97,7 @@ export class DriveConnectionBanner {
   readonly message = computed(() => {
     const status = this.integration.status();
     if (status === 'ready') {
-      return 'Sua conta continua vinculada. Confirme para renovar o acesso temporário às imagens.';
+      return 'A autorização do Google Drive precisa ser renovada.';
     }
     if (status === 'error') return 'Não foi possível validar o acesso às imagens privadas.';
     return 'Conecte sua conta para carregar e alterar as imagens privadas.';
@@ -124,7 +125,7 @@ export class DriveConnectionBanner {
       this.dismissed.set(false);
       this.toast.success('Google Drive conectado.');
     } catch (error) {
-      this.toast.error(this.errors.message(error));
+      if (!(error instanceof DriveRedirectStartedError)) this.toast.error(this.errors.message(error));
     } finally {
       this.connecting.set(false);
     }

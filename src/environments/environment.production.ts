@@ -5,6 +5,7 @@ export const environment = {
   name: 'production',
   googleDrive: {
     enabled: false,
+    workerUrl: 'REPLACE_PROD_WORKER_ORIGIN',
     clientId: 'REPLACE_GOOGLE_DRIVE_CLIENT_ID',
     pickerApiKey: 'REPLACE_GOOGLE_PICKER_API_KEY',
     cloudProjectNumber: 'REPLACE_GOOGLE_CLOUD_PROJECT_NUMBER'

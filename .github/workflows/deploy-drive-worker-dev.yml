@@ -1,0 +1,75 @@
+name: Deploy Drive Worker DEV
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/drive-offline-oauth-worker-dev]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bem-feito-drive-worker-dev
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.repository == 'EwertonMendes/bem-feito-web' && github.actor == github.repository_owner && (github.ref == 'refs/heads/feat/drive-offline-oauth-worker-dev' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+      url: https://bem-feito-drive-dev.ewertonmendes9.workers.dev/health
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.22.3
+      - run: npm ci --no-fund
+      - run: npx tsc -p worker/tsconfig.json
+      - run: node --experimental-strip-types --test worker/tests/*.test.mjs
+      - name: Publish a Worker version without editing workers.dev routing
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          TAG="bf-${GITHUB_SHA:0:12}"
+          npx --yes wrangler@4.152.0 versions upload --env dev --tag "$TAG" --message "Bem Feito Drive DEV ${GITHUB_SHA}"
+          npx --yes wrangler@4.152.0 versions deploy --env dev --version-tag "$TAG" --yes
+
+      - name: Verify Worker response
+        run: |
+          node - <<'NODE'
+          const url = 'https://bem-feito-drive-dev.ewertonmendes9.workers.dev/health';
+          for (let i=0;i<8;i++) {
+            try {
+              const response=await fetch(url,{signal:AbortSignal.timeout(10000)});
+              const data=await response.json();
+              if (response.ok && data.status==='ok' && data.environment==='dev') process.exit(0);
+            } catch {}
+            await new Promise(resolve=>setTimeout(resolve,1500));
+          }
+          process.exit(1);
+          NODE
+
+      - name: Probe Firebase signing-key availability from deployed Worker
+        run: |
+          node - <<'NODE'
+          const url = 'https://bem-feito-drive-dev.ewertonmendes9.workers.dev/health/identity-keys';
+          try {
+            const response = await fetch(url, {signal: AbortSignal.timeout(10000)});
+            const data = await response.json();
+            const good = response.ok && data.reachable === true &&
+              data.stage === 'ok' && Number.isInteger(data.keyCount) && data.keyCount > 0;
+            console.log('DEV Firebase JWKS probe:', JSON.stringify({httpStatus:response.status,
+              reachable:data.reachable,stage:data.stage,upstreamStatus:data.upstreamStatus,
+              keyCount:data.keyCount}));
+            if (!good) process.exitCode=1;
+          } catch (error) {
+            console.log('DEV Firebase JWKS probe failed:',
+              error?.name==='TimeoutError'?'timeout':'transport');
+            process.exitCode=1;
+          }
+          NODE

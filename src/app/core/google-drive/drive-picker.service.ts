@@ -37,7 +37,7 @@ export class DrivePickerService {
   private readonly scripts = inject(ExternalScriptLoaderService);
 
   async selectFolder(): Promise<{ id: string; name: string }> {
-    const token = await this.auth.connect();
+    const token = await this.auth.accessToken();
     await this.scripts.load('google-api-loader', 'https://apis.google.com/js/api.js');
     await this.loadPicker();
 

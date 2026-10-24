@@ -1,151 +1,58 @@
-# Imagens no Google Drive
+# Imagens no Google Drive — Bem Feito
 
-Esta branch substitui a dependência de Firebase Storage por uma integração privada com Google Drive. Firebase continua responsável por Authentication, Firestore e Hosting.
+A integração utiliza Google Drive privado para imagens e Firebase Authentication, Firestore e Hosting para o restante do sistema. A renovação OAuth é processada pelo Cloudflare Worker e documentada em [Google Drive OAuth offline](./google-drive-offline-oauth.md).
 
-## Modelo de segurança
+## Segurança
 
-A pasta de imagens permanece privada e deve ser compartilhada somente com as contas que realmente usam o Bem Feito. Cada conta precisa ter permissão de Editor para adicionar, substituir ou remover imagens.
+- Firebase Auth autentica o usuário. Firestore restringe as operações de negócio a usuários ativos e seus papéis.
+- Cloudflare Worker valida a identidade Firebase e a conta Google correspondente antes de emitir access tokens curtos.
+- O refresh token permanece criptografado no Cloudflare D1, nunca no navegador, Firestore ou Git.
+- O Angular utiliza o access token curto somente em memória para a API do Drive e o Google Picker.
+- O Google Drive controla as permissões físicas dos arquivos: compartilhe a pasta privada apenas com contas que precisam dela e com o papel adequado.
+- O app não consegue impedir operações feitas diretamente na API por uma pessoa que possua access token e permissão Drive de Editor. Revise as permissões reais ao adicionar usuários.
 
-O app usa autorização OAuth incremental com o escopo `https://www.googleapis.com/auth/drive.file`. Firebase Auth e Drive OAuth são responsabilidades separadas:
+## Estrutura de pastas
 
-- Firebase Auth decide se a pessoa entra no Bem Feito.
-- Firestore `users/{uid}` e as roles decidem o que ela pode fazer no sistema.
-- Google Drive decide se a conta Google pode acessar fisicamente a pasta e os arquivos.
-- O app confere se o e-mail autorizado no Drive é o mesmo e-mail autenticado no Firebase.
-
-O access token fica em memória e também é espelhado temporariamente em `sessionStorage` somente para sobreviver a recarregamentos da mesma aba. Ele é curto, limitado a `drive.file`, removido quando expira, quando o Firebase faz logout, quando a conta Firebase muda ou quando o Drive devolve `401`. Nunca grave refresh token, client secret, cookies ou credenciais de service account em Firestore, localStorage, IndexedDB, Git ou logs.
-
-OAuth Client ID, Picker API Key restrita e Cloud Project Number são identificadores públicos de uma SPA. A API Key deve ser limitada aos origins e APIs necessários.
-
-## Preparar Google Cloud DEV
-
-Use o projeto Google Cloud associado ao ambiente DEV ou um projeto dedicado à integração DEV.
-
-1. Habilite **Google Drive API**.
-2. Habilite **Google Picker API**.
-3. Configure a tela de consentimento OAuth.
-4. Se o app estiver em modo Testing, adicione as contas que testarão o Drive como test users.
-5. Crie um OAuth Client ID do tipo **Web application**.
-6. Configure os Authorized JavaScript origins:
-   - `http://localhost:4200`
-   - `https://bem-feito-dev.web.app`
-7. Crie uma API Key dedicada ao Picker.
-8. Restrinja a API Key por HTTP referrer aos origins do Bem Feito e restrinja a chave à Google Picker API.
-9. Copie o número numérico do Google Cloud Project.
-
-Em `src/environments/environment.ts`, preencha somente os valores públicos:
-
-```ts
-googleDrive: {
-  enabled: true,
-  clientId: '...apps.googleusercontent.com',
-  pickerApiKey: '...',
-  cloudProjectNumber: '123456789'
-}
-```
-
-Nunca adicione `client_secret` ao Angular.
-
-## Preparar a pasta
-
-Crie uma pasta exclusiva para o ambiente, por exemplo:
+O owner escolhe a pasta privada em **Configurações → Imagens no Google Drive**. A configuração fica no documento `integrations/google-drive` no Firestore, e as quatro subpastas existentes são reutilizadas:
 
 ```text
-Bem Feito DEV - Imagens
+Bem Feito DEV - Imagens/
+  products/
+  inputs/
+  kits/
+  additions/
 ```
 
-Mantenha-a privada. Compartilhe como **Editor** com cada pessoa que deve trabalhar com imagens.
-
-Depois:
-
-1. Entre no Bem Feito com um usuário `owner`.
-2. Abra **Configurações**.
-3. No card **Imagens no Google Drive**, clique em **Configurar pasta**.
-4. Autorize o escopo Drive quando o Google solicitar.
-5. Selecione a pasta criada.
-
-O app cria ou reutiliza as subpastas:
-
-```text
-products
-inputs
-kits
-additions
-```
-
-A configuração global fica em `integrations/google-drive`. Usuários ativos podem lê-la; somente `owner` pode criá-la ou alterá-la.
-
-Para outro usuário, como Maria:
-
-1. Compartilhe a mesma pasta com o e-mail Google dela como Editor.
-2. Cadastre/ative o perfil dela no Firebase normalmente.
-3. Ela entra no Bem Feito.
-4. Em Configurações, clica **Conectar Drive**.
-5. Se o Picker aparecer, seleciona exatamente a mesma pasta já configurada.
+O aplicativo não recria pastas por causa da mudança de autenticação. PROD deve ter Firebase, OAuth, Worker, D1, secrets e pasta separados de DEV.
 
 ## Imagens
 
-O Firestore armazena somente uma referência:
+O Firestore armazena referências `{provider:'google-drive', fileId, mimeType, sizeBytes, width, height, modifiedTime}`, nunca os bytes do arquivo.
 
-```json
-{
-  "image": {
-    "provider": "google-drive",
-    "fileId": "...",
-    "mimeType": "image/webp",
-    "sizeBytes": 123456,
-    "width": 800,
-    "height": 600,
-    "modifiedTime": "2026-10-05T20:00:00.000Z"
-  }
-}
-```
+O navegador valida WebP/PNG/JPEG/GIF/AVIF, aceita arquivos até 12 MB de entrada, reduz a maior dimensão a 1200 px, converte para WebP e limita o arquivo produzido a 3 MB.
 
-O arquivo não é armazenado no Firestore.
+Arquivos criados recebem `appProperties` de identidade da entidade. Antes de substituir ou enviar para lixeira, o aplicativo valida esses metadados. A substituição preserva o `fileId`. A visualização usa blob privado e cache de memória com carregamento próximo à viewport.
 
-Antes do upload, o navegador:
+## Conexão e renovação
 
-- aceita WebP, PNG, JPEG, GIF ou AVIF;
-- limita o arquivo original a 12 MB;
-- reduz a maior dimensão para no máximo 1200 px;
-- converte para WebP;
-- limita a saída a 3 MB.
+1. Cada usuário entra no Bem Feito via Firebase com sua conta Google.
+2. Na primeira utilização do novo cliente OAuth, seleciona **Conectar Drive**.
+3. O Worker executa Authorization Code + PKCE e guarda a concessão offline criptografada.
+4. Nos próximos logins, recupera um token válido ou renova automaticamente sem gesto do usuário.
+5. Se a autorização Google for revogada, a interface solicitará uma nova conexão.
+6. Na desconexão explícita, a concessão no servidor é revogada; no logout do Firebase, apenas o token curto em memória é descartado.
 
-Arquivos criados pelo app recebem `appProperties` com app, tipo de entidade e ID. Antes de substituir ou mandar uma imagem para a lixeira, o app confere esses metadados. Substituição mantém o mesmo `fileId`; remoção limpa a referência do Firestore e move o arquivo para a lixeira do Drive.
+Os tokens anteriores persistidos em `localStorage`/`sessionStorage` são apagados na inicialização da versão nova.
 
-A leitura usa blob privado, cache em memória e carregamento próximo ao viewport.
+## Testes mínimos
 
-## Sessão OAuth
+- Owner e Maria autorizam individualmente e acessam a mesma pasta.
+- Após expiração simulada, múltiplas imagens voltam a aparecer sem intervenção.
+- Download, upload, substituição com mesmo ID e exclusão continuam corretos.
+- Pasta principal e quatro subpastas preservadas, sem migração de dados.
+- Google Picker permite escolher a pasta, sem escopos amplos.
+- Login com outra conta Google e usuário inativo são rejeitados.
+- Logout não revoga o vínculo, enquanto Desconectar faz a revogação explícita.
+- Nenhum refresh token ou secret é exposto em navegador, Firestore, URL ou logs.
 
-O consentimento `drive.file` não deve aparecer a cada uso enquanto a concessão continuar válida.
-
-A SPA continua usando o **Google Identity Services token model**. O access token é curto e sua duração é definida pelo Google; o Angular não tenta ampliar essa validade e não armazena refresh token.
-
-O estado local é dividido em duas partes:
-
-- **access token temporário**: fica em memória e em `localStorage` somente até o `expiresAt` real informado pelo Google, vinculado à UID Firebase. Isso permite fechar/reabrir a aba sem nova autorização enquanto o token ainda for válido; no logout ele é removido;
-- **marcador de vínculo**: fica em `localStorage` e contém somente o UID Firebase, o e-mail da conta Drive validada e a data do vínculo. Esse marcador não é uma credencial e não concede acesso ao Drive.
-
-Quando o access token expira ou o Drive responde `401`, somente o token temporário é descartado. A concessão conhecida continua marcada e a próxima **ação interativa** que precisar do Drive solicita um novo token com `prompt: ''` e `login_hint`, evitando novo consentimento quando o Google permitir.
-
-Para leituras passivas, como uma imagem ainda não carregada, o navegador não pode renovar o token sozinho sem gesto do usuário. Nessa situação o app mostra **Continuar com Google Drive** somente quando o acesso for realmente necessário. Imagens já carregadas permanecem no cache em memória até logout, troca de usuário, mudança de configuração ou invalidação explícita do cache.
-
-No logout do Firebase, o access token persistido e o cache da sessão são descartados. O marcador não sensível pode permanecer para permitir retomada com a mesma UID no próximo login. Se outra UID entrar, o marcador anterior é removido.
-
-Nunca grave refresh token, client secret, access token, cookies ou credenciais de service account em `localStorage`, IndexedDB, Firestore, Git ou logs. Uma conexão realmente silenciosa por dias ou meses continuaria exigindo o authorization code model com backend seguro; isso não é simulado no frontend.
-
-## Testes recomendados
-
-Teste com duas contas reais no DEV:
-
-- owner configura a pasta;
-- ambos conseguem visualizar as mesmas imagens;
-- ambos conseguem enviar/substituir imagens quando a role do Bem Feito permite;
-- viewer não deve ganhar poderes de operação no app;
-- substituir mantém o `fileId`;
-- remover apaga a referência e manda o arquivo para a lixeira;
-- remover o compartilhamento de uma conta no Drive deve impedir o acesso aos arquivos;
-- tentar autorizar outra conta Google que não corresponda ao Firebase deve ser rejeitado;
-- nenhum token deve aparecer em Firestore, `localStorage`, IndexedDB ou Git; durante a sessão atual, apenas o access token curto pode existir em `sessionStorage`.
-
-PROD deve usar OAuth configuration e pasta separados do DEV.
+Para rollout DEV e configuração de ambientes, consulte [o guia de OAuth offline](./google-drive-offline-oauth.md).

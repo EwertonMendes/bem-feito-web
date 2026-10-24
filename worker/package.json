@@ -1,0 +1,6 @@
+{
+  "name": "bem-feito-drive-worker",
+  "private": true,
+  "type": "module",
+  "description": "Isolated Cloudflare Worker for Google Drive OAuth"
+}

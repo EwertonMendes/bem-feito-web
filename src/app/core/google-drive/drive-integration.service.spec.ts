@@ -1,168 +1,60 @@
 import '@angular/compiler';
 import { Injector, runInInjectionContext, signal } from '@angular/core';
 import { describe, expect, it, vi } from 'vitest';
-
-vi.mock('@angular/core', async () => {
-  const actual = await vi.importActual<typeof import('@angular/core')>('@angular/core');
-  return { ...actual, effect: vi.fn() };
-});
+vi.mock('@angular/core', async()=>{const actual=await vi.importActual<typeof import('@angular/core')>('@angular/core');return {...actual,effect:vi.fn()};});
 import { AuthService } from '../auth/auth.service';
 import { DriveIntegrationRepository } from '../repositories/drive-integration.repository';
 import { DriveApiService } from './drive-api.service';
 import { DriveAuthService } from './drive-auth.service';
 import { DriveIntegrationService } from './drive-integration.service';
 import { DrivePickerService } from './drive-picker.service';
-
-const config = {
-  id: 'google-drive',
-  enabled: true,
-  rootFolderId: 'root',
-  rootFolderName: 'Bem Feito DEV - Imagens',
-  folders: {
-    products: 'products',
-    inputs: 'inputs',
-    kits: 'kits',
-    additions: 'additions',
-  },
-};
-
-describe('DriveIntegrationService', () => {
-  it('does not let passive image authorization requests invalidate a connection in progress', async () => {
-    const linked = signal(true);
-    const tokenActive = signal(false);
-    const revision = signal(0);
-    const accountEmail = signal<string | null>('user@example.com');
-
-    let releaseConnect!: () => void;
-    const driveAuth = {
-      linked,
-      connected: tokenActive,
-      revision,
-      accountEmail,
-      currentToken: vi.fn(() => tokenActive() ? 'token' : null),
-      connect: vi.fn(() => new Promise<string>((resolve) => {
-        releaseConnect = () => {
-          tokenActive.set(true);
-          resolve('token');
-        };
-      })),
-      expireAccessToken: vi.fn(() => tokenActive.set(false)),
-      setAccountEmail: vi.fn(),
-      disconnect: vi.fn(),
-    };
-
-    const repository = {
-      getConfig: vi.fn().mockResolvedValue(config),
-      saveConfig: vi.fn(),
-    };
-
-    const driveApi = {
-      currentUser: vi.fn().mockResolvedValue({ emailAddress: 'user@example.com' }),
-      getFile: vi.fn().mockImplementation(async (id: string) => ({
-        id,
-        name: id,
-        mimeType: 'application/vnd.google-apps.folder',
-        trashed: false,
-      })),
-    };
-
-    const auth = {
-      waitForUser: vi.fn().mockResolvedValue({ uid: 'user-1', email: 'user@example.com' }),
-      canAdminister: vi.fn(() => true),
-    };
-
-    const picker = { selectFolder: vi.fn() };
-
-    const injector = Injector.create({
-      providers: [
-        { provide: DriveIntegrationRepository, useValue: repository },
-        { provide: DriveAuthService, useValue: driveAuth },
-        { provide: DriveApiService, useValue: driveApi },
-        { provide: DrivePickerService, useValue: picker },
-        { provide: AuthService, useValue: auth },
-      ],
-    });
-
-    const service = runInInjectionContext(injector, () => new DriveIntegrationService());
-
+const config={id:'google-drive',enabled:true,rootFolderId:'root',rootFolderName:'DEV',folders:{products:'a',inputs:'b',kits:'c',additions:'d'}};
+function setup(tokenAvailable=false){
+  const linked=signal(tokenAvailable),active=signal(tokenAvailable),revision=signal(0),email=signal<string|null>('owner@example.com');
+  const token=vi.fn(async()=>{linked.set(true);active.set(true);return 'token';});
+  const driveAuth={linked,connected:active,revision,accountEmail:email,
+    currentToken:vi.fn(()=>active()?'token':null),accessToken:token,
+    connect:vi.fn(async()=>{active.set(true);return 'token';}),
+    expireAccessToken:vi.fn(()=>active.set(false)),setAccountEmail:vi.fn(),disconnect:vi.fn()};
+  const repository={getConfig:vi.fn().mockResolvedValue(config),saveConfig:vi.fn()};
+  const driveApi={currentUser:vi.fn().mockResolvedValue({emailAddress:'owner@example.com'}),
+    getFile:vi.fn(async(id:string)=>({id,mimeType:'application/vnd.google-apps.folder',trashed:false}))};
+  const auth={waitForUser:vi.fn().mockResolvedValue({uid:'owner',email:'owner@example.com'}),canAdminister:vi.fn(()=>true)};
+  const injector=Injector.create({providers:[
+    {provide:DriveIntegrationRepository,useValue:repository},
+    {provide:DriveAuthService,useValue:driveAuth},
+    {provide:DriveApiService,useValue:driveApi},
+    {provide:DrivePickerService,useValue:{selectFolder:vi.fn()}},
+    {provide:AuthService,useValue:auth}
+  ]});
+  const service=runInInjectionContext(injector,()=>new DriveIntegrationService());
+  return {service,driveAuth,injector,driveApi};
+}
+describe('DriveIntegrationService - offline OAuth',()=>{
+  it('recovers a saved grant silently while loading the configured folder',async()=>{
+    const {service,driveAuth,injector,driveApi}=setup();
     await service.load();
-    expect(service.status()).toBe('ready');
-    expect(service.authorizationNeeded()).toBe(true);
-
-    const connecting = service.connect();
-    expect(service.connecting()).toBe(true);
-
-    service.requestAuthorization();
-    service.requestAuthorization();
-    service.requestAuthorization();
-
-    expect(driveAuth.expireAccessToken).not.toHaveBeenCalled();
-
-    releaseConnect();
-    await connecting;
-
-    expect(service.connected()).toBe(true);
+    expect(driveAuth.accessToken).toHaveBeenCalledTimes(1);
+    expect(driveApi.getFile).toHaveBeenCalledTimes(5);
     expect(service.status()).toBe('connected');
     expect(service.authorizationNeeded()).toBe(false);
-    expect(driveAuth.expireAccessToken).not.toHaveBeenCalled();
-
     injector.destroy();
   });
-
-  it('expires the token only after a real unauthorized response is reported', async () => {
-    const linked = signal(true);
-    const tokenActive = signal(true);
-    const revision = signal(0);
-    const accountEmail = signal<string | null>('user@example.com');
-
-    const driveAuth = {
-      linked,
-      connected: tokenActive,
-      revision,
-      accountEmail,
-      currentToken: vi.fn(() => tokenActive() ? 'token' : null),
-      connect: vi.fn(),
-      expireAccessToken: vi.fn(() => tokenActive.set(false)),
-      setAccountEmail: vi.fn(),
-      disconnect: vi.fn(),
-    };
-
-    const injector = Injector.create({
-      providers: [
-        { provide: DriveIntegrationRepository, useValue: { getConfig: vi.fn().mockResolvedValue(config) } },
-        { provide: DriveAuthService, useValue: driveAuth },
-        {
-          provide: DriveApiService,
-          useValue: {
-            currentUser: vi.fn().mockResolvedValue({ emailAddress: 'user@example.com' }),
-            getFile: vi.fn().mockImplementation(async (id: string) => ({
-              id,
-              name: id,
-              mimeType: 'application/vnd.google-apps.folder',
-              trashed: false,
-            })),
-          },
-        },
-        { provide: DrivePickerService, useValue: { selectFolder: vi.fn() } },
-        {
-          provide: AuthService,
-          useValue: {
-            waitForUser: vi.fn().mockResolvedValue({ uid: 'user-1', email: 'user@example.com' }),
-            canAdminister: vi.fn(() => true),
-          },
-        },
-      ],
-    });
-
-    const service = runInInjectionContext(injector, () => new DriveIntegrationService());
+  it('restores after token expiry during passive image load',async()=>{
+    const {service,driveAuth,injector}=setup();
     await service.load();
-
-    service.handleUnauthorized();
-
-    expect(driveAuth.expireAccessToken).toHaveBeenCalledTimes(1);
+    driveAuth.connected.set(false);
+    await service.ensureConnected();
+    expect(service.connected()).toBe(true);
+    expect(driveAuth.accessToken).toHaveBeenCalledTimes(2);
+    injector.destroy();
+  });
+  it('does not prompt for OAuth until the backend genuinely needs new authorization',async()=>{
+    const {service,driveAuth,injector}=setup(true);
+    await service.load();
+    service.requestAuthorization();
     expect(service.status()).toBe('ready');
-    expect(service.authorizationNeeded()).toBe(true);
-
+    expect(driveAuth.expireAccessToken).not.toHaveBeenCalled();
     injector.destroy();
   });
 });

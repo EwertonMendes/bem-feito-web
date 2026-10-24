@@ -212,6 +212,26 @@ export class CatalogPage {
     if(event.kind==='inputs'){const found=this.store.inputs().find(v=>v.id===event.id);if(found)this.editor().editInput(found);}
     if(event.kind==='additions'){const found=this.store.additions().find(v=>v.id===event.id);if(found)this.editor().editAddition(found);}
   }
+  /** Product identity stays split for display; the canonical displayName is unchanged in storage. */
+  productTitle(p:Product):string {
+    const category=productCategoryId(p);
+    if(category==='soap') return this.formatNames().get(p.formatId) || p.modelName?.trim() || p.displayName.split('·').at(-1)?.trim() || p.displayName;
+    return p.modelName?.trim() || p.displayName.split('·')[0]?.trim() || p.displayName;
+  }
+  productVariant(p:Product):string {
+    const category=productCategoryId(p);
+    if(category==='soap') return this.fragranceNames().get(p.fragranceId) || p.variantName?.trim() || p.displayName.split('·')[1]?.trim() || '';
+    if(category==='scented-candle') return p.variantName?.trim() || this.fragranceNames().get(p.candleFragranceId || p.fragranceId) || '';
+    return p.variantName?.trim() || '';
+  }
+  productEyebrow(p:Product):string {
+    const category=productCategoryId(p);
+    if(category==='scented-candle') return 'Vela aromática'+(p.volumeMl!=null?' · '+p.volumeMl+' ml':'');
+    if(category==='creative-kit') return 'Kit criativo';
+    const line=this.collectionNames().get(p.collectionId) || 'Sabonete';
+    const grams=this.weight(p);
+    return line+(grams!=null?' · '+grams+' g':'');
+  }
   freeStock(p:Product):number{return Math.max(0,p.stock-(p.reservedPhysicalStock??0));}
   weight(p:Product):number|null{return this.formatWeights().get(p.formatId)??null;}
   margin(v:number|null|undefined):string{return v==null?'—':v.toLocaleString('pt-BR',{maximumFractionDigits:1})+'%';}

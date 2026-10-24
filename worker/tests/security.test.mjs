@@ -44,6 +44,47 @@ describe('Worker cryptographic boundaries',()=>{
     } finally {globalThis.fetch=before;}
   });
 });
+
+describe('Firebase JWT verification failure stages',()=>{
+  it('accepts signed project token and distinguishes issuer, audience, expiry and signature errors',async()=>{
+    const pair=await webcrypto.subtle.generateKey(
+      {name:'RSASSA-PKCS1-v1_5',hash:'SHA-256',modulusLength:2048,
+        publicExponent:new Uint8Array([1,0,1])},true,['sign','verify']);
+    const key=await webcrypto.subtle.exportKey('jwk',pair.publicKey);
+    key.kid='firebase-test-key';
+    const before=globalThis.fetch;
+    globalThis.fetch=async()=>Response.json({keys:[key]});
+    const issuer='https://securetoken.google.com/bem-feito-dev';
+    const jwksUrl='https://firebase-test.invalid/keys';
+    const now=Math.floor(Date.now()/1000);
+    async function sign(overrides={}){
+      const header=b64url(new TextEncoder().encode(JSON.stringify({alg:'RS256',kid:'firebase-test-key'})));
+      const payload=b64url(new TextEncoder().encode(JSON.stringify({
+        iss:issuer,aud:'bem-feito-dev',sub:'user-firebase-uid',
+        exp:now+3600,iat:now-10,auth_time:now-60,email_verified:true,...overrides
+      })));
+      const input=header+'.'+payload;
+      const signature=b64url(new Uint8Array(await webcrypto.subtle.sign(
+        'RSASSA-PKCS1-v1_5',pair.privateKey,new TextEncoder().encode(input))));
+      return input+'.'+signature;
+    }
+    try {
+      const valid=await sign();
+      assert.equal((await verifyJwt(valid,jwksUrl,issuer,'bem-feito-dev',['auth_time'])).sub,'user-firebase-uid');
+      await assert.rejects(verifyJwt(await sign({aud:'other-project'}),jwksUrl,issuer,'bem-feito-dev'),
+        error=>error.code==='invalid_identity_audience');
+      await assert.rejects(verifyJwt(await sign({iss:'https://securetoken.google.com/other-project'}),
+        jwksUrl,issuer,'bem-feito-dev'),error=>error.code==='invalid_identity_issuer');
+      await assert.rejects(verifyJwt(await sign({exp:now-100}),jwksUrl,issuer,'bem-feito-dev'),
+        error=>error.code==='invalid_identity_expired');
+      const parts=valid.split('.');
+      const altered=parts[0]+'.'+b64url(new TextEncoder().encode('{"sub":"attacker"}'))+'.'+parts[2];
+      await assert.rejects(verifyJwt(altered,jwksUrl,issuer,'bem-feito-dev'),
+        error=>error.code==='invalid_identity_signature');
+    } finally {globalThis.fetch=before;}
+  });
+});
+
 describe('Worker HTTP security',()=>{
   it('responds to health without exposing credentials',async()=>{
     const r=await worker.fetch(new Request('https://bem-feito-drive-dev.ewertonmendes9.workers.dev/health'),env);

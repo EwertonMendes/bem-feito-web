@@ -4,7 +4,7 @@ import { CatalogImageEntityKind, CatalogImageRef } from '../../domain/models/ima
 import { ImageStorageAvailability, ImageStoragePort } from '../images/image-storage.port';
 import { ImageProcessorService } from '../images/image-processor.service';
 import { DriveApiError, DriveApiService, DriveFileMetadata } from './drive-api.service';
-import { DriveAuthService, DriveAuthorizationRequiredError } from './drive-auth.service';
+import { DriveAuthorizationRequiredError } from './drive-auth.service';
 import { DriveIntegrationService } from './drive-integration.service';
 
 const MAX_CACHED_IMAGE_URLS = 128;
@@ -13,7 +13,6 @@ const MAX_CACHED_IMAGE_URLS = 128;
 export class GoogleDriveImageStorageService extends ImageStoragePort {
   private readonly processor = inject(ImageProcessorService);
   private readonly api = inject(DriveApiService);
-  private readonly auth = inject(DriveAuthService);
   private readonly integration = inject(DriveIntegrationService);
   private readonly urlCache = new Map<string, string>();
   private readonly pendingDownloads = new Map<string, Promise<string | null>>();
@@ -47,17 +46,11 @@ export class GoogleDriveImageStorageService extends ImageStoragePort {
       return cached;
     }
 
-    const token = this.auth.currentToken();
-    if (!token || !this.integration.connected()) {
-      if (this.auth.linked()) this.integration.requestAuthorization();
-      return null;
-    }
-
     const pending = this.pendingDownloads.get(key);
     if (pending) return pending;
 
     const generation = this.cacheGeneration;
-    const request = this.api.download(image.fileId).then((blob) => {
+    const request = this.integration.ensureConnected().then(() => this.api.download(image.fileId)).then((blob) => {
       const url = URL.createObjectURL(blob);
       if (generation !== this.cacheGeneration) {
         URL.revokeObjectURL(url);

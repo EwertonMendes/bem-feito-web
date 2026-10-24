@@ -8,7 +8,7 @@ const principal = { uid:'test-user', email:'user@example.test', googleSub:'googl
 const envVars = {
   ENVIRONMENT:'dev',TOKEN_KEY_VERSION:'v1',
   TOKEN_KEYS:JSON.stringify({v1:b64url(randomBytes(32))}),
-  GOOGLE_CLIENT_ID:'mock-client',GOOGLE_CLIENT_SECRET:'mock-client-secret'
+  GOOGLE_CLIENT_ID:'mock-client',GOOGLE_CLIENT_SECRET:randomBytes(16).toString('hex')
 };
 function db(initial) {
   const connection = {...initial};
@@ -96,31 +96,33 @@ describe('D1 access token broker',()=>{
   it('refreshes once with simultaneous requests, then reuses the encrypted cache',async()=>{
     const env=await fixture(),original=globalThis.fetch;
     let refreshes=0;
+    const issuedToken=randomBytes(16).toString('hex');
     globalThis.fetch=async(url,init)=>{
       assert.equal(url,'https://oauth2.googleapis.com/token');
       assert.ok(String(init.body).includes('grant_type=refresh_token'));
       assert.ok(String(init.body).includes('refresh_token=refresh-for-test'));
       refreshes++;
       await new Promise(resolve=>setTimeout(resolve,60));
-      return Response.json({access_token:'new-access-token',token_type:'Bearer',expires_in:3600});
+      return Response.json({access_token:issuedToken,token_type:'Bearer',expires_in:3600});
     };
     try {
       const results=await Promise.all(Array.from({length:8},()=>token(env,principal)));
       const first=await results[0].json();
-      assert.equal(first.accessToken,'new-access-token');
+      assert.equal(first.accessToken,issuedToken);
       assert.match(first.version,/^[A-Za-z0-9_-]{43}$/);
       assert.ok(results.every(r=>r.status===200));
       const another=await (await token(env,principal)).json();
-      assert.equal(another.accessToken,'new-access-token');
+      assert.equal(another.accessToken,issuedToken);
       assert.equal(refreshes,1);
       assert.ok(env.DB.connection.encrypted_access_token);
-      assert.ok(!env.DB.connection.encrypted_access_token.includes('new-access-token'));
+      assert.ok(!env.DB.connection.encrypted_access_token.includes(issuedToken));
     } finally {globalThis.fetch=original;}
   });
 
   it('ignores a late 401 for an obsolete access token',async()=>{
     const env=await fixture(),original=globalThis.fetch;
-    globalThis.fetch=async()=>Response.json({access_token:'fresh-token',token_type:'Bearer',expires_in:3600});
+    const issuedToken=randomBytes(16).toString('hex');
+    globalThis.fetch=async()=>Response.json({access_token:issuedToken,token_type:'Bearer',expires_in:3600});
     try {
       const fresh=await (await token(env,principal)).json();
       const result=await rejectToken(env,principal,new Request('https://worker.invalid/drive/token/reject',{
@@ -129,7 +131,7 @@ describe('D1 access token broker',()=>{
       assert.equal(result.status,200);
       assert.equal(env.DB.connection.access_token_version,fresh.version);
       const cached=await (await token(env,principal)).json();
-      assert.equal(cached.accessToken,'fresh-token');
+      assert.equal(cached.accessToken,issuedToken);
     } finally {globalThis.fetch=original;}
   });
 

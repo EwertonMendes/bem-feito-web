@@ -25,6 +25,7 @@ export class DriveAuthService {
   private readonly revisionState = signal(0);
   private tokenPending?: Promise<string>;
   private startPending?: Promise<never>;
+  private authorizationDeniedUid: string | null = null;
   private readonly legacyTokenKey = `bem-feito:google-drive:${environment.name}`;
   private readonly legacyGrantKey = `bem-feito:google-drive-grant:${environment.name}`;
   readonly enabled = environment.googleDrive.enabled;
@@ -62,6 +63,7 @@ export class DriveAuthService {
     if (!this.enabled) throw new Error('Google Drive desativado neste ambiente.');
     const user = this.firebaseAuth.currentUser;
     if (!user) throw new Error('Entre no Bem Feito para acessar o Google Drive.');
+    if (this.authorizationDeniedUid === user.uid) throw new DriveAuthorizationRequiredError();
     if (!force) {
       const current = this.currentToken();
       if (current) return current;
@@ -77,6 +79,7 @@ export class DriveAuthService {
       this.tokenState.set({uid,value:result.accessToken,expiresAt:result.expiresAt,version:result.version});
       this.accountState.set(result.email);
       this.linkedState.set(true);
+      this.authorizationDeniedUid = null;
       return result.accessToken;
     })().finally(() => { this.tokenPending = undefined; });
     return this.tokenPending;
@@ -92,13 +95,16 @@ export class DriveAuthService {
     }
   }
 
-  async rejectAccessToken(): Promise<void> {
+  versionForToken(token: string): string | null {
     const current = this.tokenState();
-    if (current && current.uid === this.firebaseAuth.currentUser?.uid) {
-      // Version guarded on the Worker: a late 401 cannot invalidate a newly issued token.
-      await this.call('/drive/token/reject','POST',{version:current.version});
-    }
-    this.expireAccessToken();
+    return current?.value === token ? current.version : null;
+  }
+
+  async rejectAccessToken(version: string | null = this.tokenState()?.version ?? null): Promise<void> {
+    if (!version) return;
+    // A 401 for a superseded request must never evict the newer cache entry.
+    if (this.tokenState()?.version === version) this.expireAccessToken();
+    await this.call('/drive/token/reject','POST',{version});
   }
 
   async revoke(): Promise<void> {
@@ -138,6 +144,7 @@ export class DriveAuthService {
       const code = details?.error?.code ?? 'service_unavailable';
       if (code === 'reconnect_required' || code === 'google_identity_mismatch') {
         this.reset();
+        this.authorizationDeniedUid = user.uid;
         throw new DriveAuthorizationRequiredError();
       }
       const messages: Record<string,string> = {
@@ -160,6 +167,7 @@ export class DriveAuthService {
     this.tokenState.set(null);
     this.linkedState.set(false);
     this.accountState.set(null);
+    this.authorizationDeniedUid = null;
     if (had) this.revisionState.update(value=>value+1);
   }
 

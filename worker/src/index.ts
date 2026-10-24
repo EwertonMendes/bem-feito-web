@@ -9,10 +9,23 @@ const SECURITY_HEADERS: Record<string,string> = {
   'Cache-Control':'no-store'
 };
 function checkEnv(env: Env): void {
-  if (env.ENVIRONMENT !== 'dev' ||
-      env.FIREBASE_PROJECT_ID !== 'bem-feito-dev' ||
+  const dev = env.ENVIRONMENT === 'dev';
+  const prod = env.ENVIRONMENT === 'production';
+  if (!dev && !prod) throw new ApiError(503,'environment_mismatch');
+  if (dev && (env.FIREBASE_PROJECT_ID !== 'bem-feito-dev' ||
       env.FRONTEND_ORIGIN !== 'https://bem-feito-dev.web.app' ||
-      env.OAUTH_REDIRECT_URI !== 'https://bem-feito-drive-dev.ewertonmendes9.workers.dev/oauth/drive/callback') {
+      env.OAUTH_REDIRECT_URI !== 'https://bem-feito-drive-dev.ewertonmendes9.workers.dev/oauth/drive/callback')) {
+    throw new ApiError(503,'environment_mismatch');
+  }
+  // Future PROD is intentionally not provisioned yet; fail closed until distinct
+  // project, origin and callback are provided without changing this code.
+  if (prod && (env.FIREBASE_PROJECT_ID === 'bem-feito-dev' ||
+      !/^[-a-z0-9]{4,100}$/.test(env.FIREBASE_PROJECT_ID) ||
+      !env.FRONTEND_ORIGIN.startsWith('https://') ||
+      env.FRONTEND_ORIGIN.includes('bem-feito-dev') ||
+      !env.OAUTH_REDIRECT_URI.startsWith('https://') ||
+      env.OAUTH_REDIRECT_URI.includes('bem-feito-drive-dev') ||
+      new URL(env.OAUTH_REDIRECT_URI).pathname !== '/oauth/drive/callback')) {
     throw new ApiError(503,'environment_mismatch');
   }
 }

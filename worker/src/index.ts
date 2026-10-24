@@ -1,5 +1,6 @@
 import { ApiError, type Env } from './types.ts';
 import { principal, sameOrigin } from './auth.ts';
+import { probeFirebaseKeys } from './jwt.ts';
 import { start, launch, callback } from './oauth.ts';
 import { state, token, disconnect, rejectToken } from './tokens.ts';
 const SECURITY_HEADERS: Record<string,string> = {
@@ -52,6 +53,8 @@ export default {
         }});
       } else if (request.method === 'GET' && path === '/health') {
         response = Response.json({status:'ok',environment:env.ENVIRONMENT});
+      } else if (request.method === 'GET' && path === '/health/identity-keys' && env.ENVIRONMENT === 'dev') {
+        response = await probeFirebaseKeys();
       } else if (request.method === 'GET' && path === '/oauth/drive/launch') {
         response = await launch(request,env);
       } else if (request.method === 'GET' && path === '/oauth/drive/callback') {

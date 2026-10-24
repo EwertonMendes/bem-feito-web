@@ -155,6 +155,7 @@ export class DriveAuthService {
         refresh_busy:'O Drive está processando uma renovação. Tente novamente.',
         google_temporarily_unavailable:'O Google está temporariamente indisponível.',
         refresh_retry_later:'O acesso ao Google Drive está sendo restabelecido.',
+        revocation_pending:'A desconexão anterior está pendente. Conclua a desconexão nas configurações do Google Drive.',
         connection_changed:'A conexão do Drive foi atualizada. Tente novamente.'
       };
       throw new Error(messages[code] ?? 'Não foi possível comunicar com o serviço do Google Drive.');

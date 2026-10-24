@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
-import { CollectionDefinition, ExpenseCategory, ExpenseType, FormatDefinition, FormatPrice, FragranceDefinition, PaymentMethod, UnitDefinition } from '../../domain/models/catalog.model';
+import { CandleModel, CollectionDefinition, ExpenseCategory, ExpenseType, FormatDefinition, FormatPrice, FragranceDefinition, PaymentMethod, UnitDefinition } from '../../domain/models/catalog.model';
 import { CatalogReferenceStore } from '../../features/catalog/catalog-reference.store';
 import { CatalogStore } from '../../features/catalog/catalog.store';
 import { SettingsStore } from '../../features/settings/settings.store';
@@ -32,6 +32,7 @@ export class SettingsPage {
   void Promise.all([this.references.load(), this.catalog.load(), this.settings.load()]);
  }
  openNew(): void { this.editor().openNew(this.tab()); }
+ editCandleModel(item:CandleModel):void {this.editor().editCandleModel(item);}
  editCollection(item: CollectionDefinition): void { this.editor().editCollection(item); }
  editFragrance(item: FragranceDefinition): void { this.editor().editFragrance(item); }
  editFormat(item: FormatDefinition): void { this.editor().editFormat(item); }

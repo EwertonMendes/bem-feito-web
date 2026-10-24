@@ -13,6 +13,7 @@
         <button [class.active]="tab()==='fragrances'" (click)="tab.set('fragrances')">Fragrâncias</button>
         <button [class.active]="tab()==='formats'" (click)="tab.set('formats')">Formatos</button>
         <button [class.active]="tab()==='prices'" (click)="tab.set('prices')">Preços</button>
+        <button [class.active]="tab()==='candleModels'" (click)="tab.set('candleModels')">Modelos de velas</button>
         <button [class.active]="tab()==='units'" (click)="tab.set('units')">Unidades</button>
       </div>
     </section>
@@ -31,9 +32,17 @@
   } @else {
   <div class="bf-table-wrap">
     <table class="bf-table">
-      <thead><tr><th>Nome</th>@if(tab()==='fragrances'){<th>Coleção</th>}@if(tab()==='formats'){<th>Peso aprox.</th>}@if(tab()==='prices'){<th>Formato</th><th>Preço</th>}@if(tab()==='expenseTypes'){<th>Comportamento</th>}@if(tab()==='collections'||tab()==='fragrances'||tab()==='formats'){<th>Custo padrão</th>}<th>Status</th><th></th></tr></thead>
+      <thead><tr><th>Nome</th>@if(tab()==='candleModels'){<th>Volume</th><th>Coleção de aromas</th><th>Preço padrão</th>}@if(tab()==='fragrances'){<th>Coleção</th>}@if(tab()==='formats'){<th>Peso aprox.</th>}@if(tab()==='prices'){<th>Formato</th><th>Preço</th>}@if(tab()==='expenseTypes'){<th>Comportamento</th>}@if(tab()==='collections'||tab()==='fragrances'||tab()==='formats'){<th>Custo padrão</th>}<th>Status</th><th></th></tr></thead>
       <tbody>
-        @if (tab()==='collections') { @for(item of references.collections();track item.id){<tr><td>{{item.name}}</td><td>{{costSummary(item.costComponents)}}</td><td><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></td><td><button class="bf-button secondary" (click)="editCollection(item)">Editar</button></td></tr>} }
+        @if (tab()==='candleModels') {
+          @for(item of references.candleModels();track item.id){
+            <tr><td>{{item.name}}</td><td>{{item.volumeMl}} ml</td><td>{{collectionName(item.sourceCollectionId)}}</td>
+            <td>R$ {{(item.priceCents/100).toFixed(2).replace('.',',')}}</td>
+            <td><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></td>
+            <td><button class="bf-button secondary" (click)="editCandleModel(item)">Editar</button></td></tr>
+          }
+        }
+        @else if (tab()==='collections') { @for(item of references.collections();track item.id){<tr><td>{{item.name}}</td><td>{{costSummary(item.costComponents)}}</td><td><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></td><td><button class="bf-button secondary" (click)="editCollection(item)">Editar</button></td></tr>} }
         @else if (tab()==='fragrances') { @for(item of references.fragrances();track item.id){<tr><td>{{item.name}}</td><td>{{collectionName(item.collectionId)}}</td><td>{{costSummary(item.costComponents)}}</td><td><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></td><td><button class="bf-button secondary" (click)="editFragrance(item)">Editar</button></td></tr>} }
         @else if (tab()==='formats') { @for(item of references.formats();track item.id){<tr><td>{{item.name}}</td><td>{{item.approximateWeightGrams || '—'}} g</td><td>{{costSummary(item.costComponents)}}</td><td><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></td><td><button class="bf-button secondary" (click)="editFormat(item)">Editar</button></td></tr>} }
         @else if (tab()==='prices') { @for(item of references.formatPrices();track item.id){<tr><td>{{collectionName(item.collectionId)}}</td><td>{{formatName(item.formatId)}}</td><td>R$ {{(item.priceCents/100).toFixed(2).replace('.',',')}}</td><td><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></td><td><button class="bf-button secondary" (click)="editPrice(item)">Editar</button></td></tr>} }

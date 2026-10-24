@@ -33,28 +33,60 @@ com referências e subpastas mantidas no Firestore.
 
 ## Publicação e migrações
 
-**Ordem obrigatória:**
+**Situação em 24/10/2026:** Worker DEV foi publicado pelo workflow
+`Deploy Drive Worker DEV` e seu `GET /health` validado. O backend permanece
+deliberadamente com `OAUTH_ENABLED=false`. O banco remoto D1 ainda precisa
+receber as tabelas antes de qualquer fluxo OAuth real. O Angular DEV ainda
+usa o código anterior até o deploy preview do PR.
 
-1. Aplicar migrations em `worker/migrations` no D1 remoto DEV **antes**
-   de ativar OAuth. Não executar em PROD nem em banco de preview compartilhado.
-2. Validar as tabelas `oauth_transactions` e `drive_connections`.
-3. Validar no Cloudflare os secrets `TOKEN_KEYS` e `GOOGLE_CLIENT_SECRET`.
-4. Configurar `OAUTH_ENABLED=true` somente após migrations e verificação.
-5. Publicar o Worker utilizando `wrangler deploy --env dev --keep-vars`, com
-   o token GitHub restrito ao Worker; não sobrescrever os secrets criptografados.
-6. Executar `GET /health` e conexão real com owner, depois com Maria.
-7. Publicar o Angular DEV com o Worker ativo, homologar permissões, Picker,
-   downloads, upload, substituição, remoção e renovação de tokens.
-8. Fazer merge somente após validação. PROD tem configuração própria pendente.
+**Ordem obrigatória para liberar o fluxo real:**
 
-O token de GitHub Actions disponível não possui `D1 Edit`. Para migrations
-remotas, usar o painel D1 da conta Cloudflare (SQL console) ou uma credencial
-temporária de escopo autorizado. Não conceder D1 Edit permanente em toda a
-conta por conveniência.
+1. Acessar o Cloudflare D1 **bem-feito-drive-dev** (ID
+   `baf5dfa3-b9e6-4749-8f64-0cdcf4f482da`) → Console SQL; aplicar
+   integralmente o SQL versionado em
+   [worker/migrations/0001_drive_oauth.sql](../worker/migrations/0001_drive_oauth.sql).
+   Confirmar que as tabelas `drive_connections` e `oauth_transactions`
+   existem. Esse SQL contém `IF NOT EXISTS` para reexecução segura.
+   Alternativamente, com uma credencial temporária **D1 Edit** autorizada,
+   executar `npx wrangler@4.152.0 d1 migrations apply bem-feito-drive-dev --env dev --remote`
+   dentro de `worker/`. Nunca colar tokens em chat ou versionar credenciais.
+2. Confirmar no Worker os secrets criptografados `GOOGLE_CLIENT_SECRET` e
+   `TOKEN_KEYS`. Não trocar suas chaves após a concessão de tokens.
+3. Alterar `OAUTH_ENABLED` de `false` para `true` no arquivo
+   `worker/wrangler.jsonc` da branch **somente depois do schema pronto**.
+   Publicar a nova versão pelo workflow GitHub. A variável no arquivo é a
+   configuração durável; alterar apenas a variável no painel não é suficiente,
+   pois o próximo deploy pode sobrescrever o valor.
+4. Usar o workflow `Deploy Drive Worker DEV`, que publica via
+   `wrangler versions upload --env dev --keep-vars` e
+   `wrangler versions deploy --env dev`. O token de deploy está
+   propositalmente restrito a **Individual Workers Editor**. O comando
+   `wrangler deploy` tradicional **não** funciona com esse token porque
+   exige acesso adicional à configuração do subdomínio `workers.dev`.
+5. Conectar um owner real ao novo OAuth, validar sua identidade e confirmar a
+   leitura da pasta principal e das quatro subpastas já existentes. Depois
+   autorizar e testar também a conta de Maria. Nenhuma pasta precisa ser
+   recriada ou migrada.
+6. Somente então publicar o Angular DEV através do fluxo de preview do
+   próprio PR; validar login, carregamento de imagens, Picker, downloads,
+   upload, atualização com o mesmo `fileId`, exclusão, revogação e
+   refresh após expiração.
+7. Confirmar que nenhum token foi persistido no navegador, que a conexão
+   realmente se restaura após fechar/reabrir o aplicativo e que não há
+   chamados recorrentes de consentimento. **Não fazer merge antes de homologar**.
 
-Com a autenticação nova, o acesso anterior `initTokenClient` deixa de ser
-necessário; o usuário deve realizar uma primeira autorização no novo cliente
-OAuth, sem precisar recriar as pastas.
+O token GitHub existente **não** concede `D1 Edit`. Por segurança não
+habilitar um endpoint público de migrations no Worker nem ampliar o token
+permanente sobre todos os bancos da conta (que também contém o Roteiva).
+A migração é uma intervenção única no D1 DEV via painel ou credencial
+temporária aprovada.
+
+PROD ainda não possui projeto/host/Worker/banco/senha específicos e
+continua desativado; nunca apontá-lo ao D1 DEV.
+
+Com o novo cliente OAuth é esperada a autorização uma única vez de cada
+conta Google. As imagens e subpastas pré-existentes permanecem no mesmo Drive.
+O acesso efetivo precisa ser homologado antes do deploy do frontend.
 
 ### Validar localmente
 

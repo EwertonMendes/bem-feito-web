@@ -1,0 +1,25 @@
+<section class="multi">
+  <div class="heading"><strong>{{label()}}</strong><small>{{value().length}} selecionado(s)</small></div>
+  <button type="button" class="trigger" [attr.aria-expanded]="expanded()" [attr.aria-controls]="controlId" (click)="expanded.set(!expanded())">
+    <span class="summary">
+      @if(selectedNames().length){
+        {{ selectedNames().slice(0, 2).join(', ') }}@if(selectedNames().length > 2){ e mais {{selectedNames().length - 2}} }
+      } @else { <span class="placeholder">{{placeholder()}}</span> }
+    </span>
+    <bf-icon name="chevron-right" [class.rotated]="expanded()" />
+  </button>
+  @if(expanded()){
+    <div class="panel" [id]="controlId">
+      <label class="search"><bf-icon name="search" /><input type="search" [value]="search()" (input)="search.set($any($event.target).value)" [attr.aria-label]="'Pesquisar ' + label().toLowerCase()" placeholder="Pesquisar..." /></label>
+      <div class="tools">
+        <button type="button" (click)="selectVisible()" [disabled]="!selectable().length || allVisibleSelected()">Selecionar visíveis</button>
+        <button type="button" (click)="clear()" [disabled]="!value().length">Limpar seleção</button>
+      </div>
+      <div class="options">
+        @for(option of filtered();track option.value){
+          <bf-checkbox [label]="option.label" [checked]="value().includes(option.value)" [disabled]="option.disabled ?? false" (checkedChange)="toggle(option.value, $event)" />
+        } @empty { <p class="empty">Nenhuma opção encontrada.</p> }
+      </div>
+    </div>
+  }
+</section>

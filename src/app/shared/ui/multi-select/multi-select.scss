@@ -1,0 +1,25 @@
+:host{display:block;min-width:0}
+.multi{display:grid;gap:9px;min-width:0}
+.heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.heading strong{font-size:.82rem;color:var(--text);font-weight:680}
+.heading small{font-size:.72rem;color:var(--muted)}
+.trigger{width:100%;min-height:46px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 13px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--text);text-align:left;font:inherit;cursor:pointer}
+.trigger:hover{border-color:color-mix(in srgb,var(--brand) 35%,var(--line));background:var(--surface-elevated)}
+.trigger:focus-visible,.tools button:focus-visible{outline:3px solid color-mix(in srgb,var(--brand) 28%,transparent);outline-offset:2px}
+.trigger bf-icon{width:16px;height:16px;flex:none;color:var(--muted);transition:transform .16s ease}
+.trigger bf-icon.rotated{transform:rotate(90deg)}
+.summary{font-size:.83rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.placeholder{color:var(--muted)}
+.panel{padding:12px;border:1px solid var(--line);border-radius:13px;background:var(--surface-2);display:grid;gap:10px}
+.search{display:flex;align-items:center;gap:8px;min-height:40px;padding:0 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.search:focus-within{border-color:var(--brand)}
+.search bf-icon{width:16px;height:16px;color:var(--muted)}
+.search input{border:0;background:none;color:var(--text);outline:0;min-width:0;width:100%;font:inherit;font-size:.8rem}
+.tools{display:flex;justify-content:space-between;gap:12px}
+.tools button{padding:6px 0;border:0;background:transparent;color:var(--brand-strong);font-size:.74rem;font-weight:680;cursor:pointer}
+.tools button:disabled{opacity:.42;cursor:default}
+.options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 10px;max-height:205px;overflow:auto;scrollbar-width:thin}
+.options bf-checkbox{min-height:42px}
+.empty{grid-column:1/-1;text-align:center;color:var(--muted);font-size:.8rem}
+@media(max-width:470px){.options{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.trigger bf-icon{transition:none}}

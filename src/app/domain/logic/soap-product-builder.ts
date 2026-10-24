@@ -22,7 +22,7 @@ export function formatPriceForSelection(
   customPricesCents: Readonly<Record<string, number>>,
 ): { cents: number | null; source: SoapCandidate['priceSource'] } {
   if (Object.prototype.hasOwnProperty.call(customPricesCents, formatId)) {
-    return { cents: customPricesCents[formatId], source: 'custom' };
+    return { cents: customPricesCents[formatId]!, source: 'custom' };
   }
   const price = priceRules.find(item => item.active && item.collectionId === collectionId && item.formatId === formatId);
   return price ? { cents: price.priceCents, source: 'default' } : { cents: null, source: 'missing' };

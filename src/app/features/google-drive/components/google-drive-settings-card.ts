@@ -61,6 +61,17 @@ import { ToastService } from '../../../core/services/toast.service';
               {{ connectLabel() }}
             </button>
           }
+          @if (integration.linked() && !confirmDisconnect()) {
+            <button class="bf-button secondary" type="button" [disabled]="!!busy()"
+              (click)="confirmDisconnect.set(true)">Desconectar</button>
+          }
+          @if (confirmDisconnect()) {
+            <button class="bf-button secondary" type="button" [disabled]="!!busy()"
+              (click)="confirmDisconnect.set(false)">Cancelar</button>
+            <button class="bf-button secondary" type="button" [disabled]="!!busy()"
+              [bfLoadingButton]="busy() === 'disconnect'"
+              (click)="disconnect()">Confirmar desconexão</button>
+          }
           @if (auth.canAdminister()) {
             <button
               class="bf-button"
@@ -87,12 +98,20 @@ import { ToastService } from '../../../core/services/toast.service';
 export class GoogleDriveSettingsCard {
   readonly integration = inject(DriveIntegrationService);
   readonly auth = inject(AuthService);
-  readonly busy = signal<'connect' | 'configure' | null>(null);
+  readonly busy = signal<'connect' | 'configure' | 'disconnect' | null>(null);
+  readonly confirmDisconnect = signal(false);
 
   private readonly toast = inject(ToastService);
   private readonly errors = inject(ErrorService);
 
   constructor() {
+    const outcome = new URLSearchParams(window.location.search).get('drive');
+    if (outcome) {
+      if (outcome === 'connected') this.toast.success('Google Drive autorizado. O acesso agora será renovado automaticamente.');
+      else if (outcome === 'cancelled') this.toast.error('A conexão com o Google Drive foi cancelada.');
+      else this.toast.error('Não foi possível concluir a autorização do Google Drive. Verifique a conta selecionada.');
+      window.history.replaceState(null, '', window.location.pathname + window.location.hash);
+    }
     void this.integration.load();
   }
 
@@ -122,6 +141,18 @@ export class GoogleDriveSettingsCard {
     } finally {
       this.busy.set(null);
     }
+  }
+
+  async disconnect(): Promise<void> {
+    if (this.busy()) return;
+    this.busy.set('disconnect');
+    try {
+      await this.integration.disconnect();
+      this.confirmDisconnect.set(false);
+      this.toast.success('Google Drive desconectado desta conta.');
+    } catch (error) {
+      this.toast.error(this.errors.message(error));
+    } finally { this.busy.set(null); }
   }
 
   async configure(): Promise<void> {

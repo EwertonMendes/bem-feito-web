@@ -58,7 +58,8 @@ export class DriveIntegrationService {
 
       const nextStatus: DriveIntegrationStatus = linked ? 'ready' : 'disconnected';
       if (status !== nextStatus) this.statusState.set(nextStatus);
-      this.authorizationNeededState.set(linked);
+      // An expired browser token is recoverable silently; do not flash the consent banner.
+      this.authorizationNeededState.set(false);
     });
   }
 

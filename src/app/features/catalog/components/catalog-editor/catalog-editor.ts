@@ -361,7 +361,11 @@ export class CatalogEditor {
       stock: existing?.stock ?? 0, minimumStock: model.minimumStock, image: existing?.image,
       recipe: this.recipe().filter((item) => item.inputId && item.quantity > 0 && item.unitId),
     };
-    const id = await this.store.saveProduct(product);
+    // When a linked candle aroma is edited manually, clear the obsolete reference
+    // atomically with the product update, never leaving a stale fragrance link.
+    const unlinkCandleFragrance = model.categoryId === 'scented-candle' &&
+      !!existing?.candleFragranceId && existing.variantName !== model.variantName.trim();
+    const id = await this.store.saveProduct(product, unlinkCandleFragrance);
     // Se a imagem falhar após salvar o cadastro, a próxima tentativa atualiza o mesmo documento.
     this.editingId.set(id);
     await this.applyImageChange('products', id, existing?.image, (image) => this.store.setProductImage(id, image));

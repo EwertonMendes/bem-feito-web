@@ -48,7 +48,7 @@ jobs:
       - name: Bundle Cloudflare Worker in dry-run mode
         working-directory: worker
         run: npx --yes wrangler@4.152.0 deploy --dry-run --env dev --outdir /tmp/bem-feito-drive-build
-      - run: node --experimental-strip-types --test worker/tests/security.test.mjs
+      - run: node --experimental-strip-types --test worker/tests/*.test.mjs
       - run: npm run test:migration
       - run: npm run test:data-admin:emulator
       - run: npm run security:audit

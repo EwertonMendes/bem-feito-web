@@ -8,7 +8,6 @@ const env = {
   ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:'bem-feito-dev',
   FRONTEND_ORIGIN:'https://bem-feito-dev.web.app',
   GOOGLE_CLIENT_ID:'fake-client',
-  GOOGLE_CLIENT_SECRET:'not-for-production',
   OAUTH_REDIRECT_URI:'https://bem-feito-drive-dev.ewertonmendes9.workers.dev/oauth/drive/callback',
   OAUTH_ENABLED:'false',TOKEN_KEY_VERSION:'v1',
   TOKEN_KEYS:JSON.stringify({v1:b64url(webcrypto.getRandomValues(new Uint8Array(32)))})

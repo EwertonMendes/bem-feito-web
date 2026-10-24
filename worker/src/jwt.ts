@@ -17,6 +17,27 @@ function reject(stage: string): never {
   throw new ApiError(401, 'invalid_identity_' + stage);
 }
 
+const FIREBASE_KEYS_URL = 'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
+
+/** DEV-only health probe; never returns keys, tokens, account data or raw upstream bodies. */
+export async function probeFirebaseKeys(): Promise<Response> {
+  let response: Response;
+  try {
+    response = await fetch(FIREBASE_KEYS_URL, { signal: AbortSignal.timeout(8000), redirect: 'follow' });
+  } catch (error) {
+    const kind = error instanceof Error && error.name === 'TimeoutError' ? 'timeout' : 'transport';
+    return Response.json({reachable:false,stage:kind},{status:503});
+  }
+  if (!response.ok) return Response.json({reachable:false,stage:'http',upstreamStatus:response.status},{status:503});
+  let content: {keys?:Jwk[]};
+  try { content = await response.json() as {keys?:Jwk[]}; }
+  catch { return Response.json({reachable:false,stage:'json'},{status:503}); }
+  if (!Array.isArray(content.keys) || !content.keys.some(key=>key.kty==='RSA' && key.kid)) {
+    return Response.json({reachable:false,stage:'schema'},{status:503});
+  }
+  return Response.json({reachable:true,stage:'ok',keyCount:content.keys.length});
+}
+
 async function keys(url: string, reload = false): Promise<Jwk[]> {
   const hit = jwksCache.get(url);
   if (!reload && hit && hit.expiresAt > Date.now()) return hit.keys;
@@ -24,7 +45,7 @@ async function keys(url: string, reload = false): Promise<Jwk[]> {
   try {
     response = await fetch(url, {
       signal: AbortSignal.timeout(8000),
-      redirect: 'error'
+      redirect: 'follow'
     });
   } catch { throw new ApiError(503, 'identity_keys_unavailable'); }
   if (!response.ok) throw new ApiError(503, 'identity_keys_unavailable');

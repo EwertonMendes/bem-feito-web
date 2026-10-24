@@ -33,49 +33,18 @@ com referências e subpastas mantidas no Firestore.
 
 ## Publicação e migrações
 
-**Situação em 24/10/2026:** Worker DEV foi publicado pelo workflow
-`Deploy Drive Worker DEV` e seu `GET /health` validado. O backend permanece
-deliberadamente com `OAUTH_ENABLED=false`. O banco remoto D1 ainda precisa
-receber as tabelas antes de qualquer fluxo OAuth real. O Angular DEV ainda
-usa o código anterior até o deploy preview do PR.
+**Situação em 24/10/2026:** migration D1 aplicada e conferida, OAuth ativado no painel Cloudflare pela configuração de produção do OAuth Google (ambiente aplicativo permanece DEV), `OAUTH_ENABLED=true` versionado no Wrangler; Worker com `/health` 200, rota protegida retornando 401 sem autenticação e CORS validado pelo provisionamento. O Angular do PR #77 foi publicado em Firebase DEV por `/deploy-dev-preview`, com commit verificado. Ainda é necessária homologação do consentimento real com owner e Maria, acesso aos arquivos existentes e refresh. Não realizar merge até validar o OAuth ponta a ponta.
 
-**Ordem obrigatória para liberar o fluxo real:**
+**Estado e validação pós-publicação:**
 
-1. Acessar o Cloudflare D1 **bem-feito-drive-dev** (ID
-   `baf5dfa3-b9e6-4749-8f64-0cdcf4f482da`) → Console SQL; aplicar
-   integralmente o SQL versionado em
-   [worker/migrations/0001_drive_oauth.sql](../worker/migrations/0001_drive_oauth.sql).
-   Confirmar que as tabelas `drive_connections` e `oauth_transactions`
-   existem. Esse SQL contém `IF NOT EXISTS` para reexecução segura.
-   Alternativamente, com uma credencial temporária **D1 Edit** autorizada,
-   executar `npx wrangler@4.152.0 d1 migrations apply bem-feito-drive-dev --env dev --remote`
-   dentro de `worker/`. Nunca colar tokens em chat ou versionar credenciais.
-2. Confirmar no Worker os secrets criptografados `GOOGLE_CLIENT_SECRET` e
-   `TOKEN_KEYS`. Não trocar suas chaves após a concessão de tokens.
-3. Alterar `OAUTH_ENABLED` de `false` para `true` no arquivo
-   `worker/wrangler.jsonc` da branch **somente depois do schema pronto**.
-   Publicar a nova versão pelo workflow GitHub. A variável no arquivo é a
-   configuração durável; alterar apenas a variável no painel não é suficiente,
-   pois o próximo deploy pode sobrescrever o valor.
-4. Usar o workflow `Deploy Drive Worker DEV`, que publica via
-   `wrangler versions upload --env dev --keep-vars` e
-   `wrangler versions deploy --env dev`. O token de deploy está
-   propositalmente restrito a **Individual Workers Editor**. O comando
-   `wrangler deploy` tradicional **não** funciona com esse token porque
-   exige acesso adicional à configuração do subdomínio `workers.dev`.
-5. Conectar um owner real ao novo OAuth, validar sua identidade e confirmar a
-   leitura da pasta principal e das quatro subpastas já existentes. Depois
-   autorizar e testar também a conta de Maria. Nenhuma pasta precisa ser
-   recriada ou migrada.
-6. Somente então publicar o Angular DEV através do fluxo de preview do
-   próprio PR; validar login, carregamento de imagens, Picker, downloads,
-   upload, atualização com o mesmo `fileId`, exclusão, revogação e
-   refresh após expiração.
-7. Confirmar que nenhum token foi persistido no navegador, que a conexão
-   realmente se restaura após fechar/reabrir o aplicativo e que não há
-   chamados recorrentes de consentimento. **Não fazer merge antes de homologar**.
+1. D1 `bem-feito-drive-dev` possui as tabelas `oauth_transactions` e `drive_connections`, aplicadas manualmente no SQL Console e confirmadas pelo Codex.
+2. Worker DEV já recebeu `OAUTH_ENABLED=true` no painel Cloudflare. A mesma configuração foi registrada em `worker/wrangler.jsonc`. Os secrets `GOOGLE_CLIENT_SECRET` e `TOKEN_KEYS` foram preservados.
+3. O workflow `Deploy Drive Worker DEV` utiliza `wrangler versions upload --env dev` e `wrangler versions deploy --env dev`, com token de escopo `Individual Workers Editor`; variáveis públicas são integralmente gerenciadas pelo Wrangler. Secrets permanecem preservados no Cloudflare entre deployments, conforme documentação oficial, sem `--keep-vars`.
+4. Frontend Angular DEV foi publicado pelo workflow de preview do PR #77. O commit publicado é verificado pelo GitHub.
+5. **Homologação pendente:** cada conta (owner e Maria) deve concluir uma autorização inicial do cliente OAuth novo. Verificar leitura das pastas e arquivos atuais, renovação do token após expiração, upload, substituição, lixeira e desconexão. O procedimento de consentimento real depende da conta Google autenticada no navegador; não automatizar com credenciais compartilhadas.
+6. Somente depois da homologação promover o PR. PROD permanece isolado e desativado.
 
-O token GitHub existente **não** concede `D1 Edit`. Por segurança não
+O token GitHub existente **não** concede `D1 Edit`. A migration já foi aplicada manualmente. Por segurança não
 habilitar um endpoint público de migrations no Worker nem ampliar o token
 permanente sobre todos os bancos da conta (que também contém o Roteiva).
 A migração é uma intervenção única no D1 DEV via painel ou credencial

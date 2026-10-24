@@ -63,7 +63,7 @@
         </section>
       }
 
-      @if (imagesEnabled && !isCreatingSoap()) {
+      @if (imagesEnabled && (!isCreatingSoap() || soapCreator()?.candidateCount() === 1)) {
         <div class="image-field">
           <bf-image-upload
             label="Imagem"

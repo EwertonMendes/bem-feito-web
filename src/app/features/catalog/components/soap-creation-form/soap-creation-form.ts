@@ -145,7 +145,7 @@ export class SoapCreationForm {
     if(candidates.some(row => !row.duplicate && (row.priceCents === null || !Number.isSafeInteger(row.priceCents) || row.priceCents < 0)))
       throw new Error('Há formatos sem preço válido. Configure o preço antes de continuar.');
   }
-  async save():Promise<number> {
+  async save():Promise<{createdCount:number;singleProductId?:string}> {
     this.validate(this.rows());
     // Releitura autoritativa para impedir salvar sobre um catálogo desatualizado.
     const existing = await this.repository.all();
@@ -162,7 +162,7 @@ export class SoapCreationForm {
       additionalCostCents:toCents(this.additionalCost()),averageUnitCostCents:0,
       stock:0,minimumStock:this.minimumStock(),recipe:this.validRecipe().map(item=>({...item})),
     }));
-    await this.store.createProductVariations(products);
-    return products.length;
+    const created = await this.store.createProductVariations(products);
+    return {createdCount:created.length,singleProductId:created.length===1?created[0]?.id:undefined};
   }
 }

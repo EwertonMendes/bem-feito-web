@@ -287,7 +287,17 @@ export class CatalogEditor {
     this.saving.set(true);
     try {
       if (this.isCreatingSoap()) {
-        const count = await this.soapCreator()!.save();
+        const result = await this.soapCreator()!.save();
+        // A gravação dos produtos já foi concluída. Falhas no upload não podem repetir o lote.
+        if (result.singleProductId && this.soapCreator()!.candidateCount() === 1 && this.imageFile()) {
+          try {
+            const id = result.singleProductId;
+            await this.applyImageChange('products', id, undefined, image => this.store.setProductImage(id, image));
+          } catch {
+            this.toast.error('Produto criado, mas não foi possível salvar a imagem. Adicione a foto pela edição do produto.');
+          }
+        }
+        const count = result.createdCount;
         this.toast.success(count + (count === 1 ? ' produto criado com sucesso.' : ' produtos criados com sucesso.'));
       } else if (this.kind() === 'products') {
         await this.saveProduct();

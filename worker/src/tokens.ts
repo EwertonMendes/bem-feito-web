@@ -6,6 +6,7 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve,ms));
 async function row(env: Env, uid: string): Promise<Connection> {
   const connection = await env.DB.prepare('SELECT * FROM drive_connections WHERE owner_uid=?')
     .bind(uid).first<Connection>();
+  if (connection?.status === 'revocation_pending') throw new ApiError(409,'revocation_pending');
   if (!connection || connection.status !== 'connected' || !connection.encrypted_refresh_token) {
     throw new ApiError(409,'reconnect_required');
   }

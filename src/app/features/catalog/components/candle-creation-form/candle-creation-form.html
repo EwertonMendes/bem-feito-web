@@ -1,0 +1,70 @@
+<div class="soap-create candle-create">
+  <section class="step">
+    <div class="step-heading"><span class="step-number">1</span><div><strong>Modelo da vela</strong><small>O nome e o volume são definidos automaticamente pelo modelo.</small></div></div>
+    <label class="bf-field"><span>Modelo</span><bf-select [value]="modelId()" (valueChange)="selectModel($event)" [options]="modelOptions()" ariaLabel="Modelo da vela" /></label>
+    @if(model();as selectedModel){
+      <div class="model-summary"><bf-icon name="check" /><div><strong>{{selectedModel.name}}</strong><small>Volume: {{selectedModel.volumeMl}} ml · Coleção de aromas: {{collection()?.name ?? 'Não configurada'}}</small></div></div>
+    }
+    @if(!sourceValid()){
+      <p class="review-alert" role="alert">Coleção de aromas não encontrada ou inativa. Configure o modelo em Configurações → Modelos de velas antes de continuar.</p>
+    }
+  </section>
+  <section class="step">
+    <div class="step-heading"><span class="step-number">2</span><div><strong>Escolha os aromas</strong><small>Somente fragrâncias ativas da coleção configurada para este modelo.</small></div></div>
+    <bf-multi-select label="Aromas" placeholder="Selecione um ou vários aromas" [options]="fragranceOptions()" [value]="fragranceIds()" (valueChange)="fragranceIds.set($event)" />
+    <button class="bf-link-action" type="button" [disabled]="!sourceValid()" (click)="addNewFragrance()"><bf-icon name="plus" /> Criar fragrância</button>
+  </section>
+  <section class="step">
+    <div class="step-heading"><span class="step-number">3</span><div><strong>Preço por vela</strong><small>O preço do modelo é usado automaticamente em todas as velas selecionadas.</small></div></div>
+    <div class="candle-price-row">
+      <label class="bf-field"><span>Preço de venda</span><bf-number-input kind="currency" [min]="0" [value]="fromPrice()" (valueChange)="setPrice($event)" ariaLabel="Preço de venda de cada vela" /></label>
+      @if(customPriceCents() !== null){<button type="button" class="bf-button secondary" (click)="customPriceCents.set(null)">Restaurar padrão</button>}
+    </div>
+    <small class="hint">{{customPriceCents()===null?'Preço padrão do modelo':'Preço personalizado somente para estes produtos'}} · Não altera valores de velas já cadastradas.</small>
+  </section>
+  <section class="step">
+    <button class="advanced-toggle" type="button" [attr.aria-expanded]="advancedExpanded()" (click)="advancedExpanded.set(!advancedExpanded())">
+      <span><strong>Configurações adicionais</strong><small>Estoque mínimo, custo adicional e receita específica destas velas.</small></span><bf-icon name="chevron-right" [class.rotated]="advancedExpanded()" />
+    </button>
+    @if(advancedExpanded()){
+      <div class="advanced-body">
+        <div class="advanced-grid">
+          <label class="bf-field"><span>Estoque mínimo</span><bf-number-input kind="integer" [min]="0" [value]="minimumStock()" (valueChange)="minimumStock.set($event)" ariaLabel="Estoque mínimo" /></label>
+          <label class="bf-field"><span>Custo adicional por unidade</span><bf-number-input kind="currency" [min]="0" [value]="additionalCost()" (valueChange)="additionalCost.set($event)" ariaLabel="Custo adicional por vela" /></label>
+        </div>
+        <bf-checkbox label="Produtos ativos" [checked]="active()" (checkedChange)="active.set($event)" />
+        <div class="recipe-head"><div><strong>Insumos específicos das velas</strong><small>Não herda a receita de sabonetes. Configure os insumos por vela apenas se tiver as quantidades corretas.</small></div><button type="button" class="bf-button secondary" (click)="addComponent()">+ Insumo</button></div>
+        @for(item of recipe();track $index;let i=$index){
+          <div class="recipe-row">
+            <bf-select-search [options]="inputOptions()" [value]="item.inputId" (valueChange)="updateInput(i,$event)" ariaLabel="Insumo da vela" />
+            <bf-number-input kind="decimal" [min]="0" [decimals]="3" [value]="item.quantity" (valueChange)="updateComponent(i,{quantity:$event})" ariaLabel="Quantidade de insumo" />
+            <small>{{inputUnit(item.inputId)}}</small>
+            <button class="bf-icon-button" type="button" (click)="removeComponent(i)" aria-label="Remover insumo"><bf-icon name="trash" /></button>
+          </div>
+        }
+        @if(invalidRecipe()){<p role="alert" class="review-alert">Complete ou remova os insumos incompletos.</p>}
+        <p class="hint">@if(cost();as estimate){ {{estimate.costPending?'Custo parcial':'Custo estimado'}}: {{currency(estimate.unitCostCents)}} } @else { Custo de produção ainda não configurado. }</p>
+      </div>
+    }
+  </section>
+  <section class="step review">
+    <div class="step-heading"><span class="step-number">4</span><div><strong>Revise o cadastro</strong><small>As velas são independentes e entram com estoque zero. Imagens de lotes maiores poderão ser adicionadas depois.</small></div></div>
+    <div class="review-stats">
+      <div><strong>{{rows().length}}</strong><small>Selecionadas</small></div>
+      <div><strong>{{freshRows().length}}</strong><small>Novas</small></div>
+      <div><strong>{{duplicateCount()}}</strong><small>Existentes</small></div>
+    </div>
+    @if(duplicateCount()){<p class="review-note">As {{duplicateCount()}} vela(s) já cadastradas serão ignoradas. Não haverá alteração no estoque ou no preço delas.</p>}
+    @if(fragranceIds().length>30){<p class="review-alert" role="alert">Escolha no máximo 30 aromas por cadastro.</p>}
+    @if(rows().length){
+      <div class="preview-list" aria-label="Prévia das velas">
+        @for(row of rows();track row.fragranceId){
+          <div class="preview-row" [class.existing]="row.duplicate">
+            <div class="preview-name"><strong>{{row.displayName}}</strong><small>{{row.duplicate?'Já cadastrada — ignorada':'Nova vela · estoque inicial zero'}}</small></div>
+            <div class="preview-values"><strong>{{currency(priceCents() ?? 0)}}</strong></div>
+          </div>
+        }
+      </div>
+    } @else {<div class="preview-empty">Escolha os aromas para visualizar as velas que serão criadas.</div>}
+  </section>
+</div>

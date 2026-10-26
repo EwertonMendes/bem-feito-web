@@ -179,6 +179,7 @@ export async function apply(request: Request, plan: Plan, db: Firestore, archive
     if (request.operation !== 'backup') {
       for (const [i, row] of plan.rows.entries()) {
         const after = decode(row.after, db);
+        if (request.operation === 'migrate' && hash(row.after) === hash(row.before)) continue;
         if (after === null) { if (current[i].exists) tx.delete(refs[i]); }
         else if (request.operation === 'restore') tx.set(refs[i], after);
         else tx.set(refs[i], { ...after, ...(current[i].exists ? {} : { createdAt: now, createdBy: `data-admin:${actor.id}` }), updatedAt: now, updatedBy: `data-admin:${actor.id}` });

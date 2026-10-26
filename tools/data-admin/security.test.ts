@@ -5,6 +5,7 @@ import { validateRequest, assertDestination, assertScope, requestHash, hash, red
 import { parseCommand, assertPermission, assertPull, assertTrustedMasterMigration, authorize } from './gate.ts';
 import { FirestoreArchive } from './storage.ts';
 import { report, validBackupPath } from './engine.ts';
+import { retiredInputData } from './migration.ts';
 import { encode } from './codec.ts';
 const config = JSON.parse(await readFile(new URL('./config.json', import.meta.url), 'utf8'));
 const commit = 'a'.repeat(40);
@@ -18,6 +19,27 @@ test('schema rejects arbitrary code, queries, fields, credentials and protected 
   assert.throws(() => validateRequest({ ...request, changes: [{ ...request.changes[0], expected: {} }] }));
   assert.throws(() => validateRequest({ ...request, schemaVersion: 2 }));
 });
+test('cost-only migration requires exact explicit code selection and preserves financial and legacy balances', () => {
+  const base = { code: 'GLI-01', name: 'Glicerina', stock: 530, committedStock: 3,
+    reservedPhysicalStock: 2, averageUnitCostCents: 4, costBasisQuantity: 500,
+    costBasisValueCents: 2100, createdAt: 'historical', trackingMode: 'exact' };
+  const next = retiredInputData(base);
+  assert.equal(next.trackingMode, 'untracked');
+  assert.equal(next.stock, 530);
+  assert.equal(next.averageUnitCostCents, 4);
+  assert.equal(next.costBasisValueCents, 2100);
+  assert.equal(next.createdAt, 'historical');
+  assert.equal(next.committedStock, 0);
+  assert.equal(next.reservedPhysicalStock, 0);
+  const migration = { schemaVersion: 1, id: 'inputs-cutover-test', environment: 'dev', projectId: 'bem-feito-dev',
+    operation: 'migrate', migration: 'input-cost-only-v1', inputCodes: ['GLI-01'],
+    deploymentSha: commit, destructive: { projectId: 'bem-feito-dev', paths: ['inputs'] } };
+  assert.equal(validateRequest(migration).migration, 'input-cost-only-v1');
+  assert.throws(() => validateRequest({ ...migration, inputCodes: [] }));
+  assert.throws(() => validateRequest({ ...migration, inputCodes: ['GLI-01','GLI-01'] }));
+  assert.throws(() => validateRequest({ ...request, inputCodes: ['GLI-01'] }));
+});
+
 test('DEV cannot select PROD; unknown production destination fails closed', () => {
   assert.equal(assertDestination(validateRequest(request), config).projectId, 'bem-feito-dev');
   assert.throws(() => assertDestination(validateRequest({ ...request, environment: 'prod' }), config));

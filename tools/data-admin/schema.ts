@@ -7,7 +7,7 @@ export type Change = Target & { action: 'create' | 'update' | 'delete'; expected
 export type Request = {
   schemaVersion: 1; id: string; environment: Environment; projectId: string;
   operation: 'read' | 'inspect' | 'verify' | 'create' | 'update' | 'delete' | 'batch-update' | 'backup' | 'restore' | 'migrate';
-  targets?: Target[]; changes?: Change[]; backup?: string; migration?: 'unit-products-v2' | 'product-categories-v1';
+  targets?: Target[]; changes?: Change[]; backup?: string; migration?: 'unit-products-v2' | 'product-categories-v1' | 'input-cost-only-v1'; inputCodes?: string[];
   deploymentSha?: string; destructive?: { projectId: string; paths: string[] };
 };
 
@@ -72,13 +72,14 @@ function fields(collection: string, value: unknown) {
 }
 export function validateRequest(value: unknown): Request {
   object(value);
-  exact(value, ['schemaVersion', 'id', 'environment', 'projectId', 'operation', 'targets', 'changes', 'backup', 'migration', 'deploymentSha', 'destructive']);
+  exact(value, ['schemaVersion', 'id', 'environment', 'projectId', 'operation', 'targets', 'changes', 'backup', 'migration', 'deploymentSha', 'inputCodes', 'destructive']);
   invariant(value.schemaVersion === 1, 'Unknown schema version'); identifier(value.id);
   invariant(['dev', 'prod'].includes(String(value.environment)), 'Unknown environment');
   invariant(typeof value.projectId === 'string' && /^[a-z][a-z0-9-]{5,29}$/.test(value.projectId), 'Invalid project ID');
   const operations = ['read', 'inspect', 'verify', 'create', 'update', 'delete', 'batch-update', 'backup', 'restore', 'migrate'];
   invariant(operations.includes(String(value.operation)), 'Operation not allowed');
   const op = String(value.operation);
+  if (op !== 'migrate') invariant(value.inputCodes === undefined, 'Input list is permitted only for registered migrations');
   if (['read', 'inspect', 'verify', 'backup'].includes(op)) {
     invariant(Array.isArray(value.targets) && value.targets.length > 0 && value.targets.length <= 200, 'Expected 1..200 explicit targets');
     value.targets.forEach(target);
@@ -88,7 +89,12 @@ export function validateRequest(value: unknown): Request {
     invariant(value.targets === undefined && value.changes === undefined && value.migration === undefined && value.deploymentSha === undefined, 'Incompatible restore fields');
   } else if (op === 'migrate') {
     invariant(value.environment === 'dev' && value.projectId === 'bem-feito-dev', 'Migration is DEV only');
-    invariant(['unit-products-v2', 'product-categories-v1'].includes(String(value.migration)), 'Unknown registered migration'); sha(value.deploymentSha);
+    invariant(['unit-products-v2', 'product-categories-v1', 'input-cost-only-v1'].includes(String(value.migration)), 'Unknown registered migration'); sha(value.deploymentSha);
+    if (value.migration === 'input-cost-only-v1') {
+      invariant(Array.isArray(value.inputCodes) && value.inputCodes.length > 0 && value.inputCodes.length <= 80, 'Explicit nonempty material codes required');
+      invariant(value.inputCodes.every(code => typeof code === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(code)), 'Invalid material code');
+      invariant(new Set(value.inputCodes).size === value.inputCodes.length, 'Duplicated material code');
+    } else invariant(value.inputCodes === undefined, 'Unexpected material codes for migration');
     invariant(value.changes === undefined && value.targets === undefined && value.backup === undefined, 'Migration accepts no code or custom data');
   } else {
     invariant(Array.isArray(value.changes) && value.changes.length > 0 && value.changes.length <= 200, 'Expected 1..200 changes');

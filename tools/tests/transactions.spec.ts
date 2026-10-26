@@ -587,6 +587,76 @@ describe('Actual repositories against restrictive emulator rules', () => {
     cancel: false, lines: [{ productId: 'p', quantity }],
   });
 
+  const retireInput = async (id: string) => env.withSecurityRulesDisabled(async ctx => {
+    await setDoc(doc(ctx.firestore(), 'inputs', id), {
+      trackingMode: 'untracked', minimumStockConfigured: false, minimumStock: 0,
+      stockStatus: 'untracked', committedStock: 0, reservedPhysicalStock: 0,
+    }, { merge: true });
+  });
+
+  it('retains old material debit history without restoring a retired balance on production correction', async () => {
+    const before = await production.create('p', 1, day);
+    expect(await data('inputs', 'i')).toMatchObject({ stock: 15 });
+    await retireInput('i');
+    const draft = { expectedVersion: 0, businessDate: day, notes: '', reason: 'Quantidade revisada',
+      cancel: false, lines: [{ productId: 'p', quantity: 2 }] };
+    const preview = await productionCorrection.preview(before.production.id, draft);
+    expect(preview.impacts.every(x => x.itemType === 'product')).toBe(true);
+    await productionCorrection.apply(before.production.id, draft);
+    expect(await data('inputs', 'i')).toMatchObject({ stock: 15, trackingMode: 'untracked' });
+    expect(await data('products', 'p')).toMatchObject({ stock: 12 });
+    expect(await data('productions', before.production.id)).toMatchObject({ totalCostCents: 1000 });
+    expect(await count('productionCorrections')).toBe(1);
+  });
+
+  it('does not refund retired material stock when cancelling an old delivered sale', async () => {
+    const result = await sales.create({ ...draft(), lines: [
+      { kind: 'product', sourceId: 'p', quantity: 1 },
+      { kind: 'addition', sourceId: 'a', quantity: 1 },
+    ] });
+    expect(await data('inputs', 'i')).toMatchObject({ stock: 19 });
+    await retireInput('i');
+    await sales.cancel(result.sale.id);
+    expect(await data('products', 'p')).toMatchObject({ stock: 10 });
+    expect(await data('inputs', 'i')).toMatchObject({ stock: 19 });
+    expect(await data('sales', result.sale.id)).toMatchObject({ status: 'cancelled' });
+  });
+
+  it('edits legacy additions after retirement without reviving old input inventory', async () => {
+    const created = await sales.create({ ...draft(), lines: [
+      { kind: 'product', sourceId: 'p', quantity: 1 },
+      { kind: 'addition', sourceId: 'a', quantity: 1 },
+    ] });
+    await retireInput('i');
+    const line = created.sale.items.find(item => item.kind === 'product')!;
+    const corrected = await advancedCorrections.correct(created.sale.id, {
+      expectedSignature: saleCorrectionSignature(created.sale),
+      lines: [{ id: line.id, kind: 'product', sourceId: 'p', quantity: 1, unitPriceCents: 1000 }],
+      discountCents: 0,
+      reason: 'Adicional removido',
+    });
+    expect(corrected.sale.items).toHaveLength(1);
+    expect(await data('inputs', 'i')).toMatchObject({ stock: 19 });
+    expect(await data('products', 'p')).toMatchObject({ stock: 9 });
+  });
+
+  it('cost-only receipts retain purchase reference without creating physical stock', async () => {
+    await retireInput('i');
+    const created = await finance.createPurchaseBatch({
+      businessDate: day, receiptStatus: 'received',
+      items: [{ inputId: 'i', unitId: 'u', quantity: 3, amountCents: 720 }],
+    });
+    expect(created.expense.amountCents).toBe(720);
+    expect(await data('inputs', 'i')).toMatchObject({
+      stock: 20, trackingMode: 'untracked', costBasisQuantity: 23, costBasisValueCents: 2720,
+    });
+    expect(await count('stockMovements')).toBe(0);
+    await corrections.cancel(created.expense.id, 'Compra duplicada');
+    expect(await data('inputs', 'i')).toMatchObject({
+      stock: 20, costBasisQuantity: 20, costBasisValueCents: 2000,
+    });
+  });
+
   it('corrects quantity atomically using historical costs and records an immutable revision', async () => {
     const id = (await production.create('p', 2, day)).production.id;
     const preview = await productionCorrection.preview(id, correctionDraft(3));

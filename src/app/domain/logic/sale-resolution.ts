@@ -1,4 +1,4 @@
-import { trackingModeForInput } from './costing';
+import { inputUnitCostCents, trackingModeForInput } from './costing';
 import { productCategoryId } from './product-category';
 import { Addition, InputItem, Product } from '../models/catalog.model';
 import { SaleDraft, SaleLineSnapshot, StockEffect } from '../models/sales.model';
@@ -77,14 +77,14 @@ export function resolveSaleDraft(
     for (const component of addition.components) {
       const input = catalog.inputs.get(component.inputId);
       if (!input) throw new Error(`Insumo inválido no adicional ${addition.name}.`);
-      unitCostCents += Math.round(component.quantity * input.averageUnitCostCents);
+      unitCostCents += component.quantity * inputUnitCostCents(input);
       if (trackingModeForInput(input) !== 'untracked') {
-        lineEffects.push({itemType:'input',itemId:input.id,quantityDelta:-(component.quantity * line.quantity),unitCostCents:input.averageUnitCostCents});
+        lineEffects.push({itemType:'input',itemId:input.id,quantityDelta:-(component.quantity * line.quantity),unitCostCents:Math.round(inputUnitCostCents(input))});
         addEffect({
           itemType: 'input',
           itemId: input.id,
           quantityDelta: -(component.quantity * line.quantity),
-          unitCostCents: input.averageUnitCostCents,
+          unitCostCents: Math.round(inputUnitCostCents(input)),
         });
       }
     }
@@ -97,10 +97,10 @@ export function resolveSaleDraft(
       image: addition.image,
       quantity: line.quantity,
       unitPriceCents: addition.priceCents,
-      unitCostCents,
+      unitCostCents: Math.round(unitCostCents),
       stockEffects: lineEffects,
       totalCents: Math.round(addition.priceCents * line.quantity),
-      totalCostCents: unitCostCents * line.quantity,
+      totalCostCents: Math.round(unitCostCents * line.quantity),
     });
   }
 

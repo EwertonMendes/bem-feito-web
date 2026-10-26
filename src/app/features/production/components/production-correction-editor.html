@@ -39,7 +39,7 @@
           <button type="button" (click)="pickReason('Lançamento duplicado')">Duplicado</button>
         </div>
       </div>
-      <p class="correction-hint">A correção ajustará somente as diferenças no estoque e nos insumos, preservando o histórico.</p>
+      <p class="correction-hint">A correção ajusta o estoque dos produtos e materiais ainda controlados. Insumos sem controle mantêm somente o histórico de custos.</p>
     } @else if(review(); as plan) {
       <div class="correction-review" [class.cancelled]="isCancellation()">
         <div class="review-head">

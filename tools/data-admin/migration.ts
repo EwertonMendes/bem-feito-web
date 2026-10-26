@@ -103,7 +103,7 @@ async function prepareCategoryMigration(request: Request, db: Firestore, env: an
  * All input documents are snapshotted for an exhaustive collection precondition,
  * but only selected changed documents are written (see engine.apply).
  */
-export function retiredInputData(before: Record<string, any>) {
+export function retiredInputData<T extends { code: string; [key: string]: any }>(before: T) {
   invariant(before && typeof before.code === 'string', 'Invalid material document');
   invariant(['exact','estimated','untracked'].includes(String(before.trackingMode ?? 'estimated')), 'Unexpected input tracking mode');
   return {

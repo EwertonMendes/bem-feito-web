@@ -163,13 +163,14 @@ service cloud.firestore {
           && validProductStockStatus(data)
           && (!('image' in data) || validImage(data.image)))
         || (name == 'inputs'
-          && fields(data, ['code', 'active', 'name', 'unitId', 'stock', 'minimumStock', 'averageUnitCostCents'], ['image', 'minimumStockConfigured', 'trackingMode', 'stockStatus', 'costBasisQuantity', 'costBasisValueCents', 'committedStock', 'reservedPhysicalStock'])
+          && fields(data, ['code', 'active', 'name', 'unitId', 'stock', 'minimumStock', 'averageUnitCostCents'], ['image', 'minimumStockConfigured', 'trackingMode', 'availabilityStatus', 'stockStatus', 'costBasisQuantity', 'costBasisValueCents', 'committedStock', 'reservedPhysicalStock'])
           && text(data.code) && text(data.name) && text(data.unitId) && data.active is bool
           && stock(data.stock) && quantity(data.minimumStock) && money(data.averageUnitCostCents)
            && (!('committedStock' in data) || quantity(data.committedStock))
           && (!('reservedPhysicalStock' in data) || (quantity(data.reservedPhysicalStock) && data.reservedPhysicalStock <= data.stock))
           && (!('minimumStockConfigured' in data) || data.minimumStockConfigured is bool)
           && (!('trackingMode' in data) || data.trackingMode in ['exact', 'estimated', 'untracked'])
+          && (!('availabilityStatus' in data) || (data.availabilityStatus is string && data.availabilityStatus.size() <= 240))
           && (!('costBasisQuantity' in data) || quantity(data.costBasisQuantity))
           && (!('costBasisValueCents' in data) || money(data.costBasisValueCents))
           && validInputStockStatus(data)

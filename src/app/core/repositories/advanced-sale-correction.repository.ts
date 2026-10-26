@@ -9,6 +9,7 @@ import { StockMovement } from '../../domain/models/inventory.model';
 import { Sale } from '../../domain/models/sales.model';
 import { planAdvancedSaleEdit, AdvancedSaleDraft, AdvancedSaleCatalog } from '../../domain/logic/advanced-sale-edit';
 import { productStockStatus, stockStatusForInput } from '../../domain/logic/stock-status';
+import { trackingModeForInput } from '../../domain/logic/costing';
 import { StockChange } from './mutation-results';
 
 @Injectable({providedIn:'root'})
@@ -50,14 +51,22 @@ export class AdvancedSaleCorrectionRepository {
       }
       const catalog:AdvancedSaleCatalog={products,additions,inputs};
       const plan=planAdvancedSaleEdit(current,draft,catalog);
-      if(current.stockApplied!==false && plan.inventoryDeltas.length && !draft.stockReconciliationConfirmed)
+      // Read legacy components from Firestore: added-line catalog does not include them.
+      const legacyIds=[...new Set(plan.inventoryDeltas.filter(d=>d.itemType==='input').map(d=>d.itemId))];
+      const legacySnaps=await Promise.all(legacyIds.map(inputId=>tx.get(doc(this.db,'inputs',inputId))));
+      const legacyModes=new Map(legacySnaps.map((snap,index)=>{
+        if(!snap.exists())throw new Error('Insumo histórico não encontrado. Concilie antes de editar.');
+        return [legacyIds[index]!,trackingModeForInput(snap.data() as InputItem)] as const;
+      }));
+      const applicableDeltas=plan.inventoryDeltas.filter(delta=>delta.itemType==='product'||legacyModes.get(delta.itemId)!=='untracked');
+      if(current.stockApplied!==false && applicableDeltas.length && !draft.stockReconciliationConfirmed)
         throw new Error('Confirme que a correção corresponde ao estoque físico antes de salvar.');
       if(plan.totalCents===current.totalCents&&plan.discountCents===current.discountCents
         &&JSON.stringify(plan.items)===JSON.stringify(current.items))
         throw new Error('Nenhuma alteração identificada.');
       type Target={ref:ReturnType<typeof doc>;data:Product|InputItem};
       const targets=new Map<string,Target>();
-      for(const delta of plan.inventoryDeltas){
+      for(const delta of applicableDeltas){
         const name=delta.itemType==='product'?'products':'inputs';
         const key=delta.itemType+':'+delta.itemId,ref=doc(this.db,name,delta.itemId);
         const snap=await tx.get(ref);
@@ -67,7 +76,7 @@ export class AdvancedSaleCorrectionRepository {
       // Do not write until every read, allocation check and stock validation is complete.
       const updates:Array<{ref:ReturnType<typeof doc>;data:Record<string,unknown>;change:StockChange;
         movement?:Omit<StockMovement,'id'>}>=[];
-      for(const delta of plan.inventoryDeltas){
+      for(const delta of applicableDeltas){
         const target=targets.get(delta.itemType+':'+delta.itemId)!;
         const entity=target.data;
         const reserved=entity.reservedPhysicalStock??Math.min(entity.stock,entity.committedStock??0);

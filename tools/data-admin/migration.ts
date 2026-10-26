@@ -136,7 +136,7 @@ async function prepareCostOnlyMigration(request: Request, db: Firestore): Promis
       invariant(previous.trackingMode !== 'untracked', 'Selected input is already untracked; review its current status');
       invariant(Number.isFinite(previous.stock) && previous.stock >= 0, 'Invalid legacy stock');
       invariant((previous.reservedPhysicalStock ?? 0) <= previous.stock, 'Invalid reserved input balance');
-      row.after = encode(retiredInputData(previous));
+      row.after = encode(retiredInputData(previous as Record<string, any> & { code: string }));
       conversions++;
       seen.add(previous.code);
     }

@@ -10,7 +10,7 @@ import {
   signInWithRedirect,
   signOut,
 } from 'firebase/auth';
-import { Unsubscribe, doc, onSnapshot } from 'firebase/firestore';
+import { Unsubscribe, doc, getDocFromServer, onSnapshot } from 'firebase/firestore';
 import { UserProfile } from '../../domain/models/common.model';
 import { FIREBASE_AUTH, FIRESTORE } from '../firebase/firebase.providers';
 
@@ -101,8 +101,10 @@ export class AuthService {
   async retryProfile(): Promise<UserProfile | null> {
     const user = await this.waitForUser();
     if (!user) return null;
-    this.clearProfileListener();
-    return this.ensureProfileListener(user);
+    const snapshot = await getDocFromServer(doc(this.firestore, 'users', user.uid));
+    const profile = snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as UserProfile) : null;
+    if (this.user()?.uid === user.uid) this.profileState.set(profile);
+    return profile;
   }
 
   private ensureProfileListener(user: User): Promise<UserProfile | null> {
@@ -116,20 +118,26 @@ export class AuthService {
     this.profileUid = user.uid;
     this.profileReady = new Promise<UserProfile | null>((resolve, reject) => {
       let initial = true;
+      const reference = doc(this.firestore, 'users', user.uid);
       this.profileUnsubscribe = onSnapshot(
-        doc(this.firestore, 'users', user.uid),
+        reference,
         { includeMetadataChanges: true },
         (snapshot) => {
           // A missing document in IndexedDB is not evidence of revoked access.
           // Only an authoritative server snapshot can resolve the login gate.
           if (snapshot.metadata.fromCache) return;
-          const profile = snapshot.exists()
-            ? ({ id: snapshot.id, ...snapshot.data() } as UserProfile)
-            : null;
-          this.profileState.set(profile);
-          if (initial) {
-            initial = false;
-            resolve(profile);
+          const apply = (result: typeof snapshot) => {
+            if (this.profileUid !== user.uid) return;
+            const profile = result.exists() ? ({ id: result.id, ...result.data() } as UserProfile) : null;
+            this.profileState.set(profile);
+            if (initial) { initial = false; resolve(profile); }
+          };
+          if (!snapshot.exists() && initial) {
+            void getDocFromServer(reference).then(apply, (error) => {
+              if (initial) { initial = false; reject(error); }
+            });
+          } else {
+            apply(snapshot);
           }
         },
         (error) => {

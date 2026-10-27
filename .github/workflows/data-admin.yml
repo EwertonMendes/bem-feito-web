@@ -30,7 +30,7 @@ on:
         type: choice
         options: [dev, prod]
         default: dev
-        required: true
+        required: false
       query:
         description: Bounded JSON query (query mode only)
         required: false

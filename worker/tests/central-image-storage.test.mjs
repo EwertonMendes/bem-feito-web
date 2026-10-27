@@ -63,6 +63,7 @@ function setupGoogle(metadata=driveMetadata(), options={}){
     if(address.includes('firestore.googleapis.com')){
       assert.equal(init.headers.Authorization,'Bearer firebase-id-token');
       if(address.endsWith('/integrations/google-drive')) return Response.json(integration);
+      if(address.endsWith('/documents:runQuery')) return Response.json([{document:product}]);
       if(address.endsWith('/products/'+entityId)) return Response.json(options.reference??product);
       throw Error('Unexpected Firestore document: '+address);
     }
@@ -94,6 +95,16 @@ describe('shared image storage authorization boundaries',()=>{
       assert.equal(response.headers.get('Cache-Control'),'no-store');
       assert.deepEqual(new Uint8Array(await response.arrayBuffer()),sample);
       assert.ok(mock.requests.every(call=>!call.address.includes('secret-owner-access-token')));
+    }finally{mock.restore();}
+  });
+  it('reads a legacy imported image when its filename is a product code, not Firestore UID',async()=>{
+    const env=await fixture(),mock=setupGoogle(driveMetadata({
+      appProperties:undefined,name:'products_PROD-086.webp'
+    }));
+    try{
+      const response=await imageRequest(req('GET','/storage/image/'+imageId),env,maria);
+      assert.equal(response.status,200);
+      assert.ok(mock.requests.some(r=>r.address.includes('/documents:runQuery')));
     }finally{mock.restore();}
   });
   it('rejects another folder even when Google Drive exposes the file',async()=>{

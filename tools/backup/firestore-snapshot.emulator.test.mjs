@@ -9,8 +9,8 @@ test('full snapshot restores into an independent empty emulator database without
   const request = async (url, method = 'GET', body) => {
     const local = localName(url.replace('https://firestore.googleapis.com', 'http://' + host));
     if (body?.writes) body = { ...body, writes: body.writes.map(w => ({ ...w, update: { ...w.update, name: localName(w.update.name) } })) };
-    const response = await fetch(local, { method, ...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}) });
-    assert.ok(response.ok, 'Local emulator API rejected test operation');
+    const response = await fetch(local, { method, headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
+    assert.ok(response.ok, 'Local emulator API rejected test operation: HTTP ' + response.status);
     return response.json();
   };
   const docs = [
@@ -24,10 +24,10 @@ test('full snapshot restores into an independent empty emulator database without
   const snapshot = await readSnapshot(request, receipt.backupHash);
   assert.equal(snapshot.documents.length, 2);
   const recovery = 'http://' + host + '/v1/projects/demo-backup-recovery/databases/(default)/documents';
-  const response = await fetch(recovery + ':commit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ writes: snapshot.documents.map(d => ({ update: { name: 'projects/demo-backup-recovery/databases/(default)/documents/' + d.path, fields: d.fields }, currentDocument: { exists: false } })) }) });
+  const response = await fetch(recovery + ':commit', { method: 'POST', headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' }, body: JSON.stringify({ writes: snapshot.documents.map(d => ({ update: { name: 'projects/demo-backup-recovery/databases/(default)/documents/' + d.path, fields: d.fields }, currentDocument: { exists: false } })) }) });
   assert.ok(response.ok);
   for (const doc of snapshot.documents) {
-    const result = await (await fetch(recovery + '/' + doc.path)).json();
+    const result = await (await fetch(recovery + '/' + doc.path, { headers: { Authorization: 'Bearer owner' } })).json();
     assert.equal(digest(result.fields), digest(doc.fields));
   }
 });

@@ -9,7 +9,11 @@ import { AuthService } from '../../core/auth/auth.service';
     <main class="state">
       <img src="/brand-mark.svg" alt="" />
       <h1>Acesso ainda não liberado</h1>
-      <p>O acesso desta sessão ainda não foi confirmado. Verifique novamente; sua conta não será alterada.</p>
+      @if(auth.profileErrorCode(); as code) {
+        <p role="alert">A consulta ao Firestore falhou: {{code}}. Seu cadastro não foi alterado.</p>
+      } @else {
+        <p>Ainda não foi possível validar o perfil deste UID no servidor. Sua conta não foi alterada.</p>
+      }
       <p class="email">{{ auth.user()?.email }}</p>
       <button class="bf-button" type="button" [disabled]="verifying()" (click)="retry()">{{verifying()?'Verificando...':'Verificar acesso novamente'}}</button>
       @if (error()) { <p role="alert">{{error()}}</p> }
@@ -42,9 +46,13 @@ export class AccessDeniedPage {
     this.error.set(null);
     try {
       const profile = await this.auth.retryProfile();
-      if (profile?.active) await this.router.navigateByUrl('/dashboard');
+      if (profile?.active && ['owner','operator','viewer'].includes(profile.role)) {
+        await this.router.navigateByUrl('/dashboard');
+      } else {
+        this.error.set('O servidor não retornou um perfil ativo para o UID autenticado.');
+      }
     } catch {
-      this.error.set('Não foi possível confirmar o acesso. Verifique sua conexão e tente novamente.');
+      this.error.set(this.auth.error() || 'Não foi possível confirmar o perfil diretamente no Firestore.');
     } finally {
       this.verifying.set(false);
     }

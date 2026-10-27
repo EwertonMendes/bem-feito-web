@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { DriveRedirectStartedError } from '../../../core/google-drive/drive-auth.service';
 import { BfLoadingButton } from '../../../shared/ui/button/loading-button';
 import { AuthService } from '../../../core/auth/auth.service';
@@ -50,7 +50,7 @@ import { ToastService } from '../../../core/services/toast.service';
 
       @if (integration.enabled) {
         <div class="actions">
-          @if (integration.config()) {
+          @if (showConnect()) {
             <button
               class="bf-button secondary"
               type="button"
@@ -61,16 +61,17 @@ import { ToastService } from '../../../core/services/toast.service';
               {{ connectLabel() }}
             </button>
           }
-          @if ((integration.linked() || integration.status() === 'error') && !confirmDisconnect()) {
-            <button class="bf-button secondary" type="button" [disabled]="!!busy()"
-              (click)="confirmDisconnect.set(true)">Desconectar</button>
-          }
-          @if (confirmDisconnect()) {
-            <button class="bf-button secondary" type="button" [disabled]="!!busy()"
-              (click)="confirmDisconnect.set(false)">Cancelar</button>
-            <button class="bf-button secondary" type="button" [disabled]="!!busy()"
-              [bfLoadingButton]="busy() === 'disconnect'"
-              (click)="disconnect()">Confirmar desconexão</button>
+          @if (showDisconnect()) {
+            @if (!confirmDisconnect()) {
+              <button class="bf-button secondary" type="button" [disabled]="!!busy()"
+                (click)="confirmDisconnect.set(true)">Desconectar</button>
+            } @else {
+              <button class="bf-button secondary" type="button" [disabled]="!!busy()"
+                (click)="confirmDisconnect.set(false)">Cancelar</button>
+              <button class="bf-button secondary" type="button" [disabled]="!!busy()"
+                [bfLoadingButton]="busy() === 'disconnect'"
+                (click)="disconnect()">Confirmar desconexão</button>
+            }
           }
           @if (auth.canAdminister()) {
             <button
@@ -100,6 +101,15 @@ export class GoogleDriveSettingsCard {
   readonly auth = inject(AuthService);
   readonly busy = signal<'connect' | 'configure' | 'disconnect' | null>(null);
   readonly confirmDisconnect = signal(false);
+  readonly showConnect = computed(() => {
+    if (!this.integration.enabled || !this.integration.config()?.enabled) return false;
+    const status = this.integration.status();
+    return status !== 'loading' && status !== 'disabled' && status !== 'unconfigured'
+      && !this.integration.connected();
+  });
+  readonly showDisconnect = computed(() =>
+    this.integration.enabled && !!this.integration.config()?.enabled && this.integration.connected()
+  );
 
   private readonly toast = inject(ToastService);
   private readonly errors = inject(ErrorService);
@@ -130,7 +140,7 @@ export class GoogleDriveSettingsCard {
   }
 
   async connect(): Promise<void> {
-    if (this.busy()) return;
+    if (this.busy() || !this.showConnect()) return;
     this.busy.set('connect');
 
     try {
@@ -144,7 +154,7 @@ export class GoogleDriveSettingsCard {
   }
 
   async disconnect(): Promise<void> {
-    if (this.busy()) return;
+    if (this.busy() || !this.showDisconnect()) return;
     this.busy.set('disconnect');
     try {
       await this.integration.disconnect();

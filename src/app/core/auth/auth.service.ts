@@ -61,7 +61,7 @@ export class AuthService {
         await signInWithRedirect(this.auth, provider);
         return;
       }
-      this.errorState.set(this.authError(error));
+      this.errorState.set(this.profileErrorCode() ? this.profileReadError(this.profileErrorCode()!) : this.authError(error));
     } finally {
       this.busyState.set(false);
     }

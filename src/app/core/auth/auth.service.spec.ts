@@ -32,6 +32,7 @@ vi.mock('firebase/firestore', () => ({
 describe('Google login routing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.profile = null;
     mocks.redirectResult.mockResolvedValue(null);
     mocks.popup.mockResolvedValue({ user: { uid: 'test-user' } });
     mocks.navigate.mockResolvedValue(true);

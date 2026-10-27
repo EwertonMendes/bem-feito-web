@@ -10,7 +10,7 @@ test('full snapshot restores into an independent empty emulator database without
     const local = localName(url.replace('https://firestore.googleapis.com', 'http://' + host));
     if (body?.writes) body = { ...body, writes: body.writes.map(w => ({ ...w, update: { ...w.update, name: localName(w.update.name) } })) };
     const response = await fetch(local, { method, headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
-    assert.ok(response.ok, 'Local emulator API rejected test operation: HTTP ' + response.status);
+    assert.ok(response.ok, 'Local emulator API rejected test operation: HTTP ' + response.status + (response.ok ? '' : ' ' + await response.text()));
     return response.json();
   };
   const docs = [

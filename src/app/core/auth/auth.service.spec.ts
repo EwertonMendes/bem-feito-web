@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   redirectResult: vi.fn(),
   navigate: vi.fn(),
   profileListener: vi.fn(),
+  serverProfile: vi.fn(),
 }));
 
 vi.mock('firebase/auth', () => ({
@@ -25,6 +26,7 @@ vi.mock('firebase/auth', () => ({
 vi.mock('firebase/firestore', () => ({
   doc: vi.fn(),
   onSnapshot: mocks.profileListener,
+  getDocFromServer: mocks.serverProfile,
 }));
 
 describe('Google login routing', () => {
@@ -33,6 +35,7 @@ describe('Google login routing', () => {
     mocks.redirectResult.mockResolvedValue(null);
     mocks.popup.mockResolvedValue({ user: { uid: 'test-user' } });
     mocks.navigate.mockResolvedValue(true);
+    mocks.serverProfile.mockImplementation(async () => ({ id: 'test-user', exists: () => mocks.profile !== null, data: () => mocks.profile }));
     mocks.profileListener.mockImplementation((_ref, _options, next) => {
       next({
         metadata: { fromCache: false },
@@ -98,6 +101,38 @@ describe('Google login routing', () => {
     expect(mocks.navigate).toHaveBeenCalledWith('/dashboard');
     expect(mocks.navigate).not.toHaveBeenCalledWith('/acesso-negado');
     expect(auth.profile()?.active).toBe(true);
+    injector.destroy();
+  });
+
+  it('checks the server when the listener reports a missing profile', async () => {
+    mocks.profile = { active: true, role: 'owner' };
+    mocks.profileListener.mockImplementation((_ref, _opts, next) => {
+      next({ id: 'test-user', exists: () => false, data: () => null, metadata: { fromCache: false } });
+      return () => {};
+    });
+    const injector = Injector.create({ providers: [
+      { provide: FIREBASE_AUTH, useValue: {} },
+      { provide: FIRESTORE, useValue: {} },
+      { provide: Router, useValue: { navigateByUrl: mocks.navigate } },
+    ] });
+    const auth = runInInjectionContext(injector, () => new AuthService());
+    await auth.loginWithGoogle();
+    expect(mocks.serverProfile).toHaveBeenCalledOnce();
+    expect(mocks.navigate).toHaveBeenCalledWith('/dashboard');
+    injector.destroy();
+  });
+
+  it('rechecks the server directly after the profile is reactivated', async () => {
+    mocks.profile = null;
+    const injector = Injector.create({ providers: [
+      { provide: FIREBASE_AUTH, useValue: {} },
+      { provide: FIRESTORE, useValue: {} },
+      { provide: Router, useValue: { navigateByUrl: mocks.navigate } },
+    ] });
+    const auth = runInInjectionContext(injector, () => new AuthService());
+    await auth.loginWithGoogle();
+    mocks.profile = { active: true, role: 'owner' };
+    expect((await auth.retryProfile())?.role).toBe('owner');
     injector.destroy();
   });
 

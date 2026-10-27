@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, output, signal, viewChild } from '@angular/core';
-import { standardCostForProduct, productCostComponents, trackingModeForInput } from '../../../domain/logic/costing';
+import { standardCostForProduct, productCostComponents, inputUnitCostCents, trackingModeForInput } from '../../../domain/logic/costing';
 import { productCategoryId, productCategoryName } from '../../../domain/logic/product-category';
 import { Addition, InputItem, Product } from '../../../domain/models/catalog.model';
 import { CatalogImageEntityKind } from '../../../domain/models/image.model';
@@ -105,6 +105,8 @@ export class CatalogDetails {
   percent(value: number | null): string { return value === null ? 'Indisponível' : value.toLocaleString('pt-BR',{maximumFractionDigits:1})+'%'; }
   quantity(value: number): string { return value.toLocaleString('pt-BR',{maximumFractionDigits:3}); }
   availableStock(p: Product): number { return Math.max(0, p.stock - (p.reservedPhysicalStock ?? 0)); }
+  tracksInputStock(input: InputItem): boolean { return trackingModeForInput(input) !== 'untracked'; }
+  inputCost(input: InputItem): number { return inputUnitCostCents(input); }
   tracking(input: InputItem): string {
     const type = trackingModeForInput(input);
     return type === 'exact' ? 'Controlado' : type === 'estimated' ? 'Estimado' : 'Não controlar';

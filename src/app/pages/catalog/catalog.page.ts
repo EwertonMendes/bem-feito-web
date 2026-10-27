@@ -236,4 +236,5 @@ export class CatalogPage {
   weight(p:Product):number|null{return this.formatWeights().get(p.formatId)??null;}
   margin(v:number|null|undefined):string{return v==null?'—':v.toLocaleString('pt-BR',{maximumFractionDigits:1})+'%';}
   inputMode(v:InputItem):string{const type=trackingModeForInput(v);return type==='exact'?'Controlado':type==='estimated'?'Estimado':'Não controlar';}
+  tracksInputStock(input: InputItem): boolean { return trackingModeForInput(input) !== 'untracked'; }
 }

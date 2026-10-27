@@ -116,7 +116,7 @@ export class CatalogEditor {
     min(p.minimumStock, 0);
   });
 
-  readonly inputModel = signal<InputFormModel>({ name: '', unitId: '', trackingMode: 'estimated', availabilityStatus: '', minimumStock: 0, active: true });
+  readonly inputModel = signal<InputFormModel>({ name: '', unitId: '', trackingMode: 'untracked', availabilityStatus: '', minimumStock: 0, active: true });
   readonly inputForm = form(this.inputModel, (p) => {
     required(p.name);
     required(p.unitId);
@@ -149,8 +149,8 @@ export class CatalogEditor {
   ];
   readonly inputTrackingHint = computed(() => {
     const mode = this.inputModel().trackingMode;
-    if (mode === 'exact') return 'Ideal para bases glicerinadas e embalagens com contagem física. O saldo deve representar a quantidade real disponível.';
-    if (mode === 'untracked') return 'Indicado para essências, corantes e lauril: atualize a disponibilidade qualitativa sem medir o líquido. Compras e composições continuam considerando o custo.';
+    if (mode === 'exact') return 'Indicado para embalagens e outros materiais que vocês realmente contam. Compras e consumo alteram o estoque físico.';
+    if (mode === 'untracked') return 'Indicado para bases glicerinadas, essências, corantes e lauril. Compras atualizam o custo de referência e as receitas continuam calculando custos, sem contagem nem baixa física.';
     return 'Ideal para outros insumos com quantidades aproximadas conhecidas. Não exige precisão e não bloqueia a operação.';
   });
   readonly unitOptions = computed<BfSelectOption[]>(() =>
@@ -211,7 +211,7 @@ export class CatalogEditor {
       this.productModel.set({ categoryId: 'soap', modelName: '', variantName: '', description: '', volumeMl: 40, collectionId: '', fragranceId: '', formatId: '', salePrice: 0, additionalCost: 0, minimumStock: 0, active: true });
       this.recipe.set([]);
     } else if (kind === 'inputs') {
-      this.inputModel.set({ name: '', unitId: '', trackingMode: 'estimated', availabilityStatus: '', minimumStock: 0, active: true });
+      this.inputModel.set({ name: '', unitId: '', trackingMode: 'untracked', availabilityStatus: '', minimumStock: 0, active: true });
     } else {
       this.additionModel.set({ name: '', category: 'Embalagem', price: 0, notes: '', active: true });
       this.additionComponents.set([]);
@@ -383,7 +383,10 @@ export class CatalogEditor {
       name: model.name.trim(),
       unitId: model.unitId,
       trackingMode: model.trackingMode,
-      availabilityStatus: model.trackingMode === 'exact' ? undefined : model.availabilityStatus.trim().slice(0,240) || undefined,
+      // Preserve pre-cutover qualitative notes without displaying or requiring updates.
+      availabilityStatus: model.trackingMode === 'estimated'
+        ? model.availabilityStatus.trim().slice(0,240) || undefined
+        : existing?.availabilityStatus,
       stock: existing?.stock ?? 0,
       minimumStock: tracked ? model.minimumStock : 0,
       minimumStockConfigured: tracked,

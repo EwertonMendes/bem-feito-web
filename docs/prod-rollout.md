@@ -1,6 +1,6 @@
 # Bem Feito: runbook de ambientes e primeira implantação PROD
 
-> Status: pré-infraestrutura. Este PR não pode ser promovido à produção até o manifesto do Codex, CI verde, backup/restore verificados e homologação humana.
+> Status: recursos PROD provisionados e identidades reais integradas. A publicação exige CI verde, promoção protegida e validação de runtime. O primeiro snapshot completo e a restauração isolada foram verificados; a primeira execução periódica por OIDC permanece parte do aceite.
 
 ## Arquitetura
 
@@ -14,7 +14,7 @@
 
 Provisionar Firebase PROD (Hosting/Auth Google/Firestore Native), contas IAM e Workload Identity Federation para deploy e administração de dados, projeto de arquivo privado independente, OAuth server e Picker, Worker Cloudflare/D1 PROD, segredos do Worker, token Cloudflare mínimo e pasta Drive PROD.
 
-Codex NÃO altera os arquivos do repositório, DEV ou seus recursos. Sem IDs presumidos, chaves permanentes de service account ou faturamento automático.
+As configurações versionadas usam os recursos PROD verificados. Preservar os dados e credenciais DEV; não usar IDs presumidos, chaves permanentes de service account ou faturamento automático.
 
 ### GitHub Environment: prod
 
@@ -55,11 +55,11 @@ Proteger environment com revisão humana do proprietário e restrição à maste
 - data-prod-preview: leitura autorizada para planos e backups, exclusivamente master.
 - data-prod-execute: operações administrativas aprovadas, exclusivamente master, aprovação específica e sem bypass administrativo.
 - Seguir exatamente tools/data-admin/gate.ts e docs/data-administration.md para proteção do único mantenedor.
-- tools/data-admin/config.json ainda contém environments.prod = null. Não preencher com IDs inventados. Após o Codex entregar IDs reais, atualizar em PR: projectId, projectNumber, provider, reader, writer e archive PROD.
-- O pipeline data-admin.yml permite pedidos prod com preview / apply e hashes imutáveis, mas permanece inacessível enquanto prod = null. O modo query pode consultar DEV ou PROD com resultados criptografados após configurar o destino e o reader PROD. O modo direct continua exclusivamente DEV; alterações em PROD usam preview, aprovação e apply. OIDC e Environment garantem isolamento.
+- tools/data-admin/config.json contém os IDs verificados de bem-feito-prod, bem-feito-archive-prod, provider e contas reader/writer exclusivos. Qualquer troca dessas identidades exige nova revisão de IAM e do contrato WIF.
+- O pipeline data-admin.yml permite pedidos prod com preview / apply e hashes imutáveis, mas permanece inacessível enquanto prod = null. O modo query pode consultar DEV ou PROD com resultados criptografados usando o destino e o reader PROD explicitamente configurados. O modo direct continua exclusivamente DEV; alterações em PROD usam preview, aprovação e apply. OIDC e Environment garantem isolamento.
 - Não executar mutações comerciais sem backup externo em arquivo privado PROD e readback verificado.
 
-No GitHub Environment **data-prod-preview**, o Codex deve definir as variáveis PROD_FIREBASE_PROJECT_ID, PROD_DATA_WIF_PROVIDER e PROD_DATA_READER_ACCOUNT, iguais aos valores reais versionados em tools/data-admin/config.json. O workflow revalida essas três identidades antes de obter OIDC. Para consultas privadas, selecionar target_environment=prod e usar um QueryPlan com environment=prod e projectId real. Até a configuração existir, PROD é rejeitado.
+No GitHub Environment **data-prod-preview**, o Codex deve definir as variáveis PROD_FIREBASE_PROJECT_ID, PROD_DATA_WIF_PROVIDER e PROD_DATA_READER_ACCOUNT, iguais aos valores reais versionados em tools/data-admin/config.json. O workflow revalida essas três identidades antes de obter OIDC. Para consultas privadas, selecionar target_environment=prod e usar um QueryPlan com environment=prod e projectId real. Configuração ausente ou divergente permanece rejeitada; validar a troca OIDC real antes de operar.
 
 ## Estratégia de configuração
 
@@ -81,7 +81,7 @@ As configurações públicas de PROD não são armazenadas em arquivos estático
 6. Configurar pasta Drive PROD, OAuth e permissões no usuário correto. Após testes de Google Picker, consentimento, renovação, upload, leitura, substituição e lixeira, definir PROD_OAUTH_ENABLED=true e republicar Worker aprovado.
 7. Planejar e executar carga inicial real **auditada**. Não copiar DEV inteiro: reconciliar fonte real de estoque, vendas, pagamentos, despesas, produção, encomendas, configurações e contadores, transferir imagens para pasta PROD e mapear fileIds mantendo integridade e permissões.
 8. Homologar desktop/mobile com teste mínimo não destrutivo: login, listagem, relatórios, autorização, referências de imagens, transações, HTTPS/CORS, consulta de auditoria e backups verificados.
-9. Confirmar primeiro snapshot periódico completo e **testar restore em ambiente de recuperação isolado** antes de operação diária. Administração de dados e Workflows de deploy não substituem este requisito.
+9. Executar e confirmar o primeiro snapshot pelo workflow `backup-prod.yml`, com a identidade exclusiva de backup. O snapshot inicial e a restauração local isolada dos dados reais foram conferidos; repetir o exercício operacional conforme [prod-backup.md](prod-backup.md). Administração de dados e Workflows de deploy não substituem o backup periódico.
 
 ## Operação e rollback
 
@@ -89,7 +89,7 @@ As configurações públicas de PROD não são armazenadas em arquivos estático
 - A promoção é manual; não disponibilizar jobs PROD para branch de PR.
 - Para rollback de código, usar PR de revert, CI e nova homologação DEV (ou procedimento emergencial do provedor com aprovação/documentação). Reverter código não reverte mudanças Firestore/D1.
 - Para migrações de schema usar estratégia expand-migrate-contract, backup e testes de restore antes de mudanças destrutivas.
-- Firestore backups periódicos completos, retenção e restauração D1 ficam **pendentes de implementação e homologação**; não chamar PROD pronta até estarem operacionais.
+- O backup completo diário está implementado em `backup-prod.yml`, com retenção indefinida create-only e readback por checksum. Concluir WIF/Environment e validar a primeira execução. A recuperação D1 por Time Travel e a integração OAuth continuam exigindo homologação; não chamar PROD pronta antes dessas verificações.
 - É proibido faturamento/upgrade automático sem consentimento do proprietário.
 
 ## Evidência mínima por entrega

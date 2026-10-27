@@ -20,7 +20,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { summarizeSaleItems } from '../../domain/logic/sale-analytics';
-import { productCostComponents, standardCostForProduct } from '../../domain/logic/costing';
+import { productCostComponents, standardCostForProduct, trackingModeForInput } from '../../domain/logic/costing';
 import { productCategoryId } from '../../domain/logic/product-category';
 import { productStockStatus, stockStatusForInput } from '../../domain/logic/stock-status';
 import { Addition, CollectionDefinition, FormatDefinition, FragranceDefinition, InputItem, Product } from '../../domain/models/catalog.model';
@@ -657,6 +657,8 @@ export class SalesRepository {
         const path = effect.itemType === 'product' ? 'products' : 'inputs';
         const snapshot = refs.get(path + ':' + effect.itemId);
         if (!snapshot?.exists()) throw new Error('Item da encomenda não encontrado no estoque.');
+        // Historical orders may retain physical effects recorded before cutover.
+        if (effect.itemType === 'input' && trackingModeForInput(snapshot.data() as InputItem) === 'untracked') continue;
         const required = -effect.quantityDelta;
         const committed = Number(snapshot.data()['committedStock'] ?? 0);
         const physical = Number(snapshot.data()['stock'] ?? 0);
@@ -741,6 +743,7 @@ export class SalesRepository {
         if (!snapshot?.exists()) throw new Error('Não foi possível reverter o estoque da venda.');
 
         const entity = { id: snapshot.id, ...snapshot.data() } as Product | InputItem;
+        if (effect.itemType === 'input' && trackingModeForInput(entity as InputItem) === 'untracked') continue;
         const stock = currentSale.stockApplied === false
           ? Number(snapshot.data()['stock'] ?? 0)
           : Number(snapshot.data()['stock'] ?? 0) - effect.quantityDelta;

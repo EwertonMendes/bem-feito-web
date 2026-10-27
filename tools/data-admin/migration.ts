@@ -97,10 +97,64 @@ async function prepareCategoryMigration(request: Request, db: Firestore, env: an
   return { schemaVersion: 1, requestHash: requestHash(request), projectId: request.projectId,
     environment: 'dev', operation: 'migrate', scope, rows, dependencies: [], sourceHash };
 }
+/**
+ * A registered, additive cutover of explicitly selected materials.
+ * Never infer ingredient categories from names or measure stocks.
+ * All input documents are snapshotted for an exhaustive collection precondition,
+ * but only selected changed documents are written (see engine.apply).
+ */
+export function retiredInputData<T extends { code: string; [key: string]: any }>(before: T) {
+  invariant(before && typeof before.code === 'string', 'Invalid material document');
+  invariant(['exact','estimated','untracked'].includes(String(before.trackingMode ?? 'estimated')), 'Unexpected input tracking mode');
+  return {
+    ...before,
+    trackingMode: 'untracked',
+    minimumStockConfigured: false,
+    minimumStock: 0,
+    stockStatus: 'untracked',
+    committedStock: 0,
+    reservedPhysicalStock: 0,
+  };
+}
+
+async function prepareCostOnlyMigration(request: Request, db: Firestore): Promise<Plan> {
+  const selected = new Set(request.inputCodes ?? []);
+  invariant(selected.size > 0, 'No materials were selected');
+  const snapshot = await db.collection('inputs').get();
+  invariant(!snapshot.empty, 'No materials in DEV');
+  const codes = new Set<string>();
+  const seen = new Set<string>();
+  const rows: Row[] = [];
+  let conversions = 0;
+  for (const doc of snapshot.docs) {
+    invariant(validBackupPath(doc.ref.path), 'Unexpected DEV input path');
+    const previous = doc.data();
+    invariant(typeof previous.code === 'string' && !codes.has(previous.code), 'Invalid or duplicated input code');
+    codes.add(previous.code);
+    const row = snapshotRow(doc);
+    if (selected.has(previous.code)) {
+      invariant(previous.trackingMode !== 'untracked', 'Selected input is already untracked; review its current status');
+      invariant(Number.isFinite(previous.stock) && previous.stock >= 0, 'Invalid legacy stock');
+      invariant((previous.reservedPhysicalStock ?? 0) <= previous.stock, 'Invalid reserved input balance');
+      row.after = encode(retiredInputData(previous as Record<string, any> & { code: string }));
+      conversions++;
+      seen.add(previous.code);
+    }
+    rows.push(row);
+  }
+  invariant(conversions === selected.size && seen.size === selected.size, 'One or more approved input codes are missing or incompatible');
+  const scope = ['inputs'];
+  assertScope(request, scope);
+  assertPlanCapacity(rows);
+  return { schemaVersion: 1, requestHash: requestHash(request), projectId: request.projectId,
+    environment: 'dev', operation: 'migrate', scope, rows, dependencies: [] };
+}
+
 export async function prepareMigration(request: Request, db: Firestore, env: any): Promise<Plan> {
   invariant(request.environment === 'dev' && request.projectId === 'bem-feito-dev', 'DEV-only migration');
   const deployment = await fetch('https://bem-feito-dev.web.app/deployment.json', { cache: 'no-store' });
   invariant(deployment.ok && (await deployment.json() as any).commit === request.deploymentSha, 'Exact application commit must already be deployed in DEV');
+  if (request.migration === 'input-cost-only-v1') return prepareCostOnlyMigration(request, db);
   if (request.migration === 'product-categories-v1') return prepareCategoryMigration(request, db, env);
   runRegisteredScript('tools/migration/fetch-sheets.mjs', [], { MIGRATION_SNAPSHOT_ID: env.snapshotId });
   runRegisteredScript('tools/migration/normalize-legacy.mjs');

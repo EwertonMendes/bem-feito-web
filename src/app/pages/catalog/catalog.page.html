@@ -29,7 +29,7 @@
         <div class="catalog-field"><span>Disponibilidade</span><bf-select [value]="productAvailability()" (valueChange)="productAvailability.set($any($event))" [options]="availabilityOptions" ariaLabel="Filtrar disponibilidade" /></div>
       } @else if(tab()==='inputs'){
         <div class="catalog-field"><span>Tipo de controle</span><bf-select [value]="inputTrackingFilter()" (valueChange)="inputTrackingFilter.set($event)" [options]="inputTrackingOptions" ariaLabel="Filtrar tipo de estoque"/></div>
-        <div class="catalog-field"><span>Situação</span><bf-select [value]="inputAvailability()" (valueChange)="inputAvailability.set($any($event))" [options]="availabilityOptions" ariaLabel="Filtrar situação dos insumos"/></div>
+        <div class="catalog-field"><span>Estoque (controlados)</span><bf-select [value]="inputAvailability()" (valueChange)="inputAvailability.set($any($event))" [options]="availabilityOptions" ariaLabel="Filtrar estoque dos insumos controlados"/></div>
       } @else {
         <div class="catalog-field"><span>Categoria</span><bf-select [value]="additionCategoryFilter()" (valueChange)="additionCategoryFilter.set($event)" [options]="additionCategoryOptions()" ariaLabel="Filtrar categoria do adicional"/></div>
         <div class="catalog-field"><span>Status</span><bf-select [value]="additionStatus()" (valueChange)="additionStatus.set($event)" [options]="additionStatusOptions" ariaLabel="Filtrar situação dos adicionais"/></div>
@@ -94,7 +94,7 @@
               <div class="catalog-meta"><span>{{item.code}}</span><span class="bf-badge" [class.muted]="!item.active">{{item.active?'Ativo':'Inativo'}}</span></div>
               <h2>{{item.name}}</h2><p class="catalog-subtitle">{{inputMode(item)}}</p>
               <div class="catalog-stats"><strong>{{item.averageUnitCostCents>0?currency(item.averageUnitCostCents):'Custo pendente'}}</strong>
-                <span>@if(item.trackingMode==='untracked'||item.minimumStockConfigured===false){ {{item.availabilityStatus||'Sem medição'}} } @else {Saldo {{item.stock}}}</span>
+                <span>@if(tracksInputStock(item)){Saldo {{item.stock}}} @else {Custo de referência}</span>
               </div>
               <span class="catalog-details-cta">Ver detalhes <bf-icon name="chevron-right"/></span>
             </div>

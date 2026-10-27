@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard } from './core/auth/auth.guard';
+import { accessDeniedGuard, authGuard } from './core/auth/auth.guard';
 import { publicOnlyGuard } from './core/auth/public-only.guard';
 import { AppShell } from './layout/app-shell/app-shell';
 
@@ -11,6 +11,7 @@ export const routes: Routes = [
   },
   {
     path: 'acesso-negado',
+    canActivate: [accessDeniedGuard],
     loadComponent: () => import('./pages/access-denied/access-denied.page').then((m) => m.AccessDeniedPage),
   },
   {

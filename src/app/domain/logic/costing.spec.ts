@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { productCostBreakdown, productCostComponents, standardCostForProduct, trackingModeForInput } from './costing';
+import { productCostBreakdown, productCostComponents, standardCostForProduct, trackingModeForInput, inputUnitCostCents } from './costing';
 import { InputItem, Product } from '../models/catalog.model';
 
 const product: Product = {
@@ -62,6 +62,15 @@ describe('standard costing', () => {
     }, inputs);
     expect(result.unitCostCents).toBe(240);
     expect(result.costPending).toBe(false);
+  });
+
+  it('calculates fraction-of-cent material costs from purchases, independent of obsolete physical balance', () => {
+    const base = { ...input('base', 2), trackingMode: 'untracked' as const,
+      stock: 999, costBasisQuantity: 1000, costBasisValueCents: 2300 };
+    expect(inputUnitCostCents(base)).toBe(2.3);
+    const result = standardCostForProduct({ ...product, additionalCostCents: 0, recipe: [{ inputId: 'base', unitId: 'g', quantity: 87 }] }, {}, new Map([['base', base]]));
+    expect(result.unitCostCents).toBe(200);
+    expect(base.stock).toBe(999);
   });
 
   it('treats legacy tracked inputs as estimated and explicit untracked inputs as untracked', () => {

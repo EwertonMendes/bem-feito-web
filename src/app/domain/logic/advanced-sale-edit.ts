@@ -2,7 +2,7 @@ import { Product, Addition, InputItem } from '../models/catalog.model';
 import { Sale, SaleLineSnapshot, StockEffect, OrderLineAllocation } from '../models/sales.model';
 import { summarizeSaleItems } from './sale-analytics';
 import { saleCorrectionSignature } from './sale-correction';
-import { trackingModeForInput } from './costing';
+import { inputUnitCostCents, trackingModeForInput } from './costing';
 
 export interface AdvancedSaleLineDraft {
   id:string;
@@ -76,10 +76,10 @@ function freshLine(draft:AdvancedSaleLineDraft,catalog:AdvancedSaleCatalog):Sale
   for(const component of addition.components){
     const input=catalog.inputs.get(component.inputId);
     if(!input)throw new Error('O adicional possui um insumo não encontrado.');
-    unitCostCents+=component.quantity*input.averageUnitCostCents;
+    unitCostCents+=component.quantity*inputUnitCostCents(input);
     if(trackingModeForInput(input)!=='untracked')
       stockEffects.push({itemType:'input',itemId:input.id,quantityDelta:-component.quantity*draft.quantity,
-        unitCostCents:input.averageUnitCostCents});
+        unitCostCents:Math.round(inputUnitCostCents(input))});
   }
   return {
     id:draft.id,kind:'addition',sourceId:addition.id,name:addition.name,

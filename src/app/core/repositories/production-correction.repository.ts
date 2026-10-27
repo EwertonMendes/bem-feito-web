@@ -183,7 +183,8 @@ export class ProductionCorrectionRepository {
         const mode = trackingModeForInput(input);
         const debited = Math.max(0, recordedDebits.get(inputId) ?? 0);
         if (mode === 'untracked') {
-          if (debited > 1e-6) throw new Error('O insumo ' + input.name + ' mudou para sem controle. Regularize o modo de estoque antes de corrigir.');
+          // Historical debits are immutable audit evidence. No fictional physical
+          // stock is restored for an ingredient whose tracking was retired.
           continue;
         }
         let delta: number;

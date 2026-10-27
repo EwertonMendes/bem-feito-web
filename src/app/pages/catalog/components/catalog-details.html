@@ -65,7 +65,7 @@
         <div class="details-summary">
           <span class="details-eyebrow"><bf-icon name="inventory"/> {{insumo.code}}</span>
           <h3>{{insumo.name}}</h3>
-          <p>Consulte o saldo, o custo médio e os produtos que utilizam este material.</p>
+          <p>{{tracksInputStock(insumo) ? 'Consulte o saldo físico, o custo e as composições cadastradas.' : 'Consulte o custo de referência e as composições cadastradas, sem controle de saldo físico.'}}</p>
           <div class="details-chips">
             <span><bf-icon [name]="tracking(insumo)==='Controlado'?'stock-exact':tracking(insumo)==='Estimado'?'stock-estimated':'stock-untracked'"/> {{tracking(insumo)}}</span>
             <span><bf-icon name="details"/> {{unitName(insumo.unitId)}}</span>
@@ -73,12 +73,10 @@
           </div>
         </div>
       </div>
-      <div class="details-section-title"><span class="details-title-icon"><bf-icon name="inventory"/></span><span>Estoque e custo <small>Situação do insumo</small></span></div>
-      <div class="details-metrics">
-        <div class="details-metric metric-cost"><div class="metric-heading"><bf-icon name="cogs"/><span>Custo médio por {{unitName(insumo.unitId)}}</span></div><strong>{{insumo.averageUnitCostCents>0?currency(insumo.averageUnitCostCents):'Não informado'}}</strong><small>Utilizado nas estimativas de produção</small></div>
-        @if(insumo.trackingMode==='untracked'||insumo.minimumStockConfigured===false){
-          <div class="details-metric metric-price"><div class="metric-heading"><bf-icon name="stock-untracked"/><span>Disponibilidade</span></div><strong>{{insumo.availabilityStatus||'Sem medição de volume'}}</strong><small>Insumo sem quantidade controlada</small></div>
-        } @else {
+      <div class="details-section-title"><span class="details-title-icon"><bf-icon [name]="tracksInputStock(insumo)?'inventory':'cogs'"/></span><span>{{tracksInputStock(insumo)?'Estoque e custo':'Custo do insumo'}} <small>{{tracksInputStock(insumo)?'Saldo e custo de referência':'Referência para estimativas de produção'}}</small></span></div>
+      <div class="details-metrics" [class.cost-only]="!tracksInputStock(insumo)">
+        <div class="details-metric metric-cost"><div class="metric-heading"><bf-icon name="cogs"/><span>Custo médio por {{unitName(insumo.unitId)}}</span></div><strong>{{inputCost(insumo)>0?currency(inputCost(insumo)):'Não informado'}}</strong><small>Utilizado nas estimativas de produção</small></div>
+        @if(tracksInputStock(insumo)){
           <div class="details-metric metric-price"><div class="metric-heading"><bf-icon name="inventory"/><span>{{insumo.trackingMode==='exact'?'Saldo registrado':'Saldo aproximado'}}</span></div><strong>{{quantity(insumo.stock)}} {{unitName(insumo.unitId)}}</strong><small>{{insumo.trackingMode==='exact'?'Quantidade controlada':'Valor aproximado'}}</small></div>
           <div class="details-metric metric-profit"><div class="metric-heading"><bf-icon name="order"/><span>Reservado</span></div><strong>{{quantity(insumo.reservedPhysicalStock??0)}} {{unitName(insumo.unitId)}}</strong><small>Separado para encomendas</small></div>
           <div class="details-metric metric-margin"><div class="metric-heading"><bf-icon name="low-stock-input"/><span>Estoque mínimo</span></div><strong>{{quantity(insumo.minimumStock)}} {{unitName(insumo.unitId)}}</strong><small>Referência para reposição</small></div>
@@ -88,7 +86,7 @@
       <div class="details-related">
         @for(p of usedByProducts();track p.id){<div><bf-icon name="product"/><span>{{p.displayName}}</span></div>}
         @for(a of usedByAdditions();track a.id){<div><bf-icon name="addition"/><span>{{a.name}} <small>Adicional</small></span></div>}
-        @if(!usedByProducts().length && !usedByAdditions().length){<p class="details-hint"><bf-icon name="info"/> Nenhum produto ou adicional utiliza esse insumo em uma composição cadastrada.</p>}
+        @if(!usedByProducts().length && !usedByAdditions().length){<p class="details-hint"><bf-icon name="info"/> Nenhum vínculo encontrado nas composições atualmente cadastradas. Quando uma receita incluir este insumo, seus produtos aparecerão aqui.</p>}
       </div>
     } @else if(kind()==='additions' && addition(); as extra) {
       <div class="details-hero">

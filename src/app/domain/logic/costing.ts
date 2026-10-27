@@ -39,6 +39,14 @@ export function trackingModeForInput(
   return input.minimumStockConfigured === false ? 'untracked' : 'estimated';
 }
 
+/** Average acquisition price is independent of remaining physical stock. */
+export function inputUnitCostCents(input: Pick<InputItem, 'averageUnitCostCents' | 'costBasisQuantity' | 'costBasisValueCents'>): number {
+  const quantity = Number(input.costBasisQuantity);
+  const value = Number(input.costBasisValueCents);
+  if (Number.isFinite(quantity) && quantity > 0 && Number.isSafeInteger(value) && value >= 0) return value / quantity;
+  return Math.max(0, Number(input.averageUnitCostCents || 0));
+}
+
 export function productCostBreakdown(
   product: Pick<Product, 'recipe'>,
   references: ProductCostReferences,
@@ -84,17 +92,17 @@ export function standardCostForProduct(
   }
 
   let costPending = false;
-  let unitCostCents = Math.max(0, Math.round(product.additionalCostCents || 0));
+  let rawUnitCostCents = Math.max(0, Number(product.additionalCostCents || 0));
   const components: CostedComponent[] = [];
   for (const definition of definitions) {
     const input = inputs.get(definition.inputId);
     if (!input) throw new Error('A composição de custo contém um insumo inválido.');
     if (input.unitId !== definition.unitId) throw new Error(`Unidade incompatível para ${input.name}.`);
-    const inputCost = Math.max(0, Number(input.averageUnitCostCents || 0));
+    const inputCost = inputUnitCostCents(input);
     const componentCost = Math.round(definition.quantity * inputCost);
     if (inputCost <= 0) costPending = true;
-    unitCostCents += componentCost;
-    components.push({ ...definition, unitCostCents: inputCost, totalCostCents: componentCost });
+    rawUnitCostCents += definition.quantity * inputCost;
+    components.push({ ...definition, unitCostCents: Math.round(inputCost), totalCostCents: componentCost });
   }
-  return { unitCostCents: Math.round(unitCostCents), costPending, components };
+  return { unitCostCents: Math.round(rawUnitCostCents), costPending, components };
 }

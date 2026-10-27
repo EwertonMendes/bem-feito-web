@@ -70,8 +70,10 @@ export class InventoryPage {
       downloadCsv('bem-feito-estoque-insumos.csv',
         ['Código','Insumo','Tipo de controle','Físico','Reservado','Livre','Mínimo','Custo médio (R$)'],
         this.catalog.inputs().map(i=>[
-          i.code,i.name,this.inputMode(i),i.stock,i.reservedPhysicalStock??0,
-          this.inputFreeStock(i),i.minimumStock,exportCents(i.averageUnitCostCents)]));
+          i.code,i.name,this.inputMode(i),this.inputMode(i)==='untracked'?'':i.stock,
+          this.inputMode(i)==='untracked'?'':(i.reservedPhysicalStock??0),
+          this.inputMode(i)==='untracked'?'':this.inputFreeStock(i),
+          this.inputMode(i)==='untracked'?'':i.minimumStock,exportCents(i.averageUnitCostCents)]));
     }
   }
   readonly currency = formatCurrency;

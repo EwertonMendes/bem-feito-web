@@ -143,6 +143,14 @@ export class CatalogStore {
   }
 
   async saveInput(input: InputItem): Promise<string> {
+    const previous = input.id ? this.inputsState().find(item => item.id === input.id) : undefined;
+    if (previous) {
+      const oldMode = previous.trackingMode ?? (previous.minimumStockConfigured === false ? 'untracked' : 'estimated');
+      const newMode = input.trackingMode ?? 'estimated';
+      if (oldMode !== newMode && (oldMode === 'untracked' || newMode === 'untracked')) {
+        throw new Error('A mudança entre controle físico e custo sem saldo exige migração auditada e conciliação.');
+      }
+    }
     const base = { ...input, stockStatus: stockStatusForInput(input) };
     if (base.id) {
       const normalized = this.normalizeInput(base);

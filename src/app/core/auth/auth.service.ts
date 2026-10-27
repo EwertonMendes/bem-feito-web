@@ -10,7 +10,7 @@ import {
   signInWithRedirect,
   signOut,
 } from 'firebase/auth';
-import { Unsubscribe, doc, onSnapshot } from 'firebase/firestore';
+import { doc, getDocFromServer } from 'firebase/firestore';
 import { UserProfile } from '../../domain/models/common.model';
 import { FIREBASE_AUTH, FIRESTORE } from '../firebase/firebase.providers';
 
@@ -24,9 +24,6 @@ export class AuthService {
   private readonly profileState = signal<UserProfile | null>(null);
   private readonly busyState = signal(false);
   private readonly errorState = signal<string | null>(null);
-  private profileUid: string | null = null;
-  private profileUnsubscribe: Unsubscribe | null = null;
-  private profileReady: Promise<UserProfile | null> | null = null;
 
   readonly user = computed(() => this.userState() ?? null);
   readonly profile = this.profileState.asReadonly();
@@ -36,16 +33,16 @@ export class AuthService {
   readonly role = computed(() => this.profileState()?.role ?? null);
   readonly canOperate = computed(() => this.role() === 'owner' || this.role() === 'operator');
   readonly canAdminister = computed(() => this.role() === 'owner');
+  readonly profileErrorCode = signal<string | null>(null);
 
   constructor() {
     onAuthStateChanged(this.auth, (user) => {
+      const oldUid = this.userState()?.uid;
       this.userState.set(user);
-      if (user) {
-        void this.ensureProfileListener(user).catch((error) => {
-          this.errorState.set(this.authError(error));
-        });
-      } else {
-        this.clearProfileListener();
+      if (!user || (oldUid !== user.uid && this.profileState()?.id !== user.uid)) {
+        // The profile is tied to the exact Firebase Auth UID, not the email.
+        this.profileState.set(null);
+        this.profileErrorCode.set(null);
       }
     });
     void this.completeRedirect();
@@ -64,7 +61,7 @@ export class AuthService {
         await signInWithRedirect(this.auth, provider);
         return;
       }
-      this.errorState.set(this.authError(error));
+      this.errorState.set(this.profileErrorCode() ? this.profileReadError(this.profileErrorCode()!) : this.authError(error));
     } finally {
       this.busyState.set(false);
     }
@@ -72,7 +69,8 @@ export class AuthService {
 
   async logout(): Promise<void> {
     await signOut(this.auth);
-    this.clearProfileListener();
+    this.profileState.set(null);
+    this.profileErrorCode.set(null);
     await this.router.navigateByUrl('/login');
   }
 
@@ -90,55 +88,47 @@ export class AuthService {
     });
   }
 
+  /**
+   * Profile authorization is an explicit server read. Cached listeners previously
+   * raced with popup, guards and retries, sometimes replacing a valid owner
+   * profile with a stale negative result.
+   */
   async resolveProfile(user: User | null): Promise<UserProfile | null> {
     if (!user) {
-      this.clearProfileListener();
+      this.profileState.set(null);
+      this.profileErrorCode.set(null);
       return null;
     }
-    return this.ensureProfileListener(user);
+    try {
+      const snapshot = await getDocFromServer(doc(this.firestore, 'users', user.uid));
+      const profile = snapshot.exists()
+        ? ({ id: snapshot.id, ...snapshot.data() } as UserProfile)
+        : null;
+      // A result from a previous login must never overwrite a newer session.
+      const activeUid = this.userState()?.uid;
+      if (activeUid === undefined || activeUid === user.uid) {
+        this.profileState.set(profile);
+        this.profileErrorCode.set(null);
+      }
+      return profile;
+    } catch (error) {
+      const code = this.firebaseCode(error) || 'firestore/unknown';
+      this.profileErrorCode.set(code);
+      this.errorState.set(this.profileReadError(code));
+      // Never call a transient Firestore failure "account not authorized".
+      throw error;
+    }
   }
 
-  private ensureProfileListener(user: User): Promise<UserProfile | null> {
-    if (this.profileUid === user.uid && this.profileReady) return this.profileReady;
-
-    this.clearProfileListener();
-    this.profileUid = user.uid;
-    this.profileReady = new Promise<UserProfile | null>((resolve, reject) => {
-      let initial = true;
-      this.profileUnsubscribe = onSnapshot(
-        doc(this.firestore, 'users', user.uid),
-        (snapshot) => {
-          const profile = snapshot.exists()
-            ? ({ id: snapshot.id, ...snapshot.data() } as UserProfile)
-            : null;
-          this.profileState.set(profile);
-          if (initial) {
-            initial = false;
-            resolve(profile);
-          }
-        },
-        (error) => {
-          this.profileState.set(null);
-          this.profileUnsubscribe = null;
-          this.profileUid = null;
-          this.profileReady = null;
-          if (initial) {
-            initial = false;
-            reject(error);
-          }
-        },
-      );
-    });
-
-    return this.profileReady;
+  async retryProfile(): Promise<UserProfile | null> {
+    const user = await this.waitForUser();
+    return this.resolveProfile(user);
   }
 
-  private clearProfileListener(): void {
-    this.profileUnsubscribe?.();
-    this.profileUnsubscribe = null;
-    this.profileUid = null;
-    this.profileReady = null;
-    this.profileState.set(null);
+  private profileReadError(code: string): string {
+    if (code === 'permission-denied') return 'Firestore negou a leitura do perfil (permission-denied).';
+    if (code === 'unavailable') return 'Firestore indisponível. Verifique a conexão e tente novamente.';
+    return 'Falha ao consultar o perfil no Firestore (' + code + ').';
   }
 
   private async completeRedirect(): Promise<void> {

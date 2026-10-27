@@ -18,7 +18,7 @@ Codex NÃO altera os arquivos do repositório, DEV ou seus recursos. Sem IDs pre
 
 ### GitHub Environment: prod
 
-Proteger environment com revisão humana do proprietário e restrição à master. Adicionar as seguintes **Environment variables** (configuração pública, não secrets):
+Proteger environment com revisão humana do proprietário e restrição à master. Exigir exatamente um revisor (proprietário), prevent_self_review=false e can_admins_bypass=false; os jobs consultam a configuração por API antes de qualquer autenticação/deploy e recusam environments não protegidos ou criados automaticamente. Adicionar as seguintes **Environment variables** (configuração pública, não secrets):
 
 | Nome | Valor |
 | --- | --- |

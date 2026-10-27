@@ -51,6 +51,10 @@ test('Deploy workflows demand protected human-approved PROD and never reuse DEV 
     assert.doesNotMatch(workflow, /github-deploy@bem-feito-dev/);
     assert.doesNotMatch(workflow, /FIREBASE_TOKEN|credentials_json/);
   }
+  const gate = readFileSync('tools/deploy/verify-prod-release.mjs', 'utf8');
+  assert.match(gate, /environments\/prod/);
+  assert.match(gate, /required_reviewers/);
+  assert.match(gate, /can_admins_bypass/);
   assert.match(readFileSync('.github/workflows/deploy-prod.yml', 'utf8'), /--project "\$PROD_FIREBASE_PROJECT_ID"/);
   assert.match(readFileSync('.github/workflows/deploy-drive-worker-prod.yml', 'utf8'), /--env prod/);
 });

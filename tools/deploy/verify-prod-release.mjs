@@ -35,6 +35,25 @@ const master = await github('branches/master');
 if (!master.protected || master.commit?.sha !== sha || env.GITHUB_SHA !== sha) {
   fail('release must be the current protected master commit');
 }
+// GitHub creates an unprotected Environment if it does not exist. Reject that state
+// before any PROD token, Cloudflare upload or federated credential can be used.
+const protection = await github('environments/prod');
+if (protection.deployment_branch_policy?.custom_branch_policies !== true ||
+    protection.can_admins_bypass !== false) {
+  fail('PROD Environment must restrict branch and disable administrative approval bypass');
+}
+const policies = await github('environments/prod/deployment-branch-policies');
+if (policies.branch_policies?.length !== 1 ||
+    policies.branch_policies[0].name !== 'master' ||
+    policies.branch_policies[0].type !== 'branch') {
+  fail('PROD Environment branch allowlist must contain only master');
+}
+const rule = protection.protection_rules?.find(item => item.type === 'required_reviewers');
+if (!rule || rule.prevent_self_review !== false || rule.reviewers?.length !== 1 ||
+    rule.reviewers[0].type !== 'User' ||
+    String(rule.reviewers[0].reviewer?.id) !== '33728924') {
+  fail('PROD release requires the explicit owner reviewer and a human Environment approval');
+}
 const prs = await github('commits/' + sha + '/pulls');
 if (!Array.isArray(prs) || !prs.some(pr => pr.merged_at && pr.state === 'closed' &&
     pr.base?.ref === 'master' && pr.base?.repo?.full_name === repo)) {

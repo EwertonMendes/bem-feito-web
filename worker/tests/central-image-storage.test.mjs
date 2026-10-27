@@ -142,6 +142,25 @@ describe('shared image storage authorization boundaries',()=>{
       assert.ok(patch.address.includes(imageId));
     }finally{mock.restore();}
   });
+  it('only deletes an unlinked legacy image when filename matches this catalog record',async()=>{
+    const env=await fixture(),mock=setupGoogle(driveMetadata({
+      appProperties:undefined,name:'products_PROD-086.webp'
+    }),{reference:{fields:{code:string('PROD-086')}}});
+    try {
+      const response=await imageRequest(req('DELETE','/storage/image/'+imageId+'?kind=products&entityId='+entityId),env,maria);
+      assert.equal(response.status,200);
+    }finally{mock.restore();}
+  });
+  it('refuses deleting another legacy image after its Firestore reference was cleared',async()=>{
+    const env=await fixture(),mock=setupGoogle(driveMetadata({
+      appProperties:undefined,name:'products_OTHER-099.webp'
+    }),{reference:{fields:{code:string('PROD-086')}}});
+    try {
+      await assert.rejects(imageRequest(req('DELETE','/storage/image/'+imageId+'?kind=products&entityId='+entityId),env,maria),
+        error=>error.code==='storage_image_reference_mismatch');
+      assert.equal(mock.requests.filter(r=>r.init.method==='PATCH').length,0);
+    }finally{mock.restore();}
+  });
   it('uploads images with the storage owner identity, approved folder and entity scope',async()=>{
     const env=await fixture(),mock=setupGoogle(driveMetadata(),{reference:{fields:{}}});
     try{

@@ -20,7 +20,7 @@ function setup(tokenAvailable=false){
   const repository={getConfig:vi.fn().mockResolvedValue(config),saveConfig:vi.fn()};
   const driveApi={currentUser:vi.fn().mockResolvedValue({emailAddress:'owner@example.com'}),
     getFile:vi.fn(async(id:string)=>({id,mimeType:'application/vnd.google-apps.folder',trashed:false}))};
-  const auth={waitForUser:vi.fn().mockResolvedValue({uid:'owner',email:'owner@example.com'}),canAdminister:vi.fn(()=>true)};
+  const auth={user:signal({uid:'owner',email:'owner@example.com'}),waitForUser:vi.fn().mockResolvedValue({uid:'owner',email:'owner@example.com'}),canAdminister:vi.fn(()=>true)};
   const picker={selectFolder:vi.fn()};
   const central={status:vi.fn().mockResolvedValue({available:false,ownerEmail:'owner@example.com'})};
   const injector=Injector.create({providers:[

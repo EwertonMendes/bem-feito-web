@@ -54,8 +54,10 @@ Proteger environment com revisão humana do proprietário e restrição à maste
 - data-prod-execute: operações administrativas aprovadas, exclusivamente master, aprovação específica e sem bypass administrativo.
 - Seguir exatamente tools/data-admin/gate.ts e docs/data-administration.md para proteção do único mantenedor.
 - tools/data-admin/config.json ainda contém environments.prod = null. Não preencher com IDs inventados. Após o Codex entregar IDs reais, atualizar em PR: projectId, projectNumber, provider, reader, writer e archive PROD.
-- O pipeline data-admin.yml já foi projetado para pedidos prod com preview / apply e hashes imutáveis, mas permanece inacessível enquanto prod = null. Os modos query e direct são DEV-only e **não** devem ser redirecionados a PROD via substituição de strings.
+- O pipeline data-admin.yml permite pedidos prod com preview / apply e hashes imutáveis, mas permanece inacessível enquanto prod = null. O modo query pode consultar DEV ou PROD com resultados criptografados após configurar o destino e o reader PROD. O modo direct continua exclusivamente DEV; alterações em PROD usam preview, aprovação e apply. OIDC e Environment garantem isolamento.
 - Não executar mutações comerciais sem backup externo em arquivo privado PROD e readback verificado.
+
+No GitHub Environment **data-prod-preview**, o Codex deve definir as variáveis PROD_FIREBASE_PROJECT_ID, PROD_DATA_WIF_PROVIDER e PROD_DATA_READER_ACCOUNT, iguais aos valores reais versionados em tools/data-admin/config.json. O workflow revalida essas três identidades antes de obter OIDC. Para consultas privadas, selecionar target_environment=prod e usar um QueryPlan com environment=prod e projectId real. Até a configuração existir, PROD é rejeitado.
 
 ## Estratégia de configuração
 

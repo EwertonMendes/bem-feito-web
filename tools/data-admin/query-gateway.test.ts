@@ -39,3 +39,12 @@ test('all ordinary collections and fields can be queried with bounded limits', (
   const users={...basic,queries:[{name:'any',collection:'users',filters:[],limit:5}]};
   assert.equal(validateQueryPlan(JSON.stringify(users)).queries[0].collection,'users');
 });
+
+
+test('PROD queries are schema-bounded and cannot silently target DEV', () => {
+  const prod = { ...basic, environment: 'prod', projectId: 'bem-feito-prod' };
+  assert.equal(validateQueryPlan(JSON.stringify(prod)).environment, 'prod');
+  assert.throws(() => validateQueryPlan(JSON.stringify({ ...prod, projectId: 'bem-feito-dev' })));
+  assert.throws(() => validateQueryPlan(JSON.stringify({ ...prod, projectId: 'another-dev' })));
+  assert.throws(() => validateQueryPlan(JSON.stringify({ ...prod, environment: 'staging' })));
+});

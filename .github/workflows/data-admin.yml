@@ -25,6 +25,12 @@ on:
       plan_hash:
         description: Immutable plan SHA-256 from preview (apply only)
         required: false
+      target_environment:
+        description: Environment for encrypted queries (prod only after infrastructure is approved)
+        type: choice
+        options: [dev, prod]
+        default: dev
+        required: true
       query:
         description: Bounded JSON query (query mode only)
         required: false
@@ -154,7 +160,7 @@ jobs:
           rm -f tools/migration/legacy-raw.json tools/migration/migration-data.json
 
   query:
-    name: Query DEV (encrypted, read-only)
+    name: Query approved target (encrypted, read-only)
     if: >-
       github.repository_id == '1406056807' &&
       github.ref == 'refs/heads/master' &&
@@ -162,7 +168,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     environment:
-      name: data-dev-preview
+      name: ${{ inputs.target_environment == 'prod' && 'data-prod-preview' || 'data-dev-preview' }}
     permissions:
       contents: read
       actions: read
@@ -183,15 +189,22 @@ jobs:
           GATEWAY_QUERY: ${{ inputs.query }}
           GATEWAY_KEY: ${{ inputs.recipient_public_key }}
         run: node --experimental-strip-types tools/data-admin/query-gate.ts
-      - name: Obtain DEV read-only identity through existing protected OIDC
+      - name: Cross-check PROD reader credentials against the approved config before OIDC
+        if: inputs.target_environment == 'prod'
+        env:
+          PROD_FIREBASE_PROJECT_ID: ${{ vars.PROD_FIREBASE_PROJECT_ID }}
+          PROD_DATA_WIF_PROVIDER: ${{ vars.PROD_DATA_WIF_PROVIDER }}
+          PROD_DATA_READER_ACCOUNT: ${{ vars.PROD_DATA_READER_ACCOUNT }}
+        run: node tools/data-admin/prod-query-target.mjs
+      - name: Obtain environment-specific read-only identity through protected OIDC
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
         with:
-          project_id: bem-feito-dev
-          workload_identity_provider: projects/312978463343/locations/global/workloadIdentityPools/github-data/providers/github
-          service_account: github-data-dev-read@bem-feito-dev.iam.gserviceaccount.com
+          project_id: ${{ inputs.target_environment == 'prod' && vars.PROD_FIREBASE_PROJECT_ID || 'bem-feito-dev' }}
+          workload_identity_provider: ${{ inputs.target_environment == 'prod' && vars.PROD_DATA_WIF_PROVIDER || 'projects/312978463343/locations/global/workloadIdentityPools/github-data/providers/github' }}
+          service_account: ${{ inputs.target_environment == 'prod' && vars.PROD_DATA_READER_ACCOUNT || 'github-data-dev-read@bem-feito-dev.iam.gserviceaccount.com' }}
           create_credentials_file: true
           export_environment_variables: true
-      - name: Query Firestore DEV and return encrypted result only
+      - name: Query selected Firestore environment and return encrypted result only
         env:
           GH_TOKEN: ${{ github.token }}
           GATEWAY_QUERY: ${{ inputs.query }}

@@ -131,6 +131,8 @@ describe('Google login routing', () => {
     ] });
     const auth = runInInjectionContext(injector, () => new AuthService());
     await auth.loginWithGoogle();
+    // The mocked Auth SDK does not emit onAuthStateChanged automatically.
+    (auth as any).userState.set({ uid: 'test-user' });
     mocks.profile = { active: true, role: 'owner' };
     expect((await auth.retryProfile())?.role).toBe('owner');
     injector.destroy();

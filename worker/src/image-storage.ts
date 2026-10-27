@@ -176,7 +176,7 @@ async function assertImage(
       (tagged && properties['app'] !== 'bem-feito') ||
       !meta.parents?.includes(cfg['folders'][k as Kind]) ||
       !Number.isSafeInteger(Number(meta.size)) || Number(meta.size) <= 0 || Number(meta.size) > MAX_IMAGE ||
-      (expected && (expected.kind !== k || expected.entityId !== entityId))) {
+      (expected && (expected.kind !== k || (tagged && expected.entityId !== entityId)))) {
     throw new ApiError(403,'storage_image_outside_catalog');
   }
   if (!tagged) {

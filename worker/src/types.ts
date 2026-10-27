@@ -9,6 +9,7 @@ export interface Env {
   OAUTH_ENABLED: string;
   TOKEN_KEYS: string;
   TOKEN_KEY_VERSION: string;
+  STORAGE_OWNER_EMAIL: string;
 }
 export interface D1Database {
   prepare(sql: string): {

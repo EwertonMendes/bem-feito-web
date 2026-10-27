@@ -32,6 +32,7 @@ export function createWorkerConfig(env) {
         GOOGLE_CLIENT_ID: assertGoogleClientId(required(env, 'PROD_GOOGLE_OAUTH_SERVER_CLIENT_ID'), 'PROD_GOOGLE_OAUTH_SERVER_CLIENT_ID'),
         OAUTH_REDIRECT_URI: oauthRedirect,
         TOKEN_KEY_VERSION: required(env, 'PROD_TOKEN_KEY_VERSION'),
+        STORAGE_OWNER_EMAIL: 'ewertonmendes9@gmail.com',
         OAUTH_ENABLED: oauthEnabled,
       },
       d1_databases: [{ binding: 'DB', database_name: required(env, 'PROD_D1_DATABASE_NAME'),

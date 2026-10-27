@@ -17,6 +17,7 @@
         "GOOGLE_CLIENT_ID": "312978463343-9i9096fr0ccdnbono33mcob32mqdgdlv.apps.googleusercontent.com",
         "OAUTH_REDIRECT_URI": "https://bem-feito-drive-dev.ewertonmendes9.workers.dev/oauth/drive/callback",
         "TOKEN_KEY_VERSION": "v1",
+        "STORAGE_OWNER_EMAIL": "ewertonmendes9@gmail.com",
         "OAUTH_ENABLED": "true"
       },
       "d1_databases": [

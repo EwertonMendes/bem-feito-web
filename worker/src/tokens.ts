@@ -34,7 +34,7 @@ async function cached(env: Env, c: Connection): Promise<{accessToken: string;exp
     expiresAt:c.access_token_expires_at,email:c.google_email
   };
 }
-async function grant(env: Env, user: Principal): Promise<{accessToken:string;expiresAt:number;email:string;version:string}> {
+export async function grant(env: Env, user: Principal): Promise<{accessToken:string;expiresAt:number;email:string;version:string}> {
   const started = Date.now();
   let attempt = 0;
   while (Date.now() - started < MAX_WAIT_MS) {

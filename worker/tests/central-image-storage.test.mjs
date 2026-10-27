@@ -121,6 +121,16 @@ describe('shared image storage authorization boundaries',()=>{
       assert.equal(mock.requests.filter(r=>r.address.includes('www.googleapis.com')).length,0);
     }finally{mock.restore();}
   });
+  it('trashes an image after Firestore clears its reference, without deleting another image',async()=>{
+    const env=await fixture(),mock=setupGoogle(driveMetadata(),{reference:{fields:{}}});
+    try{
+      const result=await imageRequest(req('DELETE','/storage/image/'+imageId+'?kind=products&entityId='+entityId),env,maria);
+      assert.deepEqual(await result.json(),{deleted:true});
+      const patch=mock.requests.find(r=>r.init.method==='PATCH');
+      assert.equal(JSON.parse(patch.init.body).trashed,true);
+      assert.ok(patch.address.includes(imageId));
+    }finally{mock.restore();}
+  });
   it('uploads images with the storage owner identity, approved folder and entity scope',async()=>{
     const env=await fixture(),mock=setupGoogle();
     try{

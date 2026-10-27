@@ -43,6 +43,7 @@ jobs:
       - run: npm run test:ci-config
       - run: npm run test:prod-config
       - run: npm ci --no-fund
+      - run: node --test tools/backup/firestore-snapshot.test.mjs
       - run: npm run check:data-admin
       - run: npm run test:data-admin
       - run: npx tsc -p worker/tsconfig.json

@@ -145,7 +145,7 @@ describe('shared image storage authorization boundaries',()=>{
       assert.equal(mock.requests.filter(r=>r.address.includes('www.googleapis.com')).length,0);
     }finally{mock.restore();}
   });
-  it('does not accept another Drive owner's account in central storage',async()=>{
+  it('does not accept a different Google Drive account as central owner',async()=>{
     const env=await fixture();
     env.STORAGE_OWNER_EMAIL='somebody-else@example.com';
     const result=await (await storageStatus(env,maria)).json();

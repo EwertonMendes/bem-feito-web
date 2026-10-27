@@ -42,8 +42,7 @@
     "test:data-admin:emulator": "npx --yes --package firebase-tools@15.32.1 firebase emulators:exec --only firestore --project demo-bem-feito \"node --experimental-strip-types --test tools/data-admin/emulator.test.ts tools/data-admin/direct-emulator.test.ts tools/backup/firestore-snapshot.emulator.test.mjs\"",
     "test:prod-config": "node --test tools/tests/prod-deployment.test.mjs",
     "firebase:wait-indexes:prod": "node tools/deploy/wait-for-firestore-indexes.mjs",
-    "firebase:verify-queries:prod": "node tools/deploy/verify-firestore-queries.mjs",
-    "test:dashboard-indexes": "node --test tools/tests/dashboard-indexes.test.mjs"
+    "firebase:verify-queries:prod": "node tools/deploy/verify-firestore-queries.mjs"
   },
   "dependencies": {
     "@angular/common": "^22.2.1",

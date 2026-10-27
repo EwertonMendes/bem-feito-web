@@ -216,7 +216,7 @@ export async function imageRequest(request:Request,env:Env,user:Principal):Promi
     // A catalog record must already exist. Avoid allowing editors to create
     // arbitrary Drive files by forging unattached entity identifiers.
     if (await referencedImage(env,request,k,entityId)) throw new ApiError(409,'storage_image_already_exists');
-    const created=await google(env,owner,DRIVE+'/files?fields=+encodeURIComponent('id,name,mimeType,parents,appProperties'),
+    const created=await google(env,owner,DRIVE+'/files?fields='+encodeURIComponent('id,name,mimeType,parents,appProperties'),
       {method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({name:k+'_'+entityId+'.webp',mimeType:'image/webp',
           parents:[cfg['folders'][k]],appProperties:{app:'bem-feito',entityType:k,entityId}})});

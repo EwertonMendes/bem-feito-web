@@ -193,7 +193,7 @@ export async function imageRequest(request:Request,env:Env,user:Principal):Promi
   }
   const k = kind(url.searchParams.get('kind')), entityId = id(url.searchParams.get('entityId'));
   if (method === 'POST' || method === 'PUT') {
-    if (request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase() !== 'image/webp') {
+    if (request.headers.get('Content-Type')?.split(';')[0]?.trim().toLowerCase() !== 'image/webp') {
       throw new ApiError(415,'invalid_image_type');
     }
     const length = Number(request.headers.get('Content-Length') ?? '0');

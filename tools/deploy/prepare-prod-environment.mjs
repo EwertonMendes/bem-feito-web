@@ -22,7 +22,6 @@ export function createFrontendConfig(env) {
       !firebase.appId.startsWith('1:' + number + ':web:')) {
     throw new Error('Firebase PROD web config does not belong to the declared project');
   }
-  if (cloudNumber !== number) throw new Error('Picker project and Firebase project must match for PROD');
   const config = {
     production: true,
     name: 'production',

@@ -5,26 +5,7 @@ import { createFrontendConfig } from '../deploy/prepare-prod-environment.mjs';
 import { createWorkerConfig } from '../deploy/prepare-prod-worker-config.mjs';
 import { productionOrigin } from '../deploy/prod-config.mjs';
 
-const env = {
-  PROD_FIREBASE_PROJECT_ID: 'bem-feito-prod',
-  PROD_FIREBASE_API_KEY: 'AIza' + 'a'.repeat(35),
-  PROD_FIREBASE_AUTH_DOMAIN: 'bem-feito-prod.firebaseapp.com',
-  PROD_FIREBASE_STORAGE_BUCKET: 'bem-feito-prod.firebasestorage.app',
-  PROD_FIREBASE_MESSAGING_SENDER_ID: '987654321098',
-  PROD_FIREBASE_APP_ID: '1:987654321098:web:abcdef012345',
-  PROD_FRONTEND_ORIGIN: 'https://bem-feito-prod.web.app',
-  PROD_WORKER_ORIGIN: 'https://bem-feito-drive-prod.example.workers.dev',
-  PROD_GOOGLE_PICKER_CLIENT_ID: '987654321098-abcxyz.apps.googleusercontent.com',
-  PROD_GOOGLE_PICKER_API_KEY: 'AIza' + 'b'.repeat(35),
-  PROD_GOOGLE_CLOUD_PROJECT_NUMBER: '987654321098',
-  PROD_GOOGLE_OAUTH_SERVER_CLIENT_ID: '987654321098-another.apps.googleusercontent.com',
-  PROD_OAUTH_REDIRECT_URI: 'https://bem-feito-drive-prod.example.workers.dev/oauth/drive/callback',
-  PROD_WORKER_NAME: 'bem-feito-drive-prod',
-  PROD_D1_DATABASE_NAME: 'bem-feito-drive-prod',
-  PROD_D1_DATABASE_ID: '127d0bbe-79b0-420a-a4c9-bb7a89587ac2',
-  PROD_TOKEN_KEY_VERSION: 'v1',
-  PROD_OAUTH_ENABLED: 'false',
-};
+import { env } from './prod-fixture.mjs';
 
 test('Angular prod config is generated with separate Firebase, Google Picker and Worker resources', () => {
   const output = createFrontendConfig(env);

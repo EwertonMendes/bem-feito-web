@@ -71,3 +71,13 @@ jobs:
           retention-days: 2
       - run: rm -f public/deployment.json
       - run: npm run build:prod
+      - name: Generate synthetic PROD resources and metadata (CI-only fixture)
+        run: node tools/tests/generate-prod-fixture.mjs
+      - name: Compile real generated PROD configuration
+        run: npm run build:prod
+      - name: Assert synthetic PROD bundle cannot contain DEV resource IDs
+        run: node tools/tests/verify-prod-fixture.mjs
+      - name: Verify PROD Worker build path without cloud authentication
+        working-directory: worker
+        run: npx --yes wrangler@4.152.0 deploy --dry-run --config wrangler.generated.prod.jsonc --env prod --outdir /tmp/bem-feito-drive-prod-fixture
+      - run: rm -f public/deployment.json worker/wrangler.generated.prod.jsonc

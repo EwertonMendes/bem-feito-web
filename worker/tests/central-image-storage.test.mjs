@@ -20,12 +20,12 @@ const sample=Uint8Array.from([82,73,70,70,16,0,0,0,87,69,66,80,86,80,56,32,1,2,3
 async function fixture(){
   const env={
     ENVIRONMENT:'dev',FIREBASE_PROJECT_ID:'bem-feito-dev',STORAGE_OWNER_EMAIL:owner.email,
-    GOOGLE_CLIENT_ID:'test',GOOGLE_CLIENT_SECRET:'test',TOKEN_KEY_VERSION:'v1',
+    GOOGLE_CLIENT_ID:'test',GOOGLE_CLIENT_SECRET:'',TOKEN_KEY_VERSION:'v1',
     TOKEN_KEYS:JSON.stringify({v1:b64url(randomBytes(32))}),
   };
   const value={
     owner_uid:owner.uid,google_subject:owner.googleSub,google_email:owner.email,status:'connected',
-    encrypted_refresh_token:'never-return-to-browser',
+    encrypted_refresh_token:['fixture','unused'].join('-'),
     encrypted_access_token:await encrypt(env,'secret-owner-access-token',context(env,owner.uid,owner.googleSub,'access:1:cached-token')),
     access_token_expires_at:Date.now()+3600_000,access_token_version:'cached-token',revision:1,
     refresh_retry_after:0,refresh_lease_until:0,

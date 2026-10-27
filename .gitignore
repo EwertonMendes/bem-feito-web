@@ -33,3 +33,6 @@ tools/migration/legacy-raw.json
 tools/migration/migration-data.json
 tools/migration/.private/
 tools/data-admin/.private/
+
+# Generated PROD config exists only during the authorized CI/CD job
+worker/wrangler.generated.prod.jsonc

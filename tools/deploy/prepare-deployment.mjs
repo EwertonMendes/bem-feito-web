@@ -6,8 +6,18 @@ if (!commit || !/^[0-9a-f]{40}$/i.test(commit)) {
 }
 
 const sourcePr = process.env.DEPLOY_SOURCE_PR?.trim() || 'manual';
+const environment = process.env.DEPLOY_ENVIRONMENT?.trim() || 'dev';
+if (!['dev', 'prod'].includes(environment)) {
+  throw new Error('Unsupported deployment environment');
+}
+if (environment === 'prod') {
+  if (process.env.GITHUB_ACTIONS !== 'true' || process.env.GITHUB_REF !== 'refs/heads/master' ||
+      process.env.GITHUB_ENVIRONMENT !== 'prod' || process.env.GITHUB_EVENT_NAME !== 'workflow_dispatch') {
+    throw new Error('PROD metadata requires the approved GitHub production workflow');
+  }
+}
 const payload = {
-  environment: 'dev',
+  environment,
   commit,
   sourcePr,
   deployedAt: new Date().toISOString(),
@@ -15,4 +25,4 @@ const payload = {
 
 mkdirSync('public', { recursive: true });
 writeFileSync('public/deployment.json', `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
-console.log(`Prepared DEV deployment metadata for ${commit}.`);
+console.log(`Prepared ${environment.toUpperCase()} deployment metadata for ${commit}.`);

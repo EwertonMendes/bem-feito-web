@@ -7,6 +7,13 @@ export const authGuard: CanActivateFn = async () => {
   const router = inject(Router);
   const user = await auth.waitForUser();
   if (!user) return router.parseUrl('/login');
-  const profile = await auth.resolveProfile(user);
-  return profile?.active === true ? true : router.parseUrl('/acesso-negado');
+  try {
+    const profile = await auth.resolveProfile(user);
+    return profile?.active === true && ['owner', 'operator', 'viewer'].includes(profile.role)
+      ? true : router.parseUrl('/acesso-negado');
+  } catch {
+    // Network / rules failures must not masquerade as revoked authorization.
+    // The denied page surfaces the exact Firestore error code and allows retry.
+    return router.parseUrl('/acesso-negado');
+  }
 };

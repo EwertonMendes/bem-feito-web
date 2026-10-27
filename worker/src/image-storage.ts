@@ -137,6 +137,29 @@ async function metadata(env: Env, owner: Principal, fileId: string): Promise<Dri
   const result = await google(env,owner,DRIVE+'/files/'+encodeURIComponent(fileId)+'?fields='+fields+'&supportsAllDrives=true');
   return await result.response.json() as DriveMeta;
 }
+async function legacyFileIsReferenced(env:Env,request:Request,kind:Kind,fileId:string):Promise<boolean> {
+  // Imported files may be named after the business CODE, not Firestore UID.
+  // Resolve the exact fileId against Firestore rather than trusting filenames.
+  const url='https://firestore.googleapis.com/v1/projects/'+encodeURIComponent(env.FIREBASE_PROJECT_ID)+
+    '/databases/(default)/documents:runQuery';
+  const body={structuredQuery:{
+    from:[{collectionId:kind}],
+    where:{fieldFilter:{field:{fieldPath:'image.fileId'},op:'EQUAL',value:{stringValue:fileId}}},
+    limit:1,
+  }};
+  let response:Response;
+  try {
+    response=await fetch(url,{method:'POST',headers:{Authorization:'Bearer '+callerToken(request),
+      'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(10000)});
+  }catch{throw new ApiError(503,'storage_firestore_unavailable');}
+  if(response.status===401 || response.status===403)throw new ApiError(403,'storage_permission_denied');
+  if(!response.ok)throw new ApiError(503,'storage_firestore_unavailable');
+  const records=await response.json() as Array<{document?:unknown}>;
+  return Array.isArray(records) && records.some(row=>{
+    const image=fields(fields(row.document)['image']?.mapValue);
+    return str(image['provider'])==='google-drive' && str(image['fileId'])===fileId;
+  });
+}
 async function assertImage(
   env:Env, request:Request, meta:DriveMeta, cfg:StorageConfig,
   expected?:{kind:Kind;entityId:string}, allowUnlinked=false,
@@ -157,9 +180,15 @@ async function assertImage(
     throw new ApiError(403,'storage_image_outside_catalog');
   }
   if (!tagged) {
-    const ref=await referencedImage(env,request,k as Kind,entityId);
-    if (ref !== meta.id && !(allowUnlinked && !ref)) {
-      throw new ApiError(403,'storage_image_reference_mismatch');
+    if (!expected) {
+      if (!(await legacyFileIsReferenced(env,request,k as Kind,meta.id))) {
+        throw new ApiError(403,'storage_image_reference_mismatch');
+      }
+    } else {
+      const ref=await referencedImage(env,request,k as Kind,expected.entityId);
+      if (ref !== meta.id && !(allowUnlinked && !ref)) {
+        throw new ApiError(403,'storage_image_reference_mismatch');
+      }
     }
   }
   return {kind:k as Kind,entityId};

@@ -66,7 +66,7 @@ function setupGoogle(metadata=driveMetadata(), options={}){
       if(address.endsWith('/products/'+entityId)) return Response.json(options.reference??product);
       throw Error('Unexpected Firestore document: '+address);
     }
-    if(address.includes('www.googleapis.com/drive/v3')){
+    if(address.includes('www.googleapis.com/drive/v3') || address.includes('www.googleapis.com/upload/drive/v3')){
       assert.equal(new Headers(init.headers).get('Authorization'),'Bearer secret-owner-access-token');
       if(init.method==='POST') return Response.json({id:'created-image-123',mimeType:'image/webp'});
       if(init.method==='PATCH')return Response.json({...metadata,id:address.includes('created-image')?'created-image-123':imageId});

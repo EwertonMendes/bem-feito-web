@@ -77,7 +77,8 @@ export class DriveConnectionBanner {
 
   readonly visible = computed(() => {
     if (this.dismissed() || this.isSettingsRoute()) return false;
-    if (!this.integration.enabled || !this.integration.config()?.enabled) return false;
+    if (!this.integration.enabled || !this.integration.config()?.enabled ||
+        this.integration.centralActive() || !this.integration.isStorageOwner()) return false;
 
     const status = this.integration.status();
     if (status === 'loading' || status === 'unconfigured' || status === 'disabled' || status === 'connected') {

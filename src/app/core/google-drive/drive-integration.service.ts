@@ -7,6 +7,7 @@ import { DriveIntegrationRepository } from '../repositories/drive-integration.re
 import { DriveApiError, DriveApiService } from './drive-api.service';
 import { DriveAuthService, DriveAuthorizationRequiredError, DriveRedirectStartedError } from './drive-auth.service';
 import { DrivePickerService } from './drive-picker.service';
+import { CentralDriveImageApiService } from './central-drive-image-api.service';
 
 export type DriveIntegrationStatus =
   | 'disabled'
@@ -23,6 +24,9 @@ export class DriveIntegrationService {
   private readonly driveAuth = inject(DriveAuthService);
   private readonly driveApi = inject(DriveApiService);
   private readonly picker = inject(DrivePickerService);
+  private readonly central = inject(CentralDriveImageApiService);
+  private readonly centralActiveState = signal(false);
+  private readonly storageOwnerState = signal('');
   private readonly auth = inject(AuthService);
   private readonly configState = signal<GoogleDriveIntegration | null>(null);
   private readonly statusState = signal<DriveIntegrationStatus>(environment.googleDrive.enabled ? 'loading' : 'disabled');
@@ -42,9 +46,12 @@ export class DriveIntegrationService {
   readonly authorizationNeeded = this.authorizationNeededState.asReadonly();
   readonly connecting = this.connectingState.asReadonly();
   readonly driveEmail = this.driveAuth.accountEmail;
+  readonly centralActive = this.centralActiveState.asReadonly();
+  readonly storageOwnerEmail = this.storageOwnerState.asReadonly();
+  readonly isStorageOwner = computed(() => this.auth.user()?.email?.toLowerCase() === this.storageOwnerState() && !!this.storageOwnerState());
   readonly revision = computed(() => this.driveAuth.revision() + this.configRevision());
   readonly linked = computed(() => Boolean(this.configState()?.enabled && this.driveAuth.linked()));
-  readonly connected = computed(() => this.statusState() === 'connected' && this.driveAuth.connected());
+  readonly connected = computed(() => this.statusState() === 'connected' && (this.centralActiveState() || this.driveAuth.connected()));
 
   constructor() {
     effect(() => {
@@ -54,7 +61,7 @@ export class DriveIntegrationService {
 
       if (!this.loaded || !this.configState()?.enabled) return;
       if (status === 'loading' || status === 'unconfigured' || status === 'disabled' || status === 'error') return;
-      if (tokenActive) return;
+      if (tokenActive || this.centralActiveState()) return;
 
       const nextStatus: DriveIntegrationStatus = linked ? 'ready' : 'disconnected';
       if (status !== nextStatus) this.statusState.set(nextStatus);
@@ -93,7 +100,17 @@ export class DriveIntegrationService {
         return;
       }
 
-      // Recover access silently through the Worker. Never require a user gesture for refresh.
+      const centralStatus = await this.central.status();
+      this.storageOwnerState.set(centralStatus.ownerEmail.trim().toLowerCase());
+      this.centralActiveState.set(centralStatus.available);
+      if (centralStatus.available) {
+        this.statusState.set('connected');
+        return;
+      }
+      if (firebaseUser.email?.trim().toLowerCase() !== this.storageOwnerState()) {
+        throw new Error('A conta proprietária precisa conectar o armazenamento central. Solicite ao administrador.');
+      }
+      // The storage owner can still reconnect its encrypted server-side OAuth grant.
       await this.driveAuth.accessToken();
       await this.verifyAccount();
       await this.verifyConfiguredFolder(config);
@@ -112,7 +129,9 @@ export class DriveIntegrationService {
 
   async configure(): Promise<void> {
     if (!this.enabled) throw new Error('A integração com Google Drive ainda não foi configurada no ambiente.');
-    if (!this.auth.canAdminister()) throw new Error('Somente um owner pode configurar a pasta de imagens.');
+    if (!this.auth.canAdminister() || (this.storageOwnerState() && !this.isStorageOwner())) {
+      throw new Error('Somente a conta proprietária do armazenamento pode alterar a pasta central.');
+    }
 
     try {
       await this.driveAuth.connect();
@@ -168,6 +187,9 @@ export class DriveIntegrationService {
 
     const config = this.configState();
     if (!config?.enabled) throw new Error('A pasta de imagens ainda não foi configurada por um owner.');
+
+    if (this.centralActiveState()) return;
+    if (!this.isStorageOwner()) throw new Error('Somente o proprietário pode conectar o Drive central.');
 
     try {
       await this.driveAuth.connect();
@@ -228,10 +250,13 @@ export class DriveIntegrationService {
   }
 
   async disconnect(): Promise<void> {
+    if (!this.isStorageOwner()) throw new Error('Somente o proprietário pode desconectar o armazenamento central.');
     await this.driveAuth.revoke();
+    this.centralActiveState.set(false);
     this.statusState.set('disconnected');
     this.authorizationNeededState.set(false);
     this.errorState.set(null);
+    this.configRevision.update((value) => value + 1);
   }
 
   requestAuthorization(): void {

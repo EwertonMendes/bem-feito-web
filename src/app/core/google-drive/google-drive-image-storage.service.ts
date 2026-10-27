@@ -3,8 +3,9 @@ import { environment } from '../../../environments/environment';
 import { CatalogImageEntityKind, CatalogImageRef } from '../../domain/models/image.model';
 import { ImageStorageAvailability, ImageStoragePort } from '../images/image-storage.port';
 import { ImageProcessorService } from '../images/image-processor.service';
-import { DriveApiError, DriveApiService, DriveFileMetadata } from './drive-api.service';
-import { DriveAuthorizationRequiredError } from './drive-auth.service';
+import { DriveApiError, DriveFileMetadata } from './drive-api.service';
+import { CentralDriveImageApiService } from './central-drive-image-api.service';
+
 import { DriveIntegrationService } from './drive-integration.service';
 
 const MAX_CACHED_IMAGE_URLS = 128;
@@ -12,7 +13,7 @@ const MAX_CACHED_IMAGE_URLS = 128;
 @Injectable({ providedIn: 'root' })
 export class GoogleDriveImageStorageService extends ImageStoragePort {
   private readonly processor = inject(ImageProcessorService);
-  private readonly api = inject(DriveApiService);
+  private readonly api = inject(CentralDriveImageApiService);
   private readonly integration = inject(DriveIntegrationService);
   private readonly urlCache = new Map<string, string>();
   private readonly pendingDownloads = new Map<string, Promise<string | null>>();
@@ -59,12 +60,7 @@ export class GoogleDriveImageStorageService extends ImageStoragePort {
       this.cacheUrl(key, url);
       return url;
     }).catch((error) => {
-      if (error instanceof DriveAuthorizationRequiredError) {
-        this.integration.requestAuthorization();
-        return null;
-      }
-      if (error instanceof DriveApiError && error.status === 401) {
-        this.integration.handleUnauthorized();
+      if (error instanceof DriveApiError && (error.status === 401 || error.status === 403 || error.status === 404)) {
         return null;
       }
       throw error;
@@ -82,16 +78,10 @@ export class GoogleDriveImageStorageService extends ImageStoragePort {
     let metadata: DriveFileMetadata;
 
     if (existing) {
-      await this.assertManagedFile(kind, entityId, existing);
-      metadata = await this.api.updateImage(existing.fileId, processed.blob);
+      metadata = await this.api.updateImage(kind, entityId, existing.fileId, processed.blob);
       this.invalidate(existing.fileId);
     } else {
-      metadata = await this.api.createImage(
-        this.integration.folderFor(kind),
-        `${kind}_${entityId}.webp`,
-        processed.blob,
-        { app: 'bem-feito', entityType: kind, entityId },
-      );
+      metadata = await this.api.createImage(kind, entityId, processed.blob);
     }
 
     return {
@@ -109,22 +99,8 @@ export class GoogleDriveImageStorageService extends ImageStoragePort {
     if (!this.enabled || !image) return;
 
     await this.integration.ensureConnected();
-    await this.assertManagedFile(kind, entityId, image);
-    await this.api.trash(image.fileId);
+    await this.api.trash(kind, entityId, image.fileId);
     this.invalidate(image.fileId);
-  }
-
-  private async assertManagedFile(kind: CatalogImageEntityKind, entityId: string, image: CatalogImageRef): Promise<void> {
-    const metadata = await this.api.getFile(image.fileId);
-    if (
-      metadata.trashed ||
-      metadata.mimeType !== 'image/webp' ||
-      metadata.appProperties?.['app'] !== 'bem-feito' ||
-      metadata.appProperties?.['entityType'] !== kind ||
-      metadata.appProperties?.['entityId'] !== entityId
-    ) {
-      throw new Error('A imagem não pertence a este cadastro e não pode ser alterada.');
-    }
   }
 
   private cacheKey(image: CatalogImageRef): string {

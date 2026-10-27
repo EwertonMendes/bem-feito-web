@@ -25,7 +25,7 @@ import { ToastService } from '../../../core/services/toast.service';
         <div class="drive-copy">
           <div class="title">
             <strong>Imagens no Google Drive</strong>
-            <span>Arquivos privados, acessíveis somente pelas contas compartilhadas na pasta.</span>
+            <span>Armazenamento central do Bem Feito. Todos os usuários autorizados acessam as mesmas imagens.</span>
           </div>
 
           @if (!integration.enabled) {
@@ -39,7 +39,7 @@ import { ToastService } from '../../../core/services/toast.service';
                 {{ statusLabel() }}
               </span>
               <span>{{ config.rootFolderName }}</span>
-              @if (integration.driveEmail()) { <small>{{ integration.driveEmail() }}</small> }
+              @if (integration.storageOwnerEmail()) { <small>Armazenamento: {{ integration.storageOwnerEmail() }}</small> }
             </div>
             @if (integration.error()) { <p class="error">{{ integration.error() }}</p> }
           } @else {
@@ -73,7 +73,7 @@ import { ToastService } from '../../../core/services/toast.service';
                 (click)="disconnect()">Confirmar desconexão</button>
             }
           }
-          @if (auth.canAdminister()) {
+          @if (auth.canAdminister() && (!integration.storageOwnerEmail() || integration.isStorageOwner())) {
             <button
               class="bf-button"
               type="button"
@@ -102,13 +102,14 @@ export class GoogleDriveSettingsCard {
   readonly busy = signal<'connect' | 'configure' | 'disconnect' | null>(null);
   readonly confirmDisconnect = signal(false);
   readonly showConnect = computed(() => {
-    if (!this.integration.enabled || !this.integration.config()?.enabled) return false;
+    if (!this.integration.enabled || !this.integration.config()?.enabled || !this.integration.isStorageOwner()) return false;
+    if (this.integration.centralActive()) return false;
     const status = this.integration.status();
     return status !== 'loading' && status !== 'disabled' && status !== 'unconfigured'
       && !this.integration.connected();
   });
   readonly showDisconnect = computed(() =>
-    this.integration.enabled && !!this.integration.config()?.enabled && this.integration.connected()
+    this.integration.enabled && !!this.integration.config()?.enabled && this.integration.isStorageOwner() && this.integration.centralActive()
   );
 
   private readonly toast = inject(ToastService);

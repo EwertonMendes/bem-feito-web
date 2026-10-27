@@ -52,12 +52,6 @@
   </aside>
 
   <main class="content">
-    @if (isDevelopmentEnvironment) {
-      <div class="environment-notice" role="note">
-        <strong>DEV</strong>
-        <span>Ambiente de testes — não registre operações reais aqui.</span>
-      </div>
-    }
     @if (navigation.routeLoading()) {
       <div class="route-progress" role="status" aria-label="Carregando tela"><span></span></div>
     }

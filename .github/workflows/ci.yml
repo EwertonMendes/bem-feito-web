@@ -41,6 +41,7 @@ jobs:
       - run: npm run test:security
       - run: npm run test:architecture
       - run: npm run test:ci-config
+      - run: node --test tools/tests/dashboard-indexes.test.mjs
       - run: npm run test:prod-config
       - run: npm ci --no-fund
       - run: node --test tools/backup/firestore-snapshot.test.mjs

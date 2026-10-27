@@ -1,0 +1,128 @@
+name: Deploy PROD (manual promotion)
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: "Exact homologated master commit SHA (40 lowercase hex)"
+        type: string
+        required: true
+      deploy_firestore:
+        description: "Apply Firestore Rules and indexes before Hosting (review index changes)"
+        type: boolean
+        default: true
+        required: true
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: bem-feito-prod-release
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    if: github.repository_id == '1406056807' && github.ref == 'refs/heads/master' && github.actor == 'EwertonMendes'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: master
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.22.3
+      - name: Confirm exact CI-approved commit has been published in DEV
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: node tools/deploy/verify-prod-release.mjs
+
+  deploy:
+    needs: gate
+    runs-on: ubuntu-latest
+    environment:
+      name: prod
+      url: ${{ vars.PROD_FRONTEND_ORIGIN }}
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+      id-token: write
+    env:
+      RELEASE_SHA: ${{ inputs.release_sha }}
+      DEPLOY_COMMIT: ${{ inputs.release_sha }}
+      DEPLOY_SOURCE_PR: approved-prod-release
+      DEPLOY_ENVIRONMENT: prod
+      GITHUB_ENVIRONMENT: prod
+      PROD_FIREBASE_PROJECT_ID: ${{ vars.PROD_FIREBASE_PROJECT_ID }}
+      PROD_FIREBASE_API_KEY: ${{ vars.PROD_FIREBASE_API_KEY }}
+      PROD_FIREBASE_AUTH_DOMAIN: ${{ vars.PROD_FIREBASE_AUTH_DOMAIN }}
+      PROD_FIREBASE_STORAGE_BUCKET: ${{ vars.PROD_FIREBASE_STORAGE_BUCKET }}
+      PROD_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.PROD_FIREBASE_MESSAGING_SENDER_ID }}
+      PROD_FIREBASE_APP_ID: ${{ vars.PROD_FIREBASE_APP_ID }}
+      PROD_FRONTEND_ORIGIN: ${{ vars.PROD_FRONTEND_ORIGIN }}
+      PROD_APPROVED_CUSTOM_ORIGIN: ${{ vars.PROD_APPROVED_CUSTOM_ORIGIN }}
+      PROD_WORKER_ORIGIN: ${{ vars.PROD_WORKER_ORIGIN }}
+      PROD_GOOGLE_PICKER_CLIENT_ID: ${{ vars.PROD_GOOGLE_PICKER_CLIENT_ID }}
+      PROD_GOOGLE_PICKER_API_KEY: ${{ vars.PROD_GOOGLE_PICKER_API_KEY }}
+      PROD_GOOGLE_CLOUD_PROJECT_NUMBER: ${{ vars.PROD_GOOGLE_CLOUD_PROJECT_NUMBER }}
+      DEPLOY_VERIFY_URL: ${{ vars.PROD_FRONTEND_ORIGIN }}/deployment.json
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.release_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.22.3
+      - name: Reauthorize exact release after human PROD approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tools/deploy/verify-prod-release.mjs
+      - run: npm ci --no-fund
+      - name: Generate validated production web configuration
+        run: node tools/deploy/prepare-prod-environment.mjs
+      - name: Verify PROD Worker was independently published first
+        run: |
+          node - <<'NODE'
+          const origin = new URL(process.env.PROD_WORKER_ORIGIN);
+          if (origin.origin !== process.env.PROD_WORKER_ORIGIN) throw Error('Invalid Worker origin');
+          const response = await fetch(origin + '/health', {signal:AbortSignal.timeout(10000)});
+          const body = await response.json();
+          if (!response.ok || body.status !== 'ok' || body.environment !== 'production') {
+            throw Error('PROD Worker is not healthy or has the wrong environment');
+          }
+          console.log('Independent production Worker passed health check.');
+          NODE
+      - name: Authenticate with PROD-only federated identity
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ vars.PROD_FIREBASE_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.PROD_WIF_PROVIDER }}
+          service_account: ${{ vars.PROD_DEPLOY_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+          export_environment_variables: true
+      - name: Prepare signed deployment metadata
+        run: node tools/deploy/prepare-deployment.mjs
+      - name: Build Angular PROD with its own Firebase/Drive config
+        run: npm run build:prod
+      - name: Deploy PROD rules and indexes only when approved in dispatch
+        if: inputs.deploy_firestore
+        run: |
+          npx --yes --package firebase-tools@15.32.1 firebase deploy \
+            --project "$PROD_FIREBASE_PROJECT_ID" --only firestore --non-interactive
+      - name: Wait for PROD indexes to become ready
+        if: inputs.deploy_firestore
+        run: npm run firebase:wait-indexes:dev
+      - name: Verify PROD Firestore query execution
+        if: inputs.deploy_firestore
+        run: npm run firebase:verify-queries:dev
+      - name: Publish exclusively to PROD Hosting
+        run: |
+          npx --yes --package firebase-tools@15.32.1 firebase deploy \
+            --project "$PROD_FIREBASE_PROJECT_ID" --only hosting --non-interactive
+      - name: Verify published PROD commit and environment
+        run: node tools/deploy/verify-deployment.mjs

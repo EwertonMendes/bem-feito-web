@@ -186,8 +186,17 @@ async function assertImage(
       }
     } else {
       const ref=await referencedImage(env,request,k as Kind,expected.entityId);
-      if (ref !== meta.id && !(allowUnlinked && !ref)) {
-        throw new ApiError(403,'storage_image_reference_mismatch');
+      if (ref !== meta.id) {
+        if (!allowUnlinked || ref) throw new ApiError(403,'storage_image_reference_mismatch');
+        // Legacy removals happen after Firestore unlink. Verify the original
+        // Drive filename against this entity's ID or business code, never
+        // trust just a supplied unrelated product id.
+        const doc=await firestore(env,callerToken(request),
+          encodeURIComponent(k)+'/'+encodeURIComponent(expected.entityId));
+        const code=str(fields(doc)['code']);
+        const permittedNames=[k+'_'+expected.entityId+'.webp'];
+        if (code && ID.test(code)) permittedNames.push(k+'_'+code+'.webp');
+        if (!permittedNames.includes(meta.name)) throw new ApiError(403,'storage_image_reference_mismatch');
       }
     }
   }

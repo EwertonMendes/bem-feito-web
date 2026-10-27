@@ -8,7 +8,7 @@
 - PROD: projeto Firebase, Worker, banco D1, OAuth e pasta Drive exclusivos. Não usar nenhuma credencial ou project ID de DEV.
 - Código: feature PR -> CI -> DEV -> merge master -> CI/master -> promoção manual (Worker, depois Firebase) -> PROD.
 - Dados: nunca sincronizados automaticamente de DEV. Carga inicial somente a partir de fonte real reconciliada, com backup e verificação de relações e referências das imagens.
-- Cada release PROD exige SHA exato da master protegida, PR mergeada, CI/master com sucesso, mesmo SHA publicado em DEV e aprovação do GitHub Environment.
+- Cada release PROD exige SHA exato da master protegida, PR mergeada, CI/master com sucesso, mesmo SHA do frontend publicado em DEV e aprovação do GitHub Environment. Worker PROD também exige o mesmo SHA publicado e validado no Worker DEV.
 
 ## Contrato com o Codex (infraestrutura externa)
 
@@ -72,7 +72,7 @@ As configurações públicas de PROD não são armazenadas em arquivos estático
 ## Primeira publicação
 
 1. Receber manifesto do Codex com IDs reais, confirmação dos Environments e IAM mínimo. Proibir quaisquer apontamentos PROD -> DEV.
-2. Revisar e mergear a PR de código após testes e CI verde. A implantação DEV deve ter o mesmo SHA da master, pois a promoção exige homologação daquele commit.
+2. Revisar e mergear a PR de código após testes e CI verde. A implantação DEV deve ter o mesmo SHA da master. Para publicar o Worker em PROD, executar previamente o workflow DEV "Deploy Drive Worker DEV" manualmente na master, com o mesmo SHA, e verificar o health check; o gate PROD exige o sucesso dessa publicação DEV.
 3. Com OAuth desativado e migrations D1 PROD verificadas, disparar o workflow **Deploy Drive Worker PROD** da master, informando o SHA completo homologado. Exigir sucesso no health endpoint com environment = production.
 4. Disparar **Deploy PROD** da master com o mesmo SHA. Para a carga inicial definir deploy_firestore=true, após revisar impactos de índice. O workflow publica Rules/índices, espera READY, executa consultas de verificação e só então publica Hosting. Verifica deployment.json no site publicado com commit e environment=prod.
 5. Criar/autorizar separadamente perfis users/UID no Firebase PROD; a conta Google em Firebase Auth PROD recebe outro UID. Autenticação PROD deve permanecer isolada do DEV.

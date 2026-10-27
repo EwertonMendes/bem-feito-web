@@ -55,4 +55,21 @@ const deployed = await dev.json();
 if (deployed.environment !== 'dev' || deployed.commit !== sha) {
   fail('DEV is not serving the exact release commit; homologate this revision before PROD');
 }
+// Worker promotion must also prove that this exact version has actually passed through DEV.
+if (workflow.startsWith('deploy-drive-worker-prod.yml@')) {
+  const workerRuns = await github('actions/workflows/deploy-drive-worker-dev.yml/runs?head_sha=' +
+    sha + '&status=success&per_page=100');
+  if (!workerRuns.workflow_runs?.some(run =>
+    run.head_sha === sha && run.head_branch === 'master' &&
+    run.conclusion === 'success' && run.event === 'workflow_dispatch')) {
+    fail('this Worker version was not deployed successfully to DEV from the exact master SHA');
+  }
+  const devWorker = await fetch('https://bem-feito-drive-dev.ewertonmendes9.workers.dev/health', {
+    signal: AbortSignal.timeout(15000),
+  });
+  const workerHealth = await devWorker.json();
+  if (!devWorker.ok || workerHealth.status !== 'ok' || workerHealth.environment !== 'dev') {
+    fail('the DEV Worker is not healthy');
+  }
+}
 console.log('Trusted PROD release authorized: SHA ' + sha + ', validated master CI and DEV publication.');

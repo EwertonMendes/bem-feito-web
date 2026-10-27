@@ -19,7 +19,7 @@
     "firebase:emulators": "npx --yes --package firebase-tools@15.32.1 firebase emulators:start",
     "firebase:deploy:dev": "npm run build:dev:hosting && npx --yes --package firebase-tools@15.32.1 firebase deploy --project bem-feito-dev --only firestore,hosting",
     "firebase:deploy:dev:ci": "npm run firebase:deploy:dev:firestore && npm run firebase:wait-indexes:dev && npm run firebase:verify-queries:dev && npm run firebase:deploy:dev:hosting",
-    "firebase:deploy:prod": "npx --yes --package firebase-tools@15.32.1 firebase use prod && npm run build:prod && npx --yes --package firebase-tools@15.32.1 firebase deploy --only firestore,hosting",
+    "firebase:deploy:prod": "node -e \"console.error('PROD only deploys via the manually approved GitHub Deploy PROD workflow'); process.exit(1)\"",
     "deploy:prepare:dev": "node tools/deploy/prepare-deployment.mjs",
     "deploy:verify:dev": "node tools/deploy/verify-deployment.mjs",
     "migration:normalize": "node tools/migration/normalize-legacy.mjs",
@@ -39,7 +39,10 @@
     "firebase:verify-queries:dev": "node tools/deploy/verify-firestore-queries.mjs",
     "test:data-admin": "node --experimental-strip-types --test tools/data-admin/security.test.ts tools/data-admin/query-gateway.test.ts tools/data-admin/query-gate.test.ts tools/data-admin/direct-gateway.test.ts",
     "check:data-admin": "tsc -p tools/data-admin/tsconfig.json",
-    "test:data-admin:emulator": "npx --yes --package firebase-tools@15.32.1 firebase emulators:exec --only firestore --project demo-bem-feito \"node --experimental-strip-types --test tools/data-admin/emulator.test.ts tools/data-admin/direct-emulator.test.ts\""
+    "test:data-admin:emulator": "npx --yes --package firebase-tools@15.32.1 firebase emulators:exec --only firestore --project demo-bem-feito \"node --experimental-strip-types --test tools/data-admin/emulator.test.ts tools/data-admin/direct-emulator.test.ts tools/backup/firestore-snapshot.emulator.test.mjs\"",
+    "test:prod-config": "node --test tools/tests/prod-deployment.test.mjs",
+    "firebase:wait-indexes:prod": "node tools/deploy/wait-for-firestore-indexes.mjs",
+    "firebase:verify-queries:prod": "node tools/deploy/verify-firestore-queries.mjs"
   },
   "dependencies": {
     "@angular/common": "^22.2.1",

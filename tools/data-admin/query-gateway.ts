@@ -5,7 +5,7 @@ type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 export type Filter = { field: string; op: '==' | '<' | '<=' | '>' | '>=' | 'in'; value: Json };
 export type Find = { name: string; collection: string; filters: Filter[]; limit: number; orderBy?: { field: string; direction: 'asc' | 'desc' }[]; select?: string[] };
 export type Lookup = { name: string; from: string; path: string; collection: string; limit: number };
-export type QueryPlan = { schemaVersion: 1; environment: 'dev'; projectId: 'bem-feito-dev'; queries: Find[]; lookups?: Lookup[] };
+export type QueryPlan = { schemaVersion: 1; environment: 'dev' | 'prod'; projectId: string; queries: Find[]; lookups?: Lookup[] };
 
 const RESERVED_COLLECTIONS = new Set(['system','dataAdminOperations','migrationRuns','migrationSources','counters']);
 const MAX_TOTAL = 120;
@@ -43,7 +43,12 @@ export function validateQueryPlan(input: string): QueryPlan {
   try { raw = JSON.parse(input); } catch { throw Error('Invalid query JSON'); }
   const plan = obj(raw);
   exact(plan, ['schemaVersion', 'environment', 'projectId', 'queries', 'lookups']);
-  if (plan.schemaVersion !== 1 || plan.environment !== 'dev' || plan.projectId !== 'bem-feito-dev') throw Error('Only Firestore DEV queries are supported');
+  if (plan.schemaVersion !== 1 || !['dev', 'prod'].includes(String(plan.environment)) ||
+      typeof plan.projectId !== 'string' || !/^[a-z][a-z0-9-]{5,29}$/.test(plan.projectId) ||
+      (plan.environment === 'dev' && plan.projectId !== 'bem-feito-dev') ||
+      (plan.environment === 'prod' && (plan.projectId === 'bem-feito-dev' || plan.projectId.includes('-dev')))) {
+    throw Error('The Firestore query target must be a valid isolated DEV/PROD project');
+  }
   if (!Array.isArray(plan.queries) || plan.queries.length < 1 || plan.queries.length > 4) throw Error('Expected 1 to 4 queries');
   if (plan.lookups !== undefined && (!Array.isArray(plan.lookups) || plan.lookups.length > 4)) throw Error('At most 4 lookups');
   let total = 0;
@@ -155,7 +160,7 @@ export async function executeQueryPlan(db: Firestore, plan: QueryPlan) {
       const d=lookupCache.get(l.collection + '/' + id); return d?[d]:[];
     })});
   }
-  const plain = JSON.stringify({schemaVersion:1,projectId:'bem-feito-dev',createdAt:new Date().toISOString(),readEstimate:reads,results});
+  const plain = JSON.stringify({schemaVersion:1,projectId:plan.projectId,createdAt:new Date().toISOString(),readEstimate:reads,results});
   if (Buffer.byteLength(plain, 'utf8') > 75000) throw Error('Encrypted result exceeds output budget; narrow the projection');
   return plain;
 }

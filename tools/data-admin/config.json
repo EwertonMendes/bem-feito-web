@@ -24,6 +24,18 @@
       "snapshotId": "1NOm_Jr-poLwvo0lZxAXlXz-njEK-h7JcjREna0EClkw",
       "categorySnapshotId": "1sd3yIbGJZNeBoSOSqYyEqODUAL7rVOesBoxDy1hjBmw"
     },
-    "prod": null
+    "prod": {
+      "projectId": "bem-feito-prod",
+      "projectNumber": "561166235264",
+      "databaseId": "(default)",
+      "archive": {
+        "kind": "firestore",
+        "projectId": "bem-feito-archive-prod",
+        "databaseId": "(default)"
+      },
+      "provider": "projects/561166235264/locations/global/workloadIdentityPools/github-data/providers/github",
+      "reader": "github-data-prod-read@bem-feito-prod.iam.gserviceaccount.com",
+      "writer": "github-data-prod@bem-feito-prod.iam.gserviceaccount.com"
+    }
   }
 }

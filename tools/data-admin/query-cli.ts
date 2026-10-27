@@ -11,13 +11,13 @@ try {
   // Revalidate after OIDC with the same exact actor, input and protected master.
   const { plan } = await authorizeQuery(event, process.env, config, p => githubApi(p, process.env.GH_TOKEN!));
   const key = validateRecipientKey(process.env.GATEWAY_KEY!);
-  const app = initializeApp({ credential: applicationDefault(), projectId: 'bem-feito-dev' });
-  const db = getFirestore(app, '(default)');
+  const app = initializeApp({ credential: applicationDefault(), projectId: plan.projectId });
+  const db = getFirestore(app, config.environments[plan.environment].databaseId);
   const result = await executeQueryPlan(db, plan);
   const envelope = encryptResult(result, key, process.env.GATEWAY_QUERY!);
   // This is the ONLY data-bearing line. Never log JSON, customer information or monetary amounts.
   console.log('BF_QUERY_ENCRYPTED_V1=' + envelope);
-  console.log('Query complete: encrypted result produced using read-only DEV identity.');
+  console.log('Query complete: encrypted result produced using isolated read-only identity.');
 } catch {
   // Firebase exceptions may contain customer data, query literals or credentials.
   console.error('Query failed safely. Check query limits, indexes, authorization and private result size.');

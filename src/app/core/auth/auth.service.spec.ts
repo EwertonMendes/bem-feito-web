@@ -33,8 +33,9 @@ describe('Google login routing', () => {
     mocks.redirectResult.mockResolvedValue(null);
     mocks.popup.mockResolvedValue({ user: { uid: 'test-user' } });
     mocks.navigate.mockResolvedValue(true);
-    mocks.profileListener.mockImplementation((_ref, next) => {
+    mocks.profileListener.mockImplementation((_ref, _options, next) => {
       next({
+        metadata: { fromCache: false },
         exists: () => mocks.profile !== null,
         id: 'test-user',
         data: () => mocks.profile,
@@ -46,12 +47,13 @@ describe('Google login routing', () => {
   it('allows the profile listener to retry after a transient Firestore error', async () => {
     mocks.profile = { active: true, role: 'owner' };
     mocks.profileListener
-      .mockImplementationOnce((_ref, _next, error) => {
+      .mockImplementationOnce((_ref, _options, _next, error) => {
         error({ code: 'unavailable' });
         return () => {};
       })
-      .mockImplementationOnce((_ref, next) => {
+      .mockImplementationOnce((_ref, _options, next) => {
         next({
+          metadata: { fromCache: false },
           exists: () => true,
           id: 'test-user',
           data: () => mocks.profile,
@@ -72,6 +74,53 @@ describe('Google login routing', () => {
     await auth.loginWithGoogle();
     expect(mocks.profileListener).toHaveBeenCalledTimes(2);
     expect(mocks.navigate).toHaveBeenCalledWith('/dashboard');
+    injector.destroy();
+  });
+
+  it('waits for server confirmation instead of denying a cached missing profile', async () => {
+    mocks.profile = { active: true, role: 'owner' };
+    mocks.profileListener.mockImplementation((_ref, options, next) => {
+      expect(options).toEqual({ includeMetadataChanges: true });
+      next({ id: 'test-user', exists: () => false, data: () => undefined,
+        metadata: { fromCache: true } });
+      queueMicrotask(() => next({ id: 'test-user', exists: () => true,
+        data: () => mocks.profile, metadata: { fromCache: false } }));
+      return () => {};
+    });
+    const injector = Injector.create({ providers: [
+      { provide: FIREBASE_AUTH, useValue: {} },
+      { provide: FIRESTORE, useValue: {} },
+      { provide: Router, useValue: { navigateByUrl: mocks.navigate } },
+    ] });
+    const auth = runInInjectionContext(injector, () => new AuthService());
+
+    await auth.loginWithGoogle();
+    expect(mocks.navigate).toHaveBeenCalledWith('/dashboard');
+    expect(mocks.navigate).not.toHaveBeenCalledWith('/acesso-negado');
+    expect(auth.profile()?.active).toBe(true);
+    injector.destroy();
+  });
+
+  it('uses a newly authorized live profile instead of a stale missing result', async () => {
+    let notify: (snapshot: any) => void = () => {};
+    mocks.profileListener.mockImplementation((_ref, _opts, next) => {
+      notify = next;
+      next({ id: 'test-user', exists: () => false, data: () => undefined,
+        metadata: { fromCache: false } });
+      return () => {};
+    });
+    const injector = Injector.create({ providers: [
+      { provide: FIREBASE_AUTH, useValue: {} },
+      { provide: FIRESTORE, useValue: {} },
+      { provide: Router, useValue: { navigateByUrl: mocks.navigate } },
+    ] });
+    const auth = runInInjectionContext(injector, () => new AuthService());
+
+    await auth.loginWithGoogle();
+    expect(mocks.navigate).toHaveBeenCalledWith('/acesso-negado');
+    notify({ id: 'test-user', exists: () => true,
+      data: () => ({ active: true, role: 'owner' }), metadata: { fromCache: false } });
+    expect((await auth.resolveProfile({ uid: 'test-user' } as any))?.active).toBe(true);
     injector.destroy();
   });
 

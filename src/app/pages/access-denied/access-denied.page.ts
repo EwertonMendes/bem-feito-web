@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 
 @Component({
@@ -8,13 +9,44 @@ import { AuthService } from '../../core/auth/auth.service';
     <main class="state">
       <img src="/brand-mark.svg" alt="" />
       <h1>Acesso ainda não liberado</h1>
-      <p>Sua conta Google foi reconhecida, mas não existe um usuário ativo correspondente no Firestore.</p>
+      <p>O acesso desta sessão ainda não foi confirmado. Verifique novamente; sua conta não será alterada.</p>
       <p class="email">{{ auth.user()?.email }}</p>
-      <button class="bf-button" type="button" (click)="auth.logout()">Usar outra conta</button>
+      <button class="bf-button" type="button" [disabled]="verifying()" (click)="retry()">{{verifying()?'Verificando...':'Verificar acesso novamente'}}</button>
+      @if (error()) { <p role="alert">{{error()}}</p> }
+      <button class="bf-button secondary" type="button" (click)="auth.logout()">Usar outra conta</button>
     </main>
   `,
   styles: [`.state{min-height:100dvh;display:grid;place-items:center;align-content:center;gap:14px;text-align:center;padding:24px}.state img{width:58px}.state h1{margin:12px 0 0;letter-spacing:-.04em}.state p{max-width:560px;margin:0;color:var(--muted);line-height:1.5}.email{font-weight:800;color:var(--text)!important}.state button{margin-top:10px}`],
 })
 export class AccessDeniedPage {
   readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+  readonly verifying = signal(false);
+  readonly error = signal<string | null>(null);
+
+  constructor() {
+    // If the server later validates a profile, leave the denied page without
+    // making the user sign out or reauthenticate.
+    effect(() => {
+      const user = this.auth.user();
+      const profile = this.auth.profile();
+      if (user && profile?.id === user.uid && profile.active) {
+        void this.router.navigateByUrl('/dashboard');
+      }
+    });
+  }
+
+  async retry(): Promise<void> {
+    if (this.verifying()) return;
+    this.verifying.set(true);
+    this.error.set(null);
+    try {
+      const profile = await this.auth.retryProfile();
+      if (profile?.active) await this.router.navigateByUrl('/dashboard');
+    } catch {
+      this.error.set('Não foi possível confirmar o acesso. Verifique sua conexão e tente novamente.');
+    } finally {
+      this.verifying.set(false);
+    }
+  }
 }

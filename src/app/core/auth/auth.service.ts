@@ -98,8 +98,19 @@ export class AuthService {
     return this.ensureProfileListener(user);
   }
 
+  async retryProfile(): Promise<UserProfile | null> {
+    const user = await this.waitForUser();
+    if (!user) return null;
+    this.clearProfileListener();
+    return this.ensureProfileListener(user);
+  }
+
   private ensureProfileListener(user: User): Promise<UserProfile | null> {
-    if (this.profileUid === user.uid && this.profileReady) return this.profileReady;
+    if (this.profileUid === user.uid && this.profileReady) {
+      // The live listener may have received an updated server profile after
+      // the initial sign-in. Never keep returning a stale initial snapshot.
+      return this.profileReady.then(() => this.profileState());
+    }
 
     this.clearProfileListener();
     this.profileUid = user.uid;
@@ -107,7 +118,11 @@ export class AuthService {
       let initial = true;
       this.profileUnsubscribe = onSnapshot(
         doc(this.firestore, 'users', user.uid),
+        { includeMetadataChanges: true },
         (snapshot) => {
+          // A missing document in IndexedDB is not evidence of revoked access.
+          // Only an authoritative server snapshot can resolve the login gate.
+          if (snapshot.metadata.fromCache) return;
           const profile = snapshot.exists()
             ? ({ id: snapshot.id, ...snapshot.data() } as UserProfile)
             : null;

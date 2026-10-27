@@ -39,7 +39,7 @@ export class AuthService {
     onAuthStateChanged(this.auth, (user) => {
       const oldUid = this.userState()?.uid;
       this.userState.set(user);
-      if (!user || oldUid !== user.uid) {
+      if (!user || (oldUid !== user.uid && this.profileState()?.id !== user.uid)) {
         // The profile is tied to the exact Firebase Auth UID, not the email.
         this.profileState.set(null);
         this.profileErrorCode.set(null);

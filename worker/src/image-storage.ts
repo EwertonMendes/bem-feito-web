@@ -150,11 +150,14 @@ function assertImage(meta: DriveMeta, cfg: StorageConfig, expected?:{kind:Kind;e
   }
   return {kind:k as Kind,entityId};
 }
-async function assertReferenced(env:Env, request:Request, kind:Kind, entityId:string,fileId:string): Promise<void> {
+async function referencedImage(env:Env, request:Request, kind:Kind, entityId:string): Promise<string> {
   const doc = await firestore(env,callerToken(request),encodeURIComponent(kind)+'/'+encodeURIComponent(entityId));
   const data = fields(doc);
   const image = fields(data['image']?.mapValue);
-  if (str(image['fileId']) !== fileId || str(image['provider']) !== 'google-drive') {
+  return str(image['provider']) === 'google-drive' ? str(image['fileId']) : '';
+}
+async function assertReferenced(env:Env, request:Request, kind:Kind, entityId:string,fileId:string): Promise<void> {
+  if ((await referencedImage(env,request,kind,entityId)) !== fileId) {
     throw new ApiError(403,'storage_image_reference_mismatch');
   }
 }
@@ -210,7 +213,10 @@ export async function imageRequest(request:Request,env:Env,user:Principal):Promi
       const meta=await upload(env,owner,body,fileId!);
       return Response.json(info(meta));
     }
-    const created=await google(env,owner,DRIVE+'/files?fields='+encodeURIComponent('id,name,mimeType,parents,appProperties'),
+    // A catalog record must already exist. Avoid allowing editors to create
+    // arbitrary Drive files by forging unattached entity identifiers.
+    if (await referencedImage(env,request,k,entityId)) throw new ApiError(409,'storage_image_already_exists');
+    const created=await google(env,owner,DRIVE+'/files?fields=+encodeURIComponent('id,name,mimeType,parents,appProperties'),
       {method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({name:k+'_'+entityId+'.webp',mimeType:'image/webp',
           parents:[cfg['folders'][k]],appProperties:{app:'bem-feito',entityType:k,entityId}})});
@@ -227,7 +233,10 @@ export async function imageRequest(request:Request,env:Env,user:Principal):Promi
       throw error;
     }
   }
-  await assertReferenced(env,request,k,entityId,fileId!);
+  // The frontend clears the Firestore image reference first, then trashes the
+  // old Drive image. Never delete when the document references a DIFFERENT file.
+  const current = await referencedImage(env,request,k,entityId);
+  if (current && current !== fileId!) throw new ApiError(403,'storage_image_reference_mismatch');
   assertImage(await metadata(env,owner,fileId!),cfg,{kind:k,entityId});
   await google(env,owner,fileUrl(fileId!,'&fields=id'),{
     method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({trashed:true})

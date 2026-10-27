@@ -11,11 +11,14 @@ function setup() {
   const status = signal<DriveIntegrationStatus>('loading');
   const connected = signal(false);
   const config = signal<{ enabled: boolean } | null>({ enabled: true });
+  const centralActive = signal(false);
+  const storageOwnerEmail = signal('owner@example.com');
+  const isStorageOwner = signal(true);
   const integration = {
     enabled: true,
     status,
     connected,
-    config,
+    config,centralActive,storageOwnerEmail,isStorageOwner,
     load: vi.fn().mockResolvedValue(undefined),
     disconnect: vi.fn().mockResolvedValue(undefined),
   };
@@ -28,7 +31,7 @@ function setup() {
     ],
   });
   const card = runInInjectionContext(injector, () => new GoogleDriveSettingsCard());
-  return { card, status, connected, config, integration, injector };
+  return { card, status, connected, config, centralActive, isStorageOwner, integration, injector };
 }
 
 describe('Google Drive settings connection actions', () => {
@@ -53,12 +56,14 @@ describe('Google Drive settings connection actions', () => {
   });
 
   it('shows only Disconnect when the Drive connection is active', () => {
-    const { card, status, connected, injector } = setup();
+    const { card, status, connected, centralActive, injector } = setup();
     status.set('connected');
     connected.set(true);
+    centralActive.set(true);
     expect(card.showConnect()).toBe(false);
     expect(card.showDisconnect()).toBe(true);
     connected.set(false);
+    centralActive.set(false);
     expect(card.showConnect()).toBe(true);
     expect(card.showDisconnect()).toBe(false);
     injector.destroy();
@@ -76,6 +81,13 @@ describe('Google Drive settings connection actions', () => {
     injector.destroy();
   });
 
+  it('never offers another administrator access to the central storage grant',()=>{
+    const {card,status,centralActive,isStorageOwner,injector} = setup();
+    status.set('connected'); centralActive.set(true); isStorageOwner.set(false);
+    expect(card.showConnect()).toBe(false);
+    expect(card.showDisconnect()).toBe(false);
+    injector.destroy();
+  });
   it('does not attempt disconnect when the Drive is no longer connected', async () => {
     const { card, status, integration, injector } = setup();
     status.set('disconnected');

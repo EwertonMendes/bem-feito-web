@@ -3,6 +3,7 @@ import { principal, sameOrigin } from './auth.ts';
 import { probeFirebaseKeys } from './jwt.ts';
 import { start, launch, callback } from './oauth.ts';
 import { state, token, disconnect, rejectToken } from './tokens.ts';
+import { storageStatus, imageRequest } from './image-storage.ts';
 const SECURITY_HEADERS: Record<string,string> = {
   'X-Content-Type-Options':'nosniff',
   'Content-Security-Policy':"default-src 'none'; frame-ancestors 'none'",
@@ -47,7 +48,7 @@ export default {
       if (request.method === 'OPTIONS') {
         if (origin !== env.FRONTEND_ORIGIN) throw new ApiError(403,'origin_denied');
         response = new Response(null,{status:204,headers:{
-          'Access-Control-Allow-Methods':'GET, POST, OPTIONS',
+          'Access-Control-Allow-Methods':'GET, POST, PUT, DELETE, OPTIONS',
           'Access-Control-Allow-Headers':'Authorization, Content-Type',
           'Access-Control-Max-Age':'3600'
         }});
@@ -59,6 +60,13 @@ export default {
         response = await launch(request,env);
       } else if (request.method === 'GET' && path === '/oauth/drive/callback') {
         response = await callback(request,env);
+      } else if (path === '/storage/status' && request.method === 'GET') {
+        const user = await principal(request,env);
+        response = await storageStatus(env,user);
+      } else if (path === '/storage/image' || path.startsWith('/storage/image/')) {
+        if (request.method !== 'GET') sameOrigin(request,env);
+        const user = await principal(request,env);
+        response = await imageRequest(request,env,user);
       } else if (['/oauth/drive/start','/drive/token','/drive/disconnect','/drive/connection','/drive/token/reject'].includes(path)) {
         // No state-changing operation is accepted cross-origin without the intended browser Origin.
         if (request.method === 'POST') sameOrigin(request,env);

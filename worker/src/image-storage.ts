@@ -39,9 +39,9 @@ function str(field: any): string {
 }
 function assertConfig(doc: unknown): StorageConfig {
   const data = fields(doc);
-  const folders = fields(data.folders?.mapValue);
-  const rootFolderId = str(data.rootFolderId);
-  if (data.enabled?.booleanValue !== true || !ID.test(rootFolderId) ||
+  const folders = fields(data['folders']?.mapValue);
+  const rootFolderId = str(data['rootFolderId']);
+  if (data['enabled']?.booleanValue !== true || !ID.test(rootFolderId) ||
       [...KINDS].some(k => !ID.test(str(folders[k])))) {
     throw new ApiError(503, 'storage_configuration_incomplete');
   }
@@ -49,9 +49,9 @@ function assertConfig(doc: unknown): StorageConfig {
     enabled: true,
     rootFolderId,
     folders: {
-      products: str(folders.products),
-      inputs: str(folders.inputs),
-      additions: str(folders.additions),
+      products: str(folders['products']),
+      inputs: str(folders['inputs']),
+      additions: str(folders['additions']),
     },
   };
 }
@@ -94,6 +94,7 @@ async function storageOwner(env: Env): Promise<Principal> {
   ).bind(email).all<Pick<Connection,'owner_uid'|'google_subject'|'google_email'>>();
   if (rows.results.length !== 1) throw new ApiError(503,'storage_owner_not_connected');
   const row = rows.results[0];
+  if (!row) throw new ApiError(503,'storage_owner_not_connected');
   if (row.google_email.trim().toLowerCase() !== email || !ID.test(row.owner_uid) || !row.google_subject) {
     throw new ApiError(503,'storage_owner_invalid');
   }
@@ -137,12 +138,12 @@ async function metadata(env: Env, owner: Principal, fileId: string): Promise<Dri
   return await result.response.json() as DriveMeta;
 }
 function assertImage(meta: DriveMeta, cfg: StorageConfig, expected?:{kind:Kind;entityId:string}): {kind:Kind;entityId:string} {
-  const k = meta.appProperties?.entityType;
-  const entityId = meta.appProperties?.entityId ?? '';
+  const k = meta.appProperties?.['entityType'];
+  const entityId = meta.appProperties?.['entityId'] ?? '';
   if (!meta.id || !ID.test(meta.id) || meta.trashed || meta.mimeType !== 'image/webp' ||
-      meta.appProperties?.app !== 'bem-feito' ||
+      meta.appProperties?.['app'] !== 'bem-feito' ||
       !k || !KINDS.has(k) || !ID.test(entityId) ||
-      !meta.parents?.includes(cfg.folders[k as Kind]) ||
+      !meta.parents?.includes(cfg['folders'][k as Kind]) ||
       !Number.isSafeInteger(Number(meta.size)) || Number(meta.size) <= 0 || Number(meta.size) > MAX_IMAGE ||
       (expected && (expected.kind !== k || expected.entityId !== entityId))) {
     throw new ApiError(403,'storage_image_outside_catalog');
@@ -152,8 +153,8 @@ function assertImage(meta: DriveMeta, cfg: StorageConfig, expected?:{kind:Kind;e
 async function assertReferenced(env:Env, request:Request, kind:Kind, entityId:string,fileId:string): Promise<void> {
   const doc = await firestore(env,callerToken(request),encodeURIComponent(kind)+'/'+encodeURIComponent(entityId));
   const data = fields(doc);
-  const image = fields(data.image?.mapValue);
-  if (str(image.fileId) !== fileId || str(image.provider) !== 'google-drive') {
+  const image = fields(data['image']?.mapValue);
+  if (str(image['fileId']) !== fileId || str(image['provider']) !== 'google-drive') {
     throw new ApiError(403,'storage_image_reference_mismatch');
   }
 }
@@ -212,7 +213,7 @@ export async function imageRequest(request:Request,env:Env,user:Principal):Promi
     const created=await google(env,owner,DRIVE+'/files?fields='+encodeURIComponent('id,name,mimeType,parents,appProperties'),
       {method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({name:k+'_'+entityId+'.webp',mimeType:'image/webp',
-          parents:[cfg.folders[k]],appProperties:{app:'bem-feito',entityType:k,entityId}})});
+          parents:[cfg['folders'][k]],appProperties:{app:'bem-feito',entityType:k,entityId}})});
     const value=await created.response.json() as DriveMeta;
     if (!value.id || !ID.test(value.id)) throw new ApiError(502,'storage_invalid_create_response');
     try {

@@ -43,6 +43,8 @@ Proteger environment com revisão humana do proprietário e restrição à maste
 | PROD_OAUTH_ENABLED | "false" até homologar OAuth, depois "true" |
 | PROD_WIF_PROVIDER | Caminho completo do Workload Identity Provider de deploy PROD |
 | PROD_DEPLOY_SERVICE_ACCOUNT | E-mail da service account PROD exclusiva de deploy |
+| PROD_VERIFY_WIF_PROVIDER | WIF provider específico do job aprovado Deploy PROD para verificação somente-leitura |
+| PROD_VERIFY_READER_SERVICE_ACCOUNT | Service account de leitura de dados Firestore somente para smoke de índices e consultas; sem escrita |
 
 **Environment secrets do GitHub para Cloudflare**: CLOUDFLARE_ACCOUNT_ID e CLOUDFLARE_API_TOKEN. O token deve ter escopo mínimo de publicação de versões do Worker PROD; confirmar as permissões de leitura de metadados/bindings exigidas pelo Wrangler.
 
@@ -74,7 +76,7 @@ As configurações públicas de PROD não são armazenadas em arquivos estático
 1. Receber manifesto do Codex com IDs reais, confirmação dos Environments e IAM mínimo. Proibir quaisquer apontamentos PROD -> DEV.
 2. Revisar e mergear a PR de código após testes e CI verde. A implantação DEV deve ter o mesmo SHA da master. Para publicar o Worker em PROD, executar previamente o workflow DEV "Deploy Drive Worker DEV" manualmente na master, com o mesmo SHA, e verificar o health check; o gate PROD exige o sucesso dessa publicação DEV.
 3. Com OAuth desativado e migrations D1 PROD verificadas, disparar o workflow **Deploy Drive Worker PROD** da master, informando o SHA completo homologado. Exigir sucesso no health endpoint com environment = production.
-4. Disparar **Deploy PROD** da master com o mesmo SHA. Para a carga inicial definir deploy_firestore=true, após revisar impactos de índice. O workflow publica Rules/índices, espera READY, executa consultas de verificação e só então publica Hosting. Verifica deployment.json no site publicado com commit e environment=prod.
+4. Disparar **Deploy PROD** da master com o mesmo SHA. Para a carga inicial definir deploy_firestore=true, após revisar impactos de índice. O workflow publica Rules/índices usando a identidade de deploy, espera READY, troca para uma identidade Firestore somente-leitura para executar consultas de verificação, restaura a identidade de deploy e só então publica Hosting. Verifica deployment.json no site publicado com commit e environment=prod.
 5. Criar/autorizar separadamente perfis users/UID no Firebase PROD; a conta Google em Firebase Auth PROD recebe outro UID. Autenticação PROD deve permanecer isolada do DEV.
 6. Configurar pasta Drive PROD, OAuth e permissões no usuário correto. Após testes de Google Picker, consentimento, renovação, upload, leitura, substituição e lixeira, definir PROD_OAUTH_ENABLED=true e republicar Worker aprovado.
 7. Planejar e executar carga inicial real **auditada**. Não copiar DEV inteiro: reconciliar fonte real de estoque, vendas, pagamentos, despesas, produção, encomendas, configurações e contadores, transferir imagens para pasta PROD e mapear fileIds mantendo integridade e permissões.

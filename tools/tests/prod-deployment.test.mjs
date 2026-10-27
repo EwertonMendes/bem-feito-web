@@ -55,6 +55,10 @@ test('Deploy workflows demand protected human-approved PROD and never reuse DEV 
   assert.match(gate, /environments\/prod/);
   assert.match(gate, /required_reviewers/);
   assert.match(gate, /can_admins_bypass/);
-  assert.match(readFileSync('.github/workflows/deploy-prod.yml', 'utf8'), /--project "\$PROD_FIREBASE_PROJECT_ID"/);
+  const deployment = readFileSync('.github/workflows/deploy-prod.yml', 'utf8');
+  assert.match(deployment, /PROD_VERIFY_WIF_PROVIDER/);
+  assert.match(deployment, /PROD_VERIFY_READER_SERVICE_ACCOUNT/);
+  assert.match(deployment, /Restore deploy-only identity/);
+  assert.match(deployment, /--project "\$PROD_FIREBASE_PROJECT_ID"/);
   assert.match(readFileSync('.github/workflows/deploy-drive-worker-prod.yml', 'utf8'), /--env prod/);
 });

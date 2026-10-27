@@ -119,9 +119,27 @@ jobs:
       - name: Wait for PROD indexes to become ready
         if: inputs.deploy_firestore
         run: npm run firebase:wait-indexes:prod
-      - name: Verify PROD Firestore query execution
+      - name: Authenticate with isolated read-only index verifier
+        if: inputs.deploy_firestore
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ vars.PROD_FIREBASE_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.PROD_VERIFY_WIF_PROVIDER }}
+          service_account: ${{ vars.PROD_VERIFY_READER_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+          export_environment_variables: true
+      - name: Verify PROD Firestore query execution without using deploy identity to read business data
         if: inputs.deploy_firestore
         run: npm run firebase:verify-queries:prod
+      - name: Restore deploy-only identity before publishing Hosting
+        if: inputs.deploy_firestore
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ vars.PROD_FIREBASE_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.PROD_WIF_PROVIDER }}
+          service_account: ${{ vars.PROD_DEPLOY_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+          export_environment_variables: true
       - name: Publish exclusively to PROD Hosting
         run: |
           npx --yes --package firebase-tools@15.32.1 firebase deploy \

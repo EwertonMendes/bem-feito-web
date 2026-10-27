@@ -132,7 +132,7 @@ describe('shared image storage authorization boundaries',()=>{
     }finally{mock.restore();}
   });
   it('uploads images with the storage owner identity, approved folder and entity scope',async()=>{
-    const env=await fixture(),mock=setupGoogle();
+    const env=await fixture(),mock=setupGoogle(driveMetadata(),{reference:{fields:{}}});
     try{
       const response=await imageRequest(req('POST','/storage/image?kind=products&entityId='+entityId,sample),env,maria);
       assert.equal(response.status,200);

@@ -44,6 +44,15 @@ const checks = [
       .where('businessDate', '<=', endDate)
       .orderBy('businessDate', 'desc').orderBy(FieldPath.documentId(), 'desc').limit(1).get(),
   ]),
+  // The annual revenue chart uses a *single* sum(totalCents) for each month.
+  // The multi-aggregate index below cannot necessarily serve this separate shape:
+  // an additional discountCents field precedes totalCents in that index.
+  // Exercising the exact chart query prevents PROD-only failed-precondition 400s.
+  ['dashboard:monthly-revenue-single-sum', () => db.collection('sales')
+    .where('status', '==', 'active')
+    .where('businessDate', '>=', startDate)
+    .where('businessDate', '<=', endDate)
+    .aggregate({ revenueCents: AggregateField.sum('totalCents') }).get()],
   ['dashboard:sales-period', () => db.collection('sales')
     .where('status', '==', 'active')
     .where('businessDate', '>=', startDate)

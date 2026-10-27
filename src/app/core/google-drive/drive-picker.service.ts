@@ -4,12 +4,14 @@ import { DriveAuthService } from './drive-auth.service';
 import { ExternalScriptLoaderService } from './external-script-loader.service';
 
 interface PickerView {
+  setParent(folderId: string): PickerView;
   setIncludeFolders(value: boolean): PickerView;
   setSelectFolderEnabled(value: boolean): PickerView;
   setMimeTypes(value: string): PickerView;
 }
 
 interface PickerBuilder {
+  setTitle(title: string): PickerBuilder;
   setOAuthToken(token: string): PickerBuilder;
   setDeveloperKey(key: string): PickerBuilder;
   setAppId(appId: string): PickerBuilder;
@@ -36,7 +38,7 @@ export class DrivePickerService {
   private readonly auth = inject(DriveAuthService);
   private readonly scripts = inject(ExternalScriptLoaderService);
 
-  async selectFolder(): Promise<{ id: string; name: string }> {
+  async selectFolder(options: { title?: string; parentId?: string } = {}): Promise<{ id: string; name: string }> {
     const token = await this.auth.accessToken();
     await this.scripts.load('google-api-loader', 'https://apis.google.com/js/api.js');
     await this.loadPicker();
@@ -48,9 +50,11 @@ export class DrivePickerService {
       .setIncludeFolders(true)
       .setSelectFolderEnabled(true)
       .setMimeTypes('application/vnd.google-apps.folder');
+    if (options.parentId) view.setParent(options.parentId);
 
     return new Promise((resolve, reject) => {
       const picker = new pickerApi.PickerBuilder()
+        .setTitle(options.title ?? 'Selecione a pasta de imagens')
         .setOAuthToken(token)
         .setDeveloperKey(environment.googleDrive.pickerApiKey)
         .setAppId(environment.googleDrive.cloudProjectNumber)

@@ -173,15 +173,11 @@ export class DriveIntegrationService {
       await this.driveAuth.connect();
       await this.verifyAccount();
 
-      try {
-        await this.verifyConfiguredFolder(config);
-      } catch (error) {
-        if (!(error instanceof DriveApiError) || ![403, 404].includes(error.status)) throw error;
-        const selected = await this.picker.selectFolder();
-        if (selected.id !== config.rootFolderId) {
-          throw new Error('Selecione exatamente a pasta de imagens configurada para este ambiente.');
-        }
-        await this.verifyConfiguredFolder(config);
+      // drive.file grants are per item. Selecting the root does not authorize
+      // subfolders provisioned by a different OAuth application.
+      await this.authorizeConfiguredFolder(config.rootFolderId, config.rootFolderName);
+      for (const [name, id] of Object.entries(config.folders)) {
+        await this.authorizeConfiguredFolder(id, name, config.rootFolderId);
       }
 
       this.statusState.set('connected');
@@ -266,6 +262,24 @@ export class DriveIntegrationService {
     }
 
     this.driveAuth.setAccountEmail(driveUser.emailAddress);
+  }
+
+  private async authorizeConfiguredFolder(id: string, name: string, parentId?: string): Promise<void> {
+    try {
+      const folder = await this.driveApi.getFile(id);
+      if (folder.mimeType !== 'application/vnd.google-apps.folder' || folder.trashed) {
+        throw new Error(`A pasta ${name} não está disponível.`);
+      }
+    } catch (error) {
+      if (!(error instanceof DriveApiError) || ![403, 404].includes(error.status)) throw error;
+      const selected = await this.picker.selectFolder({ title: `Autorize a pasta ${name}`, parentId });
+      if (selected.id !== id) throw new Error(`Selecione exatamente a pasta ${name} configurada para este ambiente.`);
+      const folder = await this.driveApi.getFile(id);
+      if (folder.mimeType !== 'application/vnd.google-apps.folder' || folder.trashed ||
+          (parentId && !folder.parents?.includes(parentId))) {
+        throw new Error(`A pasta ${name} não está disponível dentro da pasta de imagens configurada.`);
+      }
+    }
   }
 
   private async verifyConfiguredFolder(config: GoogleDriveIntegration): Promise<void> {

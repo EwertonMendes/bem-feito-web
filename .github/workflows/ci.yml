@@ -41,6 +41,7 @@ jobs:
       - run: npm run test:security
       - run: npm run test:architecture
       - run: npm run test:ci-config
+      - run: npm run test:prod-config
       - run: npm ci --no-fund
       - run: npm run check:data-admin
       - run: npm run test:data-admin

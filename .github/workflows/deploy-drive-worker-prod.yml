@@ -85,7 +85,6 @@ jobs:
       - name: Publish tagged Worker version (preserve Cloudflare-managed secrets)
         working-directory: worker
         run: |
-          TAG="bf-prod-${{ github.sha }}"
           TAG="${{ inputs.release_sha }}"
           TAG="bf-prod-$(printf '%s' "$TAG" | cut -c1-12)"
           npx --yes wrangler@4.152.0 versions upload --config wrangler.generated.prod.jsonc \

@@ -19,7 +19,7 @@ export function productionOrigin(value, label) {
   try { url = new URL(value); } catch { throw new Error('Invalid URL for ' + label); }
   if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash ||
     url.pathname !== '/' || url.port || url.hostname.includes('bem-feito-dev') ||
-    /(^|[.-])dev([.-]|$)/i.test(url.hostname)) {
+    url.hostname.split('.').slice(0, -1).some(part => part === 'dev' || part.endsWith('-dev') || part.startsWith('dev-'))) {
     throw new Error(label + ' must be a separate HTTPS origin without path, query or credentials');
   }
   return url.origin;

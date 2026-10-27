@@ -75,7 +75,7 @@
       </div>
       <div class="details-section-title"><span class="details-title-icon"><bf-icon [name]="tracksInputStock(insumo)?'inventory':'cogs'"/></span><span>{{tracksInputStock(insumo)?'Estoque e custo':'Custo do insumo'}} <small>{{tracksInputStock(insumo)?'Saldo e custo de referência':'Referência para estimativas de produção'}}</small></span></div>
       <div class="details-metrics" [class.cost-only]="!tracksInputStock(insumo)">
-        <div class="details-metric metric-cost"><div class="metric-heading"><bf-icon name="cogs"/><span>Custo médio por {{unitName(insumo.unitId)}}</span></div><strong>{{inputCost(insumo)>0?currency(Math.round(inputCost(insumo))):'Não informado'}}</strong><small>Utilizado nas estimativas de produção</small></div>
+        <div class="details-metric metric-cost"><div class="metric-heading"><bf-icon name="cogs"/><span>Custo médio por {{unitName(insumo.unitId)}}</span></div><strong>{{inputCost(insumo)>0?currency(inputCost(insumo)):'Não informado'}}</strong><small>Utilizado nas estimativas de produção</small></div>
         @if(tracksInputStock(insumo)){
           <div class="details-metric metric-price"><div class="metric-heading"><bf-icon name="inventory"/><span>{{insumo.trackingMode==='exact'?'Saldo registrado':'Saldo aproximado'}}</span></div><strong>{{quantity(insumo.stock)}} {{unitName(insumo.unitId)}}</strong><small>{{insumo.trackingMode==='exact'?'Quantidade controlada':'Valor aproximado'}}</small></div>
           <div class="details-metric metric-profit"><div class="metric-heading"><bf-icon name="order"/><span>Reservado</span></div><strong>{{quantity(insumo.reservedPhysicalStock??0)}} {{unitName(insumo.unitId)}}</strong><small>Separado para encomendas</small></div>

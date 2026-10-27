@@ -232,6 +232,8 @@ export class DriveIntegrationService {
   private async ensureConnectedInternal(): Promise<void> {
     if (this.connected() && this.driveAuth.currentToken()) return;
     if (!this.loaded) await this.load();
+    if (this.centralActiveState()) return;
+    if (!this.isStorageOwner()) throw new Error('O armazenamento central está indisponível. O proprietário deve reconectar o Google Drive.');
     const config = this.configState();
     if (!config?.enabled) throw new Error('A pasta de imagens não está configurada.');
     try {

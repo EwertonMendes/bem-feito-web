@@ -8,6 +8,7 @@ import { DriveApiError, DriveApiService } from './drive-api.service';
 import { DriveAuthService } from './drive-auth.service';
 import { DriveIntegrationService } from './drive-integration.service';
 import { DrivePickerService } from './drive-picker.service';
+import { CentralDriveImageApiService } from './central-drive-image-api.service';
 const config={id:'google-drive',enabled:true,rootFolderId:'root',rootFolderName:'DEV',folders:{products:'a',inputs:'b',kits:'c',additions:'d'}};
 function setup(tokenAvailable=false){
   const linked=signal(tokenAvailable),active=signal(tokenAvailable),revision=signal(0),email=signal<string|null>('owner@example.com');
@@ -21,17 +22,33 @@ function setup(tokenAvailable=false){
     getFile:vi.fn(async(id:string)=>({id,mimeType:'application/vnd.google-apps.folder',trashed:false}))};
   const auth={waitForUser:vi.fn().mockResolvedValue({uid:'owner',email:'owner@example.com'}),canAdminister:vi.fn(()=>true)};
   const picker={selectFolder:vi.fn()};
+  const central={status:vi.fn().mockResolvedValue({available:false,ownerEmail:'owner@example.com'})};
   const injector=Injector.create({providers:[
     {provide:DriveIntegrationRepository,useValue:repository},
     {provide:DriveAuthService,useValue:driveAuth},
     {provide:DriveApiService,useValue:driveApi},
     {provide:DrivePickerService,useValue:picker},
+    {provide:CentralDriveImageApiService,useValue:central},
     {provide:AuthService,useValue:auth}
   ]});
   const service=runInInjectionContext(injector,()=>new DriveIntegrationService());
-  return {service,driveAuth,injector,driveApi,picker};
+  return {service,driveAuth,injector,driveApi,picker,central};
 }
 describe('DriveIntegrationService - offline OAuth',()=>{
+  it('lets another signed-in user use central storage without personal OAuth or Picker',async()=>{
+    const {service,injector,driveAuth,driveApi,picker,central}=setup();
+    central.status.mockResolvedValue({available:true,ownerEmail:'owner@example.com'});
+    await service.load();
+    expect(service.centralActive()).toBe(true);
+    expect(service.connected()).toBe(true);
+    expect(service.storageOwnerEmail()).toBe('owner@example.com');
+    expect(driveAuth.accessToken).not.toHaveBeenCalled();
+    expect(driveApi.getFile).not.toHaveBeenCalled();
+    expect(picker.selectFolder).not.toHaveBeenCalled();
+    await service.ensureConnected();
+    expect(driveAuth.accessToken).not.toHaveBeenCalled();
+    injector.destroy();
+  });
   it('authorizes inaccessible existing subfolders individually without changing configured IDs',async()=>{
     const {service,injector,driveApi,picker}=setup(true);
     await service.load();

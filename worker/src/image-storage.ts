@@ -137,16 +137,30 @@ async function metadata(env: Env, owner: Principal, fileId: string): Promise<Dri
   const result = await google(env,owner,DRIVE+'/files/'+encodeURIComponent(fileId)+'?fields='+fields+'&supportsAllDrives=true');
   return await result.response.json() as DriveMeta;
 }
-function assertImage(meta: DriveMeta, cfg: StorageConfig, expected?:{kind:Kind;entityId:string}): {kind:Kind;entityId:string} {
-  const k = meta.appProperties?.['entityType'];
-  const entityId = meta.appProperties?.['entityId'] ?? '';
+async function assertImage(
+  env:Env, request:Request, meta:DriveMeta, cfg:StorageConfig,
+  expected?:{kind:Kind;entityId:string}, allowUnlinked=false,
+):Promise<{kind:Kind;entityId:string}> {
+  // Imported pre-OAuth images may lack appProperties. Accept those only when
+  // name and exact Firestore image reference identify a catalog record.
+  const properties=meta.appProperties;
+  const tagged=properties && Object.keys(properties).length > 0;
+  const legacy=/^(products|inputs|additions)_([A-Za-z0-9_-]{1,160})\.webp$/.exec(meta.name ?? '');
+  const k=tagged ? properties['entityType'] : legacy?.[1];
+  const entityId=tagged ? properties['entityId'] : legacy?.[2];
   if (!meta.id || !ID.test(meta.id) || meta.trashed || meta.mimeType !== 'image/webp' ||
-      meta.appProperties?.['app'] !== 'bem-feito' ||
-      !k || !KINDS.has(k) || !ID.test(entityId) ||
+      !k || !KINDS.has(k) || !entityId || !ID.test(entityId) ||
+      (tagged && properties['app'] !== 'bem-feito') ||
       !meta.parents?.includes(cfg['folders'][k as Kind]) ||
       !Number.isSafeInteger(Number(meta.size)) || Number(meta.size) <= 0 || Number(meta.size) > MAX_IMAGE ||
       (expected && (expected.kind !== k || expected.entityId !== entityId))) {
     throw new ApiError(403,'storage_image_outside_catalog');
+  }
+  if (!tagged) {
+    const ref=await referencedImage(env,request,k as Kind,entityId);
+    if (ref !== meta.id && !(allowUnlinked && !ref)) {
+      throw new ApiError(403,'storage_image_reference_mismatch');
+    }
   }
   return {kind:k as Kind,entityId};
 }
@@ -188,7 +202,7 @@ export async function imageRequest(request:Request,env:Env,user:Principal):Promi
   const owner = await storageOwner(env);
   if (method === 'GET') {
     const meta=await metadata(env,owner,fileId!);
-    assertImage(meta,cfg);
+    await assertImage(env,request,meta,cfg);
     const result=await google(env,owner,fileUrl(fileId!,'&alt=media'));
     const binary=await result.response.arrayBuffer();
     if (!binary.byteLength || binary.byteLength > MAX_IMAGE) throw new ApiError(502,'storage_invalid_image_size');
@@ -209,7 +223,7 @@ export async function imageRequest(request:Request,env:Env,user:Principal):Promi
         String.fromCharCode(...signature.slice(8,12))!=='WEBP') throw new ApiError(415,'invalid_image_type');
     if (method === 'PUT') {
       await assertReferenced(env,request,k,entityId,fileId!);
-      assertImage(await metadata(env,owner,fileId!),cfg,{kind:k,entityId});
+      await assertImage(env,request,await metadata(env,owner,fileId!),cfg,{kind:k,entityId});
       const meta=await upload(env,owner,body,fileId!);
       return Response.json(info(meta));
     }
@@ -237,7 +251,7 @@ export async function imageRequest(request:Request,env:Env,user:Principal):Promi
   // old Drive image. Never delete when the document references a DIFFERENT file.
   const current = await referencedImage(env,request,k,entityId);
   if (current && current !== fileId!) throw new ApiError(403,'storage_image_reference_mismatch');
-  assertImage(await metadata(env,owner,fileId!),cfg,{kind:k,entityId});
+  await assertImage(env,request,await metadata(env,owner,fileId!),cfg,{kind:k,entityId},true);
   await google(env,owner,fileUrl(fileId!,'&fields=id'),{
     method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({trashed:true})
   });

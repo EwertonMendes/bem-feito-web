@@ -289,7 +289,7 @@
           @if(shippingEnabled()){
             <label class="bf-field">
               <span>Valor do frete (R$)</span>
-              <bf-number-input kind="currency" [min]="0" [formField]="saleForm.shippingFee" ariaLabel="Valor do frete" />
+              <bf-number-input kind="currency" [formField]="saleForm.shippingFee" ariaLabel="Valor do frete" />
             </label>
           }
         </section>

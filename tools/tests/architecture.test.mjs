@@ -212,6 +212,24 @@ test('close buttons remain within viewport on compact dialogs and Drive notice',
 });
 
 
+test('sales detail actions reflow and shipping correction keeps a clear form-to-preview gap', () => {
+  const html = readFileSync(resolve(appRoot, 'pages/sales/sales.page.html'), 'utf8');
+  const css = readFileSync(resolve(appRoot, 'pages/sales/sales.page.scss'), 'utf8');
+
+  assert.match(html, /class="bf-dialog sale-detail-dialog"/);
+  assert.match(html, /class="bf-dialog-footer sale-detail-footer"/);
+  assert.match(html, /class="sale-footer-group sale-footer-edits" role="group"/);
+  assert.match(html, /class="sale-footer-group sale-footer-main" role="group"/);
+  assert.match(html, /class="sale-metadata-editor sale-shipping-editor"/);
+  assert.match(html, /class="sale-metadata-grid sale-shipping-grid"/);
+  assert.match(html, /class="sale-detail-line sale-detail-shipping"/);
+  assert.match(css, /\.sale-detail-footer \.sale-footer-edits\s*\{\s*display: grid;\s*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/);
+  assert.match(css, /@media \(max-width: 640px\)\s*\{[\s\S]*?\.sale-detail-footer \.sale-footer-edits,[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+  assert.match(css, /\.sale-shipping-editor\s*\{\s*display: grid;\s*gap: 16px;/);
+  assert.match(css, /\.sale-shipping-editor \.sale-shipping-grid textarea\s*\{[\s\S]*?min-height: 100px;/);
+  assert.match(css, /\.sale-shipping-editor \.sale-correction-preview\s*\{[\s\S]*?grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/);
+});
+
 test('catalog follows sales in sidebar and replaces inventory in mobile primary navigation', () => {
   const shell = readFileSync(resolve(appRoot, 'layout/app-shell/app-shell.ts'), 'utf8');
   const definition = shell.match(/readonly nav: NavItem\[\] = \[([\s\S]*?)\n  \];/)?.[1];

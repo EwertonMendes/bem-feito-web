@@ -190,7 +190,7 @@
 
 
 
-  <dialog bfDialog #detailDialog="bfDialog" class="bf-dialog" [busy]="!!pendingAction()">
+  <dialog bfDialog #detailDialog="bfDialog" class="bf-dialog sale-detail-dialog" [busy]="!!pendingAction()">
     @if (selectedSale(); as sale) {
       <div class="bf-dialog-header">
         <div>
@@ -213,21 +213,23 @@
             <div class="sale-detail-line"><span>{{ item.quantity }}× {{ item.name }}</span><strong>{{ currency(item.totalCents) }}</strong></div>
 
           }
+          @if((sale.shippingFeeCents??0)>0 && !editingShipping()){
+            <div class="sale-detail-line sale-detail-shipping">
+              <span>Frete de entrega</span><strong>{{ currency(sale.shippingFeeCents??0) }}</strong>
+            </div>
+          }
         </section>
-        @if((sale.shippingFeeCents??0)>0 && !editingShipping()){
-          <div class="sale-detail-line"><span>Frete</span><strong>{{ currency(sale.shippingFeeCents??0) }}</strong></div>
-        }
         @if(editingShipping()){
-          <section class="sale-metadata-editor" aria-label="Corrigir frete">
+          <section class="sale-metadata-editor sale-shipping-editor" aria-label="Corrigir frete">
             <h3>Corrigir frete da venda</h3>
             <p>Altera o frete sem movimentar estoque ou registrar um novo pagamento.</p>
-            <div class="sale-metadata-grid">
+            <div class="sale-metadata-grid sale-shipping-grid">
               <label>Frete cobrado (R$)
                 <input class="bf-input" type="number" min="0" step="0.01" [value]="shippingAmount()"
                   (input)="shippingAmount.set(+$any($event.target).value); shippingReclassify.set(false)" />
               </label>
               @if((shippingAmount()*100-(sale.shippingFeeCents??0))>0 && (shippingAmount()*100-(sale.shippingFeeCents??0))<=sale.tipCents){
-                <bf-checkbox class="wide" [checked]="shippingReclassify()"
+                <bf-checkbox class="sale-shipping-reclassify" [checked]="shippingReclassify()"
                   (checkedChange)="shippingReclassify.set($event)"
                   [label]="'Reclassificar '+currency(Math.round(shippingAmount()*100-(sale.shippingFeeCents??0)))+' da gorjeta já recebida como frete'" />
               }
@@ -401,18 +403,49 @@
           </section>
         }
       </div>
-      <div class="bf-dialog-footer">
-        @if(sale.status==='active' && !editingDetails() && !editingItems() && !editingShipping() && hasProductLines(sale)) { <button class="bf-button secondary" type="button" [disabled]="!!pendingAction() || openingItemEditor()" [bfLoadingButton]="openingItemEditor()" (click)="openItemCorrection(sale)"><bf-icon name="details"/> {{openingItemEditor()?"Carregando...":"Editar venda"}}</button> }
-        @if(sale.status==='active' && !editingDetails() && !editingItems() && !editingShipping()) { <button class="bf-button secondary" type="button" [disabled]="!!pendingAction()" (click)="editingDetails.set(true)"><bf-icon name="details"/> Corrigir dados</button> }
+      <div class="bf-dialog-footer sale-detail-footer">
         @if(sale.status==='active' && !editingDetails() && !editingItems() && !editingShipping()){
-          <button class="bf-button secondary" type="button" [disabled]="!!pendingAction() || openingItemEditor()"
-            (click)="openShippingCorrection(sale)">Editar frete</button>
+          <div class="sale-footer-group sale-footer-edits" role="group" aria-label="Ajustes da venda">
+            @if(hasProductLines(sale)){
+              <button class="bf-button secondary" type="button"
+                [disabled]="!!pendingAction() || openingItemEditor()"
+                [bfLoadingButton]="openingItemEditor()" (click)="openItemCorrection(sale)">
+                <bf-icon name="details"/> {{openingItemEditor()?'Carregando...':'Editar venda'}}
+              </button>
+            }
+            <button class="bf-button secondary" type="button" [disabled]="!!pendingAction()"
+              (click)="editingDetails.set(true)"><bf-icon name="details"/> Corrigir dados</button>
+            <button class="bf-button secondary" type="button"
+              [disabled]="!!pendingAction() || openingItemEditor()"
+              (click)="openShippingCorrection(sale)">Editar frete</button>
+          </div>
         }
-        @if (sale.status==='active' && sale.balanceCents>0 && !editingItems() && !editingDetails() && !editingShipping()){<button class="bf-button" type="button" (click)="modals.openReceipt(sale.id)"><bf-icon name="payment"/> Receber</button>}
-        @if (sale.status==='active' && sale.fulfillmentStatus==='in-production' && !editingItems() && !editingDetails() && !editingShipping()){<button class="bf-button" type="button" [disabled]="!!pendingAction()" [bfLoadingButton]="pendingAction()==='ready'" (click)="advanceSelected('ready')">{{pendingAction()==='ready'?'Atualizando...':'Marcar pronta'}}</button>}
-        @if (sale.status==='active' && sale.fulfillmentStatus==='ready' && !editingItems() && !editingDetails() && !editingShipping()){<button class="bf-button" type="button" [disabled]="!!pendingAction()" [bfLoadingButton]="pendingAction()==='delivered'" (click)="advanceSelected('delivered')">{{pendingAction()==='delivered'?'Atualizando...':'Entregar / retirar'}}</button>}
-        @if (sale.status!=='cancelled' && !editingItems() && !editingDetails() && !editingShipping()) { <button class="bf-button danger" type="button" [disabled]="!!pendingAction()" [bfLoadingButton]="pendingAction()==='cancel'" (click)="cancelSelected()">{{pendingAction()==='cancel'?'Cancelando...':'Cancelar venda'}}</button> }
-        <button class="bf-button secondary" type="button" (click)="detailDialog.close()">Fechar</button>
+        <div class="sale-footer-group sale-footer-main" role="group" aria-label="Ações da venda">
+          @if(sale.status==='active' && !editingDetails() && !editingItems() && !editingShipping()){
+            @if(sale.balanceCents>0){
+              <button class="bf-button" type="button" [disabled]="!!pendingAction()"
+                (click)="modals.openReceipt(sale.id)"><bf-icon name="payment"/> Receber</button>
+            }
+            @if(sale.fulfillmentStatus==='in-production'){
+              <button class="bf-button" type="button" [disabled]="!!pendingAction()"
+                [bfLoadingButton]="pendingAction()==='ready'" (click)="advanceSelected('ready')">
+                {{pendingAction()==='ready'?'Atualizando...':'Marcar pronta'}}
+              </button>
+            }
+            @if(sale.fulfillmentStatus==='ready'){
+              <button class="bf-button" type="button" [disabled]="!!pendingAction()"
+                [bfLoadingButton]="pendingAction()==='delivered'" (click)="advanceSelected('delivered')">
+                {{pendingAction()==='delivered'?'Atualizando...':'Entregar / retirar'}}
+              </button>
+            }
+            <button class="bf-button danger" type="button" [disabled]="!!pendingAction()"
+              [bfLoadingButton]="pendingAction()==='cancel'" (click)="cancelSelected()">
+              {{pendingAction()==='cancel'?'Cancelando...':'Cancelar venda'}}
+            </button>
+          }
+          <button class="bf-button secondary sale-footer-close" type="button"
+            [disabled]="!!pendingAction()" (click)="detailDialog.close()">Fechar</button>
+        </div>
       </div>
     }
   </dialog>

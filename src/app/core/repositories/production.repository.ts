@@ -212,6 +212,10 @@ export class ProductionRepository {
       for (const item of items) {
         const product = products.get(item.productId)!;
         const stock = product.stock + item.quantity;
+        const averageEstimateCents = item.costPending ? product.averageUnitCostCents
+          : product.averageUnitCostCents > 0 && product.stock > 0
+            ? Math.round((product.stock * product.averageUnitCostCents + item.totalCostCents) / stock)
+            : item.unitCostCents;
         const committedStock = product.committedStock ?? 0;
         const previousReserved = product.reservedPhysicalStock ?? Math.min(product.stock, committedStock);
         const explicitCommitted = product.explicitCommittedStock ?? 0;
@@ -231,13 +235,13 @@ export class ProductionRepository {
           stock, stockStatus: productStockStatus(stock, product.minimumStock),
           reservedPhysicalStock,
           // An incomplete estimate must never overwrite the last known sale cost.
-          averageUnitCostCents: item.costPending ? product.averageUnitCostCents : item.unitCostCents,
+          averageUnitCostCents: averageEstimateCents,
           ...(item.costingModel === 'simplified' && !item.costPending
-            ? { costingVersion: 2 as const, unitCostDeciCents: item.unitCostCents * 10 } : {}),
+            ? { costingVersion: 2 as const, unitCostDeciCents: averageEstimateCents * 10 } : {}),
           updatedAt: serverTimestamp(), updatedBy: userId,
         });
         stockChanges.push({ itemType: 'product', itemId: item.productId, stock, reservedPhysicalStock,
-          averageUnitCostCents: item.costPending ? product.averageUnitCostCents : item.unitCostCents });
+          averageUnitCostCents: averageEstimateCents });
         movement('product', item.productId, item.quantity, item.unitCostCents, item.totalCostCents);
       }
 

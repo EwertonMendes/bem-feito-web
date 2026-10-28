@@ -1,7 +1,7 @@
 import { BfLoadingButton } from '../../../../shared/ui/button/loading-button';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
-import { Addition, AdditionComponent, InputItem, InputTrackingMode, Product, RecipeComponent } from '../../../../domain/models/catalog.model';
+import { Addition, AdditionComponent, InputItem, InputTrackingMode, CostPool, Product, RecipeComponent } from '../../../../domain/models/catalog.model';
 import { standardCostForProduct, trackingModeForInput } from '../../../../domain/logic/costing';
 import { PRODUCT_CATEGORIES, productCategoryId, productIdentity } from '../../../../domain/logic/product-category';
 import { CatalogImageEntityKind, CatalogImageRef } from '../../../../domain/models/image.model';
@@ -24,7 +24,7 @@ import { SoapCreationForm } from '../soap-creation-form/soap-creation-form';
 import { CandleCreationForm } from '../candle-creation-form/candle-creation-form';
 
 interface ProductFormModel { categoryId: 'soap' | 'creative-kit' | 'scented-candle'; modelName: string; variantName: string; description: string; volumeMl: number; collectionId: string; fragranceId: string; formatId: string; salePrice: number; additionalCost: number; minimumStock: number; active: boolean; }
-interface InputFormModel { name: string; unitId: string; trackingMode: InputTrackingMode; availabilityStatus: string; minimumStock: number; active: boolean; }
+interface InputFormModel { name: string; unitId: string; trackingMode: InputTrackingMode; costPool: '' | CostPool; availabilityStatus: string; minimumStock: number; active: boolean; }
 interface AdditionFormModel { name: string; category: string; price: number; notes: string; active: boolean; }
 
 @Component({
@@ -116,7 +116,7 @@ export class CatalogEditor {
     min(p.minimumStock, 0);
   });
 
-  readonly inputModel = signal<InputFormModel>({ name: '', unitId: '', trackingMode: 'untracked', availabilityStatus: '', minimumStock: 0, active: true });
+  readonly inputModel = signal<InputFormModel>({ name: '', unitId: '', trackingMode: 'untracked', costPool: '', availabilityStatus: '', minimumStock: 0, active: true });
   readonly inputForm = form(this.inputModel, (p) => {
     required(p.name);
     required(p.unitId);
@@ -142,6 +142,14 @@ export class CatalogEditor {
     { value: '', label: 'Selecione' },
     ...this.references.units().map((item) => ({ value: item.id, label: item.name })),
   ]);
+  readonly inputCostPoolOptions: readonly BfSelectOption[] = [
+    {value:'',label:'Sem grupo de composição'},
+    {value:'base',label:'Glicerina base (g)'},
+    {value:'surfactant',label:'Lauril (ml)'},
+    {value:'fragrance-classic',label:'Essência clássica (ml)'},
+    {value:'fragrance-premium',label:'Essência + Aroma (ml)'},
+    {value:'colorant',label:'Corante (ml)'},
+  ];
   readonly inputTrackingOptions: readonly BfSelectOption[] = [
     { value: 'exact', icon: 'stock-exact', label: 'Controlado', description: 'Contagem exata. Entradas e consumos alteram o saldo e a falta pode bloquear a operação.' },
     { value: 'estimated', icon: 'stock-estimated', label: 'Estimado', description: 'Saldo aproximado. Compras e consumo previsto atualizam o saldo, mas a falta nunca bloqueia.' },
@@ -192,10 +200,9 @@ export class CatalogEditor {
   readonly productCostSummary = computed(() => {
     const preview = this.productCostPreview();
     if (!preview) return 'Custo ainda indisponível';
-    const pending = preview.components.filter((item) => item.unitCostCents <= 0).length;
-    return pending
-      ? `${this.currency(preview.unitCostCents)} · ${pending} custo${pending === 1 ? '' : 's'} pendente${pending === 1 ? '' : 's'}`
-      : this.currency(preview.unitCostCents);
+    return preview.costPending
+      ? `${this.currency(preview.unitCostCents)} · estimativa parcial (${preview.missingReferences?.join(', ') || 'faltam preços'})`
+      : `${this.currency(preview.unitCostCents)} · ${preview.model === 'simplified' ? 'custo estimado' : 'custo padrão'}`;
   });
 
   constructor() {
@@ -211,7 +218,7 @@ export class CatalogEditor {
       this.productModel.set({ categoryId: 'soap', modelName: '', variantName: '', description: '', volumeMl: 40, collectionId: '', fragranceId: '', formatId: '', salePrice: 0, additionalCost: 0, minimumStock: 0, active: true });
       this.recipe.set([]);
     } else if (kind === 'inputs') {
-      this.inputModel.set({ name: '', unitId: '', trackingMode: 'untracked', availabilityStatus: '', minimumStock: 0, active: true });
+      this.inputModel.set({ name: '', unitId: '', trackingMode: 'untracked', costPool: '', availabilityStatus: '', minimumStock: 0, active: true });
     } else {
       this.additionModel.set({ name: '', category: 'Embalagem', price: 0, notes: '', active: true });
       this.additionComponents.set([]);
@@ -237,6 +244,7 @@ export class CatalogEditor {
       name: item.name,
       unitId: item.unitId,
       trackingMode,
+      costPool: item.costPool ?? '',
       availabilityStatus: item.availabilityStatus ?? '',
       minimumStock: trackingMode === 'untracked' ? 0 : item.minimumStock,
       active: item.active,
@@ -376,6 +384,14 @@ export class CatalogEditor {
     const model = this.inputModel();
     const existing = this.store.inputs().find((item) => item.id === this.editingId());
     const tracked = model.trackingMode !== 'untracked';
+    if (model.costPool && tracked)
+      throw new Error('Materiais usados no custo médio não podem ter saldo físico. Selecione “Não controlar saldo”.');
+    if (model.costPool) {
+      const name = this.references.units().find(unit => unit.id === model.unitId)?.name.toLocaleLowerCase('pt-BR') ?? '';
+      const expectsGrams = model.costPool === 'base';
+      const valid = expectsGrams ? /^(g|grama|gramas)$/.test(name) : /^(ml|mililitro|mililitros)$/.test(name);
+      if (!valid) throw new Error('Grupo de custo incompatível com a unidade: use g para glicerina e ml para os demais materiais.');
+    }
     const input: InputItem = {
       id: existing?.id ?? '',
       code: existing?.code ?? '',
@@ -383,6 +399,7 @@ export class CatalogEditor {
       name: model.name.trim(),
       unitId: model.unitId,
       trackingMode: model.trackingMode,
+      ...(model.costPool ? { costPool: model.costPool } : {}),
       // Preserve pre-cutover qualitative notes without displaying or requiring updates.
       availabilityStatus: model.trackingMode === 'estimated'
         ? model.availabilityStatus.trim().slice(0,240) || undefined

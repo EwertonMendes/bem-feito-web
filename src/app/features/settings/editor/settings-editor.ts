@@ -2,7 +2,7 @@ import { BfLoadingButton } from '../../../shared/ui/button/loading-button';
 import { CatalogImage } from '../../../shared/media/catalog-image/catalog-image';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild, output } from '@angular/core';
 import { FormField, form, min, required } from '@angular/forms/signals';
-import { CandleModel, CollectionDefinition, ExpenseCategory, ExpenseType, FormatDefinition, FormatPrice, FragranceDefinition, PaymentMethod, RecipeComponent, UnitDefinition } from '../../../domain/models/catalog.model';
+import { CandleModel, CollectionDefinition, ExpenseCategory, ExpenseType, FormatDefinition, FormatPrice, FragranceDefinition, PaymentMethod, RecipeComponent, UnitDefinition, SoapCostProfile } from '../../../domain/models/catalog.model';
 import { CatalogReferenceStore } from '../../../features/catalog/catalog-reference.store';
 import { CatalogStore } from '../../../features/catalog/catalog.store';
 import { SettingsStore } from '../../../features/settings/settings.store';
@@ -23,6 +23,9 @@ type SimpleSetting = UnitDefinition | PaymentMethod | ExpenseCategory;
 interface SimpleModel { name: string; active: boolean; }
 interface FragranceModel extends SimpleModel { collectionId: string; }
 interface FormatModel extends SimpleModel { approximateWeightGrams: number; }
+const emptySoapCostProfile = (): SoapCostProfile => ({
+  baseGrams: 0, surfactantMl: 0, fragranceMl: 0, colorantMl: 0, extraUnitCostCents: 0,
+});
 interface CandleModelForm { name: string; volumeMl: number; price: number; sourceCollectionId: string; active: boolean; }
 interface PriceModel { collectionId: string; formatId: string; price: number; active: boolean; }
 interface ExpenseTypeModel extends SimpleModel { kind: ExpenseType['kind']; }
@@ -51,6 +54,14 @@ export class BfSettingsEditor {
   readonly saving = signal(false);
   readonly editingId = signal('');
   readonly costComponents = signal<RecipeComponent[]>([]);
+  readonly useSimplifiedCost = signal(false);
+  readonly soapCostProfile = signal<SoapCostProfile>(emptySoapCostProfile());
+  readonly fragranceCostPool = signal<'' | 'fragrance-classic' | 'fragrance-premium'>('');
+  readonly fragranceCostOptions: readonly BfSelectOption[] = [
+    {value:'',label:'Não definido'},
+    {value:'fragrance-classic',label:'Essências Clássicas (preço médio)'},
+    {value:'fragrance-premium',label:'Essências + Aroma (preço médio)'},
+  ];
   readonly simpleModel = signal<SimpleModel>({ name: '', active: true });
   readonly simpleForm = form(this.simpleModel, (p) => required(p.name));
   readonly fragranceModel = signal<FragranceModel>({ name: '', collectionId: '', active: true });
@@ -100,6 +111,9 @@ export class BfSettingsEditor {
     this.tab.set(kind);
     this.editingId.set('');
     this.costComponents.set([]);
+    this.useSimplifiedCost.set(false);
+    this.soapCostProfile.set(emptySoapCostProfile());
+    this.fragranceCostPool.set('');
     this.simpleModel.set({ name: '', active: true });
     this.fragranceModel.set({ name: '', collectionId, active: true });
     this.formatModel.set({ name: '', approximateWeightGrams: 0, active: true });
@@ -124,6 +138,7 @@ export class BfSettingsEditor {
     this.tab.set('collections');
     this.editingId.set(item.id);
     this.simpleModel.set({ name: item.name, active: item.active });
+    this.fragranceCostPool.set(item.fragranceCostPool ?? '');
     this.costComponents.set((item.costComponents ?? []).map((component) => ({ ...component })));
     this.dialog().open();
   }
@@ -148,6 +163,8 @@ export class BfSettingsEditor {
     this.tab.set('formats');
     this.editingId.set(item.id);
     this.formatModel.set({ name: item.name, approximateWeightGrams: item.approximateWeightGrams ?? 0, active: item.active });
+    this.useSimplifiedCost.set(!!item.soapCostProfile);
+    this.soapCostProfile.set(item.soapCostProfile ? { ...item.soapCostProfile } : emptySoapCostProfile());
     this.costComponents.set((item.costComponents ?? []).map((component) => ({ ...component })));
     this.dialog().open();
   }
@@ -227,9 +244,13 @@ export class BfSettingsEditor {
     return this.costSummary(this.costComponents());
   }
 
+  patchSoapCostProfile(field: keyof SoapCostProfile, value: number): void {
+    this.soapCostProfile.update(profile => ({ ...profile, [field]: value }));
+  }
+
   costScopeHint(): string {
     if (this.tab() === 'formats') return 'Aplicado a todo produto deste formato. Bom para base, peso padrão e materiais comuns.';
-    if (this.tab() === 'fragrances') return 'Aplicado a todo produto desta fragrância. Bom para essência e corantes específicos.';
+    if (this.tab() === 'fragrances') return 'Legado: usado somente em formatos sem perfil simplificado. O novo modelo usa grupos de essências e corantes.';
     return 'Aplicado a todo produto desta coleção. Use para componentes comuns à linha.';
   }
 
@@ -249,11 +270,22 @@ export class BfSettingsEditor {
           sourceCollectionId:model.sourceCollectionId,active:model.active,
         });
       } else if (this.tab() === 'collections') {
-        savedId = await this.references.saveCollection({ id, ...this.simpleModel(), costComponents } as CollectionDefinition);
+        savedId = await this.references.saveCollection({
+          id, ...this.simpleModel(), costComponents,
+          ...(this.fragranceCostPool() ? { fragranceCostPool: this.fragranceCostPool() } : {}),
+        } as CollectionDefinition);
       } else if (this.tab() === 'fragrances') {
         savedId = await this.references.saveFragrance({ id, ...this.fragranceModel(), costComponents } as FragranceDefinition);
       } else if (this.tab() === 'formats') {
-        savedId = await this.references.saveFormat({ id, ...this.formatModel(), costComponents } as FormatDefinition);
+        const profile = this.soapCostProfile();
+        if (this.useSimplifiedCost() && (!Number.isFinite(profile.baseGrams) || profile.baseGrams <= 0 ||
+          [profile.surfactantMl, profile.fragranceMl, profile.colorantMl, profile.extraUnitCostCents ?? 0]
+            .some(value => !Number.isFinite(value) || value < 0)))
+          throw new Error('Para ativar o custo simplificado, informe glicerina em gramas e dosagens válidas não negativas.');
+        savedId = await this.references.saveFormat({
+          id, ...this.formatModel(), costComponents,
+          ...(this.useSimplifiedCost() ? { soapCostProfile: profile } : {}),
+        } as FormatDefinition);
       } else if (this.tab() === 'prices') {
         const model = this.priceModel();
         await this.references.saveFormatPrice({ id, collectionId: model.collectionId, formatId: model.formatId, priceCents: toCents(model.price), active: model.active } as FormatPrice);

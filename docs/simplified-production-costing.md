@@ -39,3 +39,31 @@ Separar claramente **caixa (compra integral)**, **margem gerencial estimada (cus
 ## Compatibilidade
 
 Todos os campos novos são opcionais. Produções históricas ficam com snapshots inalterados até a recalibração aprovada; elas podem continuar com o aviso de custo parcial. A implantação do código não recalcula retroativamente valores, não apaga movimentações e não altera o caixa.
+
+## Auditoria de referências existentes — 28/10/2026
+
+Fonte consultada em leitura: planilha operacional "Bem Feito — Controle de Vendas, Estoque e Custos",
+aba "Compras e Despesas", "Custos de Aquisição", "Ficha de Produção" e "Cadastros".
+Estes são **dados históricos**, não substituem a verificação dos cadastros atuais do Firestore e não autorizam criar novas compras.
+
+| Material | Compra / custo registrado | Normalização para referência de fabricação | Atenção |
+| --- | --- | --- | --- |
+| Glicerina branca | M000008 3 kg R$55,10 + frete CA-00004 R$13,99 = R$69,09 | R$23,03/kg com esse frete | M000011 3 kg R$58,00; M000018 4 kg R$89,07 tinha recebimento pendente na planilha |
+| Glicerina transparente | M000007 4 kg R$77,90 | R$19,475/kg | Compra por kg, cálculo por grama |
+| Lauril vegetal | M000006 1 frasco 500 ml R$16,80 | R$0,0336/ml | Outra embalagem de Mercado Livre referida nas observações, sem valor individual confirmado nesta linha |
+| Essências Clássicas | M000002 4 frascos ×100 ml R$51,61 | R$0,129025/ml em média para esse kit | Não tratar como preço de todas as essências fora do kit |
+| Essências Vollmens Premium | M000001 3 frascos ×30 g R$52,71 | R$0,585667/g para esse lote | **Gramas não são mililitros**; confirmar fator ou modelar dosagem em g. M000019 lote extra R$55,71 em trânsito na planilha |
+| Corantes | M000010 5 frascos ×30 ml R$31,92 | R$0,2128/ml | Custo médio do kit, independente da cor |
+| Saquinho organza | M000012 100 un. R$22,99 | R$0,2299/un. | Estoque físico permanece controlado |
+
+Ficha de Produção registrada em 08/10/2026 (quantidade média por unidade; sequência `base g / essência ml / corante ml / lauril ml`):
+- Mini Florzinhas: `3 / 1 / 1 / 1`.
+- Patinha M: `35 / 1,5 / 1 / 1,5`.
+- Patinha G: `55 / 1,5 / 1,5 / 1,5`.
+- Barra Arredondada: `87 / 2,5 / 2 / 2`.
+- Massageador: `120 / 3 / 2,5 / 2`.
+- Mini Cubinhos: `9 / 0,2 / 0,2 / 0,2`.
+- Floral: ficha antiga dizia **90 g**, mas a correção informada em 28/10/2026 é **75–80 g**. Usar 77,5 g como ponto médio de custo **após aprovação da referência**; as quantidades específicas da composição permanecem sem confirmação.
+- Coraçõezinhos: 1,5 g por unidade, sem composição comprovada na ficha.
+
+As fichas antigas são propostas de referência para homologação, **não valores novos validados**. Conservar divergências e documentar alterações de versão. Para produção em g/ml com compras em `kg`, `ml` ou `un`, o cadastro permite indicar `costUnitFactor` por item (por exemplo: 1 kg = 1000 g; 1 frasco de 500 ml = 500 ml), sem alterar lançamentos financeiros nem estoque. Não presumir equivalência g/ml para essências premium.

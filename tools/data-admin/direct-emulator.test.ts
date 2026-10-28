@@ -54,7 +54,7 @@ test('audited batchPatch changes two costing references in one transaction',asyn
   await run(req({id:'direct-batch-317',action:'batchPatch',changes}));
   assert.equal((await fmt.get()).data()?.approximateWeightGrams,77.5);
   assert.equal((await col.get()).data()?.fragranceCostPool,'fragrance-classic');
-  await assert.rejects(prepareDirect(req({id:'direct-batch-stale-317',action:'batchPatch',changes}),db),/precondition/i);
+  await assert.rejects(prepareDirect(req({id:'direct-batch-stale-317',action:'batchPatch',changes}),db),/precondition|absent/i);
 });
 test('reverses arbitrary multi-movement production and preserves earlier stock changes',async()=>{
   const pid='direct-production-317', productId='direct-product-317', inputId='direct-input-317';

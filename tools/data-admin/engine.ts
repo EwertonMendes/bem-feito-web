@@ -29,10 +29,12 @@ export function snapshotRow(snapshot: DocumentSnapshot): Row {
   const data = snapshot.exists ? snapshot.data()! : null;
   return { path: snapshot.ref.path, version: version(snapshot), before: encode(data), after: encode(data) };
 }
-function assertExpected(data: Payload | null, expected: Payload | null) {
+function assertExpected(data: Payload | null, expected: Payload | null, expectedAbsent: string[] = []) {
   if (expected === null) { invariant(data === null, 'Create destination already exists'); return; }
   invariant(data, 'Expected document missing');
-  for (const [key, value] of Object.entries(expected)) invariant(hash(data[key]) === hash(value), 'Field precondition differs');
+  for (const [key, value] of Object.entries(expected)) invariant(Object.hasOwn(data,key) &&
+    hash(data[key]) === hash(value), 'Field precondition differs');
+  for (const key of expectedAbsent) invariant(!Object.hasOwn(data,key), 'Expected reference field to be absent');
 }
 
 export async function prepare(request: Request, db: Firestore, archive: Archive): Promise<Plan> {
@@ -61,16 +63,31 @@ export async function prepare(request: Request, db: Firestore, archive: Archive)
     if (request.changes) {
       for (const [i, change] of request.changes.entries()) {
         const before = current[i].exists ? current[i].data()! : null;
-        assertExpected(before, change.expected);
+        assertExpected(before, change.expected, change.expectedAbsent ?? []);
         let after: Payload | null = change.action === 'delete' ? null : { ...(before ?? {}), ...change.values };
         if (change.collection === 'fragrances' && before) invariant(after?.collectionId === before.collectionId, 'Changing fragrance ownership needs a registered domain migration');
         if (change.collection === 'formatPrices' && before) invariant(after?.collectionId === before.collectionId && after?.formatId === before.formatId, 'Changing price relationships needs a registered domain migration');
         if (change.collection === 'inputs' && after) {
-          const basis = Math.max(0, Number(before?.costBasisQuantity ?? before?.stock ?? 0));
-          invariant(Number.isFinite(basis) && basis <= 1_000_000, 'Invalid input cost basis');
-          after.costBasisQuantity = basis;
-          after.costBasisValueCents = Math.round(basis * Number(after.averageUnitCostCents));
-          invariant(Number.isSafeInteger(after.costBasisValueCents) && Number(after.costBasisValueCents) <= 1_000_000_000, 'Input cost basis exceeds domain limit');
+          // A historical unit-price correction may still recompute its legacy basis.
+          // Cost-only references are explicitly purchase-funded and MUST NEVER be
+          // silently recalculated from obsolete physical stock balances.
+          const isUnitCostChange = Object.hasOwn(change.values ?? {}, 'averageUnitCostCents');
+          const isExplicitBasis = ['costBasisQuantity','costBasisValueCents'].some(k =>
+            Object.hasOwn(change.values ?? {}, k));
+          if (isUnitCostChange && !isExplicitBasis) {
+            const basis = Math.max(0, Number(before?.costBasisQuantity ?? before?.stock ?? 0));
+            invariant(Number.isFinite(basis) && basis <= 1_000_000, 'Invalid input cost basis');
+            after.costBasisQuantity = basis;
+            after.costBasisValueCents = Math.round(basis * Number(after.averageUnitCostCents));
+            invariant(Number.isSafeInteger(after.costBasisValueCents) &&
+              Number(after.costBasisValueCents) <= 1_000_000_000, 'Input cost basis exceeds domain limit');
+          }
+          if (Object.hasOwn(change.values ?? {}, 'costPool')) {
+            invariant(before?.trackingMode === 'untracked', 'Only non-stock production materials may join a reference cost group');
+            invariant(Number(after.costUnitFactor) > 0 &&
+              Number(after.costBasisQuantity) > 0 &&
+              Number(after.costBasisValueCents) > 0, 'Production reference cost requires explicit purchase quantity and amount');
+          }
         }
         rows[i].after = encode(after);
       }

@@ -67,7 +67,7 @@
         <label class="bf-field" [attr.data-invalid]="receiptSubmitted() && receiptErrors().methodId ? 'true' : null"><span>Forma</span><bf-select [formField]="receiptForm.methodId" [options]="requiredPaymentMethodOptions()" ariaLabel="Forma de pagamento" />@if(receiptSubmitted() && receiptErrors().methodId){<small class="bf-field-error">{{receiptErrors().methodId}}</small>}</label>
         <label class="bf-field full" [attr.data-invalid]="receiptSubmitted() && receiptErrors().amount ? 'true' : null"><span>Valor recebido</span><bf-number-input kind="currency" [formField]="receiptForm.amount" ariaLabel="Valor recebido" />@if(receiptSubmitted() && receiptErrors().amount){<small class="bf-field-error">{{receiptErrors().amount}}</small>}</label>
       </div>
-      <p class="receipt-hint">Se o valor ultrapassar o saldo, o excedente será registrado como gorjeta.</p>
+      <p class="receipt-hint">Se o valor ultrapassar o saldo, você precisará confirmar o excedente como gorjeta.</p>
     </div>
     <div class="bf-dialog-footer"><button class="bf-button secondary" type="button" (click)="receiptDialog.close()">Cancelar</button><button class="bf-button" type="button" [disabled]="receiptSaving()" [bfLoadingButton]="receiptSaving()" (click)="saveReceipt()">{{receiptSaving()?'Registrando...':'Confirmar recebimento'}}</button></div>
   </dialog>

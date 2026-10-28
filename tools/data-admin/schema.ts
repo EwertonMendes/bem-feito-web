@@ -19,6 +19,16 @@ export const BUSINESS_COLLECTIONS = [
 export const MIGRATION_COLLECTIONS = [...BUSINESS_COLLECTIONS, 'migrationRuns', 'migrationSources'];
 const READABLE = new Set<string>([...MIGRATION_COLLECTIONS, 'dataAdminSmoke']);
 type FieldType = 'text' | 'id' | 'money' | 'boolean' | 'costPool' | 'fragranceCostPool' | 'unitFactor' | 'quantity' | 'weight' | 'soapProfile';
+const REQUIRED_CREATE_FIELDS: Record<string, readonly string[]> = {
+  collections: ['name','active'],
+  fragrances: ['name','active','collectionId'],
+  formats: ['name','active'],
+  units: ['name','active'],
+  paymentMethods: ['name','active'],
+  expenseCategories: ['name','active'],
+  formatPrices: ['collectionId','formatId','priceCents','active'],
+  dataAdminSmoke: ['value'],
+};
 const FIELD_TYPES: Record<string, Record<string, FieldType>> = {
   collections: { name: 'text', active: 'boolean', fragranceCostPool: 'fragranceCostPool' },
   fragrances: { name: 'text', active: 'boolean', collectionId: 'id' },
@@ -123,12 +133,14 @@ export function validateRequest(value: unknown): Request {
       invariant(item.action === (op === 'batch-update' ? 'update' : op), 'Action differs from operation');
       const collection = String(item.collection);
       if (item.action === 'create') {
+        invariant(item.expectedAbsent === undefined, 'Create cannot specify absence conditions');
         invariant(item.expected === null, 'Create requires expected:null'); fields(collection, item.values);
         invariant(['collections', 'fragrances', 'formats', 'units', 'paymentMethods', 'expenseCategories', 'formatPrices', 'dataAdminSmoke'].includes(collection), 'Create requires a registered domain operation');
-        invariant(Object.keys(FIELD_TYPES[collection]).every(k => Object.hasOwn(item.values as Payload, k)), 'Incomplete create');
+        invariant(REQUIRED_CREATE_FIELDS[collection]?.every(k => Object.hasOwn(item.values as Payload, k)), 'Incomplete create');
       } else {
         fields(collection, item.expected);
         if (item.action === 'delete') {
+          invariant(item.expectedAbsent === undefined, 'Delete cannot specify absence conditions');
           invariant(collection === 'dataAdminSmoke', 'Business deletion requires the registered DEV replacement migration');
           invariant(item.values === undefined, 'Delete accepts no values');
         } else {

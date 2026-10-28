@@ -50,18 +50,20 @@
     <div class="bf-dialog-body">
       @if(selectedDay(); as day) {
         <div class="day-stats detail-stats"><div><strong>{{day.quantity}}</strong><small>unidades</small></div><div><strong>{{day.products}}</strong><small>produtos diferentes</small></div><div><strong>{{currency(day.totalCents)}}</strong><small>custo registrado</small></div></div>
-        @if(day.pending && day.entries.some(entry => (entry.missingCostReferences?.length ?? 0) > 0)){
+        @if(missingCostReferences().length){
           <p class="preview-hint"><strong>Referências de custo pendentes:</strong>
-            @for(entry of day.entries;track entry.id){
-              @for(missing of entry.missingCostReferences ?? [];track missing){
-                <span> {{missing}}. </span>
-              }
-            }
+            @for(missing of missingCostReferences(); track missing){<span> {{missing}}. </span>}
           </p>
         }
         <h3>Produtos fabricados</h3>
         @for(item of detailItems();track item.productId) {
           <div class="consumption"><div class="consumption-copy"><strong>{{item.name}}</strong><small>{{item.pending?'Custo parcial':'Custo calculado'}}</small></div><div class="consumption-values"><strong>{{item.quantity}} un.</strong><small>{{currency(item.costCents)}}</small></div></div>
+        }
+        @if(detailEstimates().length){
+          <h3>Materiais estimados por grupo (não alteram estoque)</h3>
+          @for(part of detailEstimates();track part.pool){
+            <div class="consumption"><strong>{{costGroupLabel(part.pool)}}</strong><div class="consumption-values"><strong>{{part.quantity | number:'1.0-3'}}</strong><small>{{currency(part.totalCostCents)}}</small></div></div>
+          }
         }
         <h3>Materiais previstos nas composições antigas</h3>
         @for(item of detailConsumptions();track item.inputId) {

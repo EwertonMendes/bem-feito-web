@@ -23,7 +23,30 @@
         <div class="bf-grid two"><label class="bf-field"><span>Nome</span><input class="bf-input" [formField]="simpleForm.name" /></label><bf-checkbox class="toggle" [formField]="simpleForm.active" label="Ativo" /></div>
       }
 
-      @if(tab()==='collections'||tab()==='fragrances'||tab()==='formats'){
+      @if(tab()==='collections'){
+        <section class="simplified-cost-settings">
+          <strong>Grupo de custo das essências</strong>
+          <p>Define o preço médio de essências usado nos sabonetes desta coleção. A fragrância e os corantes escolhidos na fabricação continuam livres.</p>
+          <bf-select [value]="fragranceCostPool()" (valueChange)="fragranceCostPool.set($any($event))" [options]="fragranceCostOptions" ariaLabel="Grupo de custo das essências" />
+        </section>
+      }
+      @if(tab()==='formats'){
+        <section class="simplified-cost-settings">
+          <bf-checkbox [checked]="useSimplifiedCost()" (checkedChange)="useSimplifiedCost.set($event)" label="Usar custeio simplificado, sem contagem física de materiais"/>
+          <p>Quantidades médias por sabonete. São estimativas, não uma receita fixa nem uma baixa de estoque. As essências e cores podem ser misturadas livremente.</p>
+          @if(useSimplifiedCost()){
+            <div class="bf-grid two">
+              <label class="bf-field"><span>Glicerina base (g) *</span><bf-number-input kind="decimal" [decimals]="3" [min]="0" [value]="soapCostProfile().baseGrams" (valueChange)="patchSoapCostProfile('baseGrams',$event)" ariaLabel="Glicerina em gramas"/></label>
+              <label class="bf-field"><span>Lauril médio (ml)</span><bf-number-input kind="decimal" [decimals]="3" [min]="0" [value]="soapCostProfile().surfactantMl" (valueChange)="patchSoapCostProfile('surfactantMl',$event)" ariaLabel="Lauril médio em ml"/></label>
+              <label class="bf-field"><span>Essências em média (ml)</span><bf-number-input kind="decimal" [decimals]="3" [min]="0" [value]="soapCostProfile().fragranceMl" (valueChange)="patchSoapCostProfile('fragranceMl',$event)" ariaLabel="Essências médias em ml"/></label>
+              <label class="bf-field"><span>Corantes em média (ml)</span><bf-number-input kind="decimal" [decimals]="3" [min]="0" [value]="soapCostProfile().colorantMl" (valueChange)="patchSoapCostProfile('colorantMl',$event)" ariaLabel="Corantes médios em ml"/></label>
+              <label class="bf-field"><span>Custo adicional fixo (R$)</span><bf-number-input kind="currency" [min]="0" [value]="(soapCostProfile().extraUnitCostCents ?? 0)/100" (valueChange)="patchSoapCostProfile('extraUnitCostCents',toCents($event))" ariaLabel="Custo adicional por sabonete"/></label>
+            </div>
+            <p>Ativar este modelo substitui as receitas físicas antigas no cálculo. Os preços dos materiais virão de compras cadastradas e seus grupos de custo.</p>
+          }
+        </section>
+      }
+      @if(tab()==='collections'||tab()==='fragrances'||(tab()==='formats' && !useSimplifiedCost())){
         <section class="cost-composition">
           <div class="cost-head"><div><strong>Componentes de custo padrão</strong><small>{{costScopeHint()}}</small></div><button class="bf-button secondary" type="button" (click)="addCostComponent()">+ Insumo</button></div>
           @for(component of costComponents();track $index;let i=$index){

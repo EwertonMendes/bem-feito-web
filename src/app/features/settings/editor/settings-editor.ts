@@ -48,6 +48,7 @@ export class BfSettingsEditor {
   private readonly dialog = viewChild.required<BfDialog>('editor');
 
   readonly currency = formatCurrency;
+  readonly toCents = toCents;
   readonly tab = signal<SettingTab>('collections');
   readonly initialized = computed(() => this.references.initialized() && this.catalog.initialized() && this.settings.initialized());
   readonly refreshing = computed(() => this.initialized() && (this.references.loading() || this.catalog.loading() || this.settings.loading()));

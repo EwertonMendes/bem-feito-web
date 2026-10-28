@@ -100,13 +100,16 @@ export class ProductionPage {
     colorant: 'Corantes (ml)',
   } as Record<string, string>)[pool] ?? pool;
   readonly detailItems = computed(() => {
-    const items = new Map<string, { productId: string; name: string; quantity: number; costCents: number; pending: boolean }>();
+    const items = new Map<string, { productId: string; name: string; quantity: number; costCents: number; pending: boolean; missingCostReason?: string }>();
     for (const entry of this.selectedDay()?.entries ?? []) {
       if (entry.status === 'cancelled') continue;
       for (const part of this.displayItemsFor(entry)) {
         const previous = items.get(part.productId);
+        const product = this.catalog.products().find(candidate => candidate.id === part.productId);
+        const missingCostReason = part.costPending && product?.categoryId === 'candle'
+          ? 'Custo parcial · composição da vela não cadastrada' : undefined;
         if (previous) { previous.quantity += part.quantity; previous.costCents += part.totalCostCents; previous.pending ||= part.costPending; }
-        else items.set(part.productId, { productId: part.productId, name: part.productName, quantity: part.quantity, costCents: part.totalCostCents, pending: part.costPending });
+        else items.set(part.productId, { productId: part.productId, name: part.productName, quantity: part.quantity, costCents: part.totalCostCents, pending: part.costPending, missingCostReason });
       }
     }
     return [...items.values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));

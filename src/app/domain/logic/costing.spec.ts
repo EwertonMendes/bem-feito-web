@@ -31,6 +31,44 @@ const input = (id: string, cost: number): InputItem => ({
 });
 
 describe('standard costing', () => {
+  it('calculates an aromatic mixture without choosing a fixed colour or perfume', () => {
+    const make = (id: string, pool: NonNullable<InputItem['costPool']>, qty: number, cents: number, unit: string): InputItem => ({
+      ...input(id, 0), costPool: pool, unitId: unit, trackingMode: 'untracked',
+      costBasisQuantity: qty, costBasisValueCents: cents,
+    });
+    const inputs = new Map<string, InputItem>([
+      ['white-base', make('white-base', 'base', 1000, 3000, 'g')],
+      ['lauril', make('lauril', 'surfactant', 100, 1000, 'ml')],
+      ['essence-a', make('essence-a', 'fragrance-classic', 100, 2000, 'ml')],
+      ['essence-b', make('essence-b', 'fragrance-classic', 100, 4000, 'ml')],
+      ['blue', make('blue', 'colorant', 20, 400, 'ml')],
+      ['red', make('red', 'colorant', 20, 800, 'ml')],
+    ]);
+    const cost = standardCostForProduct(product, {
+      collection: {id:'col',name:'Clássica',active:true,fragranceCostPool:'fragrance-classic'},
+      format: {id:'fmt',name:'Floral',active:true,soapCostProfile:{
+        baseGrams: 90, surfactantMl: 1, fragranceMl: 2, colorantMl: 0.1,
+      }},
+    }, inputs);
+    expect(cost.costPending).toBe(false);
+    expect(cost.model).toBe('simplified');
+    expect(cost.unitCostCents).toBe(342);
+    expect(cost.components).toEqual([]);
+    expect(cost.estimateLines?.map(line => line.pool)).toEqual(['base','surfactant','fragrance-classic','colorant']);
+    expect(input('base',2).stock).toBe(0);
+  });
+
+  it('refuses to invent a cost when the fragrance group has no price', () => {
+    const cost = standardCostForProduct(product, {
+      collection: {id:'c',name:'Clássica',active:true,fragranceCostPool:'fragrance-classic'},
+      format: {id:'fmt',name:'Floral',active:true,soapCostProfile:{
+        baseGrams: 90, surfactantMl: 0, fragranceMl: 2, colorantMl: 0,
+      }},
+    }, new Map([['base', {...input('base', 2),costPool:'base',active:true}]]));
+    expect(cost.costPending).toBe(true);
+    expect(cost.missingReferences).toContain('Preço de referência: Grupo de essências da coleção');
+    expect(cost.components).toEqual([]);
+  });
   it('composes reusable format, collection, fragrance and product adjustments', () => {
     const components = productCostComponents(product, {
       format: { id: 'fmt', name: 'Barra', active: true, costComponents: [{ inputId: 'base', unitId: 'g', quantity: 90 }] },

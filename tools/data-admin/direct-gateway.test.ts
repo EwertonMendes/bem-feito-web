@@ -23,6 +23,15 @@ test('direct gateway accepts reusable safe requests, never hard-coded production
     quantity:1,unitPriceCents:1600,expectedAvailableStock:1,
     customerName:'Isabele',businessDate:'2026-10-21'})).action,'recordPaidSale');
 });
+test('batchPatch validates atomic compare-and-swap and rejects duplicates',()=>{
+  const a={collection:'formats',documentId:'f1',expected:{approximateWeightGrams:90},values:{approximateWeightGrams:77.5}};
+  const b={collection:'collections',documentId:'c1',expected:{},expectedAbsent:['fragranceCostPool'],values:{fragranceCostPool:'fragrance-classic'}};
+  const request={...base,action:'batchPatch',changes:[a,b]};
+  assert.equal(validateDirectRequest(json(request)).changes?.length,2);
+  assert.throws(()=>validateDirectRequest(json({...request,changes:[a,a]})));
+  assert.throws(()=>validateDirectRequest(json({...request,environment:'prod'})));
+  assert.throws(()=>validateDirectRequest(json({...request,changes:[{...a,collection:'system'}]})));
+});
 test('direct rejects invalid payloads, protected infrastructure and unrelated projects',()=>{
   for(const p of [
     {...patch,environment:'prod'}, {...patch,projectId:'another-project'},

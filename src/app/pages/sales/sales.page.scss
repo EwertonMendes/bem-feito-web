@@ -417,6 +417,178 @@
 .sale-correction-error bf-icon{display:inline-flex;flex:none}
 @media(max-width:560px){.sale-item-correction-row{grid-template-columns:repeat(2,minmax(0,1fr))}.sale-item-correction-row>strong{grid-column:1/-1}.sale-correction-preview{grid-template-columns:1fr}}
 
+/* Sale details: two predictable action rows, never a seven-button flex overflow.
+   The common dialog keeps its fixed header and scrolling body. */
+.sale-detail-dialog .sale-detail-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+  padding: 14px 20px 16px;
+  min-width: 0;
+}
+
+.sale-detail-footer .sale-footer-group {
+  min-width: 0;
+  gap: 9px;
+}
+
+.sale-detail-footer .sale-footer-edits {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sale-detail-footer .sale-footer-main {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.sale-detail-footer .sale-footer-main:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.sale-detail-footer .bf-button {
+  min-width: 0;
+  min-height: 46px;
+  width: 100%;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.3;
+  padding: 10px 12px;
+  overflow-wrap: break-word;
+}
+
+.sale-detail-footer .bf-button bf-icon {
+  flex: none;
+}
+
+.sale-detail-footer .sale-footer-main > .bf-button {
+  width: auto;
+  flex: 1 1 140px;
+  max-width: 200px;
+}
+
+.sale-detail-footer .sale-footer-main > .sale-footer-close {
+  flex-grow: 0;
+}
+
+/* Shipping stays in the item summary with the same two-column alignment. */
+.detail-items > .sale-detail-shipping {
+  margin-top: 3px;
+  padding-top: 14px;
+  padding-bottom: 12px;
+  border-top: 1px dashed var(--line);
+  border-bottom: 0;
+  color: var(--brand-strong);
+  font-weight: 700;
+}
+.detail-items > .sale-detail-shipping strong {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Keep the correction form, textarea and preview cards separated at every width. */
+.sale-shipping-editor {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.sale-shipping-editor h3,
+.sale-shipping-editor > p {
+  margin: 0;
+}
+.sale-shipping-editor .sale-shipping-grid {
+  grid-template-columns: minmax(0, 230px) minmax(0, 1fr);
+  gap: 14px 18px;
+  align-items: center;
+  min-width: 0;
+}
+.sale-shipping-editor .sale-shipping-grid > label {
+  gap: 8px;
+  line-height: 1.45;
+}
+.sale-shipping-editor .sale-shipping-grid .sale-shipping-reclassify {
+  align-self: center;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sale-shipping-editor .sale-shipping-grid > label.wide {
+  grid-column: 1 / -1;
+}
+.sale-shipping-editor .sale-shipping-grid textarea {
+  display: block;
+  width: 100%;
+  min-height: 100px;
+  max-width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+}
+.sale-shipping-editor .sale-correction-preview {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+.sale-shipping-editor .sale-correction-preview > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sale-shipping-editor .sale-metadata-actions {
+  margin-top: 2px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* On narrower viewports actions remain large tap targets without horizontal scroll. */
+@media (max-width: 640px) {
+  .sale-detail-dialog .sale-detail-footer {
+    padding: 12px 14px 14px;
+    gap: 10px;
+  }
+  .sale-detail-footer .sale-footer-edits,
+  .sale-detail-footer .sale-footer-main {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+  .sale-detail-footer .sale-footer-main {
+    padding-top: 10px;
+  }
+  .sale-detail-footer .sale-footer-main > .bf-button {
+    width: 100%;
+    max-width: none;
+  }
+  .sale-detail-footer .sale-footer-main > .sale-footer-close:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+  .sale-shipping-editor .sale-shipping-grid {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+  .sale-shipping-editor .sale-shipping-grid .sale-shipping-reclassify {
+    grid-column: 1;
+  }
+  .sale-shipping-editor .sale-correction-preview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 380px) {
+  .sale-detail-dialog .sale-detail-footer {
+    padding-inline: 11px;
+  }
+  .sale-detail-footer .bf-button {
+    padding-inline: 7px;
+    font-size: .8rem;
+  }
+  .sale-shipping-editor {
+    padding: 12px;
+  }
+}
+
 .sales-header-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:flex-end}
 @media(max-width:540px){.sales-header-actions{width:100%}.sales-header-actions button{flex:1;min-width:0}}
 

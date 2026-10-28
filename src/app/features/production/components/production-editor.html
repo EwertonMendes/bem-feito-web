@@ -20,14 +20,19 @@
       <label class="bf-field"><span>Observações (opcional)</span><textarea class="bf-textarea" [formField]="productionForm.notes"></textarea></label>
       <section class="preview">
         <div class="cost-summary" [class.pending]="previews().pending"><span>{{previews().pending?'Custo estimado parcial':'Custo total estimado'}}</span><strong>{{currency(previews().costCents)}}</strong></div>
-        <div class="consumption-head"><strong>Materiais previstos (estimativa)</strong><span>{{previews().consumptions.length}} materiais</span></div>
+        @if(previews().pending && previews().missingReferences.length){
+          <div class="preview-hint" role="status"><strong>Para concluir o custo estimado:</strong>
+            @for(reason of previews().missingReferences; track reason){ <p>• {{reason}}</p> }
+          </div>
+        }
+        <div class="consumption-head"><strong>Materiais previstos (modelo antigo)</strong><span>{{previews().consumptions.length}} materiais</span></div>
         @for(item of previews().consumptions;track item.inputId) {
           <div class="consumption" [class.not-enough]="item.mode==='exact' && (item.available??0)<item.quantity">
             <span class="consumption-copy"><strong>{{item.name}}</strong><small>{{stockLabel(item)}}</small></span>
             <span class="consumption-values"><strong>{{item.quantity}} {{item.unit}}</strong><small>{{currency(item.totalCostCents)}}</small></span>
           </div>
         } @empty {<p class="preview-hint">Configure os custos padrão para calcular automaticamente os materiais.</p>}
-        <p class="preview-hint">A composição serve para estimar o custo. Insumos sem controle não têm saldo baixado; materiais controlados continuam sujeitos à disponibilidade.</p>
+        <p class="preview-hint">No custeio simplificado, as misturas são estimadas por grupo e nunca movimentam estoque de matérias-primas. A lista acima só se aplica aos cadastros ainda no modelo antigo.</p>
       </section>
     </div>
     <div class="bf-dialog-footer"><button class="bf-button secondary" type="button" (click)="productionDialog.close()">Cancelar</button><button class="bf-button" type="button" [disabled]="saving()" [bfLoadingButton]="saving()" (click)="save()">{{saving()?'Registrando...':'Confirmar produção'}}</button></div>

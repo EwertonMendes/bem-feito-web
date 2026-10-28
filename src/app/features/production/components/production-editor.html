@@ -25,7 +25,16 @@
             @for(reason of previews().missingReferences; track reason){ <p>• {{reason}}</p> }
           </div>
         }
-        <div class="consumption-head"><strong>Materiais previstos (modelo antigo)</strong><span>{{previews().consumptions.length}} materiais</span></div>
+        @if(previews().estimatedGroups.length){
+          <div class="consumption-head"><strong>Composição estimada por grupos</strong><span>Sem baixa de matérias-primas</span></div>
+          @for(group of previews().estimatedGroups;track group.pool){
+            <div class="consumption"><strong>{{group.pool === 'base' ? 'Glicerina (g)' : group.pool === 'surfactant' ? 'Lauril (ml)' : group.pool === 'colorant' ? 'Corantes (ml)' : 'Essências (ml)'}}</strong>
+              <span class="consumption-values"><strong>{{group.quantity}} un. referência</strong><small>{{currency(group.totalCostCents)}}</small></span></div>
+          }
+        }
+        @if(previews().consumptions.length){
+          <div class="consumption-head"><strong>Materiais previstos (modelo antigo)</strong><span>{{previews().consumptions.length}} materiais</span></div>
+        }
         @for(item of previews().consumptions;track item.inputId) {
           <div class="consumption" [class.not-enough]="item.mode==='exact' && (item.available??0)<item.quantity">
             <span class="consumption-copy"><strong>{{item.name}}</strong><small>{{stockLabel(item)}}</small></span>

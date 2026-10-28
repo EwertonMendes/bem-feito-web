@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 export type Environment = 'dev' | 'prod';
 export type Payload = Record<string, unknown>;
 export type Target = { collection: string; id: string };
-export type Change = Target & { action: 'create' | 'update' | 'delete'; expected: Payload | null; values?: Payload };
+export type Change = Target & { action: 'create' | 'update' | 'delete'; expected: Payload | null; expectedAbsent?: string[]; values?: Payload };
 export type Request = {
   schemaVersion: 1; id: string; environment: Environment; projectId: string;
   operation: 'read' | 'inspect' | 'verify' | 'create' | 'update' | 'delete' | 'batch-update' | 'backup' | 'restore' | 'migrate';
@@ -18,15 +18,26 @@ export const BUSINESS_COLLECTIONS = [
 ] as const;
 export const MIGRATION_COLLECTIONS = [...BUSINESS_COLLECTIONS, 'migrationRuns', 'migrationSources'];
 const READABLE = new Set<string>([...MIGRATION_COLLECTIONS, 'dataAdminSmoke']);
-const FIELD_TYPES: Record<string, Record<string, 'text' | 'id' | 'money' | 'boolean'>> = {
-  collections: { name: 'text', active: 'boolean' },
+type FieldType = 'text' | 'id' | 'money' | 'boolean' | 'costPool' | 'fragranceCostPool' | 'unitFactor' | 'quantity' | 'weight' | 'soapProfile';
+const REQUIRED_CREATE_FIELDS: Record<string, readonly string[]> = {
+  collections: ['name','active'],
+  fragrances: ['name','active','collectionId'],
+  formats: ['name','active'],
+  units: ['name','active'],
+  paymentMethods: ['name','active'],
+  expenseCategories: ['name','active'],
+  formatPrices: ['collectionId','formatId','priceCents','active'],
+  dataAdminSmoke: ['value'],
+};
+const FIELD_TYPES: Record<string, Record<string, FieldType>> = {
+  collections: { name: 'text', active: 'boolean', fragranceCostPool: 'fragranceCostPool' },
   fragrances: { name: 'text', active: 'boolean', collectionId: 'id' },
-  formats: { name: 'text', active: 'boolean' },
+  formats: { name: 'text', active: 'boolean', approximateWeightGrams: 'weight', soapCostProfile: 'soapProfile' },
   units: { name: 'text', active: 'boolean' },
   paymentMethods: { name: 'text', active: 'boolean' },
   expenseCategories: { name: 'text', active: 'boolean' },
   formatPrices: { collectionId: 'id', formatId: 'id', priceCents: 'money', active: 'boolean' },
-  inputs: { averageUnitCostCents: 'money' },
+  inputs: { averageUnitCostCents: 'money', costPool: 'costPool', costUnitFactor: 'unitFactor', costBasisQuantity: 'quantity', costBasisValueCents: 'money' },
   products: { salePriceCents: 'money', additionalCostCents: 'money' },
   kits: { priceCents: 'money' },
   additions: { priceCents: 'money' },
@@ -67,6 +78,23 @@ function fields(collection: string, value: unknown) {
       case 'text': invariant(typeof field === 'string' && field.trim().length > 0 && field.length <= 120 && !/[\x00-\x1f]/.test(field), 'Invalid catalog text'); break;
       case 'money': invariant(Number.isSafeInteger(field) && Number(field) >= 0 && Number(field) <= 1_000_000_000, 'Invalid money in integer cents'); break;
       case 'boolean': invariant(typeof field === 'boolean', 'Invalid boolean'); break;
+      case 'costPool': invariant(['base', 'surfactant', 'fragrance-classic', 'fragrance-premium', 'colorant'].includes(String(field)), 'Invalid reference cost group'); break;
+      case 'fragranceCostPool': invariant(['fragrance-classic','fragrance-premium'].includes(String(field)), 'Invalid fragrance cost group'); break;
+      case 'unitFactor': invariant(typeof field === 'number' && Number.isFinite(field) && field > 0 && field <= 1_000_000, 'Invalid purchase unit conversion'); break;
+      case 'quantity': invariant(typeof field === 'number' && Number.isFinite(field) && field >= 0 && field <= 1_000_000, 'Invalid purchase cost basis'); break;
+      case 'weight': invariant(typeof field === 'number' && Number.isFinite(field) && field >= 0.1 && field <= 10_000, 'Invalid finished-soap reference weight'); break;
+      case 'soapProfile': {
+        object(field);
+        exact(field, ['baseGrams','fragranceMl','colorantMl','surfactantMl','extraUnitCostCents']);
+        for (const amount of ['baseGrams','fragranceMl','colorantMl','surfactantMl']) {
+          invariant(typeof field[amount] === 'number' && Number.isFinite(field[amount]) &&
+            field[amount] >= 0 && field[amount] <= 1000, 'Invalid soap reference quantity');
+        }
+        invariant(Number(field.baseGrams) > 0, 'Soap reference must have a positive base weight');
+        if ('extraUnitCostCents' in field) invariant(Number.isSafeInteger(field.extraUnitCostCents) &&
+          Number(field.extraUnitCostCents) >= 0 && Number(field.extraUnitCostCents) <= 100000, 'Invalid soap supplementary reference cost');
+        break;
+      }
     }
   }
 }
@@ -100,22 +128,30 @@ export function validateRequest(value: unknown): Request {
     invariant(Array.isArray(value.changes) && value.changes.length > 0 && value.changes.length <= 200, 'Expected 1..200 changes');
     if (op !== 'batch-update') invariant(value.changes.length === 1, 'Single operation requires one change');
     for (const item of value.changes) {
-      object(item); exact(item, ['collection', 'id', 'action', 'expected', 'values']);
+      object(item); exact(item, ['collection', 'id', 'action', 'expected', 'expectedAbsent', 'values']);
       target({ collection: item.collection, id: item.id });
       invariant(item.action === (op === 'batch-update' ? 'update' : op), 'Action differs from operation');
       const collection = String(item.collection);
       if (item.action === 'create') {
+        invariant(item.expectedAbsent === undefined, 'Create cannot specify absence conditions');
         invariant(item.expected === null, 'Create requires expected:null'); fields(collection, item.values);
         invariant(['collections', 'fragrances', 'formats', 'units', 'paymentMethods', 'expenseCategories', 'formatPrices', 'dataAdminSmoke'].includes(collection), 'Create requires a registered domain operation');
-        invariant(Object.keys(FIELD_TYPES[collection]).every(k => Object.hasOwn(item.values as Payload, k)), 'Incomplete create');
+        invariant(REQUIRED_CREATE_FIELDS[collection]?.every(k => Object.hasOwn(item.values as Payload, k)), 'Incomplete create');
       } else {
         fields(collection, item.expected);
         if (item.action === 'delete') {
+          invariant(item.expectedAbsent === undefined, 'Delete cannot specify absence conditions');
           invariant(collection === 'dataAdminSmoke', 'Business deletion requires the registered DEV replacement migration');
           invariant(item.values === undefined, 'Delete accepts no values');
         } else {
           fields(collection, item.values);
-          invariant(Object.keys(item.values as Payload).every(k => Object.hasOwn(item.expected as Payload, k)), 'Every changed field needs an expected value');
+          const absent = item.expectedAbsent ?? [];
+          invariant(Array.isArray(absent) && absent.length <= 8 && absent.every(k =>
+            typeof k === 'string' && Object.hasOwn(FIELD_TYPES[collection],k) &&
+            !Object.hasOwn(item.expected as Payload,k)) &&
+            new Set(absent).size === absent.length, 'Invalid explicitly absent field precondition');
+          invariant(Object.keys(item.values as Payload).every(k =>
+            Object.hasOwn(item.expected as Payload,k) || absent.includes(k)), 'Every changed field needs an existing or absent precondition');
         }
       }
     }

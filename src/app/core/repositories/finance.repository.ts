@@ -88,7 +88,7 @@ export class FinanceRepository {
       if (input && inputRef && draft.quantity) {
         const quantity = draft.quantity;
         const mode = trackingModeForInput(input);
-        const previousBasisQuantity = Math.max(0, Number(input.costBasisQuantity ?? input.stock ?? 0));
+        const previousBasisQuantity = Math.max(0, Number(input.costBasisQuantity ?? (mode === 'untracked' ? 0 : input.stock ?? 0)));
         const previousBasisValueCents = Math.max(0, Number(input.costBasisValueCents ?? Math.round(previousBasisQuantity * input.averageUnitCostCents)));
         const costBasisQuantity = previousBasisQuantity + quantity;
         const costBasisValueCents = previousBasisValueCents + draft.amountCents;
@@ -194,7 +194,7 @@ export class FinanceRepository {
         if (!received) continue;
         const item = items.find(row => row.inputId === input.id)!;
         const mode = trackingModeForInput(input);
-        const prevQty = Math.max(0, Number(input.costBasisQuantity ?? input.stock ?? 0));
+        const prevQty = Math.max(0, Number(input.costBasisQuantity ?? (mode === 'untracked' ? 0 : input.stock ?? 0)));
         const prevValue = Math.max(0, Number(input.costBasisValueCents ?? Math.round(prevQty * input.averageUnitCostCents)));
         const costBasisQuantity = prevQty + item.quantity;
         const costBasisValueCents = prevValue + (item.landedCostCents ?? item.amountCents);
@@ -263,7 +263,7 @@ export class FinanceRepository {
         const item = current.items[index]!;
         const input = { id: snapshot.id, ...snapshot.data() } as InputItem;
         const mode = trackingModeForInput(input);
-        const prevQty = Math.max(0, Number(input.costBasisQuantity ?? input.stock ?? 0));
+        const prevQty = Math.max(0, Number(input.costBasisQuantity ?? (mode === 'untracked' ? 0 : input.stock ?? 0)));
         const prevValue = Math.max(0, Number(input.costBasisValueCents ?? Math.round(prevQty * input.averageUnitCostCents)));
         const costBasisQuantity = prevQty + item.quantity;
         const landed = item.landedCostCents ?? item.amountCents;

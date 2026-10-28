@@ -41,7 +41,11 @@ export function resolveSaleDraft(
       const unitPriceCents = line.manualUnitPriceCents ?? product.salePriceCents;
       if (!Number.isSafeInteger(unitPriceCents) || unitPriceCents < 0)
         throw new Error('O preço unitário precisa ser um valor válido em centavos.');
-      const unitCostCents = catalog.productUnitCosts.get(product.id) ?? product.averageUnitCostCents;
+      const unitCostCents = product.costingVersion === 2
+        ? product.averageUnitCostCents
+        : (catalog.productUnitCosts.get(product.id) ?? product.averageUnitCostCents);
+      const deciCents = product.costingVersion === 2
+        ? unitCostCents * 10 : (product.unitCostDeciCents ?? unitCostCents * 10);
       lines.push({
         id: createId(),
         kind: 'product',
@@ -54,16 +58,19 @@ export function resolveSaleDraft(
         categoryId: productCategoryId(product),
         ...(productCategoryId(product) === 'soap' ? { collectionId: product.collectionId, fragranceId: product.fragranceId, formatId: product.formatId } : {}),
         stockEffects: [{ itemType: 'product', itemId: product.id, quantityDelta: -line.quantity,
-          unitCostCents, ...(product.unitCostDeciCents !== undefined ? { unitCostDeciCents: product.unitCostDeciCents } : {}) }],
+          unitCostCents,
+          ...(product.costingVersion === 2 || product.unitCostDeciCents !== undefined
+            ? { unitCostDeciCents: deciCents } : {}) }],
         totalCents: Math.round(unitPriceCents * line.quantity),
-        totalCostCents: Math.round((product.unitCostDeciCents ?? unitCostCents * 10) * line.quantity / 10),
+        totalCostCents: Math.round(deciCents * line.quantity / 10),
       });
       addEffect({
         itemType: 'product',
         itemId: product.id,
         quantityDelta: -line.quantity,
         unitCostCents,
-        ...(product.unitCostDeciCents !== undefined ? { unitCostDeciCents: product.unitCostDeciCents } : {}),
+        ...(product.costingVersion === 2 || product.unitCostDeciCents !== undefined
+          ? { unitCostDeciCents: deciCents } : {}),
       });
       continue;
     }

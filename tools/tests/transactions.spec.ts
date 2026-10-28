@@ -640,7 +640,7 @@ describe('Actual repositories against restrictive emulator rules', () => {
     expect(await data('products', 'p')).toMatchObject({ stock: 9 });
   });
 
-  it('cost-only receipts retain purchase reference without creating physical stock', async () => {
+  it('cost-only receipts price materials without using the obsolete physical balance', async () => {
     await retireInput('i');
     const created = await finance.createPurchaseBatch({
       businessDate: day, receiptStatus: 'received',
@@ -648,12 +648,12 @@ describe('Actual repositories against restrictive emulator rules', () => {
     });
     expect(created.expense.amountCents).toBe(720);
     expect(await data('inputs', 'i')).toMatchObject({
-      stock: 20, trackingMode: 'untracked', costBasisQuantity: 23, costBasisValueCents: 2720,
+      stock: 20, trackingMode: 'untracked', costBasisQuantity: 3, costBasisValueCents: 720,
     });
     expect(await count('stockMovements')).toBe(0);
     await corrections.cancel(created.expense.id, 'Compra duplicada');
     expect(await data('inputs', 'i')).toMatchObject({
-      stock: 20, costBasisQuantity: 20, costBasisValueCents: 2000,
+      stock: 20, costBasisQuantity: 0, costBasisValueCents: 0,
     });
   });
 

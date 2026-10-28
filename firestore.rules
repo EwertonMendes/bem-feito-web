@@ -112,10 +112,20 @@ service cloud.firestore {
         || (!untracked && data.stock > data.minimumStock && data.stockStatus == 'ok');
     }
 
+    function validSoapCostProfile(data) {
+      return data is map
+        && data.keys().hasAll(['baseGrams', 'surfactantMl', 'fragranceMl', 'colorantMl'])
+        && data.keys().hasOnly(['baseGrams', 'surfactantMl', 'fragranceMl', 'colorantMl', 'extraUnitCostCents'])
+        && quantity(data.baseGrams) && data.baseGrams > 0
+        && quantity(data.surfactantMl) && quantity(data.fragranceMl) && quantity(data.colorantMl)
+        && (!('extraUnitCostCents' in data) || money(data.extraUnitCostCents));
+    }
+
     function validCatalog(name, data) {
       return (name == 'collections'
-          && fields(data, ['name', 'active'], ['costComponents'])
-          && text(data.name) && data.active is bool && validCostComponents(data))
+          && fields(data, ['name', 'active'], ['costComponents', 'fragranceCostPool'])
+          && text(data.name) && data.active is bool && validCostComponents(data)
+          && (!('fragranceCostPool' in data) || data.fragranceCostPool in ['fragrance-classic', 'fragrance-premium']))
         || (name in ['units', 'paymentMethods', 'expenseCategories']
           && fields(data, ['name', 'active'], []) && text(data.name) && data.active is bool)
         || (name == 'fragrances'
@@ -123,9 +133,10 @@ service cloud.firestore {
           && text(data.name) && text(data.collectionId) && data.active is bool
           && validCostComponents(data))
         || (name == 'formats'
-          && fields(data, ['name', 'active'], ['approximateWeightGrams', 'costComponents'])
+          && fields(data, ['name', 'active'], ['approximateWeightGrams', 'costComponents', 'soapCostProfile'])
           && text(data.name) && data.active is bool
           && (!('approximateWeightGrams' in data) || quantity(data.approximateWeightGrams))
+          && (!('soapCostProfile' in data) || validSoapCostProfile(data.soapCostProfile))
           && validCostComponents(data))
         || (name == 'expenseTypes'
           && fields(data, ['name', 'active', 'kind'], []) && text(data.name) && data.active is bool
@@ -139,7 +150,7 @@ service cloud.firestore {
           && fields(data, ['collectionId', 'formatId', 'priceCents', 'active'], [])
           && text(data.collectionId) && text(data.formatId) && money(data.priceCents) && data.active is bool)
         || (name == 'products'
-          && fields(data, ['code', 'active', 'collectionId', 'fragranceId', 'formatId', 'displayName', 'salePriceCents', 'additionalCostCents', 'averageUnitCostCents', 'stock', 'minimumStock', 'recipe'], ['image', 'stockStatus', 'committedStock', 'reservedPhysicalStock', 'explicitCommittedStock', 'explicitAllocatedStock', 'unitCostDeciCents', 'categoryId', 'modelName', 'variantName', 'description', 'volumeMl', 'candleFragranceId'])
+          && fields(data, ['code', 'active', 'collectionId', 'fragranceId', 'formatId', 'displayName', 'salePriceCents', 'additionalCostCents', 'averageUnitCostCents', 'stock', 'minimumStock', 'recipe'], ['image', 'stockStatus', 'committedStock', 'reservedPhysicalStock', 'explicitCommittedStock', 'explicitAllocatedStock', 'unitCostDeciCents', 'costingVersion', 'categoryId', 'modelName', 'variantName', 'description', 'volumeMl', 'candleFragranceId'])
           && text(data.code) && text(data.displayName) && data.active is bool
           && (!('categoryId' in data) || data.categoryId in ['soap', 'creative-kit', 'scented-candle'])
           && ((!('categoryId' in data) || data.categoryId == 'soap')
@@ -160,16 +171,24 @@ service cloud.firestore {
             && data.explicitAllocatedStock <= data.reservedPhysicalStock
             && data.explicitAllocatedStock <= data.explicitCommittedStock))
           && (!('unitCostDeciCents' in data) || money(data.unitCostDeciCents))
+          && (!('costingVersion' in data) || data.costingVersion == 2)
           && validProductStockStatus(data)
           && (!('image' in data) || validImage(data.image)))
         || (name == 'inputs'
-          && fields(data, ['code', 'active', 'name', 'unitId', 'stock', 'minimumStock', 'averageUnitCostCents'], ['image', 'minimumStockConfigured', 'trackingMode', 'availabilityStatus', 'stockStatus', 'costBasisQuantity', 'costBasisValueCents', 'committedStock', 'reservedPhysicalStock'])
+          && fields(data, ['code', 'active', 'name', 'unitId', 'stock', 'minimumStock', 'averageUnitCostCents'], ['image', 'minimumStockConfigured', 'trackingMode', 'availabilityStatus', 'stockStatus', 'costBasisQuantity', 'costBasisValueCents', 'committedStock', 'reservedPhysicalStock',
+             'costPool', 'costUnitFactor', 'untrackedSince', 'previousPhysicalStock', 'previousTrackingMode'])
           && text(data.code) && text(data.name) && text(data.unitId) && data.active is bool
           && stock(data.stock) && quantity(data.minimumStock) && money(data.averageUnitCostCents)
            && (!('committedStock' in data) || quantity(data.committedStock))
           && (!('reservedPhysicalStock' in data) || (quantity(data.reservedPhysicalStock) && data.reservedPhysicalStock <= data.stock))
           && (!('minimumStockConfigured' in data) || data.minimumStockConfigured is bool)
           && (!('trackingMode' in data) || data.trackingMode in ['exact', 'estimated', 'untracked'])
+          && (!('costPool' in data) || (data.trackingMode == 'untracked' &&
+             data.costPool in ['base','surfactant','fragrance-classic','fragrance-premium','colorant']))
+          && (!('costUnitFactor' in data) || (data.costUnitFactor is number && data.costUnitFactor > 0 && data.costUnitFactor <= 1000000))
+          && (!('untrackedSince' in data) || (data.untrackedSince is string && data.untrackedSince.size() == 10))
+          && (!('previousPhysicalStock' in data) || stock(data.previousPhysicalStock))
+          && (!('previousTrackingMode' in data) || data.previousTrackingMode in ['exact','estimated'])
           && (!('availabilityStatus' in data) || (data.availabilityStatus is string && data.availabilityStatus.size() <= 240))
           && (!('costBasisQuantity' in data) || quantity(data.costBasisQuantity))
           && (!('costBasisValueCents' in data) || money(data.costBasisValueCents))
@@ -269,11 +288,14 @@ service cloud.firestore {
               && data.items[0].inputId is string && data.items[0].quantity is number
               && data.items[0].amountCents is int)))
         || (name == 'productions'
-          && fields(data, ['code', 'businessDate', 'productId', 'productName', 'quantity', 'unitCostCents', 'totalCostCents', 'costPending', 'consumptions'], ['notes', 'items', 'status', 'correctionVersion'])
+          && fields(data, ['code', 'businessDate', 'productId', 'productName', 'quantity', 'unitCostCents', 'totalCostCents', 'costPending', 'consumptions'], ['notes', 'items', 'status', 'correctionVersion', 'costingModel', 'missingCostReferences'])
           && text(data.code) && businessDate(data) && text(data.productName)
           && (text(data.productId) || ('items' in data && data.productId == ''))
           && quantity(data.quantity) && data.quantity > 0 && money(data.unitCostCents) && money(data.totalCostCents)
           && data.costPending is bool && data.consumptions is list
+          && (!('costingModel' in data) || data.costingModel in ['legacy', 'simplified'])
+          && (!('missingCostReferences' in data) ||
+             (data.missingCostReferences is list && data.missingCostReferences.size() <= 30))
            && (!('status' in data) || data.status in ['active', 'cancelled'])
            && (!('correctionVersion' in data) || (data.correctionVersion is int && data.correctionVersion >= 0))
           && (!('items' in data) || (data.items is list && data.items.size() > 0 && data.items.size() <= 60

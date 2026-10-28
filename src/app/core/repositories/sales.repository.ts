@@ -244,6 +244,9 @@ export class SalesRepository {
 
       const requiredInputIds = new Set<string>(additionInputIds);
       for (const [id, product] of products) {
+        // Newly costed stock uses a saved per-product snapshot. This avoids
+        // charging current raw-material prices against previously made stock.
+        if (product.costingVersion === 2 || formats.get(product.formatId)?.soapCostProfile) continue;
         const components = productCostComponents(product, {
           collection: productCategoryId(product) === 'soap' ? collections.get(product.collectionId) : undefined,
           fragrance: productCategoryId(product) === 'soap' ? fragrances.get(product.fragranceId) : undefined,
@@ -265,6 +268,10 @@ export class SalesRepository {
 
       const productUnitCosts = new Map<string, number>();
       for (const [id, product] of products) {
+        if (product.costingVersion === 2 || formats.get(product.formatId)?.soapCostProfile) {
+          productUnitCosts.set(id, product.averageUnitCostCents);
+          continue;
+        }
         const cost = standardCostForProduct(product, {
           collection: productCategoryId(product) === 'soap' ? collections.get(product.collectionId) : undefined,
           fragrance: productCategoryId(product) === 'soap' ? fragrances.get(product.fragranceId) : undefined,

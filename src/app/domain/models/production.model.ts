@@ -1,4 +1,5 @@
 import { AuditFields } from './common.model';
+import type { CostEstimateLine } from '../logic/costing';
 
 export interface ProductionConsumption {
   inputId: string;
@@ -16,6 +17,10 @@ export interface ProductionItem {
   totalCostCents: number;
   costPending: boolean;
   consumptions: ProductionConsumption[];
+  /** Reference-only estimate; not physical material consumption. */
+  estimatedCosts?: CostEstimateLine[];
+  missingCostReferences?: string[];
+  costingModel?: 'legacy' | 'simplified';
 }
 
 export interface ProductionDraftItem {
@@ -28,6 +33,8 @@ export interface Production extends AuditFields {
   items?: ProductionItem[];
   status?: 'active' | 'cancelled';
   correctionVersion?: number;
+  costingModel?: 'legacy' | 'simplified';
+  missingCostReferences?: string[];
 
   id: string;
   code: string;

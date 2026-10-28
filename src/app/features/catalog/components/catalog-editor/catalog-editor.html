@@ -39,7 +39,7 @@
           }
           <div class="product-cost-preview" [class.pending]="productCostPreview()?.costPending">
             <span>Custo padrão atual</span><strong>{{productCostSummary()}}</strong>
-            <small>{{productModel().categoryId === 'soap' ? 'Formato + coleção + fragrância + ajustes deste produto.' : 'Custos ainda não definidos nesta etapa.'}}</small>
+            <small>{{productCostPreview()?.model === 'simplified' ? 'Perfil do formato + grupo de essências da coleção + preços das compras. Cores e fragrâncias podem ser misturadas.' : productModel().categoryId === 'soap' ? 'Formato + coleção + fragrância + ajustes deste produto (modelo antigo).' : 'Custos ainda não definidos nesta etapa.'}}</small>
           </div>
         }
       } @else if (kind() === 'inputs') {
@@ -47,6 +47,13 @@
           <label class="bf-field"><span>Nome</span><input class="bf-input" [formField]="inputForm.name" /></label>
           <label class="bf-field"><span>Unidade base</span><bf-select [formField]="inputForm.unitId" [options]="inputUnitOptions()" ariaLabel="Unidade base" /></label>
           <label class="bf-field"><span>Controle de estoque</span><bf-select [formField]="inputForm.trackingMode" [options]="inputTrackingOptions" [descriptive]="true" ariaLabel="Controle de estoque" /></label>
+          <label class="bf-field"><span>Grupo de custo estimado</span><bf-select [formField]="inputForm.costPool" [options]="inputCostPoolOptions" ariaLabel="Grupo de custo do material" /></label>
+          @if(inputModel().costPool){
+            <label class="bf-field"><span>Quanto equivale 1 unidade comprada ({{inputModel().costPool === 'base' ? 'g' : 'ml'}})</span>
+              <bf-number-input kind="decimal" [decimals]="3" [formField]="inputForm.costUnitFactor" ariaLabel="Conversão da unidade de compra para g ou ml"/>
+            </label>
+            <p class="hint full">Ex.: compra de 3 kg de base: 1 kg = 1000 g. Frasco de lauril de 500 ml: 1 frasco = 500 ml. Assim o custo aproveita a compra original, sem alterar a quantidade lançada e sem contar estoque.</p>
+          }
           @if (inputModel().trackingMode !== 'untracked') {
             <label class="bf-field"><span>Estoque mínimo</span><bf-number-input kind="decimal" [decimals]="3" [formField]="inputForm.minimumStock" ariaLabel="Estoque mínimo" /></label>
           }
@@ -54,7 +61,7 @@
             <label class="bf-field full"><span>Observação de disponibilidade (opcional)</span><textarea class="bf-textarea" [formField]="inputForm.availabilityStatus" placeholder="Ex.: conferência aproximada do material"></textarea></label>
           }
           <bf-checkbox class="toggle" [formField]="inputForm.active" label="Insumo ativo" />
-          <p class="hint full">{{inputTrackingHint()}}</p>
+          <p class="hint full">{{inputTrackingHint()}} Materiais de fabricação usam grupos de custo para misturas de essências e corantes. Compras atualizam preços médios sem baixar estoque.</p>
         </div>
       } @else {
         <div class="bf-grid two"><label class="bf-field"><span>Nome</span><input class="bf-input" [formField]="additionForm.name" /></label><label class="bf-field"><span>Categoria</span><input class="bf-input" [formField]="additionForm.category" /></label><label class="bf-field"><span>Preço</span><bf-number-input kind="currency" [formField]="additionForm.price" ariaLabel="Preço do adicional" /></label><bf-checkbox class="toggle" [formField]="additionForm.active" label="Adicional ativo" /><label class="bf-field full"><span>Observações</span><textarea class="bf-textarea" [formField]="additionForm.notes"></textarea></label></div>

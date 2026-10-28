@@ -18,7 +18,7 @@
         <article class="day-card">
           <div class="day-card-head">
             <div><span class="day-eyebrow">Produção do dia</span><h2>{{date(day.date)}}</h2></div>
-            <span class="bf-badge" [class.warning]="day.pending" [class.muted]="!day.quantity">{{!day.quantity?'Sem produção ativa':day.pending?'Custo parcial':day.reestimated?'Custo reestimado':'Custo calculado'}}</span>
+            <span class="bf-badge" [class.warning]="day.pending" [class.muted]="!day.quantity">{{!day.quantity?'Sem produção ativa':day.pending?'Custo parcial':'Custo calculado'}}</span>
           </div>
           <div class="day-stats">
             <div><strong>{{day.quantity}}</strong><small>unidades</small></div>
@@ -57,7 +57,7 @@
         }
         <h3>Produtos fabricados</h3>
         @for(item of detailItems();track item.productId) {
-          <div class="consumption"><div class="consumption-copy"><strong>{{item.name}}</strong><small>{{item.pending?'Custo parcial':day.reestimated?'Custo reestimado':'Custo calculado'}}</small></div><div class="consumption-values"><strong>{{item.quantity}} un.</strong><small>{{currency(item.costCents)}}</small></div></div>
+          <div class="consumption"><div class="consumption-copy"><strong>{{item.name}}</strong><small>{{item.pending?'Custo parcial':'Custo calculado'}}</small></div><div class="consumption-values"><strong>{{item.quantity}} un.</strong><small>{{currency(item.costCents)}}</small></div></div>
         }
         @if(detailEstimates().length){
           <h3>Materiais estimados por grupo (não alteram estoque)</h3>

@@ -50,11 +50,20 @@
     <div class="bf-dialog-body">
       @if(selectedDay(); as day) {
         <div class="day-stats detail-stats"><div><strong>{{day.quantity}}</strong><small>unidades</small></div><div><strong>{{day.products}}</strong><small>produtos diferentes</small></div><div><strong>{{currency(day.totalCents)}}</strong><small>custo registrado</small></div></div>
+        @if(day.pending && day.entries.some(entry => (entry.missingCostReferences?.length ?? 0) > 0)){
+          <p class="preview-hint"><strong>Referências de custo pendentes:</strong>
+            @for(entry of day.entries;track entry.id){
+              @for(missing of entry.missingCostReferences ?? [];track missing){
+                <span> {{missing}}. </span>
+              }
+            }
+          </p>
+        }
         <h3>Produtos fabricados</h3>
         @for(item of detailItems();track item.productId) {
           <div class="consumption"><div class="consumption-copy"><strong>{{item.name}}</strong><small>{{item.pending?'Custo parcial':'Custo calculado'}}</small></div><div class="consumption-values"><strong>{{item.quantity}} un.</strong><small>{{currency(item.costCents)}}</small></div></div>
         }
-        <h3>Materiais consumidos (referência)</h3>
+        <h3>Materiais previstos nas composições antigas</h3>
         @for(item of detailConsumptions();track item.inputId) {
           <div class="consumption"><strong>{{inputName(item.inputId)}}</strong><div class="consumption-values"><strong>{{item.quantity}} {{unitName(item.unitId)}}</strong><small>{{currency(item.totalCostCents)}}</small></div></div>
         }

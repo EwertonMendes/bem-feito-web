@@ -81,7 +81,7 @@ function fields(collection: string, value: unknown) {
       case 'costPool': invariant(['base', 'surfactant', 'fragrance-classic', 'fragrance-premium', 'colorant'].includes(String(field)), 'Invalid reference cost group'); break;
       case 'fragranceCostPool': invariant(['fragrance-classic','fragrance-premium'].includes(String(field)), 'Invalid fragrance cost group'); break;
       case 'unitFactor': invariant(typeof field === 'number' && Number.isFinite(field) && field > 0 && field <= 1_000_000, 'Invalid purchase unit conversion'); break;
-      case 'quantity': invariant(typeof field === 'number' && Number.isFinite(field) && field > 0 && field <= 1_000_000, 'Invalid purchase cost basis'); break;
+      case 'quantity': invariant(typeof field === 'number' && Number.isFinite(field) && field >= 0 && field <= 1_000_000, 'Invalid purchase cost basis'); break;
       case 'weight': invariant(typeof field === 'number' && Number.isFinite(field) && field >= 0.1 && field <= 10_000, 'Invalid finished-soap reference weight'); break;
       case 'soapProfile': {
         object(field);

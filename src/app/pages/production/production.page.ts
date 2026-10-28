@@ -106,7 +106,7 @@ export class ProductionPage {
       for (const part of this.displayItemsFor(entry)) {
         const previous = items.get(part.productId);
         const product = this.catalog.products().find(candidate => candidate.id === part.productId);
-        const missingCostReason = part.costPending && product?.categoryId === 'candle'
+        const missingCostReason = part.costPending && product?.categoryId === 'scented-candle'
           ? 'Custo parcial · composição da vela não cadastrada' : undefined;
         if (previous) { previous.quantity += part.quantity; previous.costCents += part.totalCostCents; previous.pending ||= part.costPending; }
         else items.set(part.productId, { productId: part.productId, name: part.productName, quantity: part.quantity, costCents: part.totalCostCents, pending: part.costPending, missingCostReason });

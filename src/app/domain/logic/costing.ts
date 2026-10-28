@@ -48,7 +48,8 @@ export interface StandardProductCost {
  * Prices and quantities without a usable acquisition reference are excluded, never invented.
  */
 export function priceForPool(pool: CostPool, inputs: ReadonlyMap<string, InputItem>): number | null {
-  const candidates = [...inputs.values()].filter(input => input.active && input.costPool === pool);
+  const candidates = [...inputs.values()].filter(input =>
+    input.active && input.costPool === pool && trackingModeForInput(input) === 'untracked');
   if (!candidates.length || new Set(candidates.map(input => input.unitId)).size !== 1) return null;
   const costs = candidates.map(input => ({
     quantity: Number(input.costBasisQuantity),

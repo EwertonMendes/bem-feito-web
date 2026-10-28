@@ -58,7 +58,9 @@ export function resolveSaleDraft(
         categoryId: productCategoryId(product),
         ...(productCategoryId(product) === 'soap' ? { collectionId: product.collectionId, fragranceId: product.fragranceId, formatId: product.formatId } : {}),
         stockEffects: [{ itemType: 'product', itemId: product.id, quantityDelta: -line.quantity,
-          unitCostCents, unitCostDeciCents: deciCents }],
+          unitCostCents,
+          ...(product.costingVersion === 2 || product.unitCostDeciCents !== undefined
+            ? { unitCostDeciCents: deciCents } : {}) }],
         totalCents: Math.round(unitPriceCents * line.quantity),
         totalCostCents: Math.round(deciCents * line.quantity / 10),
       });
@@ -67,7 +69,8 @@ export function resolveSaleDraft(
         itemId: product.id,
         quantityDelta: -line.quantity,
         unitCostCents,
-        unitCostDeciCents: deciCents,
+        ...(product.costingVersion === 2 || product.unitCostDeciCents !== undefined
+          ? { unitCostDeciCents: deciCents } : {}),
       });
       continue;
     }

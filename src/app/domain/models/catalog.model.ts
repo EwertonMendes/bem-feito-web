@@ -74,6 +74,10 @@ export interface InputItem extends AuditFields {
   trackingMode?: InputTrackingMode;
   /** Optional reference cost group: mixtures are priced as a pool, not a fixed colour or fragrance. */
   costPool?: CostPool;
+  /** Quantity in the pool's reference unit (g for base, ml for the other pools)
+   * represented by ONE registered purchase unit, e.g. 1000 for 1 kg
+   * or 500 for a 500-ml bottle. Does not modify recorded purchase units. */
+  costUnitFactor?: number;
   /** Audit metadata when an obsolete physical balance ceases to be tracked. */
   untrackedSince?: string;
   previousPhysicalStock?: number;

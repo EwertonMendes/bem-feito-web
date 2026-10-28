@@ -1,3 +1,4 @@
+import { calculateSaleTotalCents } from './sale-pricing';
 import { Product, Addition, InputItem } from '../models/catalog.model';
 import { Sale, SaleLineSnapshot, StockEffect, OrderLineAllocation } from '../models/sales.model';
 import { summarizeSaleItems } from './sale-analytics';
@@ -162,7 +163,7 @@ export function planAdvancedSaleEdit(sale:Sale,draft:AdvancedSaleDraft,catalog:A
   const subtotalCents=items.reduce((sum,line)=>sum+line.totalCents,0);
   if(!Number.isSafeInteger(subtotalCents)||draft.discountCents>subtotalCents)
     throw new Error('O desconto não pode ultrapassar a soma dos itens.');
-  const totalCents=subtotalCents-draft.discountCents;
+  const totalCents=calculateSaleTotalCents(subtotalCents,draft.discountCents,sale.shippingFeeCents??0);
   if(sale.receivedCents>totalCents)
     throw new Error('O novo total é menor que os pagamentos recebidos. Regularize o recebimento antes.');
   const balanceCents=totalCents-sale.receivedCents;

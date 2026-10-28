@@ -233,11 +233,13 @@ service cloud.firestore {
 
     function validOperation(name, data) {
       return (name == 'sales'
-          && fields(data, ['code', 'businessDate', 'discountCents', 'subtotalCents', 'totalCents', 'receivedCents', 'tipCents', 'balanceCents', 'paymentStatus', 'status', 'items', 'paymentIds', 'stockEffects'], ['customerName', 'customerSearchKey', 'customerSearchPrefixes', 'productIds', 'dueDate', 'notes', 'cancelledAt', 'cancelledBy', 'analyticsVersion', 'cogsCents', 'itemsSold', 'missingCostItems', 'fulfillmentStatus', 'stockApplied', 'orderAllocations'])
+          && fields(data, ['code', 'businessDate', 'discountCents', 'subtotalCents', 'totalCents', 'receivedCents', 'tipCents', 'balanceCents', 'paymentStatus', 'status', 'items', 'paymentIds', 'stockEffects'], ['customerName', 'customerSearchKey', 'customerSearchPrefixes', 'productIds', 'dueDate', 'notes', 'cancelledAt', 'cancelledBy', 'analyticsVersion', 'cogsCents', 'itemsSold', 'missingCostItems', 'fulfillmentStatus', 'stockApplied', 'orderAllocations', 'shippingFeeCents'])
           && text(data.code) && businessDate(data)
           && money(data.discountCents) && money(data.subtotalCents) && money(data.totalCents)
           && money(data.receivedCents) && money(data.tipCents) && money(data.balanceCents)
-          && data.discountCents <= data.subtotalCents && data.totalCents == data.subtotalCents - data.discountCents
+          && (!('shippingFeeCents' in data) || money(data.shippingFeeCents))
+          && data.discountCents <= data.subtotalCents
+          && data.totalCents == data.subtotalCents - data.discountCents + (('shippingFeeCents' in data) ? data.shippingFeeCents : 0)
           && data.receivedCents <= data.totalCents
           && data.status in ['active', 'cancelled']
            && (!('fulfillmentStatus' in data) || data.fulfillmentStatus in ['in-production', 'ready', 'delivered'])

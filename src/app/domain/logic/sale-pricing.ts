@@ -1,3 +1,9 @@
+export function paymentStatus(totalCents: number, appliedCents: number): 'paid' | 'pending' | 'partial' {
+  if (appliedCents >= totalCents) return 'paid';
+  if (appliedCents <= 0) return 'pending';
+  return 'partial';
+}
+
 /** Single source of truth for sale totals. Money is expressed in integer cents. */
 export function calculateSaleTotalCents(subtotalCents: number, discountCents: number, shippingFeeCents = 0): number {
   for (const [label, amount] of [

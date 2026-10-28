@@ -1,6 +1,5 @@
 import { Sale } from '../models/sales.model';
-import { calculateSaleTotalCents } from './sale-pricing';
-import { paymentStatus } from '../../core/utils/sale-calculations';
+import { calculateSaleTotalCents, paymentStatus } from './sale-pricing';
 
 export interface ShippingCorrectionDraft {
   shippingFeeCents: number;

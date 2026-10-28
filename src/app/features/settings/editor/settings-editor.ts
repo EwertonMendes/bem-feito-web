@@ -9,6 +9,7 @@ import { SettingsStore } from '../../../features/settings/settings.store';
 import { ToastService } from '../../../core/services/toast.service';
 import { ErrorService } from '../../../core/services/error.service';
 import { formatCurrency, fromCents, toCents } from '../../../core/utils/money';
+import { soapCostReference, floralReferenceWeight } from '../../../domain/logic/soap-cost-reference';
 import { BfIcon } from '../../../shared/ui/icon/icon';
 import { BfDialog } from '../../../shared/ui/dialog/dialog';
 import { BfSelect, BfSelectOption } from '../../../shared/ui/select/select';

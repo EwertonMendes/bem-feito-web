@@ -24,7 +24,7 @@ import { SoapCreationForm } from '../soap-creation-form/soap-creation-form';
 import { CandleCreationForm } from '../candle-creation-form/candle-creation-form';
 
 interface ProductFormModel { categoryId: 'soap' | 'creative-kit' | 'scented-candle'; modelName: string; variantName: string; description: string; volumeMl: number; collectionId: string; fragranceId: string; formatId: string; salePrice: number; additionalCost: number; minimumStock: number; active: boolean; }
-interface InputFormModel { name: string; unitId: string; trackingMode: InputTrackingMode; costPool: '' | CostPool; availabilityStatus: string; minimumStock: number; active: boolean; }
+interface InputFormModel { name: string; unitId: string; trackingMode: InputTrackingMode; costPool: '' | CostPool; costUnitFactor: number; availabilityStatus: string; minimumStock: number; active: boolean; }
 interface AdditionFormModel { name: string; category: string; price: number; notes: string; active: boolean; }
 
 @Component({
@@ -116,7 +116,7 @@ export class CatalogEditor {
     min(p.minimumStock, 0);
   });
 
-  readonly inputModel = signal<InputFormModel>({ name: '', unitId: '', trackingMode: 'untracked', costPool: '', availabilityStatus: '', minimumStock: 0, active: true });
+  readonly inputModel = signal<InputFormModel>({ name: '', unitId: '', trackingMode: 'untracked', costPool: '', costUnitFactor: 0, availabilityStatus: '', minimumStock: 0, active: true });
   readonly inputForm = form(this.inputModel, (p) => {
     required(p.name);
     required(p.unitId);
@@ -218,7 +218,7 @@ export class CatalogEditor {
       this.productModel.set({ categoryId: 'soap', modelName: '', variantName: '', description: '', volumeMl: 40, collectionId: '', fragranceId: '', formatId: '', salePrice: 0, additionalCost: 0, minimumStock: 0, active: true });
       this.recipe.set([]);
     } else if (kind === 'inputs') {
-      this.inputModel.set({ name: '', unitId: '', trackingMode: 'untracked', costPool: '', availabilityStatus: '', minimumStock: 0, active: true });
+      this.inputModel.set({ name: '', unitId: '', trackingMode: 'untracked', costPool: '', costUnitFactor: 0, availabilityStatus: '', minimumStock: 0, active: true });
     } else {
       this.additionModel.set({ name: '', category: 'Embalagem', price: 0, notes: '', active: true });
       this.additionComponents.set([]);
@@ -245,6 +245,7 @@ export class CatalogEditor {
       unitId: item.unitId,
       trackingMode,
       costPool: item.costPool ?? '',
+      costUnitFactor: item.costUnitFactor ?? 0,
       availabilityStatus: item.availabilityStatus ?? '',
       minimumStock: trackingMode === 'untracked' ? 0 : item.minimumStock,
       active: item.active,
@@ -386,12 +387,9 @@ export class CatalogEditor {
     const tracked = model.trackingMode !== 'untracked';
     if (model.costPool && tracked)
       throw new Error('Materiais usados no custo médio não podem ter saldo físico. Selecione “Não controlar saldo”.');
-    if (model.costPool) {
-      const name = this.references.units().find(unit => unit.id === model.unitId)?.name.toLocaleLowerCase('pt-BR') ?? '';
-      const expectsGrams = model.costPool === 'base';
-      const valid = expectsGrams ? /^(g|grama|gramas)$/.test(name) : /^(ml|mililitro|mililitros)$/.test(name);
-      if (!valid) throw new Error('Grupo de custo incompatível com a unidade: use g para glicerina e ml para os demais materiais.');
-    }
+    if (model.costPool && (!Number.isFinite(model.costUnitFactor) ||
+      model.costUnitFactor <= 0 || model.costUnitFactor > 1_000_000))
+      throw new Error('Informe quantos g/ml correspondem a uma unidade de compra. Ex.: 1 kg = 1000 g; 1 frasco de 500 ml = 500 ml.');
     const input: InputItem = {
       id: existing?.id ?? '',
       code: existing?.code ?? '',
@@ -399,7 +397,7 @@ export class CatalogEditor {
       name: model.name.trim(),
       unitId: model.unitId,
       trackingMode: model.trackingMode,
-      ...(model.costPool ? { costPool: model.costPool } : {}),
+      ...(model.costPool ? { costPool: model.costPool, costUnitFactor: model.costUnitFactor } : {}),
       // Preserve pre-cutover qualitative notes without displaying or requiring updates.
       availabilityStatus: model.trackingMode === 'estimated'
         ? model.availabilityStatus.trim().slice(0,240) || undefined

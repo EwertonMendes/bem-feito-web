@@ -29,10 +29,11 @@
       <article class="report-metric"><span>Faturamento</span><strong>{{money(data.revenueCents)}}</strong><small>{{data.salesCount}} venda(s)</small></article>
       <article class="report-metric"><span>Lucro bruto estimado</span><strong>{{money(data.grossProfitCents)}}</strong><small>CMV {{money(data.cogsCents)}}</small></article>
       <article class="report-metric"><span>Resultado operacional estimado</span><strong>{{money(data.operationalResultCents)}}</strong><small>Após despesas operacionais</small></article>
-      <article class="report-metric"><span>Margem bruta</span><strong>{{data.marginPercent===null?'Indisponível':data.marginPercent+'%'}}</strong><small>{{data.missingCostItems}} item(ns) sem custo informado</small></article>
+      <article class="report-metric"><span>Margem bruta</span><strong>{{data.marginPercent===null?'Indisponível':data.marginPercent+'%'}}</strong><small>Margem calculada apenas sobre produtos · {{data.missingCostItems}} item(ns) sem custo</small></article>
     </div>
     <div class="reports-overview">
       <article><span>Recebido no período</span><strong>{{money(data.receivedCents)}}</strong><small>Por data de recebimento, não por data de venda</small></article>
+      <article><span>Frete cobrado</span><strong>{{money(data.shippingCents)}}</strong><small>Separado dos produtos e gorjetas</small></article>
       <article><span>Ticket médio</span><strong>{{money(data.averageTicketCents)}}</strong><small>{{data.unitsSold}} produtos vendidos</small></article>
       <article><span>Despesas operacionais</span><strong>{{money(data.operatingExpensesCents)}}</strong><small>Não confundir com compra de estoque</small></article>
       <article><span>Compras de insumos</span><strong>{{money(data.inventoryPurchasesCents)}}</strong><small>Separadas do CMV histórico</small></article>

@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Production, ProductionItem, ProductionConsumption, ProductionCorrectionHistory } from '../../domain/models/production.model';
+import { standardCostForProduct } from '../../domain/logic/costing';
 import { ProductionCorrectionEditor } from '../../features/production/components/production-correction-editor';
 import { ProductionCorrectionService } from '../../features/production/production-correction.service';
 import { productionItems } from '../../domain/logic/production-correction';
@@ -17,7 +18,7 @@ import { BfLoadingButton } from '../../shared/ui/button/loading-button';
 import { BfSelect, BfSelectOption } from '../../shared/ui/select/select';
 import { BfPageRefresh } from '../../shared/feedback/page-refresh/page-refresh';
 import { BfTableSkeleton } from '../../shared/ui/skeleton/skeleton';
-interface ProductionDay { date: string; entries: Production[]; quantity: number; totalCents: number; pending: boolean; products: number; }
+interface ProductionDay { date: string; entries: Production[]; quantity: number; totalCents: number; pending: boolean; products: number; reestimated: boolean; }
 @Component({
  selector: 'bf-production-page',
  imports: [BfIcon, BfLoadingButton, BfDialog, BfEmptyState, BfPageRefresh, BfTableSkeleton, BfProductionEditor, ProductionCorrectionEditor, BfSelect],
@@ -56,13 +57,15 @@ export class ProductionPage {
     const byDate = new Map<string, ProductionDay>();
     for (const entry of this.store.items()) {
       const day = byDate.get(entry.businessDate) ?? {
-        date: entry.businessDate, entries: [], quantity: 0, totalCents: 0, pending: false, products: 0,
+        date: entry.businessDate, entries: [], quantity: 0, totalCents: 0, pending: false, products: 0, reestimated: false,
       };
       day.entries.push(entry);
       if (entry.status !== 'cancelled') {
         day.quantity += entry.quantity;
-        day.totalCents += entry.totalCostCents;
-        day.pending ||= entry.costPending;
+        const preview = this.displayItemsFor(entry);
+        day.totalCents += preview.reduce((sum, item) => sum + item.totalCostCents, 0);
+        day.pending ||= preview.some(item => item.costPending);
+        day.reestimated ||= entry.costPending && preview.some(item => !item.costPending);
       }
       byDate.set(day.date, day);
     }
@@ -73,12 +76,13 @@ export class ProductionPage {
   });
   readonly selectedDay = computed(() => this.days().find(day => day.date === this.selectedDayDate()));
   readonly missingCostReferences = computed(() =>
-    [...new Set((this.selectedDay()?.entries ?? []).flatMap(entry => entry.missingCostReferences ?? []))]);
+    [...new Set((this.selectedDay()?.entries ?? [])
+      .flatMap(entry => this.displayItemsFor(entry).flatMap(item => item.missingCostReferences ?? [])))]);
   readonly detailEstimates = computed(() => {
     const groups = new Map<string, { pool: string; quantity: number; totalCostCents: number }>();
     for (const entry of this.selectedDay()?.entries ?? []) {
       if (entry.status === 'cancelled') continue;
-      for (const part of this.itemsFor(entry)) {
+      for (const part of this.displayItemsFor(entry)) {
         for (const line of part.estimatedCosts ?? []) {
           const previous = groups.get(line.pool);
           const cost = Math.round(line.unitCostCents * line.quantity * part.quantity);
@@ -99,7 +103,7 @@ export class ProductionPage {
     const items = new Map<string, { productId: string; name: string; quantity: number; costCents: number; pending: boolean }>();
     for (const entry of this.selectedDay()?.entries ?? []) {
       if (entry.status === 'cancelled') continue;
-      for (const part of this.itemsFor(entry)) {
+      for (const part of this.displayItemsFor(entry)) {
         const previous = items.get(part.productId);
         if (previous) { previous.quantity += part.quantity; previous.costCents += part.totalCostCents; previous.pending ||= part.costPending; }
         else items.set(part.productId, { productId: part.productId, name: part.productName, quantity: part.quantity, costCents: part.totalCostCents, pending: part.costPending });
@@ -144,6 +148,44 @@ export class ProductionPage {
     });
   }
   itemsFor(entry: Production): ProductionItem[] { return productionItems(entry); }
+
+  /**
+   * Read-only restatement of incomplete legacy costs, based on the current
+   * registered reference prices. Never rewrites the original production, its
+   * historical sale COGS, inventory movements or payment records.
+   */
+  displayItemsFor(entry: Production): ProductionItem[] {
+    const products = new Map(this.catalog.products().map(item => [item.id, item]));
+    const formats = new Map(this.references.formats().map(item => [item.id, item]));
+    const collections = new Map(this.references.collections().map(item => [item.id, item]));
+    const inputs = new Map(this.catalog.inputs().map(item => [item.id, item]));
+    return this.itemsFor(entry).map(item => {
+      if (!item.costPending || item.costingModel === 'simplified') return item;
+      const product = products.get(item.productId);
+      if (!product) return item;
+      const format = formats.get(product.formatId);
+      if (!format?.soapCostProfile) return item;
+      try {
+        const cost = standardCostForProduct(product, {
+          format, collection: collections.get(product.collectionId),
+        }, inputs);
+        if (cost.costPending) return {
+          ...item, missingCostReferences: cost.missingReferences,
+        };
+        return {
+          ...item,
+          unitCostCents: cost.unitCostCents,
+          totalCostCents: Math.round(cost.unitCostCents * item.quantity),
+          costPending: false,
+          costingModel: 'simplified' as const,
+          estimatedCosts: cost.estimateLines,
+          missingCostReferences: [],
+        };
+      } catch {
+        return item;
+      }
+    });
+  }
  open(productId = '', date = todayBusinessDate()): void { void this.productionEditor().open(productId, date); }
   showDay(date: string): void {
     this.historyEntryId.set('');

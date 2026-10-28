@@ -176,7 +176,7 @@ service cloud.firestore {
           && (!('image' in data) || validImage(data.image)))
         || (name == 'inputs'
           && fields(data, ['code', 'active', 'name', 'unitId', 'stock', 'minimumStock', 'averageUnitCostCents'], ['image', 'minimumStockConfigured', 'trackingMode', 'availabilityStatus', 'stockStatus', 'costBasisQuantity', 'costBasisValueCents', 'committedStock', 'reservedPhysicalStock',
-             'costPool', 'untrackedSince', 'previousPhysicalStock', 'previousTrackingMode'])
+             'costPool', 'costUnitFactor', 'untrackedSince', 'previousPhysicalStock', 'previousTrackingMode'])
           && text(data.code) && text(data.name) && text(data.unitId) && data.active is bool
           && stock(data.stock) && quantity(data.minimumStock) && money(data.averageUnitCostCents)
            && (!('committedStock' in data) || quantity(data.committedStock))
@@ -185,6 +185,7 @@ service cloud.firestore {
           && (!('trackingMode' in data) || data.trackingMode in ['exact', 'estimated', 'untracked'])
           && (!('costPool' in data) || (data.trackingMode == 'untracked' &&
              data.costPool in ['base','surfactant','fragrance-classic','fragrance-premium','colorant']))
+          && (!('costUnitFactor' in data) || (data.costUnitFactor is number && data.costUnitFactor > 0 && data.costUnitFactor <= 1000000))
           && (!('untrackedSince' in data) || (data.untrackedSince is string && data.untrackedSince.size() == 10))
           && (!('previousPhysicalStock' in data) || stock(data.previousPhysicalStock))
           && (!('previousTrackingMode' in data) || data.previousTrackingMode in ['exact','estimated'])

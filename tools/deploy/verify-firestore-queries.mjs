@@ -62,6 +62,13 @@ const checks = [
       discountsCents: AggregateField.sum('discountCents'),
       saleCount: AggregateField.count(),
     }).get()],
+  // Freight must be its own aggregate. Including shippingFeeCents in the legacy
+  // KPI composite would exclude historical sales that have no freight field.
+  ['dashboard:shipping-period-single-sum', () => db.collection('sales')
+    .where('status', '==', 'active')
+    .where('businessDate', '>=', startDate)
+    .where('businessDate', '<=', endDate)
+    .aggregate({ shippingCents: AggregateField.sum('shippingFeeCents') }).get()],
   ['dashboard:optimized-sales-period', () => db.collection('sales')
     .where('status', '==', 'active')
     .where('analyticsVersion', '==', 1)

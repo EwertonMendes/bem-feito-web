@@ -4,6 +4,18 @@ import { CatalogImageRef } from './image.model';
 export type StockStatus = 'negative' | 'low' | 'ok' | 'untracked';
 export type InputTrackingMode = 'exact' | 'estimated' | 'untracked';
 
+/** A purchase-funded reference rate, not a physical recipe or inventory balance. */
+export type CostPool = 'base' | 'surfactant' | 'fragrance-classic' | 'fragrance-premium' | 'colorant';
+
+/** Reference amounts per finished soap. They never debit production-material stock. */
+export interface SoapCostProfile {
+  baseGrams: number;
+  surfactantMl: number;
+  fragranceMl: number;
+  colorantMl: number;
+  extraUnitCostCents?: number;
+}
+
 export interface RecipeComponent {
   inputId: string;
   quantity: number;
@@ -29,6 +41,8 @@ export interface Product extends AuditFields {
   salePriceCents: number;
   additionalCostCents: number;
   averageUnitCostCents: number;
+  /** Set only when a production has adopted the reference-cost model. */
+  costingVersion?: 2;
   /** Tenths of a cent, preserving historical R$0.264/R$0.384 unit costs. */
   unitCostDeciCents?: number;
   stock: number;
@@ -58,6 +72,8 @@ export interface InputItem extends AuditFields {
   minimumStock: number;
   minimumStockConfigured?: boolean;
   trackingMode?: InputTrackingMode;
+  /** Optional reference cost group: mixtures are priced as a pool, not a fixed colour or fragrance. */
+  costPool?: CostPool;
   /** Qualitative status for non-measurable liquids; never treated as a numerical balance. */
   availabilityStatus?: string;
   stockStatus?: StockStatus;
@@ -90,6 +106,8 @@ export interface CollectionDefinition extends AuditFields {
   id: string;
   name: string;
   active: boolean;
+  /** Identifies which essence-price pool this collection normally uses. */
+  fragranceCostPool?: 'fragrance-classic' | 'fragrance-premium';
   costComponents?: RecipeComponent[];
 }
 
@@ -106,6 +124,8 @@ export interface FormatDefinition extends AuditFields {
   name: string;
   active: boolean;
   approximateWeightGrams?: number;
+  /** Optional simplified reference model, independent of any physical input balance. */
+  soapCostProfile?: SoapCostProfile;
   costComponents?: RecipeComponent[];
 }
 

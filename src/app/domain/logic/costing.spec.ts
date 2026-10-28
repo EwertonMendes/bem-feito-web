@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { productCostBreakdown, productCostComponents, standardCostForProduct, trackingModeForInput, inputUnitCostCents } from './costing';
+import { productCostBreakdown, productCostComponents, standardCostForProduct, priceForPool, trackingModeForInput, inputUnitCostCents } from './costing';
 import { InputItem, Product } from '../models/catalog.model';
 
 const product: Product = {
@@ -34,7 +34,7 @@ describe('standard costing', () => {
   it('calculates an aromatic mixture without choosing a fixed colour or perfume', () => {
     const make = (id: string, pool: NonNullable<InputItem['costPool']>, qty: number, cents: number, unit: string): InputItem => ({
       ...input(id, 0), costPool: pool, unitId: unit, trackingMode: 'untracked',
-      costBasisQuantity: qty, costBasisValueCents: cents,
+      costBasisQuantity: qty, costBasisValueCents: cents, costUnitFactor: 1,
     });
     const inputs = new Map<string, InputItem>([
       ['white-base', make('white-base', 'base', 1000, 3000, 'g')],
@@ -56,6 +56,15 @@ describe('standard costing', () => {
     expect(cost.components).toEqual([]);
     expect(cost.estimateLines?.map(line => line.pool)).toEqual(['base','surfactant','fragrance-classic','colorant']);
     expect(input('base',2).stock).toBe(0);
+  });
+
+  it('normalizes purchase packaging without changing purchased quantities', () => {
+    const packageInput = {
+      ...input('base-kg', 0), unitId: 'kg', trackingMode: 'untracked' as const,
+      costPool: 'base' as const, costUnitFactor: 1000, costBasisQuantity: 3,
+      costBasisValueCents: 6909,
+    };
+    expect(priceForPool('base', new Map([['base-kg',packageInput]]))).toBeCloseTo(2.303);
   });
 
   it('refuses to invent a cost when the fragrance group has no price', () => {

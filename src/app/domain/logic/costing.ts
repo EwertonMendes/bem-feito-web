@@ -50,11 +50,12 @@ export interface StandardProductCost {
 export function priceForPool(pool: CostPool, inputs: ReadonlyMap<string, InputItem>): number | null {
   const candidates = [...inputs.values()].filter(input =>
     input.active && input.costPool === pool && trackingModeForInput(input) === 'untracked');
-  if (!candidates.length || new Set(candidates.map(input => input.unitId)).size !== 1) return null;
+  if (!candidates.length || candidates.some(input =>
+    !Number.isFinite(input.costUnitFactor) || Number(input.costUnitFactor) <= 0)) return null;
   const costs = candidates.map(input => ({
-    quantity: Number(input.costBasisQuantity),
+    quantity: Number(input.costBasisQuantity) * Number(input.costUnitFactor),
     value: Number(input.costBasisValueCents),
-    fallback: inputUnitCostCents(input),
+    fallback: inputUnitCostCents(input) / Number(input.costUnitFactor),
   }));
   const valid = costs.filter(item => Number.isFinite(item.quantity) && item.quantity > 0 &&
     Number.isFinite(item.value) && item.value > 0);

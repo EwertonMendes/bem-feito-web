@@ -57,6 +57,7 @@ export class BfProductionEditor {
     const inputMap = new Map(this.catalog.inputs().map(item => [item.id, item]));
     const consumptions = new Map<string, PreviewConsumption>();
     let costCents = 0, pending = false, units = 0;
+    const missingReferences = new Set<string>();
     for (const line of this.lines()) {
       if (!line.productId || !Number.isSafeInteger(line.quantity) || line.quantity <= 0) continue;
       const product = this.catalog.products().find(item => item.id === line.productId);
@@ -71,6 +72,7 @@ export class BfProductionEditor {
         costCents += cost.unitCostCents * line.quantity;
         units += line.quantity;
         pending ||= cost.costPending;
+        for (const missing of cost.missingReferences ?? []) missingReferences.add(missing);
         for (const part of cost.components) {
           const input = inputMap.get(part.inputId);
           if (!input) continue;
@@ -91,9 +93,10 @@ export class BfProductionEditor {
         }
       } catch {
         pending = true;
+        missingReferences.add('Composição inválida ou material não encontrado');
       }
     }
-    return { costCents, pending, units, consumptions: [...consumptions.values()] };
+    return { costCents, pending, units, consumptions: [...consumptions.values()], missingReferences: [...missingReferences] };
   });
   readonly blocking = computed(() => this.previews().consumptions.find(
     item => item.mode === 'exact' && (item.available ?? 0) < item.quantity

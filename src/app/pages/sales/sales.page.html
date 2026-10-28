@@ -227,10 +227,9 @@
                   (input)="shippingAmount.set(+$any($event.target).value); shippingReclassify.set(false)" />
               </label>
               @if((shippingAmount()*100-(sale.shippingFeeCents??0))>0 && (shippingAmount()*100-(sale.shippingFeeCents??0))<=sale.tipCents){
-                <label class="wide" style="display:flex;gap:0.5rem;align-items:center">
-                  <input type="checkbox" [checked]="shippingReclassify()" (change)="shippingReclassify.set($any($event.target).checked)" />
-                  Reclassificar {{currency(Math.round(shippingAmount()*100-(sale.shippingFeeCents??0)))}} da gorjeta já recebida como frete
-                </label>
+                <bf-checkbox class="wide" [checked]="shippingReclassify()"
+                  (checkedChange)="shippingReclassify.set($event)"
+                  [label]="'Reclassificar '+currency(Math.round(shippingAmount()*100-(sale.shippingFeeCents??0)))+' da gorjeta já recebida como frete'" />
               }
               <label class="wide">Motivo da correção
                 <textarea class="bf-textarea" rows="2" maxlength="240"

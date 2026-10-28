@@ -8,6 +8,7 @@ import {
   limit,
   orderBy,
   query,
+  where,
   runTransaction,
   serverTimestamp,
   startAfter,
@@ -81,6 +82,11 @@ export class ProductionRepository {
       quantities.set(line.productId, (quantities.get(line.productId) ?? 0) + line.quantity);
     }
 
+    // Discover the reference-cost materials once; every selected document is then
+    // read inside the transaction to capture its actual price snapshot.
+    const poolSnapshot = await getDocs(query(collection(this.firestore, 'inputs'),
+      where('costPool', 'in', ['base', 'surfactant', 'fragrance-classic', 'fragrance-premium', 'colorant'])));
+    const poolIds = new Set(poolSnapshot.docs.map(item => item.id));
     return runTransaction(this.firestore, async (transaction) => {
       const counterRef = doc(this.firestore, 'counters', 'production');
       const counterSnapshot = await transaction.get(counterRef);
@@ -114,7 +120,7 @@ export class ProductionRepository {
         format: formats.get(product.formatId)?.exists()
           ? ({ id: product.formatId, ...formats.get(product.formatId)!.data() } as FormatDefinition) : undefined,
       }) : ({}); 
-      const inputIds = new Set<string>();
+      const inputIds = new Set<string>(poolIds);
       for (const product of products.values()) {
         for (const component of productCostComponents(product, referenceFor(product))) inputIds.add(component.inputId);
       }
@@ -148,11 +154,15 @@ export class ProductionRepository {
             previous.totalCostCents += consumption.totalCostCents;
           } else consumptionByInput.set(consumption.inputId, { ...consumption });
         }
-        const itemCost = Math.round((product.unitCostDeciCents ?? cost.unitCostCents * 10) * quantity / 10);
+        const itemCost = Math.round((cost.model === 'simplified'
+          ? cost.unitCostCents * 10 : (product.unitCostDeciCents ?? cost.unitCostCents * 10)) * quantity / 10);
         items.push({
           productId, productName: product.displayName, quantity,
           unitCostCents: cost.unitCostCents, totalCostCents: itemCost,
           costPending: cost.costPending, consumptions,
+          costingModel: cost.model,
+          ...(cost.estimateLines ? { estimatedCosts: cost.estimateLines } : {}),
+          ...(cost.missingReferences?.length ? { missingCostReferences: cost.missingReferences } : {}),
         });
         totalCostCents += itemCost;
         totalQuantity += quantity;
@@ -221,6 +231,7 @@ export class ProductionRepository {
           stock, stockStatus: productStockStatus(stock, product.minimumStock),
           reservedPhysicalStock,
           averageUnitCostCents: item.unitCostCents,
+          ...(item.costingModel === 'simplified' ? { costingVersion: 2 as const, unitCostDeciCents: item.unitCostCents * 10 } : {}),
           updatedAt: serverTimestamp(), updatedBy: userId,
         });
         stockChanges.push({ itemType: 'product', itemId: item.productId, stock, reservedPhysicalStock, averageUnitCostCents: item.unitCostCents });
@@ -235,6 +246,8 @@ export class ProductionRepository {
         quantity: totalQuantity,
         unitCostCents: Math.round(totalCostCents / totalQuantity),
         totalCostCents, costPending, consumptions: [...consumptionByInput.values()],
+        costingModel: items.every(item => item.costingModel === 'simplified') ? 'simplified' : 'legacy',
+        missingCostReferences: [...new Set(items.flatMap(item => item.missingCostReferences ?? []))],
         items, notes: notes?.trim() || undefined,
       };
       const { id: _id, ...data } = production;

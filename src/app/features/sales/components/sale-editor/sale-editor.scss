@@ -387,6 +387,8 @@
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr) 38px;
   overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
   border: 1px solid color-mix(in srgb, var(--brand) 34%, var(--line));
   background: var(--brand);
   color: var(--brand-contrast);
@@ -592,6 +594,8 @@
   grid-template-columns: 28px minmax(20px, auto) 28px;
   align-items: center;
   overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
   border: 1px solid var(--line);
   border-radius: 9px;
   background: var(--surface-2);
@@ -815,6 +819,11 @@
 
 .compact-heading {
   margin-bottom: 10px;
+}
+
+/* Separate the customer details from the fulfillment explanation. */
+.customer-section > .section-heading {
+  margin-top: 20px;
 }
 
 .compact-heading > div {

@@ -19,6 +19,33 @@ test('schema rejects arbitrary code, queries, fields, credentials and protected 
   assert.throws(() => validateRequest({ ...request, changes: [{ ...request.changes[0], expected: {} }] }));
   assert.throws(() => validateRequest({ ...request, schemaVersion: 2 }));
 });
+test('PROD reference costing accepts only scoped fields with existing/absent CAS and safe units', () => {
+  const profile = {baseGrams:3,fragranceMl:1,colorantMl:1,surfactantMl:1};
+  const batch = {schemaVersion:1,id:'cost-reference-prod-20261028',environment:'prod',
+    projectId:'bem-feito-prod',operation:'batch-update',changes:[
+      {collection:'formats',id:'CAD-0040',action:'update',
+        expected:{name:'Mini Florzinhas'},expectedAbsent:['soapCostProfile'],values:{soapCostProfile:profile}},
+      {collection:'collections',id:'CAD-0001',action:'update',
+        expected:{name:'Clássica'},expectedAbsent:['fragranceCostPool'],
+        values:{fragranceCostPool:'fragrance-classic'}},
+      {collection:'inputs',id:'BASE-BRA',action:'update',
+        expected:{averageUnitCostCents:2118},
+        expectedAbsent:['costPool','costUnitFactor','costBasisQuantity','costBasisValueCents'],
+        values:{costPool:'base',costUnitFactor:1000,costBasisQuantity:6,costBasisValueCents:12709}},
+    ]};
+  assert.equal(validateRequest(batch).changes?.length,3);
+  const invalid = [
+    {...batch,changes:[{...batch.changes[0],values:{soapCostProfile:{...profile,colorantMl:NaN}}}]},
+    {...batch,changes:[{...batch.changes[0],values:{soapCostProfile:{...profile,unknown:1}}}]},
+    {...batch,changes:[{...batch.changes[0],values:{soapCostProfile:{...profile,baseGrams:-1}}}]},
+    {...batch,changes:[{...batch.changes[0],expectedAbsent:[]}]},
+    {...batch,changes:[{...batch.changes[1],values:{fragranceCostPool:'unsupported'}}]},
+    {...batch,changes:[{...batch.changes[2],values:{...batch.changes[2].values,costUnitFactor:-20}}]},
+    {...batch,changes:[{...batch.changes[2],values:{...batch.changes[2].values,stock:0}}]},
+    {...batch,changes:[{...batch.changes[0],expectedAbsent:['soapCostProfile','soapCostProfile']}]},
+  ];
+  for(const candidate of invalid) assert.throws(()=>validateRequest(candidate));
+});
 test('cost-only migration requires exact explicit code selection and preserves financial and legacy balances', () => {
   const base = { code: 'GLI-01', name: 'Glicerina', stock: 530, committedStock: 3,
     reservedPhysicalStock: 2, averageUnitCostCents: 4, costBasisQuantity: 500,

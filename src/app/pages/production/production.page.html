@@ -62,7 +62,7 @@
         @if(detailEstimates().length){
           <h3>Materiais estimados por grupo (não alteram estoque)</h3>
           @for(part of detailEstimates();track part.pool){
-            <div class="consumption"><strong>{{costGroupLabel(part.pool)}}</strong><div class="consumption-values"><strong>{{part.quantity | number:'1.0-3'}}</strong><small>{{currency(part.totalCostCents)}}</small></div></div>
+            <div class="consumption"><strong>{{costGroupLabel(part.pool)}}</strong><div class="consumption-values"><strong>{{part.quantity}}</strong><small>{{currency(part.totalCostCents)}}</small></div></div>
           }
         }
         <h3>Materiais previstos nas composições antigas</h3>

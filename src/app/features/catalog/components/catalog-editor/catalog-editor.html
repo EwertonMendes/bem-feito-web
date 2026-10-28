@@ -50,7 +50,7 @@
           <label class="bf-field"><span>Grupo de custo estimado</span><bf-select [formField]="inputForm.costPool" [options]="inputCostPoolOptions" ariaLabel="Grupo de custo do material" /></label>
           @if(inputModel().costPool){
             <label class="bf-field"><span>Quanto equivale 1 unidade comprada ({{inputModel().costPool === 'base' ? 'g' : 'ml'}})</span>
-              <bf-number-input kind="decimal" [decimals]="3" [min]="0" [formField]="inputForm.costUnitFactor" ariaLabel="Conversão da unidade de compra para g ou ml"/>
+              <bf-number-input kind="decimal" [decimals]="3" [formField]="inputForm.costUnitFactor" ariaLabel="Conversão da unidade de compra para g ou ml"/>
             </label>
             <p class="hint full">Ex.: compra de 3 kg de base: 1 kg = 1000 g. Frasco de lauril de 500 ml: 1 frasco = 500 ml. Assim o custo aproveita a compra original, sem alterar a quantidade lançada e sem contar estoque.</p>
           }

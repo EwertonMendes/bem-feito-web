@@ -247,6 +247,17 @@ export class BfSettingsEditor {
     return this.costSummary(this.costComponents());
   }
 
+  applyKnownSoapCostReference(): void {
+    const profile = this.knownSoapCostReference();
+    if (!profile) return;
+    this.soapCostProfile.set(profile);
+    this.useSimplifiedCost.set(true);
+    const weight = floralReferenceWeight(this.formatModel().name);
+    if (weight !== null) this.formatModel.update(model => ({
+      ...model, approximateWeightGrams: weight,
+    }));
+  }
+
   patchSoapCostProfile(field: keyof SoapCostProfile, value: number): void {
     this.soapCostProfile.update(profile => ({ ...profile, [field]: value }));
   }

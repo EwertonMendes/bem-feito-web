@@ -102,6 +102,7 @@ export class DashboardRepository {
 
     const [
       salesAggregate,
+      shippingAggregate,
       optimizedAggregate,
       paymentsAggregate,
       expensesAggregate,
@@ -116,9 +117,13 @@ export class DashboardRepository {
     ] = await Promise.all([
       getAggregateFromServer(salesInPeriod, {
         revenueCents: sum('totalCents'),
-        shippingCents: sum('shippingFeeCents'),
         discountsCents: sum('discountCents'),
         saleCount: count(),
+      }),
+      // A separate sum keeps the historical revenue composite index intact.
+      // Older sales have no shippingFeeCents; their product totals must still count.
+      getAggregateFromServer(salesInPeriod, {
+        shippingCents: sum('shippingFeeCents'),
       }),
       getAggregateFromServer(optimizedSalesInPeriod, {
         optimizedCount: count(),
@@ -186,7 +191,7 @@ export class DashboardRepository {
 
     return {
       revenueCents: Number(salesData.revenueCents ?? 0),
-      shippingCents: Number(salesData.shippingCents ?? 0),
+      shippingCents: Number(shippingAggregate.data().shippingCents ?? 0),
       receivedCents: Number(paymentsData.receivedCents ?? 0),
       cashReceivedCents: Number(paymentsData.cashReceivedCents ?? 0),
       receivableCents: Number(receivableAggregate.data().receivableCents ?? 0),

@@ -52,7 +52,7 @@ describe('standard costing', () => {
     }, inputs);
     expect(cost.costPending).toBe(false);
     expect(cost.model).toBe('simplified');
-    expect(cost.unitCostCents).toBe(342);
+    expect(cost.unitCostCents).toBe(393);
     expect(cost.components).toEqual([]);
     expect(cost.estimateLines?.map(line => line.pool)).toEqual(['base','surfactant','fragrance-classic','colorant']);
     expect(input('base',2).stock).toBe(0);

@@ -57,7 +57,7 @@
         }
         <h3>Produtos fabricados</h3>
         @for(item of detailItems();track item.productId) {
-          <div class="consumption"><div class="consumption-copy"><strong>{{item.name}}</strong><small>{{item.pending?'Custo parcial':'Custo calculado'}}</small></div><div class="consumption-values"><strong>{{item.quantity}} un.</strong><small>{{currency(item.costCents)}}</small></div></div>
+          <div class="consumption"><div class="consumption-copy"><strong>{{item.name}}</strong><small>{{item.pending?(item.missingCostReason ?? 'Custo parcial'):'Custo calculado'}}</small></div><div class="consumption-values"><strong>{{item.quantity}} un.</strong><small>{{currency(item.costCents)}}</small></div></div>
         }
         @if(detailEstimates().length){
           <h3>Materiais estimados por grupo (não alteram estoque)</h3>

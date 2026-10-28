@@ -284,10 +284,7 @@
             <div><span class="section-icon"><bf-icon name="order" /></span>
               <div><h3>Frete</h3><small>Opcional e variável para cada entrega.</small></div>
             </div>
-            <label class="bf-field" style="display:flex;align-items:center;gap:0.5rem">
-              <input type="checkbox" [checked]="shippingEnabled()" (change)="shippingEnabled.set($any($event.target).checked)" />
-              Cobrar frete
-            </label>
+            <bf-checkbox [checked]="shippingEnabled()" (checkedChange)="shippingEnabled.set($event)" label="Cobrar frete" />
           </div>
           @if(shippingEnabled()){
             <label class="bf-field">

@@ -18,7 +18,7 @@
         <article class="day-card">
           <div class="day-card-head">
             <div><span class="day-eyebrow">Produção do dia</span><h2>{{date(day.date)}}</h2></div>
-            <span class="bf-badge" [class.warning]="day.pending" [class.muted]="!day.quantity">{{!day.quantity?'Sem produção ativa':day.pending?'Custo parcial':'Custo calculado'}}</span>
+            <span class="bf-badge" [class.warning]="day.pending" [class.muted]="!day.quantity">{{!day.quantity?'Sem produção ativa':day.pending?'Custo parcial':day.reestimated?'Custo reestimado':'Custo calculado'}}</span>
           </div>
           <div class="day-stats">
             <div><strong>{{day.quantity}}</strong><small>unidades</small></div>
@@ -49,7 +49,7 @@
     <div class="bf-dialog-header"><div><h2>Produção de {{date(selectedDayDate())}}</h2><small>Todos os registros desta data reunidos</small></div><button class="bf-floating-close" type="button" (click)="detailDialog.close()" aria-label="Fechar janela"><bf-icon name="close" /></button></div>
     <div class="bf-dialog-body">
       @if(selectedDay(); as day) {
-        <div class="day-stats detail-stats"><div><strong>{{day.quantity}}</strong><small>unidades</small></div><div><strong>{{day.products}}</strong><small>produtos diferentes</small></div><div><strong>{{currency(day.totalCents)}}</strong><small>custo registrado</small></div></div>
+        <div class="day-stats detail-stats"><div><strong>{{day.quantity}}</strong><small>unidades</small></div><div><strong>{{day.products}}</strong><small>produtos diferentes</small></div><div><strong>{{currency(day.totalCents)}}</strong><small>{{day.reestimated?'estimativa com preços atuais':'custo registrado'}}</small></div></div>
         @if(missingCostReferences().length){
           <p class="preview-hint"><strong>Referências de custo pendentes:</strong>
             @for(missing of missingCostReferences(); track missing){<span> {{missing}}. </span>}
@@ -57,7 +57,7 @@
         }
         <h3>Produtos fabricados</h3>
         @for(item of detailItems();track item.productId) {
-          <div class="consumption"><div class="consumption-copy"><strong>{{item.name}}</strong><small>{{item.pending?'Custo parcial':'Custo calculado'}}</small></div><div class="consumption-values"><strong>{{item.quantity}} un.</strong><small>{{currency(item.costCents)}}</small></div></div>
+          <div class="consumption"><div class="consumption-copy"><strong>{{item.name}}</strong><small>{{item.pending?'Custo parcial':day.reestimated?'Custo reestimado':'Custo calculado'}}</small></div><div class="consumption-values"><strong>{{item.quantity}} un.</strong><small>{{currency(item.costCents)}}</small></div></div>
         }
         @if(detailEstimates().length){
           <h3>Materiais estimados por grupo (não alteram estoque)</h3>

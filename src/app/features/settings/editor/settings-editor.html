@@ -34,6 +34,10 @@
         <section class="simplified-cost-settings">
           <bf-checkbox [checked]="useSimplifiedCost()" (checkedChange)="useSimplifiedCost.set($event)" label="Usar custeio simplificado, sem contagem física de materiais"/>
           <p>Quantidades médias por sabonete. São estimativas, não uma receita fixa nem uma baixa de estoque. As essências e cores podem ser misturadas livremente.</p>
+          @if(knownSoapCostReference()){
+            <button class="bf-button secondary" type="button" (click)="applyKnownSoapCostReference()">Preencher a partir da ficha de produção</button>
+            <p>Usa as quantidades estimadas já confirmadas; revise os valores antes de salvar.</p>
+          }
           @if(useSimplifiedCost()){
             <div class="bf-grid two">
               <label class="bf-field"><span>Glicerina base (g) *</span><bf-number-input kind="decimal" [decimals]="3" [min]="0" [value]="soapCostProfile().baseGrams" (valueChange)="patchSoapCostProfile('baseGrams',$event)" ariaLabel="Glicerina em gramas"/></label>

@@ -4,6 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Sale } from '../../domain/models/sales.model';
 import { orderProgress } from '../../domain/logic/order-progress';
 import { saleCorrectionSignature } from '../../domain/logic/sale-correction';
+import { planShippingCorrection, shippingCorrectionSignature } from '../../domain/logic/shipping-correction';
 import { AdvancedSaleLineDraft, planAdvancedSaleEdit } from '../../domain/logic/advanced-sale-edit';
 import { CatalogStore } from '../../features/catalog/catalog.store';
 import { ModalActions } from '../../core/services/modal-actions.service';
@@ -63,9 +64,13 @@ export class SalesPage {
     Number(Boolean(this.historyFrom())) + Number(Boolean(this.historyTo())) + Number(Boolean(this.historyProduct())));
   readonly historyActive = computed(()=>this.historySubmitted() && this.search().trim()===this.historicalQuery());
   readonly statusFilter = signal<'all' | 'paid' | 'open' | 'cancelled'>('all');
-  readonly pendingAction = signal<'ready' | 'delivered' | 'cancel' | 'allocate' | 'correct' | 'correct-items' | null>(null);
+  readonly pendingAction = signal<'ready' | 'delivered' | 'cancel' | 'allocate' | 'correct' | 'correct-items' | 'shipping' | null>(null);
   readonly editingDetails = signal(false);
   readonly editingItems = signal(false);
+  readonly editingShipping = signal(false);
+  readonly shippingAmount = signal(0);
+  readonly shippingReclassify = signal(false);
+  readonly shippingReason = signal('');
   readonly openingItemEditor = signal(false);
   private readonly editBaseline = signal<Sale | null>(null);
   readonly advancedChanges=signal<AdvancedSaleLineDraft[]>([]);
@@ -97,13 +102,22 @@ export class SalesPage {
       },catalog),error:''};
     }catch(error){return {value:null,error:error instanceof Error?error.message:'Alterações inválidas.'};}
   });
+  readonly shippingPreview = computed(() => {
+    const sale = this.editBaseline();
+    if (!sale || !this.editingShipping()) return null;
+    try {
+      return {value:planShippingCorrection(sale,Math.round(this.shippingAmount()*100),this.shippingReclassify()),error:''};
+    } catch(error) {
+      return {value:null,error:error instanceof Error?error.message:'Frete inválido.'};
+    }
+  });
   readonly metadataDraft = signal({customerName:'',dueDate:'',notes:'',reason:''});
     readonly allocatingLineId = signal<string | null>(null);
   readonly allocationQuantity = signal(1);
   readonly orderProgress = orderProgress;
   private readonly selectedSnapshot = signal<Sale | null>(null);
   readonly selectedSale = computed(() => {
-    if(this.editingItems() && this.editBaseline())return this.editBaseline();
+    if((this.editingItems() || this.editingShipping()) && this.editBaseline())return this.editBaseline();
     const snapshot = this.selectedSnapshot();
     return snapshot ? this.store.sales().find(sale => sale.id === snapshot.id) ?? snapshot : null;
   });
@@ -164,9 +178,9 @@ export class SalesPage {
       }
       if(cursor!==null)throw new Error('Exportação excedeu o limite seguro. Utilize um período menor.');
       downloadCsv('bem-feito-vendas.csv',
-        ['Código','Data','Cliente','Situação','Entrega','Valor total (R$)','Recebido (R$)','Saldo (R$)','Gorjetas (R$)','Itens'],
+        ['Código','Data','Cliente','Situação','Entrega','Valor total (R$)','Frete (R$)','Recebido (R$)','Saldo (R$)','Gorjetas (R$)','Itens'],
         rows.map(sale=>[sale.code,sale.businessDate,sale.customerName??'',sale.status,
-          sale.fulfillmentStatus??'delivered',exportCents(sale.totalCents),
+          sale.fulfillmentStatus??'delivered',exportCents(sale.totalCents),exportCents(sale.shippingFeeCents??0),
           exportCents(sale.receivedCents),exportCents(sale.balanceCents),
           exportCents(sale.tipCents),sale.items.map(item=>item.quantity+'x '+item.name).join(' | ')]));
       this.toast.success('Arquivo CSV de vendas gerado.');
@@ -211,6 +225,7 @@ export class SalesPage {
     this.selectedSnapshot.set(sale);
     this.editingDetails.set(false);
     this.editingItems.set(false);
+    this.editingShipping.set(false);
     this.editBaseline.set(null);
     this.metadataDraft.set({customerName:sale.customerName??'',dueDate:sale.dueDate??'',notes:sale.notes??'',reason:''});
     this.detailDialog().open();
@@ -231,6 +246,7 @@ export class SalesPage {
       this.editBaseline.set(current);
       this.selectedSnapshot.set(current);
       this.editingDetails.set(false);
+      this.editingShipping.set(false);
       this.advancedChanges.set(current.items.map(i=>({
         id:i.id,kind:i.kind,sourceId:i.sourceId,
         quantity:i.quantity,unitPriceCents:i.unitPriceCents,
@@ -297,6 +313,55 @@ export class SalesPage {
         this.editBaseline.set(null);
       }
     }finally{this.pendingAction.set(null);}
+  }
+
+  async openShippingCorrection(sale: Sale): Promise<void> {
+    if (this.pendingAction() || this.openingItemEditor()) return;
+    this.openingItemEditor.set(true);
+    try {
+      const current = await this.repository.findByIdFromServer(sale.id);
+      if (!current || current.status !== 'active') throw new Error('Venda indisponível.');
+      if (this.selectedSnapshot()?.id !== sale.id) return;
+      this.selectedSnapshot.set(current);
+      this.editBaseline.set(current);
+      this.editingDetails.set(false);
+      this.editingItems.set(false);
+      this.shippingAmount.set((current.shippingFeeCents??0)/100);
+      this.shippingReclassify.set(false);
+      this.shippingReason.set('');
+      this.editingShipping.set(true);
+    } catch(error) {
+      this.toast.error(this.errors.message(error));
+    } finally {
+      this.openingItemEditor.set(false);
+    }
+  }
+
+  cancelShippingCorrection(): void {
+    this.editingShipping.set(false);
+    this.editBaseline.set(null);
+  }
+
+  async saveShippingCorrection(): Promise<void> {
+    const sale = this.editBaseline();
+    const plan = this.shippingPreview();
+    if (!sale || !plan?.value || this.pendingAction() || this.shippingReason().trim().length<4) return;
+    this.pendingAction.set('shipping');
+    try {
+      const updated = await this.store.correctShipping(sale.id,{
+        shippingFeeCents:Math.round(this.shippingAmount()*100),
+        reclassifyTip:this.shippingReclassify(),
+        expectedSignature:shippingCorrectionSignature(sale),
+        reason:this.shippingReason(),
+      });
+      if (updated) {
+        this.selectedSnapshot.set(updated);
+        this.editingShipping.set(false);
+        this.editBaseline.set(null);
+      }
+    } finally {
+      this.pendingAction.set(null);
+    }
   }
 
   showAllocation(lineId: string): void {

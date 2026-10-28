@@ -1,5 +1,5 @@
 import { AuditFields } from './common.model';
-import { CostEstimateLine } from '../logic/costing';
+import type { CostEstimateLine } from '../logic/costing';
 
 export interface ProductionConsumption {
   inputId: string;

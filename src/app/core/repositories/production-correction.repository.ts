@@ -69,6 +69,9 @@ export class ProductionCorrectionRepository {
     // Firestore single-field index is sufficient; query outside the transaction and
     // guard against concurrent corrections through the production revision.
     const pastMovements = await getDocs(query(collection(this.db, 'stockMovements'), where('sourceId', '==', productionId)));
+    const poolDocs = await getDocs(query(collection(this.db, 'inputs'),
+      where('costPool', 'in', ['base', 'surfactant', 'fragrance-classic', 'fragrance-premium', 'colorant'])));
+    const poolIds = new Set(poolDocs.docs.map(item => item.id));
     return runTransaction(this.db, async tx => {
       const prodSnap = await tx.get(productionRef);
       if (!prodSnap.exists()) throw new Error('Lançamento não encontrado.');
@@ -99,7 +102,7 @@ export class ProductionCorrectionRepository {
         format: formats.get(product.formatId)?.exists()
           ? ({ id: product.formatId, ...formats.get(product.formatId)!.data() } as FormatDefinition) : undefined,
       });
-      const inputIds = new Set(original.consumptions.map(x => x.inputId));
+      const inputIds = new Set([...original.consumptions.map(x => x.inputId), ...poolIds]);
       for (const item of before) for (const c of item.consumptions) inputIds.add(c.inputId);
       for (const product of novel) for (const c of productCostComponents(product, refFor(product))) inputIds.add(c.inputId);
       const inputSnapshots = await this.readMap(tx, 'inputs', inputIds);
@@ -131,8 +134,12 @@ export class ProductionCorrectionRepository {
         after.push({
           productId: product.id, productName: product.displayName, quantity: line.quantity,
           unitCostCents: cost.unitCostCents,
-          totalCostCents: Math.round((product.unitCostDeciCents ?? cost.unitCostCents * 10) * line.quantity / 10),
+          totalCostCents: Math.round((cost.model === 'simplified'
+            ? cost.unitCostCents * 10 : (product.unitCostDeciCents ?? cost.unitCostCents * 10)) * line.quantity / 10),
           costPending: cost.costPending,
+          costingModel: cost.model,
+          ...(cost.estimateLines ? { estimatedCosts: cost.estimateLines } : {}),
+          ...(cost.missingReferences?.length ? { missingCostReferences: cost.missingReferences } : {}),
           consumptions: cost.components.map(c => ({
             inputId: c.inputId, unitId: c.unitId, quantity: roundQuantity(c.quantity * line.quantity),
             unitCostCents: c.unitCostCents, totalCostCents: c.totalCostCents * line.quantity,
@@ -217,6 +224,8 @@ export class ProductionCorrectionRepository {
         productName: effective.length === 1 ? effective[0]!.productName : 'Produção do dia',
         quantity, totalCostCents, unitCostCents: Math.round(totalCostCents / quantity),
         costPending: effective.some(x => x.costPending), items: effective,
+        costingModel: effective.every(x => x.costingModel === 'simplified') ? 'simplified' : 'legacy',
+        missingCostReferences: [...new Set(effective.flatMap(x => x.missingCostReferences ?? []))],
         consumptions: aggregateProductionConsumptions(effective),
       };
       if (!cancelled && !impacts.length && original.businessDate === draft.businessDate
@@ -244,6 +253,7 @@ export class ProductionCorrectionRepository {
         productId: corrected.productId, productName: corrected.productName,
         quantity: corrected.quantity, unitCostCents: corrected.unitCostCents,
         totalCostCents: corrected.totalCostCents, costPending: corrected.costPending,
+        costingModel: corrected.costingModel, missingCostReferences: corrected.missingCostReferences,
         items: corrected.items, consumptions: corrected.consumptions,
         updatedAt: serverTimestamp(), updatedBy: userId,
       });

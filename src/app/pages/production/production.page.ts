@@ -72,6 +72,29 @@ export class ProductionPage {
     return [...byDate.values()].sort((a, b) => b.date.localeCompare(a.date));
   });
   readonly selectedDay = computed(() => this.days().find(day => day.date === this.selectedDayDate()));
+  readonly missingCostReferences = computed(() =>
+    [...new Set((this.selectedDay()?.entries ?? []).flatMap(entry => entry.missingCostReferences ?? []))]);
+  readonly detailEstimates = computed(() => {
+    const groups = new Map<string, { pool: string; quantity: number; totalCostCents: number }>();
+    for (const entry of this.selectedDay()?.entries ?? []) {
+      if (entry.status === 'cancelled') continue;
+      for (const part of this.itemsFor(entry)) {
+        for (const line of part.estimatedCosts ?? []) {
+          const previous = groups.get(line.pool);
+          const cost = Math.round(line.unitCostCents * line.quantity * part.quantity);
+          groups.set(line.pool, { pool: line.pool,
+            quantity: (previous?.quantity ?? 0) + line.quantity * part.quantity,
+            totalCostCents: (previous?.totalCostCents ?? 0) + cost });
+        }
+      }
+    }
+    return [...groups.values()];
+  });
+  readonly costGroupLabel = (pool: string): string => ({
+    base: 'Glicerina base (g)', surfactant: 'Lauril (ml)',
+    'fragrance-classic': 'Essências clássicas (ml)', 'fragrance-premium': 'Essências + Aroma (ml)',
+    colorant: 'Corantes (ml)',
+  } as Record<string, string>)[pool] ?? pool;
   readonly detailItems = computed(() => {
     const items = new Map<string, { productId: string; name: string; quantity: number; costCents: number; pending: boolean }>();
     for (const entry of this.selectedDay()?.entries ?? []) {

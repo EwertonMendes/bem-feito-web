@@ -58,6 +58,7 @@ export class BfSettingsEditor {
   readonly costComponents = signal<RecipeComponent[]>([]);
   readonly useSimplifiedCost = signal(false);
   readonly soapCostProfile = signal<SoapCostProfile>(emptySoapCostProfile());
+  readonly knownSoapCostReference = computed(() => soapCostReference(this.formatModel().name));
   readonly fragranceCostPool = signal<'' | 'fragrance-classic' | 'fragrance-premium'>('');
   readonly fragranceCostOptions: readonly BfSelectOption[] = [
     {value:'',label:'Não definido'},

@@ -230,11 +230,14 @@ export class ProductionRepository {
         transaction.update(doc(this.firestore, 'products', item.productId), {
           stock, stockStatus: productStockStatus(stock, product.minimumStock),
           reservedPhysicalStock,
-          averageUnitCostCents: item.unitCostCents,
-          ...(item.costingModel === 'simplified' ? { costingVersion: 2 as const, unitCostDeciCents: item.unitCostCents * 10 } : {}),
+          // An incomplete estimate must never overwrite the last known sale cost.
+          averageUnitCostCents: item.costPending ? product.averageUnitCostCents : item.unitCostCents,
+          ...(item.costingModel === 'simplified' && !item.costPending
+            ? { costingVersion: 2 as const, unitCostDeciCents: item.unitCostCents * 10 } : {}),
           updatedAt: serverTimestamp(), updatedBy: userId,
         });
-        stockChanges.push({ itemType: 'product', itemId: item.productId, stock, reservedPhysicalStock, averageUnitCostCents: item.unitCostCents });
+        stockChanges.push({ itemType: 'product', itemId: item.productId, stock, reservedPhysicalStock,
+          averageUnitCostCents: item.costPending ? product.averageUnitCostCents : item.unitCostCents });
         movement('product', item.productId, item.quantity, item.unitCostCents, item.totalCostCents);
       }
 

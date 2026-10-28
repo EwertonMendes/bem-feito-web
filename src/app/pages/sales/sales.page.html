@@ -405,7 +405,7 @@
       </div>
       <div class="bf-dialog-footer sale-detail-footer">
         @if(sale.status==='active' && !editingDetails() && !editingItems() && !editingShipping()){
-          <div class="sale-footer-group sale-footer-edits" aria-label="Ajustes da venda">
+          <div class="sale-footer-group sale-footer-edits" role="group" aria-label="Ajustes da venda">
             @if(hasProductLines(sale)){
               <button class="bf-button secondary" type="button"
                 [disabled]="!!pendingAction() || openingItemEditor()"
@@ -420,7 +420,7 @@
               (click)="openShippingCorrection(sale)">Editar frete</button>
           </div>
         }
-        <div class="sale-footer-group sale-footer-main" aria-label="Ações da venda">
+        <div class="sale-footer-group sale-footer-main" role="group" aria-label="Ações da venda">
           @if(sale.status==='active' && !editingDetails() && !editingItems() && !editingShipping()){
             @if(sale.balanceCents>0){
               <button class="bf-button" type="button" [disabled]="!!pendingAction()"

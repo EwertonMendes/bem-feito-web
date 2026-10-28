@@ -5,12 +5,14 @@ import type { Request, Payload } from './schema.ts';
 import { snapshotRow, type Plan, type Row } from './engine.ts';
 
 type Value = string | number | boolean | null | Value[] | { [key: string]: Value };
-type DirectAction = 'create' | 'patch' | 'delete' | 'reverseProduction' | 'adjustStock' | 'deliverSale' | 'recordPaidSale' | 'correctPaidSalePrice';
+type DirectAction = 'create' | 'patch' | 'batchPatch' | 'delete' | 'reverseProduction' | 'adjustStock' | 'deliverSale' | 'recordPaidSale' | 'correctPaidSalePrice';
 export type DirectRequest = {
   schemaVersion: 1; id: string; environment: 'dev'; projectId: 'bem-feito-dev';
   action: DirectAction;
   collection?: string; documentId?: string;
   expected?: Record<string, Value>; expectedAbsent?: string[]; values?: Record<string, Value>;
+  /** Bounded, atomic collection of independent compare-and-swap patches. */
+  changes?: Array<Pick<DirectRequest,'collection'|'documentId'|'expected'|'expectedAbsent'|'values'>>;
   itemType?: 'product' | 'input'; itemId?: string; quantityDelta?: number;
   reason?: string; businessDate?: string;
   /** Public sale code only, not a customer identifier. */
@@ -74,19 +76,37 @@ export function validateDirectRequest(input: string): DirectRequest {
   let raw: unknown;
   try { raw = JSON.parse(input); } catch { throw Error('Invalid direct request JSON'); }
   const o = props(raw, ['schemaVersion','id','environment','projectId','action','collection','documentId',
-    'expected','expectedAbsent','values','itemType','itemId','quantityDelta','reason','businessDate','saleCode',
+    'expected','expectedAbsent','values','changes','itemType','itemId','quantityDelta','reason','businessDate','saleCode',
     'paymentCode','lineItemId','productId','paymentMethodId','quantity','unitPriceCents','expectedAvailableStock','customerName','expectedOriginalTotalCents']);
   invariant(o.schemaVersion === 1 && o.environment === 'dev' && o.projectId === 'bem-feito-dev',
     'Direct administration is DEV-only');
   identifier(o.id);
   invariant((o.id as string).length <= 80, 'Operation ID too long');
-  invariant(['create','patch','delete','reverseProduction','adjustStock','deliverSale','recordPaidSale','correctPaidSalePrice'].includes(String(o.action)), 'Unknown direct action');
+  invariant(['create','patch','batchPatch','delete','reverseProduction','adjustStock','deliverSale','recordPaidSale','correctPaidSalePrice'].includes(String(o.action)), 'Unknown direct action');
   const action = o.action;
   if (action !== 'recordPaidSale' && action !== 'correctPaidSalePrice') invariant(
     ['paymentCode','lineItemId','productId','paymentMethodId','quantity','unitPriceCents',
       'expectedAvailableStock','customerName','expectedOriginalTotalCents'].every(k => o[k] === undefined),
     'Paid sale fields cannot be used in other actions');
-  if (['create','patch','delete'].includes(String(action))) {
+  if(action === 'batchPatch') {
+    invariant(['collection','documentId','expected','expectedAbsent','values','itemType','itemId',
+      'quantityDelta','reason','businessDate','saleCode'].every(k => o[k] === undefined),
+      'Batch patches cannot mix with stock or single-document actions');
+    invariant(Array.isArray(o.changes) && o.changes.length >= 1 && o.changes.length <= 30,
+      'Expected 1..30 atomic patches');
+    const paths = new Set<string>();
+    for(const candidate of o.changes) {
+      props(candidate,['collection','documentId','expected','expectedAbsent','values']);
+      validateDirectRequest(JSON.stringify({
+        schemaVersion:1,id:o.id,environment:'dev',projectId:'bem-feito-dev',
+        action:'patch',...candidate,
+      }));
+      const path = String(candidate.collection)+'/'+String(candidate.documentId);
+      invariant(!paths.has(path),'Duplicate document in atomic patches');
+      paths.add(path);
+    }
+  } else if (['create','patch','delete'].includes(String(action))) {
+    invariant(o.changes === undefined,'Single-document operation cannot include batch changes');
     identifier(o.collection);
     invariant(!RESERVED_COLLECTIONS.has(o.collection), 'Protected infrastructure collection');
     identifier(o.documentId);
@@ -110,11 +130,13 @@ export function validateDirectRequest(input: string): DirectRequest {
       invariant(o.expected === undefined && o.expectedAbsent === undefined && o.values === undefined, 'Delete takes no data fields');
     }
   } else if (action === 'reverseProduction') {
+    invariant(o.changes === undefined,'Unexpected batch changes');
     invariant(o.collection === undefined && o.expected === undefined && o.expectedAbsent === undefined && o.values === undefined &&
       o.itemType === undefined && o.itemId === undefined && o.quantityDelta === undefined &&
       o.reason === undefined && o.businessDate === undefined && o.saleCode === undefined, 'Unexpected reversal parameters');
     identifier(o.documentId);
   } else if (action === 'recordPaidSale') {
+    invariant(o.changes === undefined,'Unexpected batch changes');
     invariant(['collection','documentId','expected','expectedAbsent','values','itemType',
       'itemId','quantityDelta','reason','expectedOriginalTotalCents'].every(k=>o[k]===undefined),
       'Paid sale accepts only validated order parameters');
@@ -134,6 +156,7 @@ export function validateDirectRequest(input: string): DirectRequest {
       'Expected available stock must cover the sale');
 
   } else if (action === 'correctPaidSalePrice') {
+    invariant(o.changes === undefined,'Unexpected batch changes');
     invariant(['collection','documentId','expected','expectedAbsent','values','itemType',
       'itemId','quantityDelta','reason','lineItemId','quantity','expectedAvailableStock']
       .every(k=>o[k]===undefined),
@@ -155,12 +178,14 @@ export function validateDirectRequest(input: string): DirectRequest {
       o.expectedOriginalTotalCents !== o.unitPriceCents,
       'Explicit original amount and a different catalog price required');
   } else if (action === 'deliverSale') {
+    invariant(o.changes === undefined,'Unexpected batch changes');
     invariant(['collection','documentId','expected','expectedAbsent','values','itemType',
       'itemId','quantityDelta','reason','businessDate'].every(k => o[k] === undefined),
       'Delivery cannot contain raw writes or payment changes');
     invariant(typeof o.saleCode === 'string' && /^V[0-9]{5}$/.test(o.saleCode),
       'Exact sale code required');
   } else {
+    invariant(o.changes === undefined,'Unexpected batch changes');
     invariant(o.saleCode === undefined, 'Stock adjustment cannot specify a sale');
     invariant(o.collection === undefined && o.documentId === undefined && o.expected === undefined &&
       o.expectedAbsent === undefined && o.values === undefined, 'Stock adjustment does not accept raw field writes');
@@ -588,7 +613,11 @@ async function correctPaidSalePrice(db: Firestore, input: DirectRequest): Promis
 
 export async function prepareDirect(input: DirectRequest, db: Firestore): Promise<{request:Request;plan:Plan}> {
   const request=directAsRequest(input);
-  const rows = input.action === 'reverseProduction' ? await reverseProduction(db,input.documentId!) :
+  const rows = input.action === 'batchPatch'
+    ? (await Promise.all(input.changes!.map(change => createOrPatchOrDelete(db,{
+      ...input,...change,changes:undefined,action:'patch',
+    })))).flat()
+    : input.action === 'reverseProduction' ? await reverseProduction(db,input.documentId!) :
     input.action === 'adjustStock' ? await adjustStock(db,input) :
       input.action === 'deliverSale' ? await deliverSale(db,input.saleCode!) :
         input.action === 'recordPaidSale' ? await recordPaidSale(db,input) :

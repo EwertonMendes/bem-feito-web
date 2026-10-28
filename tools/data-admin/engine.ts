@@ -37,10 +37,68 @@ function assertExpected(data: Payload | null, expected: Payload | null, expected
   for (const key of expectedAbsent) invariant(!Object.hasOwn(data,key), 'Expected reference field to be absent');
 }
 
+/**
+ * PROD reference cost basis comes from PROD purchase receipts, never from DEV
+ * or from obsolete input stock. The IDs/formulas are not financial disclosures.
+ * Received, non-cancelled receipts only. Standalone kit receipts are linked
+ * explicitly because historical imports predate input catalog associations.
+ */
+const PROD_REFERENCE_SOURCES: Record<string,{pool:string;factor:number;unallocated?:string}> = {
+  'BASE-BRA':{pool:'base',factor:1000},
+  'BASE-TRA':{pool:'base',factor:1000},
+  'INS-021':{pool:'surfactant',factor:500},
+  'INS-023':{pool:'colorant',factor:30},
+  'INS-017':{pool:'fragrance-classic',factor:100,unallocated:'M000002'},
+  'INS-016':{pool:'fragrance-premium',factor:30,unallocated:'M000001'},
+};
+async function referencePurchaseBasis(
+  db: Firestore, inputId: string, pool: string, factor: number, before: Payload,
+): Promise<{ quantity: number; value: number; dependencies: Plan['dependencies'] }> {
+  const configuration = PROD_REFERENCE_SOURCES[inputId];
+  invariant(configuration && configuration.pool === pool && configuration.factor === factor,
+    'Unrecognized production reference source or purchase unit');
+  invariant(before.trackingMode === 'untracked', 'Production materials must not have countable stock');
+  const receipts = configuration.unallocated
+    ? [await db.doc('expenses/' + configuration.unallocated).get()]
+    : (await db.collection('expenses').where('inputId','==',inputId).limit(40).get()).docs;
+  let quantity=0,value=0;
+  const dependencies:Plan['dependencies']=[];
+  for(const doc of receipts) {
+    const expense=doc.data();
+    if(!doc.exists || !expense) {
+      invariant(!configuration.unallocated, 'Missing historical unallocated receipt');
+      continue;
+    }
+    if(expense.kind !== 'input-purchase' || expense.receiptStatus !== 'received' ||
+      expense.status === 'cancelled') {
+      invariant(!configuration.unallocated, 'Standalone historical receipt must be received');
+      continue;
+    }
+    invariant(configuration.unallocated ? !expense.inputId : expense.inputId === inputId,
+      'Unallocated receipt was assigned to another input');
+    invariant(typeof expense.quantity === 'number' && Number.isFinite(expense.quantity) &&
+      expense.quantity > 0 && Number.isSafeInteger(expense.amountCents) &&
+      expense.amountCents > 0, 'Invalid received source purchase');
+    quantity += expense.quantity;
+    value += expense.amountCents;
+    dependencies.push({path:doc.ref.path,version:version(doc)!});
+  }
+  invariant(quantity > 0 && Number.isFinite(quantity) && quantity <= 1_000_000 &&
+    value > 0 && Number.isSafeInteger(value) && value <= 1_000_000_000,
+    'No valid received purchase basis; never count pending receipts');
+  // Historical averaged unit costs may include the separately allocated freight.
+  // Preserve that purchase-funded average if larger than the simple receipts sum.
+  const average = Number(before.averageUnitCostCents ?? 0);
+  invariant(Number.isSafeInteger(average) && average >= 0, 'Invalid historical material unit cost');
+  const withDistributedFreight = Math.round(average * quantity);
+  return { quantity, value: Math.max(value, withDistributedFreight), dependencies };
+}
+
 export async function prepare(request: Request, db: Firestore, archive: Archive): Promise<Plan> {
   invariant(request.operation !== 'migrate', 'Use registered migration planner');
   let rows: Row[];
   let scope: string[];
+  const sourceDependencies: Plan['dependencies'] = [];
   if (request.operation === 'restore') {
     const backup = await archive.get('backups', request.backup!);
     invariant(backup.schemaVersion === 1 && backup.projectId === request.projectId && backup.environment === request.environment, 'Backup environment differs');
@@ -67,6 +125,20 @@ export async function prepare(request: Request, db: Firestore, archive: Archive)
         let after: Payload | null = change.action === 'delete' ? null : { ...(before ?? {}), ...change.values };
         if (change.collection === 'fragrances' && before) invariant(after?.collectionId === before.collectionId, 'Changing fragrance ownership needs a registered domain migration');
         if (change.collection === 'formatPrices' && before) invariant(after?.collectionId === before.collectionId && after?.formatId === before.formatId, 'Changing price relationships needs a registered domain migration');
+        if (change.collection === 'inputs' && after && request.environment === 'prod' &&
+          Object.hasOwn(change.values ?? {}, 'costPool') &&
+          !Object.hasOwn(change.values ?? {}, 'costBasisValueCents')) {
+          invariant(change.expectedAbsent?.includes('costBasisQuantity') &&
+            change.expectedAbsent?.includes('costBasisValueCents') &&
+            change.expectedAbsent?.includes('costPool') &&
+            change.expectedAbsent?.includes('costUnitFactor'),
+            'PROD cost reference must explicitly guard absent source fields');
+          const basis = await referencePurchaseBasis(db,change.id,
+            String(after.costPool),Number(after.costUnitFactor),before!);
+          after.costBasisQuantity = basis.quantity;
+          after.costBasisValueCents = basis.value;
+          sourceDependencies.push(...basis.dependencies);
+        }
         if (change.collection === 'inputs' && after) {
           // A historical unit-price correction may still recompute its legacy basis.
           // Cost-only references are explicitly purchase-funded and MUST NEVER be
@@ -94,7 +166,7 @@ export async function prepare(request: Request, db: Firestore, archive: Archive)
     }
   }
   if (request.operation === 'delete') assertScope(request, scope);
-  const dependencies: Plan['dependencies'] = [];
+  const dependencies: Plan['dependencies'] = [...sourceDependencies];
   // All new relationships are read again inside the write transaction.
   for (const row of rows.filter(() => !['read', 'inspect', 'verify', 'backup'].includes(request.operation))) {
     const after = decode(row.after, db);

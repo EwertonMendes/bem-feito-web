@@ -32,6 +32,9 @@ after(async () => {
   await db.doc('inputs/admin-reference-base').delete();
   await db.doc('formats/admin-reference-floral').delete();
   await db.doc('collections/admin-reference-classic').delete();
+  await db.doc('expenses/admin-prod-received').delete();
+  await db.doc('expenses/admin-prod-pending').delete();
+  await db.doc('inputs/INS-021').delete();
   await db.recursiveDelete(db.collection('dataAdminSmoke'));
   await db.doc('collections/admin-test-parent').delete();
   await db.doc('fragrances/admin-test-child').delete();
@@ -129,6 +132,34 @@ test('PROD reference migration preserves original purchases, stocks, and other d
   assert.ok([...archive.objects.keys()].some(key=>key.startsWith('backups/')));
   await assert.rejects(prepare(request,db,archive),/Expected reference field to be absent|precondition differs/);
 });
+test('PROD purchase-funded costing excludes pending receipts and never adjusts material stock',async()=>{
+  await db.doc('inputs/INS-021').set({name:'Lauril vegetal',trackingMode:'untracked',
+    averageUnitCostCents:1680,stock:85,committedStock:4,reservedPhysicalStock:0,
+    minimumStock:0,active:true});
+  await db.doc('expenses/admin-prod-received').set({kind:'input-purchase',
+    inputId:'INS-021',quantity:1,amountCents:1680,receiptStatus:'received'});
+  await db.doc('expenses/admin-prod-pending').set({kind:'input-purchase',
+    inputId:'INS-021',quantity:3,amountCents:5040,receiptStatus:'pending'});
+  const req=validateRequest({schemaVersion:1,id:'prod-invoice-calc',environment:'prod',
+    projectId:'bem-feito-prod',operation:'batch-update',changes:[
+      {collection:'inputs',id:'INS-021',action:'update',
+        expected:{averageUnitCostCents:1680},
+        expectedAbsent:['costPool','costUnitFactor','costBasisQuantity','costBasisValueCents'],
+        values:{costPool:'surfactant',costUnitFactor:500}},
+    ]});
+  const plan=await prepare(req,db,archive);
+  const after=decode(plan.rows[0].after,db);
+  assert.equal(after.costBasisQuantity,1);
+  assert.equal(after.costBasisValueCents,1680);
+  assert.equal(plan.dependencies.length,1);
+  await apply(req,plan,db,archive,{...actor,approvedPlan:hash(plan)});
+  const material=(await db.doc('inputs/INS-021').get()).data()!;
+  assert.equal(material.costPool,'surfactant');
+  assert.equal(material.costUnitFactor,500);
+  assert.equal(material.costBasisValueCents,1680);
+  assert.deepEqual([material.stock,material.committedStock,material.reservedPhysicalStock],[85,4,0]);
+});
+
 test('Firestore types survive backup/restore without marker collisions', () => {
   const value = { timestamp: new Timestamp(123, 456), point: new GeoPoint(-23, -46), bytes: Buffer.from('test'), ref: db.doc('inputs/a'), nan: NaN, nested: [{ $timestamp: 'literal-string' }] };
   assert.equal(hash(encode(decode(encode(value), db))), hash(encode(value)));

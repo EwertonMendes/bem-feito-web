@@ -55,7 +55,7 @@ test('direct authorization requires trusted owner, master and exact dispatch',as
   const sha='a'.repeat(40);
   const actor={id:33728924,login:'EwertonMendes',type:'User'};
   const event:any={repository:{id:1406056807,owner:{id:33728924}},sender:actor,
-    inputs:{mode:'direct',operation:json(patch)}};
+    inputs:{mode:'direct',operation:json(patch),target_environment:'dev'}};
   const env:any={GITHUB_ACTIONS:'true',GITHUB_REPOSITORY:config.repository,GITHUB_REF:'refs/heads/master',
     GITHUB_WORKFLOW_REF:config.repository+'/.github/workflows/data-admin.yml@refs/heads/master',
     GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_SHA:sha,GITHUB_WORKFLOW_SHA:sha,GITHUB_RUN_ATTEMPT:'1',
@@ -73,6 +73,7 @@ test('direct authorization requires trusted owner, master and exact dispatch',as
   await assert.rejects(authorizeDirect(event,{...env,GATEWAY_DIRECT:'tampered'},config,api));
   await assert.rejects(authorizeDirect({...event,sender:{...actor,id:2}},env,config,api));
   await assert.rejects(authorizeDirect({...event,inputs:{...event.inputs,pr:'12'}},env,config,api));
+  await assert.rejects(authorizeDirect({...event,inputs:{...event.inputs,target_environment:'prod'}},env,config,api));
   await assert.rejects(authorizeDirect(event,env,config,async p=>p==='branches/master'?{protected:false,commit:{sha}}:api(p)));
 });
 

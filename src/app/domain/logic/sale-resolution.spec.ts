@@ -39,6 +39,24 @@ const emptyDraft = (): SaleDraft => ({
 });
 
 describe('sale resolution', () => {
+  it('uses the stored unit cost for simplified-cost inventory without historical decimal overrides', () => {
+    const product: Product = {
+      id:'costed',code:'P',active:true,collectionId:'col',fragranceId:'f',formatId:'fmt',
+      displayName:'Floral',salePriceCents:1800,averageUnitCostCents:393,
+      additionalCostCents:0,stock:10,minimumStock:0,recipe:[],
+      costingVersion:2,unitCostDeciCents:950,
+    };
+    const result = resolveSaleDraft({
+      businessDate:'2026-10-28',
+      lines:[{kind:'product',sourceId:'costed',quantity:2}],
+      discountCents:0,fulfillmentStatus:'delivered',
+    } as SaleDraft, {
+      products:new Map([['costed',product]]),additions:new Map(),inputs:new Map(),
+      productUnitCosts:new Map([['costed',950]]),
+    });
+    expect(result.lines[0]?.unitCostCents).toBe(393);
+    expect(result.lines[0]?.totalCostCents).toBe(786);
+  });
   it('resolves a direct product line and its stock effect', () => {
     const draft = emptyDraft();
     draft.lines = [{ kind: 'product', sourceId: 'p1', quantity: 2 }];

@@ -23,8 +23,12 @@ export async function authorizeDirect(event: any, env: NodeJS.ProcessEnv, config
     actor.login === env.GITHUB_ACTOR && actor.login === env.GITHUB_TRIGGERING_ACTOR,
     'Owner identity required for direct writes');
   invariant(env.GATEWAY_DIRECT === event.inputs.operation, 'Dispatch parameters changed');
+  // Workflow dispatch includes the default target_environment even when the
+  // caller selects direct mode. Accept only the DEV default; reject PROD.
+  invariant(!event.inputs.target_environment || event.inputs.target_environment === 'dev',
+    'Direct mode is restricted to DEV');
   invariant(Object.keys(event.inputs).every(k =>
-    ['mode','operation','recipient_public_key','pr','path','sha','request_hash','plan_hash','query'].includes(k)) &&
+    ['mode','operation','target_environment','recipient_public_key','pr','path','sha','request_hash','plan_hash','query'].includes(k)) &&
     !['pr','path','sha','request_hash','plan_hash','query','recipient_public_key']
       .some(k => Boolean(event.inputs[k])), 'Direct cannot mix query or PR inputs');
   const request=validateDirectRequest(event.inputs.operation);

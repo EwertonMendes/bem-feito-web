@@ -279,6 +279,24 @@
           </div>
         </section>
 
+        <section class="panel-section shipping-section" aria-label="Frete da venda">
+          <div class="section-heading payments-head">
+            <div><span class="section-icon"><bf-icon name="order" /></span>
+              <div><h3>Frete</h3><small>Opcional e variável para cada entrega.</small></div>
+            </div>
+            <label class="bf-field" style="display:flex;align-items:center;gap:0.5rem">
+              <input type="checkbox" [checked]="shippingEnabled()" (change)="shippingEnabled.set($any($event.target).checked)" />
+              Cobrar frete
+            </label>
+          </div>
+          @if(shippingEnabled()){
+            <label class="bf-field">
+              <span>Valor do frete (R$)</span>
+              <bf-number-input kind="currency" [min]="0" [formField]="saleForm.shippingFee" ariaLabel="Valor do frete" />
+            </label>
+          }
+        </section>
+
         <section class="payments panel-section">
           <div class="section-heading payments-head">
             <div>
@@ -421,6 +439,9 @@
           <div class="totals">
             <span>Subtotal <strong>{{ currency(subtotalCents()) }}</strong></span>
             <span>Desconto <strong>{{ currency(discountCents()) }}</strong></span>
+            @if (shippingFeeCents()>0) {
+              <span>Frete <strong>{{ currency(shippingFeeCents()) }}</strong></span>
+            }
             <span>Recebido <strong>{{ currency(paymentCents()) }}</strong></span>
             @if (expectedTipCents()>0) {
               <span class="tip">Gorjeta <strong>{{ currency(expectedTipCents()) }}</strong></span>

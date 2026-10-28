@@ -20,6 +20,7 @@ import { CashManagementRepository } from './cash-management.repository';
 
 export interface DashboardMetrics {
   revenueCents: number;
+  shippingCents: number;
   receivedCents: number;
   cashReceivedCents: number;
   receivableCents: number;
@@ -115,6 +116,7 @@ export class DashboardRepository {
     ] = await Promise.all([
       getAggregateFromServer(salesInPeriod, {
         revenueCents: sum('totalCents'),
+        shippingCents: sum('shippingFeeCents'),
         discountsCents: sum('discountCents'),
         saleCount: count(),
       }),
@@ -184,6 +186,7 @@ export class DashboardRepository {
 
     return {
       revenueCents: Number(salesData.revenueCents ?? 0),
+      shippingCents: Number(salesData.shippingCents ?? 0),
       receivedCents: Number(paymentsData.receivedCents ?? 0),
       cashReceivedCents: Number(paymentsData.cashReceivedCents ?? 0),
       receivableCents: Number(receivableAggregate.data().receivableCents ?? 0),

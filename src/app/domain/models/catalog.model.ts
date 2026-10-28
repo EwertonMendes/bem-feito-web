@@ -74,6 +74,10 @@ export interface InputItem extends AuditFields {
   trackingMode?: InputTrackingMode;
   /** Optional reference cost group: mixtures are priced as a pool, not a fixed colour or fragrance. */
   costPool?: CostPool;
+  /** Audit metadata when an obsolete physical balance ceases to be tracked. */
+  untrackedSince?: string;
+  previousPhysicalStock?: number;
+  previousTrackingMode?: InputTrackingMode;
   /** Qualitative status for non-measurable liquids; never treated as a numerical balance. */
   availabilityStatus?: string;
   stockStatus?: StockStatus;

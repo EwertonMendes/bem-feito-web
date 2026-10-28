@@ -79,7 +79,7 @@
   <div class="metric-grid">
     <article class="metric-card tint-sage">
       <span class="metric-icon sage"><bf-icon name="revenue" /></span>
-      <div class="metric-copy"><span>Faturamento</span><strong>{{ currency(store.revenueCents()) }}</strong></div>
+      <div class="metric-copy"><span>Faturamento</span><strong>{{ currency(store.revenueCents()) }}</strong><small>Frete incluído: {{currency(store.shippingCents())}}</small></div>
     </article>
     <article class="metric-card">
       <span class="metric-icon sage"><bf-icon name="received" /></span>

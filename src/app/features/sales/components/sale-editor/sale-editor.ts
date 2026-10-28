@@ -13,6 +13,7 @@ import { FormField, form, min, required } from '@angular/forms/signals';
 import { Addition, Product } from '../../../../domain/models/catalog.model';
 import { PRODUCT_CATEGORIES, productCategoryId } from '../../../../domain/logic/product-category';
 import { CatalogImageRef } from '../../../../domain/models/image.model';
+import { calculateSaleTotalCents } from '../../../../domain/logic/sale-pricing';
 import { PaymentDraft, SaleDraft, SaleDraftLine } from '../../../../domain/models/sales.model';
 import { ToastService } from '../../../../core/services/toast.service';
 import { todayBusinessDate } from '../../../../core/utils/date';
@@ -28,12 +29,14 @@ import { BfIcon } from '../../../../shared/ui/icon/icon';
 import { BfSelect, BfSelectOption } from '../../../../shared/ui/select/select';
 import { paymentMethodIcon } from '../../../../shared/ui/select/payment-method-icon';
 import { BfNumberInput } from '../../../../shared/ui/number-input/number-input';
+import { BfCheckbox } from '../../../../shared/ui/checkbox/checkbox';
 
 interface SaleFormModel {
   businessDate: string;
   customerName: string;
   dueDate: string;
   discount: number;
+  shippingFee: number;
   notes: string;
 }
 
@@ -64,7 +67,7 @@ interface PaymentUi {
 
 @Component({
   selector: 'bf-sale-editor',
-  imports: [BfLoadingButton, FormField, BfConfirmDialog, BfDialog, BfIcon, CatalogImage, BfSelect, BfNumberInput],
+  imports: [BfLoadingButton, FormField, BfConfirmDialog, BfDialog, BfIcon, CatalogImage, BfSelect, BfNumberInput, BfCheckbox],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sale-editor.html',
   styleUrl: './sale-editor.scss',
@@ -87,6 +90,7 @@ export class SaleEditor {
   readonly catalogCategory = signal('');
   readonly cart = signal<CartLine[]>([]);
   readonly payments = signal<PaymentUi[]>([]);
+  readonly shippingEnabled = signal(false);
   readonly mobileView = signal<MobileView>('catalog');
   readonly detailsExpanded = signal(true);
   readonly submitting = signal(false);
@@ -95,6 +99,7 @@ export class SaleEditor {
   readonly saleForm = form(this.model, (p) => {
     required(p.businessDate);
     min(p.discount, 0);
+    min(p.shippingFee, 0);
   });
 
   readonly filteredProducts = computed(() => {
@@ -157,8 +162,9 @@ export class SaleEditor {
     Math.max(0, toCents(this.model().discount))
   );
 
+  readonly shippingFeeCents = computed(() => this.shippingEnabled() ? toCents(this.model().shippingFee) : 0);
   readonly totalCents = computed(() =>
-    Math.max(0, this.subtotalCents() - this.discountCents())
+    calculateSaleTotalCents(this.subtotalCents(), this.discountCents(), this.shippingFeeCents())
   );
 
   readonly paymentCents = computed(() =>
@@ -190,6 +196,7 @@ export class SaleEditor {
       Boolean(model.customerName.trim()) ||
       Boolean(model.dueDate) ||
       model.discount > 0 ||
+      this.shippingEnabled() ||
       Boolean(model.notes.trim())
     );
   });
@@ -410,12 +417,20 @@ export class SaleEditor {
       return;
     }
 
+    if (this.shippingEnabled() && (!Number.isFinite(this.model().shippingFee) || this.model().shippingFee < 0)) {
+      this.toast.error('Informe um frete válido.'); return;
+    }
+    if (this.expectedTipCents() > 0 && !window.confirm(
+      'O recebimento excede o total em ' + this.currency(this.expectedTipCents()) +
+      '. Confirmar esse valor como gorjeta?')) return;
+
     const draft: SaleDraft = {
       businessDate: this.model().businessDate,
       fulfillmentStatus: this.fulfillmentStatus(),
       customerName: this.model().customerName.trim() || undefined,
       dueDate: this.model().dueDate || undefined,
       discountCents: this.discountCents(),
+      shippingFeeCents: this.shippingFeeCents(),
       notes: this.model().notes.trim() || undefined,
       lines: this.cart().map((line) => this.toDraftLine(line)),
       payments: this.payments()
@@ -488,6 +503,7 @@ export class SaleEditor {
       customerName: '',
       dueDate: '',
       discount: 0,
+      shippingFee: 0,
       notes: '',
     };
   }
@@ -496,6 +512,7 @@ export class SaleEditor {
     const method = this.settings.paymentMethods().find((item) => item.active);
 
     this.cart.set([]);
+    this.shippingEnabled.set(false);
     this.fulfillmentStatus.set('delivered');
     this.model.set(this.defaultModel());
     this.payments.set(

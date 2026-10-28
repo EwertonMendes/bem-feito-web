@@ -1,4 +1,5 @@
 import { inputUnitCostCents, trackingModeForInput } from './costing';
+import { calculateSaleTotalCents } from './sale-pricing';
 import { productCategoryId } from './product-category';
 import { Addition, InputItem, Product } from '../models/catalog.model';
 import { SaleDraft, SaleLineSnapshot, StockEffect } from '../models/sales.model';
@@ -141,7 +142,7 @@ export function resolveSaleDraft(
 
   const subtotalCents = lines.reduce((sum, line) => sum + line.totalCents, 0);
   const discountCents = Math.min(Math.max(0, draft.discountCents), subtotalCents);
-  const totalCents = Math.max(0, subtotalCents - discountCents);
+  const totalCents = calculateSaleTotalCents(subtotalCents, discountCents, draft.shippingFeeCents ?? 0);
 
   return { lines, stockEffects, subtotalCents, discountCents, totalCents };
 }

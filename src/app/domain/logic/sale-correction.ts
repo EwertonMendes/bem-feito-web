@@ -1,3 +1,4 @@
+import { calculateSaleTotalCents } from './sale-pricing';
 import { Sale, SaleLineSnapshot, StockEffect } from '../models/sales.model';
 import { summarizeSaleItems } from './sale-analytics';
 
@@ -96,7 +97,7 @@ export function planSaleProductCorrection(sale:Sale,draft:SaleProductCorrection)
   if(!items.length)throw new Error('Não é possível deixar a venda sem itens.');
   const subtotalCents=items.reduce((sum,line)=>sum+line.totalCents,0);
   if(draft.discountCents>subtotalCents)throw new Error('Desconto maior que a venda.');
-  const totalCents=subtotalCents-draft.discountCents;
+  const totalCents=calculateSaleTotalCents(subtotalCents,draft.discountCents,sale.shippingFeeCents??0);
   if(sale.receivedCents>totalCents)throw new Error('O novo valor é menor que os pagamentos já recebidos. Regularize os recebimentos primeiro.');
   const balanceCents=totalCents-sale.receivedCents;
   if(balanceCents>0&&!sale.customerName?.trim())throw new Error('Informe o cliente antes de manter saldo pendente.');

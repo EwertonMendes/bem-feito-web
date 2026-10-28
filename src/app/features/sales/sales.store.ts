@@ -14,6 +14,8 @@ import { BusinessDateCursor, compareBusinessDateDesc } from '../../core/reposito
 import { SalesRepository } from '../../core/repositories/sales.repository';
 import { SaleCorrectionRepository, SaleMetadataCorrection } from '../../core/repositories/sale-correction.repository';
 import { AdvancedSaleCorrectionRepository } from '../../core/repositories/advanced-sale-correction.repository';
+import { ShippingCorrectionRepository } from '../../core/repositories/shipping-correction.repository';
+import { ShippingCorrectionDraft } from '../../domain/logic/shipping-correction';
 import { AdvancedSaleDraft } from '../../domain/logic/advanced-sale-edit';
 import { ErrorService } from '../../core/services/error.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -26,6 +28,7 @@ const RECEIVABLE_PAGE_SIZE = 40;
 export class SalesStore {
   private readonly repository = inject(SalesRepository);
   private readonly corrections = inject(SaleCorrectionRepository);
+  private readonly shippingCorrections = inject(ShippingCorrectionRepository);
   private readonly revisions = inject(DataRevisionService);
   private readonly toast = inject(ToastService);
   private readonly errors = inject(ErrorService);
@@ -248,6 +251,19 @@ export class SalesStore {
       this.toast.success('Itens da venda corrigidos com auditoria.');
       return {sale:result.sale,stockChanges:result.stockChanges};
     }catch(error){
+      this.toast.error(this.errors.message(error));
+      return null;
+    }
+  }
+
+  async correctShipping(saleId: string, draft: ShippingCorrectionDraft): Promise<Sale | null> {
+    try {
+      const result = await this.shippingCorrections.correct(saleId,draft);
+      this.patchSale(result.sale);
+      this.syncReceivable(result.sale,result.previousBalanceCents);
+      this.toast.success('Frete corrigido com histórico financeiro.');
+      return result.sale;
+    } catch(error) {
       this.toast.error(this.errors.message(error));
       return null;
     }

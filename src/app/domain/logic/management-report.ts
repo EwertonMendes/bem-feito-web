@@ -17,6 +17,8 @@ export interface ManagementReport {
   salesCount:number;
   unitsSold:number;
   revenueCents:number;
+  productRevenueCents:number;
+  shippingCents:number;
   receivedCents:number;
   tipsCents:number;
   cogsCents:number;
@@ -85,6 +87,8 @@ export function buildManagementReport(
 ):ManagementReport {
   const active=sales.filter(sale=>sale.status==='active');
   const revenueCents=active.reduce((sum,s)=>sum+s.totalCents,0);
+  const shippingCents=active.reduce((sum,s)=>sum+(s.shippingFeeCents??0),0);
+  const productRevenueCents=revenueCents-shippingCents;
   const cogsCents=active.reduce((sum,s)=>sum+s.items.reduce((v,l)=>v+l.totalCostCents,0),0);
   const missingCostItems=active.reduce((sum,s)=>sum+s.items.filter(l=>l.totalCostCents<=0).length,0);
   const receivedCents=payments.filter(p=>p.status==='active').reduce((sum,p)=>sum+p.appliedCents,0);
@@ -92,7 +96,7 @@ export function buildManagementReport(
   const paid=expenses.filter(e=>e.status!=='cancelled');
   const byKind=(kind:Expense['kind'])=>paid.filter(e=>e.kind===kind).reduce((sum,e)=>sum+e.amountCents,0);
   const operatingExpensesCents=byKind('operating-expense');
-  const grossProfitCents=revenueCents-cogsCents;
+  const grossProfitCents=productRevenueCents-cogsCents;
   const fallback=(key:string,dict:ReadonlyMap<string,string>)=>dict.get(key)??'Sem classificação histórica';
   const keyFor=(type:'collection'|'fragrance'|'format')=>(sale:Sale,line:SaleLineSnapshot):[string,string]=>{
     if(line.kind==='addition')return ['addition','Adicionais'];
@@ -102,11 +106,11 @@ export function buildManagementReport(
   return {
     salesCount:active.length,
     unitsSold:active.reduce((n,s)=>n+s.items.filter(i=>i.kind==='product').reduce((m,i)=>m+i.quantity,0),0),
-    revenueCents,receivedCents,tipsCents,cogsCents,grossProfitCents,operatingExpensesCents,
-    operationalResultCents:grossProfitCents-operatingExpensesCents+tipsCents,
+    revenueCents,productRevenueCents,shippingCents,receivedCents,tipsCents,cogsCents,grossProfitCents,operatingExpensesCents,
+    operationalResultCents:grossProfitCents+shippingCents-operatingExpensesCents+tipsCents,
     otherExpensesCents:byKind('other'),inventoryPurchasesCents:byKind('input-purchase'),
     equipmentCents:byKind('equipment'),missingCostItems,
-    marginPercent:missingCostItems?null:pct(revenueCents,grossProfitCents),
+    marginPercent:missingCostItems?null:pct(productRevenueCents,grossProfitCents),
     averageTicketCents:active.length?Math.round(revenueCents/active.length):0,
     byCategory:groups(active,(_sale,line)=>{
       if (line.kind === 'addition') return ['addition', 'Adicionais'];

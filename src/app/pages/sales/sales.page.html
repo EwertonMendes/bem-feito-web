@@ -214,6 +214,48 @@
 
           }
         </section>
+        @if((sale.shippingFeeCents??0)>0 && !editingShipping()){
+          <div class="sale-detail-line"><span>Frete</span><strong>{{ currency(sale.shippingFeeCents??0) }}</strong></div>
+        }
+        @if(editingShipping()){
+          <section class="sale-metadata-editor" aria-label="Corrigir frete">
+            <h3>Corrigir frete da venda</h3>
+            <p>Altera o frete sem movimentar estoque ou registrar um novo pagamento.</p>
+            <div class="sale-metadata-grid">
+              <label>Frete cobrado (R$)
+                <input class="bf-input" type="number" min="0" step="0.01" [value]="shippingAmount()"
+                  (input)="shippingAmount.set(+$any($event.target).value); shippingReclassify.set(false)" />
+              </label>
+              @if((shippingAmount()*100-(sale.shippingFeeCents??0))>0 && (shippingAmount()*100-(sale.shippingFeeCents??0))<=sale.tipCents){
+                <bf-checkbox class="wide" [checked]="shippingReclassify()"
+                  (checkedChange)="shippingReclassify.set($event)"
+                  [label]="'Reclassificar '+currency(Math.round(shippingAmount()*100-(sale.shippingFeeCents??0)))+' da gorjeta já recebida como frete'" />
+              }
+              <label class="wide">Motivo da correção
+                <textarea class="bf-textarea" rows="2" maxlength="240"
+                  placeholder="Ex.: frete inicialmente lançado como gorjeta"
+                  [value]="shippingReason()" (input)="shippingReason.set($any($event.target).value)"></textarea>
+              </label>
+            </div>
+            @if(shippingPreview();as preview){
+              @if(preview.value){
+                <div class="sale-correction-preview" role="status">
+                  <span>Novo total <strong>{{currency(preview.value.totalCents)}}</strong></span>
+                  <span>Recebido <strong>{{currency(preview.value.receivedCents)}}</strong></span>
+                  <span>Novo saldo <strong>{{currency(preview.value.balanceCents)}}</strong></span>
+                  <span>Gorjeta <strong>{{currency(preview.value.tipCents)}}</strong></span>
+                </div>
+              } @else {
+                <p class="sale-correction-error" role="alert">{{preview.error}}</p>
+              }
+            }
+            <div class="sale-metadata-actions">
+              <button type="button" class="bf-button secondary" (click)="cancelShippingCorrection()" [disabled]="!!pendingAction()">Cancelar</button>
+              <button type="button" class="bf-button" [disabled]="!!pendingAction() || !shippingPreview()?.value || shippingReason().trim().length<4"
+                (click)="saveShippingCorrection()">Salvar correção</button>
+            </div>
+          </section>
+        }
         @if (sale.stockApplied === false && sale.fulfillmentStatus !== 'delivered') {
           <section class="order-progress">
             <h3><bf-icon name="production"/> Acompanhamento da encomenda</h3>
@@ -360,12 +402,16 @@
         }
       </div>
       <div class="bf-dialog-footer">
-        @if(sale.status==='active' && !editingDetails() && !editingItems() && hasProductLines(sale)) { <button class="bf-button secondary" type="button" [disabled]="!!pendingAction() || openingItemEditor()" [bfLoadingButton]="openingItemEditor()" (click)="openItemCorrection(sale)"><bf-icon name="details"/> {{openingItemEditor()?"Carregando...":"Editar venda"}}</button> }
-        @if(sale.status==='active' && !editingDetails() && !editingItems()) { <button class="bf-button secondary" type="button" [disabled]="!!pendingAction()" (click)="editingDetails.set(true)"><bf-icon name="details"/> Corrigir dados</button> }
-        @if (sale.status==='active' && sale.balanceCents>0 && !editingItems() && !editingDetails()){<button class="bf-button" type="button" (click)="modals.openReceipt(sale.id)"><bf-icon name="payment"/> Receber</button>}
-        @if (sale.status==='active' && sale.fulfillmentStatus==='in-production' && !editingItems() && !editingDetails()){<button class="bf-button" type="button" [disabled]="!!pendingAction()" [bfLoadingButton]="pendingAction()==='ready'" (click)="advanceSelected('ready')">{{pendingAction()==='ready'?'Atualizando...':'Marcar pronta'}}</button>}
-        @if (sale.status==='active' && sale.fulfillmentStatus==='ready' && !editingItems() && !editingDetails()){<button class="bf-button" type="button" [disabled]="!!pendingAction()" [bfLoadingButton]="pendingAction()==='delivered'" (click)="advanceSelected('delivered')">{{pendingAction()==='delivered'?'Atualizando...':'Entregar / retirar'}}</button>}
-        @if (sale.status!=='cancelled' && !editingItems() && !editingDetails()) { <button class="bf-button danger" type="button" [disabled]="!!pendingAction()" [bfLoadingButton]="pendingAction()==='cancel'" (click)="cancelSelected()">{{pendingAction()==='cancel'?'Cancelando...':'Cancelar venda'}}</button> }
+        @if(sale.status==='active' && !editingDetails() && !editingItems() && !editingShipping() && hasProductLines(sale)) { <button class="bf-button secondary" type="button" [disabled]="!!pendingAction() || openingItemEditor()" [bfLoadingButton]="openingItemEditor()" (click)="openItemCorrection(sale)"><bf-icon name="details"/> {{openingItemEditor()?"Carregando...":"Editar venda"}}</button> }
+        @if(sale.status==='active' && !editingDetails() && !editingItems() && !editingShipping()) { <button class="bf-button secondary" type="button" [disabled]="!!pendingAction()" (click)="editingDetails.set(true)"><bf-icon name="details"/> Corrigir dados</button> }
+        @if(sale.status==='active' && !editingDetails() && !editingItems() && !editingShipping()){
+          <button class="bf-button secondary" type="button" [disabled]="!!pendingAction() || openingItemEditor()"
+            (click)="openShippingCorrection(sale)">Editar frete</button>
+        }
+        @if (sale.status==='active' && sale.balanceCents>0 && !editingItems() && !editingDetails() && !editingShipping()){<button class="bf-button" type="button" (click)="modals.openReceipt(sale.id)"><bf-icon name="payment"/> Receber</button>}
+        @if (sale.status==='active' && sale.fulfillmentStatus==='in-production' && !editingItems() && !editingDetails() && !editingShipping()){<button class="bf-button" type="button" [disabled]="!!pendingAction()" [bfLoadingButton]="pendingAction()==='ready'" (click)="advanceSelected('ready')">{{pendingAction()==='ready'?'Atualizando...':'Marcar pronta'}}</button>}
+        @if (sale.status==='active' && sale.fulfillmentStatus==='ready' && !editingItems() && !editingDetails() && !editingShipping()){<button class="bf-button" type="button" [disabled]="!!pendingAction()" [bfLoadingButton]="pendingAction()==='delivered'" (click)="advanceSelected('delivered')">{{pendingAction()==='delivered'?'Atualizando...':'Entregar / retirar'}}</button>}
+        @if (sale.status!=='cancelled' && !editingItems() && !editingDetails() && !editingShipping()) { <button class="bf-button danger" type="button" [disabled]="!!pendingAction()" [bfLoadingButton]="pendingAction()==='cancel'" (click)="cancelSelected()">{{pendingAction()==='cancel'?'Cancelando...':'Cancelar venda'}}</button> }
         <button class="bf-button secondary" type="button" (click)="detailDialog.close()">Fechar</button>
       </div>
     }

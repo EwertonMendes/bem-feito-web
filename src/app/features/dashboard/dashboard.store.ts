@@ -19,6 +19,7 @@ import {
 
 const EMPTY_METRICS: DashboardMetrics = {
   revenueCents: 0,
+  shippingCents: 0,
   receivedCents: 0,
   cashReceivedCents: 0,
   receivableCents: 0,
@@ -100,6 +101,7 @@ export class DashboardStore {
   });
 
   readonly revenueCents = computed(() => this.metricsState().revenueCents);
+  readonly shippingCents = computed(() => this.metricsState().shippingCents);
   readonly receivedCents = computed(() => this.metricsState().receivedCents);
   readonly cashReceivedCents = computed(() => this.metricsState().cashReceivedCents);
   readonly receivableCents = computed(() => this.metricsState().receivableCents);
@@ -123,9 +125,10 @@ export class DashboardStore {
     this.saleCount() ? Math.round(this.revenueCents() / this.saleCount()) : 0
   );
   readonly cashFlowCents = computed(() => this.cashReceivedCents() - this.cashOutCents());
-  readonly grossProfitCents = computed(() => this.revenueCents() - this.cogsCents());
-  readonly grossMarginPercent = computed(() => this.revenueCents()
-    ? Math.round((this.grossProfitCents() / this.revenueCents()) * 1000) / 10
+  readonly productRevenueCents = computed(() => this.revenueCents() - this.shippingCents());
+  readonly grossProfitCents = computed(() => this.productRevenueCents() - this.cogsCents());
+  readonly grossMarginPercent = computed(() => this.productRevenueCents()
+    ? Math.round((this.grossProfitCents() / this.productRevenueCents()) * 1000) / 10
     : 0
   );
   readonly resultCents = computed(() =>

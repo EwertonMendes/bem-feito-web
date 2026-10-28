@@ -32,6 +32,13 @@ describe('Management report uses exact-cent historical calculations',()=>{
       inventoryPurchasesCents:500,operationalResultCents:150,unitsSold:3});
     expect(report.byProduct.reduce((total,g)=>total+g.revenueCents,0)).toBe(299);
   });
+  it('keeps shipping out of product margin and product grouping',()=>{
+    const sale={...base,shippingFeeCents:100,totalCents:399,items:items([100,100,100])} as Sale;
+    const report=buildManagementReport([sale],[],[]);
+    expect(report).toMatchObject({revenueCents:399,productRevenueCents:299,shippingCents:100,
+      grossProfitCents:149,operationalResultCents:249});
+    expect(report.byProduct.reduce((sum,item)=>sum+item.revenueCents,0)).toBe(299);
+  });
   it('groups historical soap and new candles without retroactively recategorizing sales',()=>{
     const lines=items([100,200]);
     const sale={...base,items:[{...lines[0]!,categoryId:undefined},

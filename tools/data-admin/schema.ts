@@ -37,7 +37,7 @@ const FIELD_TYPES: Record<string, Record<string, FieldType>> = {
   paymentMethods: { name: 'text', active: 'boolean' },
   expenseCategories: { name: 'text', active: 'boolean' },
   formatPrices: { collectionId: 'id', formatId: 'id', priceCents: 'money', active: 'boolean' },
-  inputs: { averageUnitCostCents: 'money', costPool: 'costPool', costUnitFactor: 'unitFactor', costBasisQuantity: 'quantity', costBasisValueCents: 'money' },
+  inputs: { name: 'text', averageUnitCostCents: 'money', costPool: 'costPool', costUnitFactor: 'unitFactor', costBasisQuantity: 'quantity', costBasisValueCents: 'money' },
   products: { salePriceCents: 'money', additionalCostCents: 'money' },
   kits: { priceCents: 'money' },
   additions: { priceCents: 'money' },
@@ -145,6 +145,7 @@ export function validateRequest(value: unknown): Request {
           invariant(item.values === undefined, 'Delete accepts no values');
         } else {
           fields(collection, item.values);
+          invariant(collection !== 'inputs' || !Object.hasOwn(item.values as Payload,'name'), 'Materials cannot be renamed by cost reconciliation');
           const absent = item.expectedAbsent ?? [];
           invariant(Array.isArray(absent) && absent.length <= 8 && absent.every(k =>
             typeof k === 'string' && Object.hasOwn(FIELD_TYPES[collection],k) &&

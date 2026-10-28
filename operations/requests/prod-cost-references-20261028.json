@@ -1,0 +1,280 @@
+{
+  "schemaVersion": 1,
+  "id": "prod-cost-references-20261028",
+  "environment": "prod",
+  "projectId": "bem-feito-prod",
+  "operation": "batch-update",
+  "changes": [
+    {
+      "collection": "formats",
+      "id": "CAD-0015",
+      "action": "update",
+      "expected": {
+        "name": "Barra Arredondada"
+      },
+      "expectedAbsent": [
+        "soapCostProfile"
+      ],
+      "values": {
+        "soapCostProfile": {
+          "baseGrams": 87,
+          "fragranceMl": 2.5,
+          "colorantMl": 2,
+          "surfactantMl": 2
+        }
+      }
+    },
+    {
+      "collection": "formats",
+      "id": "CAD-0016",
+      "action": "update",
+      "expected": {
+        "name": "Massageador"
+      },
+      "expectedAbsent": [
+        "soapCostProfile"
+      ],
+      "values": {
+        "soapCostProfile": {
+          "baseGrams": 120,
+          "fragranceMl": 3,
+          "colorantMl": 2.5,
+          "surfactantMl": 2
+        }
+      }
+    },
+    {
+      "collection": "formats",
+      "id": "CAD-0038",
+      "action": "update",
+      "expected": {
+        "name": "Patinha M"
+      },
+      "expectedAbsent": [
+        "soapCostProfile"
+      ],
+      "values": {
+        "soapCostProfile": {
+          "baseGrams": 35,
+          "fragranceMl": 1.5,
+          "colorantMl": 1,
+          "surfactantMl": 1.5
+        }
+      }
+    },
+    {
+      "collection": "formats",
+      "id": "CAD-0039",
+      "action": "update",
+      "expected": {
+        "name": "Patinha G"
+      },
+      "expectedAbsent": [
+        "soapCostProfile"
+      ],
+      "values": {
+        "soapCostProfile": {
+          "baseGrams": 55,
+          "fragranceMl": 1.5,
+          "colorantMl": 1.5,
+          "surfactantMl": 1.5
+        }
+      }
+    },
+    {
+      "collection": "formats",
+      "id": "CAD-0040",
+      "action": "update",
+      "expected": {
+        "name": "Mini Florzinhas"
+      },
+      "expectedAbsent": [
+        "soapCostProfile"
+      ],
+      "values": {
+        "soapCostProfile": {
+          "baseGrams": 3,
+          "fragranceMl": 1,
+          "colorantMl": 1,
+          "surfactantMl": 1
+        }
+      }
+    },
+    {
+      "collection": "formats",
+      "id": "CAD-0041",
+      "action": "update",
+      "expected": {
+        "name": "Mini Cubinhos"
+      },
+      "expectedAbsent": [
+        "soapCostProfile"
+      ],
+      "values": {
+        "soapCostProfile": {
+          "baseGrams": 9,
+          "fragranceMl": 0.2,
+          "colorantMl": 0.2,
+          "surfactantMl": 0.2
+        }
+      }
+    },
+    {
+      "collection": "formats",
+      "id": "CAD-0046",
+      "action": "update",
+      "expected": {
+        "name": "Floral",
+        "approximateWeightGrams": 90
+      },
+      "expectedAbsent": [
+        "soapCostProfile"
+      ],
+      "values": {
+        "soapCostProfile": {
+          "baseGrams": 75,
+          "fragranceMl": 2.2,
+          "colorantMl": 1.7,
+          "surfactantMl": 1.7
+        },
+        "approximateWeightGrams": 77.5
+      }
+    },
+    {
+      "collection": "collections",
+      "id": "CAD-0001",
+      "action": "update",
+      "expected": {
+        "name": "Clássica"
+      },
+      "expectedAbsent": [
+        "fragranceCostPool"
+      ],
+      "values": {
+        "fragranceCostPool": "fragrance-classic"
+      }
+    },
+    {
+      "collection": "collections",
+      "id": "CAD-0002",
+      "action": "update",
+      "expected": {
+        "name": "Mais Aroma"
+      },
+      "expectedAbsent": [
+        "fragranceCostPool"
+      ],
+      "values": {
+        "fragranceCostPool": "fragrance-premium"
+      }
+    },
+    {
+      "collection": "inputs",
+      "id": "BASE-BRA",
+      "action": "update",
+      "expected": {
+        "name": "Base Glicerinada Branca"
+      },
+      "expectedAbsent": [
+        "costPool",
+        "costUnitFactor",
+        "costBasisQuantity",
+        "costBasisValueCents"
+      ],
+      "values": {
+        "costPool": "base",
+        "costUnitFactor": 1000
+      }
+    },
+    {
+      "collection": "inputs",
+      "id": "BASE-TRA",
+      "action": "update",
+      "expected": {
+        "name": "Base Glicerinada Transparente"
+      },
+      "expectedAbsent": [
+        "costPool",
+        "costUnitFactor",
+        "costBasisQuantity",
+        "costBasisValueCents"
+      ],
+      "values": {
+        "costPool": "base",
+        "costUnitFactor": 1000
+      }
+    },
+    {
+      "collection": "inputs",
+      "id": "INS-021",
+      "action": "update",
+      "expected": {
+        "name": "Lauril Vegetal"
+      },
+      "expectedAbsent": [
+        "costPool",
+        "costUnitFactor",
+        "costBasisQuantity",
+        "costBasisValueCents"
+      ],
+      "values": {
+        "costPool": "surfactant",
+        "costUnitFactor": 500
+      }
+    },
+    {
+      "collection": "inputs",
+      "id": "INS-023",
+      "action": "update",
+      "expected": {
+        "name": "Kit 5 corantes cosméticos 30 ml (vermelho, verde, amarelo, azul e rosa)"
+      },
+      "expectedAbsent": [
+        "costPool",
+        "costUnitFactor",
+        "costBasisQuantity",
+        "costBasisValueCents"
+      ],
+      "values": {
+        "costPool": "colorant",
+        "costUnitFactor": 30
+      }
+    },
+    {
+      "collection": "inputs",
+      "id": "INS-017",
+      "action": "update",
+      "expected": {
+        "name": "Essência Virtual"
+      },
+      "expectedAbsent": [
+        "costPool",
+        "costUnitFactor",
+        "costBasisQuantity",
+        "costBasisValueCents"
+      ],
+      "values": {
+        "costPool": "fragrance-classic",
+        "costUnitFactor": 100
+      }
+    },
+    {
+      "collection": "inputs",
+      "id": "INS-016",
+      "action": "update",
+      "expected": {
+        "name": "Essências Vollmens Premium ATR"
+      },
+      "expectedAbsent": [
+        "costPool",
+        "costUnitFactor",
+        "costBasisQuantity",
+        "costBasisValueCents"
+      ],
+      "values": {
+        "costPool": "fragrance-premium",
+        "costUnitFactor": 30
+      }
+    }
+  ]
+}

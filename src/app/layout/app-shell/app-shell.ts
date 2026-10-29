@@ -1,5 +1,4 @@
 import { DOCUMENT } from '@angular/common';
-import { environment } from '../../../environments/environment';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -54,7 +53,6 @@ interface NavItem {
   styleUrl: './app-shell.scss',
 })
 export class AppShell {
-  readonly isDevelopmentEnvironment = !environment.production;
   readonly auth = inject(AuthService);
   readonly theme = inject(ThemeService);
   readonly navigation = inject(NavigationLoadingService);

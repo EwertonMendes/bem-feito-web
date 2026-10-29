@@ -68,7 +68,7 @@
               </div>
               <div class="catalog-product-identity">
                 <h2>{{productTitle(item)}}</h2>
-                @if(productVariant(item)){<p class="catalog-fragrance">{{productVariant(item)}}</p>}
+                @if(productVariant(item)){<p class="catalog-product-variant" [class.soap-format]="!item.categoryId || item.categoryId==='soap'">{{productVariant(item)}}</p>}
               </div>
               <div class="catalog-card-bottom">
                 <strong class="catalog-price">{{currency(item.salePriceCents)}}</strong>

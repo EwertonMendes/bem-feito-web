@@ -215,12 +215,12 @@ export class CatalogPage {
   /** Product identity stays split for display; the canonical displayName is unchanged in storage. */
   productTitle(p:Product):string {
     const category=productCategoryId(p);
-    if(category==='soap') return this.formatNames().get(p.formatId) || p.modelName?.trim() || p.displayName.split('·').at(-1)?.trim() || p.displayName;
+    if(category==='soap') return this.fragranceNames().get(p.fragranceId) || p.variantName?.trim() || p.displayName.split('·')[1]?.trim() || p.displayName;
     return p.modelName?.trim() || p.displayName.split('·')[0]?.trim() || p.displayName;
   }
   productVariant(p:Product):string {
     const category=productCategoryId(p);
-    if(category==='soap') return this.fragranceNames().get(p.fragranceId) || p.variantName?.trim() || p.displayName.split('·')[1]?.trim() || '';
+    if(category==='soap') return this.formatNames().get(p.formatId) || p.modelName?.trim() || (p.displayName.includes('·') ? p.displayName.split('·').at(-1)?.trim() : '') || '';
     if(category==='scented-candle') return p.variantName?.trim() || this.fragranceNames().get(p.candleFragranceId || p.fragranceId) || '';
     return p.variantName?.trim() || '';
   }

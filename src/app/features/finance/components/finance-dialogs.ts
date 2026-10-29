@@ -287,6 +287,11 @@ export class BfFinanceDialogs {
     }
 
     const value = this.receiptModel();
+    const balance = this.selectedReceivable()?.balanceCents ?? 0;
+    const excess = toCents(value.amount) - balance;
+    if (excess > 0 && !window.confirm(
+      'O pagamento excede o saldo em ' + formatCurrency(excess) +
+      '. Confirmar o valor excedente como gorjeta?')) return;
     this.receiptSaving.set(true);
     try {
       const result = await this.sales.addPayment(value.saleId, value.businessDate, value.methodId, toCents(value.amount));

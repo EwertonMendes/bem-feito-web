@@ -130,10 +130,10 @@ export class ExpenseCorrectionRepository {
         const deltaQty = (updated?.quantity ?? 0) - (old?.quantity ?? 0);
         const deltaCost = (updated?.landedCostCents ?? updated?.amountCents ?? 0)
           - (old?.landedCostCents ?? old?.amountCents ?? 0);
-        const prevQty = Math.max(0, Number(input.costBasisQuantity ?? input.stock));
+        const mode = trackingModeForInput(input);
+        const prevQty = Math.max(0, Number(input.costBasisQuantity ?? (mode === 'untracked' ? 0 : input.stock)));
         const prevValue = Math.max(0, Number(input.costBasisValueCents ?? Math.round(prevQty * input.averageUnitCostCents)));
         const basisQty = prevQty + deltaQty, basisValue = prevValue + deltaCost;
-        const mode = trackingModeForInput(input);
         const stock = mode === 'untracked' ? input.stock : input.stock + deltaQty;
         const reserved = input.reservedPhysicalStock ?? 0;
         if (basisQty < -0.000001 || basisValue < 0 || (basisQty <= 0 && basisValue > 0) ||

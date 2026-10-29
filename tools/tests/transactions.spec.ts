@@ -16,6 +16,8 @@ import { ExpenseCorrectionRepository } from '../../src/app/core/repositories/exp
 import { CashManagementRepository } from '../../src/app/core/repositories/cash-management.repository';
 import { SaleCorrectionRepository } from '../../src/app/core/repositories/sale-correction.repository';
 import { AdvancedSaleCorrectionRepository } from '../../src/app/core/repositories/advanced-sale-correction.repository';
+import { ShippingCorrectionRepository } from '../../src/app/core/repositories/shipping-correction.repository';
+import { shippingCorrectionSignature } from '../../src/app/domain/logic/shipping-correction';
 import { saleCorrectionSignature } from '../../src/app/domain/logic/sale-correction';
 import { InventoryRepository } from '../../src/app/core/repositories/inventory.repository';
 
@@ -30,6 +32,7 @@ let corrections: ExpenseCorrectionRepository;
 let cash: CashManagementRepository;
 let saleCorrections: SaleCorrectionRepository;
 let advancedCorrections: AdvancedSaleCorrectionRepository;
+let shippingCorrections: ShippingCorrectionRepository;
 let inventory: InventoryRepository;
 const day = '2026-10-05';
 const audit = () => ({ createdAt: serverTimestamp(), updatedAt: serverTimestamp(), createdBy: 'operator', updatedBy: 'operator' });
@@ -91,6 +94,7 @@ beforeEach(async () => {
   cash = runInInjectionContext(injector, () => new CashManagementRepository());
   saleCorrections = runInInjectionContext(injector, () => new SaleCorrectionRepository());
   advancedCorrections = runInInjectionContext(injector, () => new AdvancedSaleCorrectionRepository());
+  shippingCorrections = runInInjectionContext(injector, () => new ShippingCorrectionRepository());
   inventory = runInInjectionContext(injector, () => new InventoryRepository());
 });
 afterAll(async () => { injector?.destroy(); await env?.cleanup(); });
@@ -351,6 +355,47 @@ describe('Actual repositories against restrictive emulator rules', () => {
     await sales.cancel(id);
     expect(await data('products', 'p')).toMatchObject({ stock: 10 });
   });
+  it('creates shipping as a first-class sale amount without tip or stock side effects', async () => {
+    const created = await sales.create({...draft(),shippingFeeCents:250,
+      payments:[{methodId:'pix',amountReceivedCents:500}]});
+    expect(created.sale).toMatchObject({subtotalCents:1000,shippingFeeCents:250,totalCents:1250,
+      receivedCents:500,tipCents:0,balanceCents:750,paymentStatus:'partial'});
+    expect(await data('products','p')).toMatchObject({stock:9});
+    expect(await count('payments')).toBe(1);
+  });
+
+  it('atomically reclassifies tip as shipping without another cash entry or stock change', async () => {
+    const created = await sales.create({...draft(),
+      payments:[{methodId:'pix',amountReceivedCents:500}]});
+    const id = created.sale.id;
+    const paymentId = created.sale.paymentIds[0]!;
+    const stockBefore = (await data('products','p'))!['stock'];
+    // Reproduce the legacy misclassification: 400 applied + 100 called a tip.
+    await env.withSecurityRulesDisabled(async context => {
+      const seed = context.firestore();
+      await Promise.all([
+        setDoc(doc(seed,'payments',paymentId),{appliedCents:400,tipCents:100},{merge:true}),
+        setDoc(doc(seed,'sales',id),{receivedCents:400,tipCents:100,balanceCents:600,paymentStatus:'partial'},{merge:true}),
+      ]);
+    });
+    const original={id,...await data('sales',id)} as import('../../src/app/domain/models/sales.model').Sale;
+    const corrected=await shippingCorrections.correct(id,{
+      shippingFeeCents:100,reclassifyTip:true,reason:'Frete confundido com gorjeta',
+      expectedSignature:shippingCorrectionSignature(original),
+    });
+    expect(corrected.sale).toMatchObject({shippingFeeCents:100,totalCents:1100,
+      receivedCents:500,tipCents:0,balanceCents:600,paymentStatus:'partial'});
+    expect(await data('payments',paymentId)).toMatchObject({amountReceivedCents:500,appliedCents:500,tipCents:0,status:'active'});
+    expect(await data('products','p')).toMatchObject({stock:stockBefore});
+    expect(await count('payments')).toBe(1);
+    expect(await count('saleCorrections')).toBe(1);
+    await expect(shippingCorrections.correct(id,{
+      shippingFeeCents:100,reclassifyTip:true,reason:'Repetição indevida',
+      expectedSignature:shippingCorrectionSignature(original),
+    })).rejects.toThrow();
+    expect(await count('saleCorrections')).toBe(1);
+  });
+
   it('receives a pending sale, reverses the receipt and accepts partial payment', async () => {
     const id = (await sales.create(draft())).sale.id;
     expect(await data('sales', id)).toMatchObject({ paymentStatus: 'pending', balanceCents: 1000 });
@@ -640,7 +685,7 @@ describe('Actual repositories against restrictive emulator rules', () => {
     expect(await data('products', 'p')).toMatchObject({ stock: 9 });
   });
 
-  it('cost-only receipts retain purchase reference without creating physical stock', async () => {
+  it('cost-only receipts price materials without using the obsolete physical balance', async () => {
     await retireInput('i');
     const created = await finance.createPurchaseBatch({
       businessDate: day, receiptStatus: 'received',
@@ -648,12 +693,12 @@ describe('Actual repositories against restrictive emulator rules', () => {
     });
     expect(created.expense.amountCents).toBe(720);
     expect(await data('inputs', 'i')).toMatchObject({
-      stock: 20, trackingMode: 'untracked', costBasisQuantity: 23, costBasisValueCents: 2720,
+      stock: 20, trackingMode: 'untracked', costBasisQuantity: 3, costBasisValueCents: 720,
     });
     expect(await count('stockMovements')).toBe(0);
     await corrections.cancel(created.expense.id, 'Compra duplicada');
     expect(await data('inputs', 'i')).toMatchObject({
-      stock: 20, costBasisQuantity: 20, costBasisValueCents: 2000,
+      stock: 20, costBasisQuantity: 0, costBasisValueCents: 0,
     });
   });
 

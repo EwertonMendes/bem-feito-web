@@ -20,8 +20,4 @@ export function allocatePayments(totalCents: number, payments: PaymentDraft[]): 
     });
 }
 
-export function paymentStatus(totalCents: number, appliedCents: number): 'paid' | 'pending' | 'partial' {
-  if (appliedCents >= totalCents) return 'paid';
-  if (appliedCents <= 0) return 'pending';
-  return 'partial';
-}
+export { paymentStatus } from '../../domain/logic/sale-pricing';

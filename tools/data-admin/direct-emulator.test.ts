@@ -42,6 +42,20 @@ test('one dispatch applies generic create, patch and delete without code tied to
   await run(req({id:'direct-delete-317',action:'delete',collection:'dataAdminSmoke',documentId:id}));
   assert.equal((await ref.get()).exists,false);
 });
+test('audited batchPatch changes two costing references in one transaction',async()=>{
+  const fmt=tracked('formats/direct-batch-f-317');
+  const col=tracked('collections/direct-batch-c-317');
+  await fmt.set({name:'Floral',approximateWeightGrams:90,active:true});
+  await col.set({name:'Clássica',active:true});
+  const changes=[
+    {collection:'formats',documentId:fmt.id,expected:{approximateWeightGrams:90},values:{approximateWeightGrams:77.5}},
+    {collection:'collections',documentId:col.id,expected:{},expectedAbsent:['fragranceCostPool'],values:{fragranceCostPool:'fragrance-classic'}},
+  ];
+  await run(req({id:'direct-batch-317',action:'batchPatch',changes}));
+  assert.equal((await fmt.get()).data()?.approximateWeightGrams,77.5);
+  assert.equal((await col.get()).data()?.fragranceCostPool,'fragrance-classic');
+  await assert.rejects(prepareDirect(req({id:'direct-batch-stale-317',action:'batchPatch',changes}),db),/precondition|absent/i);
+});
 test('reverses arbitrary multi-movement production and preserves earlier stock changes',async()=>{
   const pid='direct-production-317', productId='direct-product-317', inputId='direct-input-317';
   const production=tracked('productions/'+pid),product=tracked('products/'+productId),

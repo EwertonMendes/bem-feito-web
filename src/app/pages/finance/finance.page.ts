@@ -178,7 +178,7 @@ export class FinancePage {
          }else{
            const x=entry as Sale;
            rows.push([x.code,x.businessDate,x.customerName??'',x.paymentStatus,x.dueDate??'',
-             exportCents(x.totalCents),exportCents(x.receivedCents),exportCents(x.balanceCents)]);
+             exportCents(x.totalCents),exportCents(x.shippingFeeCents??0),exportCents(x.receivedCents),exportCents(x.balanceCents)]);
          }
        }
        if(!page.hasMore){complete=true;break;}
@@ -190,7 +190,7 @@ export class FinancePage {
        ? ['Código','Data','Descrição','Tipo','Situação','Valor (R$)','Débito em conta (R$)','Origem','Pago por']
        : kind==='payments'
        ? ['Código','Data','Venda','Forma','Situação','Aplicado (R$)','Recebido (R$)','Gorjeta (R$)']
-       : ['Código','Data','Cliente','Situação','Vencimento','Total (R$)','Recebido (R$)','Saldo (R$)'];
+       : ['Código','Data','Cliente','Situação','Vencimento','Total (R$)','Frete (R$)','Recebido (R$)','Saldo (R$)'];
      downloadCsv('bem-feito-'+kind+'.csv',headers,rows);
      this.toast.success('CSV financeiro gerado com o histórico consultado.');
    }catch(error){this.toast.error(this.errors.message(error));}

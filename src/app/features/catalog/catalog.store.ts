@@ -1,5 +1,6 @@
 import { computed, effect, inject, Injectable, signal } from '@angular/core';
 import { stockStatusForInput, stockStatusForProduct } from '../../domain/logic/stock-status';
+import { todayBusinessDate } from '../../core/utils/date';
 import { Addition, InputItem, Product } from '../../domain/models/catalog.model';
 import { CatalogImageRef } from '../../domain/models/image.model';
 import { AdditionRepository, InputRepository, ProductRepository } from '../../core/repositories/catalog.repository';
@@ -147,11 +148,27 @@ export class CatalogStore {
     if (previous) {
       const oldMode = previous.trackingMode ?? (previous.minimumStockConfigured === false ? 'untracked' : 'estimated');
       const newMode = input.trackingMode ?? 'estimated';
-      if (oldMode !== newMode && (oldMode === 'untracked' || newMode === 'untracked')) {
-        throw new Error('A mudança entre controle físico e custo sem saldo exige migração auditada e conciliação.');
+      if (oldMode === 'untracked' && newMode !== 'untracked') {
+        throw new Error('Para voltar a contar um material sem saldo, crie uma nova conferência de estoque antes da mudança.');
+      }
+      if (oldMode !== 'untracked' && newMode === 'untracked') {
+        // Never silently disable inventory used by a sellable tracked additional.
+        const linked = this.additionsState().find(add => add.active &&
+          add.components.some(component => component.inputId === previous.id));
+        if (linked) throw new Error('Este material é usado pelo adicional ' + linked.name + '. Mantenha o controle físico deste item.');
+        if ((previous.committedStock ?? 0) > 0 || (previous.reservedPhysicalStock ?? 0) > 0)
+          throw new Error('Há reservas físicas deste material. Concilie-as antes de desativar o saldo.');
       }
     }
-    const base = { ...input, stockStatus: stockStatusForInput(input) };
+    const previousMode = previous?.trackingMode ?? (previous?.minimumStockConfigured === false ? 'untracked' : 'estimated');
+    const converting = previous && previousMode !== 'untracked' && input.trackingMode === 'untracked';
+    const base: InputItem = {
+      ...input, stockStatus: stockStatusForInput(input),
+      ...(converting ? { untrackedSince: todayBusinessDate(), previousPhysicalStock: previous.stock,
+        previousTrackingMode: previousMode } : {}),
+      ...(!converting && previous?.untrackedSince ? { untrackedSince: previous.untrackedSince,
+        previousPhysicalStock: previous.previousPhysicalStock, previousTrackingMode: previous.previousTrackingMode } : {}),
+    };
     if (base.id) {
       const normalized = this.normalizeInput(base);
       await this.inputRepository.replace(normalized);

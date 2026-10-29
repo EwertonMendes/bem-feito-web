@@ -54,6 +54,8 @@ export interface Sale extends AuditFields {
   dueDate?: string;
   discountCents: number;
   subtotalCents: number;
+  /** Optional delivery charge; legacy sales default to zero. */
+  shippingFeeCents?: number;
   totalCents: number;
   receivedCents: number;
   tipCents: number;
@@ -117,6 +119,7 @@ export interface SaleDraft {
   customerName?: string;
   dueDate?: string;
   discountCents: number;
+  shippingFeeCents?: number;
   notes?: string;
   lines: SaleDraftLine[];
   payments: PaymentDraft[];

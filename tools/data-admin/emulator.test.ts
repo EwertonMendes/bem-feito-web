@@ -29,6 +29,12 @@ after(async () => {
   await db.doc('dataAdminSmoke/smoke-test').delete();
   await db.doc('system/data-revisions').delete();
   await db.doc('inputs/admin-test-input').delete();
+  await db.doc('inputs/admin-reference-base').delete();
+  await db.doc('formats/admin-reference-floral').delete();
+  await db.doc('collections/admin-reference-classic').delete();
+  await db.doc('expenses/admin-prod-received').delete();
+  await db.doc('expenses/admin-prod-pending').delete();
+  await db.doc('inputs/INS-021').delete();
   await db.recursiveDelete(db.collection('dataAdminSmoke'));
   await db.doc('collections/admin-test-parent').delete();
   await db.doc('fragrances/admin-test-child').delete();
@@ -88,6 +94,72 @@ test('cost correction also updates the weighted cost basis without changing phys
   const data = (await db.doc('inputs/admin-test-input').get()).data()!;
   assert.deepEqual([data.costBasisQuantity, data.costBasisValueCents, data.stock, data.committedStock, data.reservedPhysicalStock], [10, 1500, 7, 3, 2]);
 });
+test('PROD reference migration preserves original purchases, stocks, and other documents', async () => {
+  const inputRef=db.doc('inputs/admin-reference-base');
+  const formatRef=db.doc('formats/admin-reference-floral');
+  const collectionRef=db.doc('collections/admin-reference-classic');
+  const inputBefore={name:'Base branca',averageUnitCostCents:2118,trackingMode:'untracked',
+    stock:123,committedStock:7,reservedPhysicalStock:3,costBasisQuantity:0,costBasisValueCents:0};
+  await inputRef.set(inputBefore);
+  await formatRef.set({name:'Floral',approximateWeightGrams:90,active:true});
+  await collectionRef.set({name:'Clássica',active:true});
+  const request=validateRequest({schemaVersion:1,id:'prod-reference-test',environment:'prod',
+    projectId:'bem-feito-prod',operation:'batch-update',changes:[
+      {collection:'inputs',id:inputRef.id,action:'update',
+        expected:{averageUnitCostCents:2118,costBasisQuantity:0,costBasisValueCents:0},
+        expectedAbsent:['costPool','costUnitFactor'],
+        values:{costPool:'base',costUnitFactor:1000,costBasisQuantity:6,costBasisValueCents:12709}},
+      {collection:'formats',id:formatRef.id,action:'update',
+        expected:{name:'Floral',approximateWeightGrams:90},
+        expectedAbsent:['soapCostProfile'],
+        values:{approximateWeightGrams:77.5,
+          soapCostProfile:{baseGrams:75,fragranceMl:2.2,colorantMl:1.7,surfactantMl:1.7}}},
+      {collection:'collections',id:collectionRef.id,action:'update',
+        expected:{name:'Clássica'},expectedAbsent:['fragranceCostPool'],
+        values:{fragranceCostPool:'fragrance-classic'}},
+    ]});
+  const plan=await prepare(request,db,archive);
+  assert.equal((await inputRef.get()).data()?.costPool,undefined,'Preview does not write');
+  const outcome=await apply(request,plan,db,archive,{...actor,approvedPlan:hash(plan)});
+  assert.equal(outcome.validation,'readback-verified');
+  const input=(await inputRef.get()).data()!;
+  assert.deepEqual([input.costPool,input.costUnitFactor,input.costBasisQuantity,input.costBasisValueCents],
+    ['base',1000,6,12709]);
+  assert.deepEqual([input.stock,input.committedStock,input.reservedPhysicalStock,input.averageUnitCostCents],
+    [123,7,3,2118]);
+  assert.equal((await formatRef.get()).data()?.approximateWeightGrams,77.5);
+  assert.equal((await collectionRef.get()).data()?.fragranceCostPool,'fragrance-classic');
+  assert.ok([...archive.objects.keys()].some(key=>key.startsWith('backups/')));
+  await assert.rejects(prepare(request,db,archive),/Expected reference field to be absent|precondition differs/);
+});
+test('PROD purchase-funded costing excludes pending receipts and never adjusts material stock',async()=>{
+  await db.doc('inputs/INS-021').set({name:'Lauril vegetal',trackingMode:'untracked',
+    averageUnitCostCents:1680,stock:85,committedStock:4,reservedPhysicalStock:0,
+    minimumStock:0,active:true});
+  await db.doc('expenses/admin-prod-received').set({kind:'input-purchase',
+    inputId:'INS-021',quantity:1,amountCents:1680,receiptStatus:'received'});
+  await db.doc('expenses/admin-prod-pending').set({kind:'input-purchase',
+    inputId:'INS-021',quantity:3,amountCents:5040,receiptStatus:'pending'});
+  const req=validateRequest({schemaVersion:1,id:'prod-invoice-calc',environment:'prod',
+    projectId:'bem-feito-prod',operation:'batch-update',changes:[
+      {collection:'inputs',id:'INS-021',action:'update',
+        expected:{averageUnitCostCents:1680},
+        expectedAbsent:['costPool','costUnitFactor','costBasisQuantity','costBasisValueCents'],
+        values:{costPool:'surfactant',costUnitFactor:500}},
+    ]});
+  const plan=await prepare(req,db,archive);
+  const after=decode(plan.rows[0].after,db);
+  assert.equal(after.costBasisQuantity,1);
+  assert.equal(after.costBasisValueCents,1680);
+  assert.equal(plan.dependencies.length,1);
+  await apply(req,plan,db,archive,{...actor,approvedPlan:hash(plan)});
+  const material=(await db.doc('inputs/INS-021').get()).data()!;
+  assert.equal(material.costPool,'surfactant');
+  assert.equal(material.costUnitFactor,500);
+  assert.equal(material.costBasisValueCents,1680);
+  assert.deepEqual([material.stock,material.committedStock,material.reservedPhysicalStock],[85,4,0]);
+});
+
 test('Firestore types survive backup/restore without marker collisions', () => {
   const value = { timestamp: new Timestamp(123, 456), point: new GeoPoint(-23, -46), bytes: Buffer.from('test'), ref: db.doc('inputs/a'), nan: NaN, nested: [{ $timestamp: 'literal-string' }] };
   assert.equal(hash(encode(decode(encode(value), db))), hash(encode(value)));

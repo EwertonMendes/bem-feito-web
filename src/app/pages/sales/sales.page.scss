@@ -777,3 +777,17 @@
 /* Calm confirmation of historical queries, consistent in both themes. */
 .history-feedback{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.8rem;margin:1px 0 14px;line-height:1.4}
 .history-feedback bf-icon{display:inline-flex;color:var(--brand-strong);flex:none}
+
+/* Width/footers belong to the modal host; editing workspace styles live in its own component. */
+.sale-detail-dialog.editing-sale-items{width:min(1120px,calc(100vw - 32px));max-height:min(94dvh,980px)}
+.sale-detail-dialog.editing-sale-items .bf-dialog-body{padding:18px;scrollbar-gutter:stable}
+.sale-detail-dialog .sale-detail-footer.correction-footer{display:block;padding:12px 20px}
+.correction-footer-actions{display:flex;justify-content:flex-end;gap:10px}
+.correction-footer-actions .bf-button{min-width:150px;width:auto}
+@media(max-width:640px){
+ .sale-detail-dialog.editing-sale-items{width:calc(100vw - 28px);max-height:calc(100dvh - 52px - env(safe-area-inset-bottom))}
+ .sale-detail-dialog.editing-sale-items .bf-dialog-body{padding:12px}
+ .sale-detail-dialog .sale-detail-footer.correction-footer{padding:10px 12px}
+ .correction-footer-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .correction-footer-actions .bf-button{min-width:0;width:100%;padding:10px 7px}
+}

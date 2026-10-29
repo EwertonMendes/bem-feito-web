@@ -304,125 +304,16 @@
         @if (sale.notes && !editingDetails()) { <p class="notes">{{ sale.notes }}</p> }
         }
         @if(editingItems()){
-          <section class="sale-item-correction" aria-label="Editar itens da venda">
-            <div class="correction-intro">
-              <div>
-                <h3><bf-icon name="details"/> Editar itens da venda</h3>
-                <p>Inclua, remova ou ajuste itens. Os custos históricos dos itens preservados não mudam.</p>
-              </div>
-              <span class="correction-line-count">{{advancedChanges().length}} {{advancedChanges().length===1?'tipo de item':'tipos de itens'}}</span>
-            </div>
-            <nav class="correction-mobile-tabs" aria-label="Etapas da edição">
-              <button type="button" [class.active]="correctionMobileTab()==='lines'"
-                [attr.aria-pressed]="correctionMobileTab()==='lines'" (click)="correctionMobileTab.set('lines')">
-                Itens da venda</button>
-              <button type="button" [class.active]="correctionMobileTab()==='catalog'"
-                [attr.aria-pressed]="correctionMobileTab()==='catalog'" (click)="correctionMobileTab.set('catalog')">
-                Adicionar itens</button>
-            </nav>
-            <div class="correction-workspace">
-              <section class="correction-items-panel" [class.correction-hidden-mobile]="correctionMobileTab()!=='lines'"
-                aria-label="Itens que ficarão na venda">
-                <div class="correction-panel-title">
-                  <h4>Itens da venda</h4>
-                  <span>Edite quantidades e preços</span>
-                </div>
-                <div class="correction-items-list">
-                  @for(line of advancedChanges();track line.id){
-                    <article class="correction-item-card">
-                      <div class="correction-item-head">
-                        <div class="correction-item-thumb">
-                          <bf-catalog-image [image]="advancedLineImage(line)" [alt]="advancedLineName(line)"
-                            [thumbnail]="true" fit="contain" />
-                        </div>
-                        <div class="correction-item-identity">
-                          <strong>{{advancedLineName(line)}}</strong>
-                          <span>{{advancedLineDetail(line)}}</span>
-                        </div>
-                        <button class="correction-remove" type="button" [disabled]="!!pendingAction()"
-                          [attr.aria-label]="'Remover '+advancedLineName(line)" title="Remover item"
-                          (click)="removeAdvancedLine(line.id);advancedStockConfirmed.set(false)">
-                          <bf-icon name="trash" /></button>
-                      </div>
-                      <div class="correction-item-fields">
-                        <div class="correction-quantity-field">
-                          <span>Quantidade</span>
-                          <div class="correction-quantity">
-                            <button type="button" [disabled]="!!pendingAction() || line.quantity<=1"
-                              [attr.aria-label]="'Diminuir '+advancedLineName(line)"
-                              (click)="changeAdvancedQuantity(line.id,-1);advancedStockConfirmed.set(false)">
-                              <bf-icon name="minus" /></button>
-                            <input type="number" min="1" max="100000" step="1" [value]="line.quantity"
-                              [attr.aria-label]="'Quantidade de '+advancedLineName(line)"
-                              (input)="patchAdvancedLine(line.id,'quantity',+$any($event.target).value);advancedStockConfirmed.set(false)" />
-                            <button type="button" [disabled]="!!pendingAction()"
-                              [attr.aria-label]="'Aumentar '+advancedLineName(line)"
-                              (click)="changeAdvancedQuantity(line.id,1);advancedStockConfirmed.set(false)">
-                              <bf-icon name="plus" /></button>
-                          </div>
-                        </div>
-                        <label class="correction-price-field">Preço unitário (R$)
-                          <input class="bf-input" type="number" min="0" step="0.01"
-                            [value]="line.unitPriceCents/100"
-                            (input)="patchAdvancedLine(line.id,'unitPriceCents',Math.round(+$any($event.target).value*100))"/>
-                        </label>
-                        <span class="correction-item-total">Subtotal <strong>{{currency(line.quantity*line.unitPriceCents)}}</strong></span>
-                      </div>
-                    </article>
-                  } @empty {<p class="correction-empty">Adicione ao menos um produto ou adicional.</p>}
-                </div>
-              </section>
-              <bf-catalog-item-picker
-                [class.correction-hidden-mobile]="correctionMobileTab()!=='catalog'"
-                [products]="catalog.activeProducts()" [additions]="catalog.activeAdditions()"
-                [selected]="advancedChanges()" [baseline]="sale.items" [allowBackorder]="sale.stockApplied===false"
-                [disabled]="!!pendingAction()"
-                (picked)="addAdvancedLine($event)" />
-            </div>
-            <section class="correction-review" aria-label="Revisar valores da venda">
-              <div class="correction-review-fields">
-                <label>Desconto total (R$)
-                  <input class="bf-input" type="number" min="0" step="0.01"
-                    [value]="correctionDiscountCents()/100"
-                    (input)="correctionDiscountCents.set(Math.round(+$any($event.target).value*100))"/>
-                </label>
-                <label>Motivo da correção <em>*</em>
-                  <textarea class="bf-textarea" rows="3" maxlength="240"
-                    placeholder="Descreva o que foi alterado nesta venda"
-                    [value]="correctionReason()" (input)="correctionReason.set($any($event.target).value)"></textarea>
-                </label>
-              </div>
-              @if(correctionPreview();as preview){
-                @if(preview.value){
-                  <div class="correction-totals" role="status">
-                    <span>Total anterior<strong>{{currency(sale.totalCents)}}</strong></span>
-                    <span class="correction-new-total">Novo total<strong>{{currency(preview.value.totalCents)}}</strong></span>
-                    <span>Já recebido<strong>{{currency(sale.receivedCents)}}</strong></span>
-                    <span>Novo saldo<strong>{{currency(preview.value.balanceCents)}}</strong></span>
-                  </div>
-                  @if(preview.value.inventoryDeltas.length){
-                    <div class="advanced-impact">
-                      <strong>Movimentações de estoque previstas</strong>
-                      @for(change of preview.value.inventoryDeltas;track change.itemType+change.itemId){
-                        <span>{{inventoryDeltaName(change.itemType,change.itemId)}}:
-                          {{change.quantityDelta>0?'+':''}}{{change.quantityDelta}}
-                          {{sale.stockApplied===false?'(compromisso de estoque)':'no estoque'}}</span>
-                      }
-                    </div>
-                  }
-                } @else {
-                  <p class="sale-correction-error" role="alert"><bf-icon name="alert"/> {{preview.error}}</p>
-                }
-              }
-              @if(sale.stockApplied!==false && correctionPreview()?.value?.inventoryDeltas?.length){
-                <div class="advanced-stock-confirm">
-                  <bf-checkbox [checked]="advancedStockConfirmed()" (checkedChange)="advancedStockConfirmed.set($event)"
-                    label="Conferi o estoque físico"
-                    description="Confirmo que as quantidades correspondem à movimentação real."/>
-                </div>
-              }
-            </section>
-          </section>
+          <bf-sale-correction-editor
+            [sale]="sale" [lines]="advancedChanges()" [discount]="correctionDiscountCents()"
+            [reason]="correctionReason()" [preview]="correctionPreview()"
+            [stockConfirmed]="advancedStockConfirmed()" [busy]="!!pendingAction()"
+            (lineChanged)="patchAdvancedLine($event.id,$event.field,$event.value);advancedStockConfirmed.set(false)"
+            (lineRemoved)="removeAdvancedLine($event);advancedStockConfirmed.set(false)"
+            (linePicked)="addAdvancedLine($event)"
+            (discountChange)="correctionDiscountCents.set($event)"
+            (reasonChange)="correctionReason.set($event)"
+            (stockConfirmedChange)="advancedStockConfirmed.set($event)" />
         }
         @if(editingDetails()){
           <section class="sale-metadata-editor">

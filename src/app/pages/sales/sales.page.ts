@@ -17,9 +17,8 @@ import { formatCurrency } from '../../core/utils/money';
 import { downloadCsv, exportCents } from '../../core/utils/csv-export';
 import { BfDialog } from '../../shared/ui/dialog/dialog';
 import { BfSelect } from '../../shared/ui/select/select';
-import { CatalogImage } from '../../shared/media/catalog-image/catalog-image';
-import { CatalogImageRef } from '../../domain/models/image.model';
-import { CatalogItemPicker, CatalogPickerSelection } from '../../features/sales/components/catalog-item-picker/catalog-item-picker';
+import { CatalogPickerSelection } from '../../features/sales/components/catalog-item-picker/catalog-item-picker';
+import { SaleCorrectionEditor } from '../../features/sales/components/sale-correction-editor/sale-correction-editor';
 import { BfCheckbox } from '../../shared/ui/checkbox/checkbox';
 import { BusinessDateCursor } from '../../core/repositories/pagination';
 import { BfIcon } from '../../shared/ui/icon/icon';
@@ -30,7 +29,7 @@ import { BfSaleStatusChip } from '../../features/sales/components/sale-status-ch
 
 @Component({
   selector: 'bf-sales-page',
-  imports: [BfLoadingButton, BfIcon, BfDialog, BfSelect, BfCheckbox, CatalogImage, CatalogItemPicker, BfEmptyState, BfPageRefresh, BfTableSkeleton, BfSaleStatusChip],
+  imports: [BfLoadingButton, BfIcon, BfDialog, BfSelect, BfCheckbox, SaleCorrectionEditor, BfEmptyState, BfPageRefresh, BfTableSkeleton, BfSaleStatusChip],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sales.page.html',
   styleUrl: './sales.page.scss',
@@ -77,7 +76,6 @@ export class SalesPage {
   readonly openingItemEditor = signal(false);
   private readonly editBaseline = signal<Sale | null>(null);
   readonly advancedChanges=signal<AdvancedSaleLineDraft[]>([]);
-  readonly correctionMobileTab=signal<'lines'|'catalog'>('lines');
   readonly correctionDiscountCents=signal(0);
   readonly correctionReason=signal('');
   readonly advancedStockConfirmed=signal(false);
@@ -251,7 +249,6 @@ export class SalesPage {
       this.correctionReason.set('');
       this.advancedStockConfirmed.set(false);
       this.correctionSignature.set(saleCorrectionSignature(current));
-      this.correctionMobileTab.set('lines');
       this.editingItems.set(true);
     }catch(error){
       this.toast.error(this.errors.message(error));
@@ -265,46 +262,12 @@ export class SalesPage {
   }
   readonly Math=Math;
   hasProductLines(sale:Sale):boolean {return sale.items.length>0;}
-  advancedLineName(line:AdvancedSaleLineDraft):string{
-    const original=this.selectedSale()?.items.find(item=>item.id===line.id);
-    if(original)return original.name;
-    return line.kind==='product'
-      ?this.catalog.products().find(p=>p.id===line.sourceId)?.displayName??'Sabonete'
-      :this.catalog.additions().find(a=>a.id===line.sourceId)?.name??'Adicional';
-  }
   patchAdvancedLine(id:string,field:'quantity'|'unitPriceCents',value:number):void{
     this.advancedChanges.update(lines=>lines.map(line=>line.id===id?{...line,[field]:value}:line));
   }
   removeAdvancedLine(id:string):void{
     this.advancedChanges.update(lines=>lines.filter(line=>line.id!==id));
   }
-  advancedLineImage(line:AdvancedSaleLineDraft):CatalogImageRef|undefined {
-    const original=this.editBaseline()?.items.find(item=>item.id===line.id);
-    if(original)return original.image ?? (line.kind==='product'
-      ?this.catalog.products().find(p=>p.id===line.sourceId)?.image
-      :this.catalog.additions().find(a=>a.id===line.sourceId)?.image);
-    return line.kind==='product'
-      ?this.catalog.products().find(p=>p.id===line.sourceId)?.image
-      :this.catalog.additions().find(a=>a.id===line.sourceId)?.image;
-  }
-
-  advancedLineDetail(line:AdvancedSaleLineDraft):string {
-    return line.kind==='product'
-      ?this.catalog.products().find(p=>p.id===line.sourceId)?.code??'Produto'
-      :this.catalog.additions().find(a=>a.id===line.sourceId)?.category??'Adicional';
-  }
-
-  changeAdvancedQuantity(id:string,delta:number):void {
-    const line=this.advancedChanges().find(x=>x.id===id);
-    if(line)this.patchAdvancedLine(id,'quantity',Math.max(1,line.quantity+delta));
-  }
-
-  inventoryDeltaName(type:'product'|'input',id:string):string {
-    return type==='product'
-      ?this.catalog.products().find(p=>p.id===id)?.displayName??id
-      :this.catalog.inputs().find(i=>i.id===id)?.name??id;
-  }
-
   addAdvancedLine(selection:CatalogPickerSelection):void {
     const {sourceId,kind}=selection;
     const product=kind==='product'?this.catalog.activeProducts().find(p=>p.id===sourceId):undefined;

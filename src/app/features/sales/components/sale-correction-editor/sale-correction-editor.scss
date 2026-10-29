@@ -1,8 +1,6 @@
-/* Sales correction is a standalone editing workspace. The dialog provides one scroll
-   container and the footer remains visible on every viewport. */
-.sale-detail-dialog.editing-sale-items{width:min(1120px,calc(100vw - 32px));max-height:min(94dvh,980px)}
-.sale-detail-dialog.editing-sale-items .bf-dialog-body{padding:18px;scrollbar-gutter:stable}
-.sale-detail-dialog .sale-item-correction{display:grid;gap:18px;margin:0;max-width:none;padding:0;border:0;background:transparent}
+:host {display:block;min-width:0}
+.sale-item-correction{display:grid;gap:18px;margin:0;max-width:none;padding:0;border:0;background:transparent}
+/* Visual correction workspace scoped to the lazy-loaded Angular component. */
 .correction-intro{display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:10px}
 .correction-intro h3{margin:0;display:flex;align-items:center;gap:8px;font-size:1rem}
 .correction-intro p{margin:6px 0 0;font-size:.78rem;color:var(--muted);line-height:1.5}
@@ -47,17 +45,12 @@
 .correction-totals .correction-new-total{background:var(--brand-soft);border-color:color-mix(in srgb,var(--brand) 35%,var(--line))}
 .correction-totals .correction-new-total strong{color:var(--brand-strong)}
 .correction-mobile-tabs{display:none}
-.sale-detail-dialog .sale-detail-footer.correction-footer{display:block;padding:12px 20px}
-.correction-footer-actions{display:flex;justify-content:flex-end;gap:10px}
-.correction-footer-actions .bf-button{min-width:150px;width:auto}
 @media(max-width:900px){
  .correction-workspace{grid-template-columns:minmax(0,1fr)}
  .correction-items-panel{padding:14px}
  .correction-review-fields{grid-template-columns:1fr 1.5fr}
 }
 @media(max-width:640px){
- .sale-detail-dialog.editing-sale-items{width:calc(100vw - 28px);max-height:calc(100dvh - 52px - env(safe-area-inset-bottom))}
- .sale-detail-dialog.editing-sale-items .bf-dialog-body{padding:12px}
  .correction-mobile-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
  .correction-mobile-tabs button{min-height:44px;border:1px solid var(--line);border-radius:11px;background:var(--surface-2);color:var(--muted);font:inherit;font-size:.76rem;font-weight:700}
  .correction-mobile-tabs button.active{border-color:var(--brand);background:var(--brand-soft);color:var(--brand-strong)}
@@ -68,9 +61,6 @@
  .correction-totals{grid-template-columns:repeat(2,minmax(0,1fr))}
  .correction-item-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
  .correction-item-total{grid-column:1/-1;display:flex;justify-content:space-between;gap:8px;padding-top:10px;border-top:1px solid var(--line)}
- .sale-detail-dialog .sale-detail-footer.correction-footer{padding:10px 12px}
- .correction-footer-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
- .correction-footer-actions .bf-button{min-width:0;width:100%;padding:10px 7px}
 }
 @media(max-width:380px){
  .correction-item-head{grid-template-columns:52px minmax(0,1fr) 38px;gap:8px}
@@ -80,3 +70,10 @@
  .correction-intro{gap:8px}
 }
 @media(prefers-reduced-motion:reduce){.correction-remove,.correction-mobile-tabs button{transition:none}}
+
+.advanced-impact{display:flex;flex-wrap:wrap;gap:8px;font-size:.75rem;color:var(--muted);padding:12px;border-radius:12px;background:var(--surface-2);margin-top:8px}
+.advanced-impact strong{width:100%;color:var(--text)}
+.advanced-impact span{border:1px solid var(--line);border-radius:8px;padding:6px 8px;overflow-wrap:anywhere}
+.advanced-stock-confirm{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:.78rem;color:var(--text);line-height:1.5;background:var(--surface-2)}
+.sale-correction-error{display:flex;gap:8px;align-items:start;padding:12px;border-radius:10px;background:var(--warning-soft);color:var(--warning);font-size:.76rem}
+.sale-correction-error bf-icon{display:inline-flex;flex:none}

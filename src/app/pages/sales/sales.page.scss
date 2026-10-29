@@ -592,36 +592,6 @@
 .sales-header-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:flex-end}
 @media(max-width:540px){.sales-header-actions{width:100%}.sales-header-actions button{flex:1;min-width:0}}
 
-/* Advanced sale editor. Compact line cards reflow without overflowing on narrow devices. */
-.advanced-item-row{display:grid;grid-template-columns:minmax(160px,2fr) minmax(85px,1fr) minmax(120px,1fr) auto;align-items:end;gap:12px;border:1px solid var(--line);border-radius:14px;padding:12px;margin:10px 0;background:var(--surface)}
-.advanced-item-row strong{min-width:0;overflow-wrap:anywhere;align-self:center}
-.advanced-item-row label{display:grid;gap:6px;min-width:0}
-.advanced-item-row .bf-input{width:100%;min-width:0}
-.advanced-remove{display:inline-flex;align-items:center;gap:5px;justify-content:center;min-height:40px}
-.advanced-add-item{display:grid;gap:10px;padding:14px;margin:14px 0;background:var(--surface-2);border-radius:14px}
-.advanced-add-item h4{margin:0;font-size:.88rem}
-.advanced-add-controls{display:flex;gap:10px;align-items:center;min-width:0}
-.advanced-add-controls bf-select{min-width:0;flex:1}
-.advanced-impact{display:flex;flex-wrap:wrap;gap:8px;font-size:.75rem;color:var(--muted);padding:12px;border-radius:12px;background:var(--surface-2);margin-top:8px}
-.advanced-impact strong{width:100%;color:var(--text)}
-.advanced-impact span{border:1px solid var(--line);border-radius:8px;padding:6px 8px;overflow-wrap:anywhere}
-@media(max-width:800px){.advanced-item-row{grid-template-columns:repeat(2,minmax(0,1fr))}.advanced-item-row strong{grid-column:1/-1}.advanced-remove{grid-column:1/-1;justify-self:end}}
-@media(max-width:430px){.advanced-add-controls{display:grid;grid-template-columns:minmax(0,1fr)}.advanced-add-controls .bf-button{width:100%}}
-
-.advanced-stock-confirm{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:.78rem;color:var(--text);line-height:1.5;background:var(--surface-2)}
-.advanced-stock-confirm input{flex:none;width:17px;height:17px;margin-top:2px;accent-color:var(--brand)}
-
-/* Prevent nested grid min-content from enlarging the mobile dialog. */
-.bf-dialog .sale-item-correction>*{min-width:0;max-width:100%}
-.bf-dialog .sale-item-correction .advanced-add-item{grid-template-columns:minmax(0,1fr)}
-.bf-dialog .sale-item-correction .advanced-add-controls{max-width:100%}
-@media(max-width:560px){
-  .bf-dialog .sale-item-correction{padding:12px}
-  .bf-dialog .sale-item-correction .sale-item-correction-row:last-of-type{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .bf-dialog .sale-item-correction .advanced-item-row{grid-template-columns:repeat(2,minmax(0,1fr));min-width:0}
-  .bf-dialog .sale-item-correction .advanced-item-row>strong{grid-column:1/-1}
-}
-
 /* Sales: compact search and collapsible advanced filters. One consistent layout for
    desktop, tablets and phones; no absolute positioning or overflowing min widths. */
 .sales-filters-panel {

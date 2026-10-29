@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { CatalogImageRef } from '../../../../domain/models/image.model';
+import { orderSaleCorrectionLines } from './sale-correction-lines';
 import {maxSaleLineQuantity,canIncreaseSaleProduct,physicalFreeStock} from '../../../../domain/logic/sale-edit-stock';
 import { Sale } from '../../../../domain/models/sales.model';
 import { AdvancedSaleLineDraft, AdvancedSalePlan } from '../../../../domain/logic/advanced-sale-edit';
@@ -28,6 +29,8 @@ export class SaleCorrectionEditor {
   readonly catalog=inject(CatalogStore);
   readonly sale=input.required<Sale>();
   readonly lines=input.required<readonly AdvancedSaleLineDraft[]>();
+  /** Presentation-only ordering: newest additions first; the draft is unchanged. */
+  readonly displayedLines=computed(()=>orderSaleCorrectionLines(this.lines(),this.sale().items));
   readonly discount=input.required<number>();
   readonly reason=input.required<string>();
   readonly preview=input<{value:AdvancedSalePlan|null;error:string}|null>(null);

@@ -22,7 +22,7 @@
         <span>Edite quantidades e preços</span>
       </div>
       <div class="correction-items-list">
-        @for(line of lines();track line.id){
+        @for(line of displayedLines();track line.id){
           <article class="correction-item-card">
             <div class="correction-item-head">
               <div class="correction-item-thumb">

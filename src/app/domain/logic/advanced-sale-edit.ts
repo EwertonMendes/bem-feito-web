@@ -42,6 +42,25 @@ export interface AdvancedSalePlan {
   analytics:ReturnType<typeof summarizeSaleItems>;
 }
 
+/**
+ * A ready order has already allocated its products. Changing its item
+ * composition requires returning it to production first, releasing those
+ * allocations in an audited operation. Pure price/discount edits stay allowed.
+ */
+export function readyOrderNeedsReopening(
+  sale: Pick<Sale,'fulfillmentStatus'|'items'>,
+  draft: readonly AdvancedSaleLineDraft[],
+):boolean{
+  if(sale.fulfillmentStatus!=='ready')return false;
+  if(sale.items.length!==draft.length)return true;
+  const originals=new Map(sale.items.map(item=>[item.id,item]));
+  return draft.some(line=>{
+    const original=originals.get(line.id);
+    return !original || original.kind!==line.kind ||
+      original.sourceId!==line.sourceId || original.quantity!==line.quantity;
+  });
+}
+
 const effectKey=(e:Pick<StockEffect,'itemType'|'itemId'>)=>e.itemType+':'+e.itemId;
 const validQty=(value:number)=>Number.isSafeInteger(value)&&value>=1&&value<=100000;
 const validCents=(value:number)=>Number.isSafeInteger(value)&&value>=0&&value<=1000000000;

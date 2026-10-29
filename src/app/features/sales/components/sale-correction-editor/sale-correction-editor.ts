@@ -36,6 +36,8 @@ export class SaleCorrectionEditor {
   readonly preview=input<{value:AdvancedSalePlan|null;error:string}|null>(null);
   readonly stockConfirmed=input.required<boolean>();
   readonly busy=input(false);
+  readonly reopenRequired=input(false);
+  readonly reopenRequested=output<void>();
 
   readonly lineChanged=output<SaleCorrectionLineChange>();
   readonly lineRemoved=output<string>();

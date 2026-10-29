@@ -81,12 +81,33 @@
           [value]="discount()/100"
           (input)="discountChange.emit(Math.round(+$any($event.target).value*100))"/>
       </label>
-      <label class="correction-reason-field">Motivo da correção <em>*</em>
+      <label class="correction-reason-field">
+        <span class="correction-field-label">Motivo da correção <em aria-hidden="true">*</em></span>
         <textarea class="bf-textarea" rows="3" maxlength="240"
           placeholder="Descreva o que foi alterado nesta venda"
           [value]="reason()" (input)="reasonChange.emit($any($event.target).value)"></textarea>
       </label>
     </div>
+    @if(reopenRequired()){
+      <div class="correction-reopen-notice" role="status">
+        <div class="correction-reopen-message">
+          <strong>Encomenda marcada como pronta</strong>
+          <p>Os produtos desta encomenda já estão reservados. Para adicionar, remover
+            ou alterar quantidades, é necessário voltar o andamento para
+            <strong>Em produção</strong> e liberar essas reservas primeiro.</p>
+          <p>A reabertura será salva e auditada imediatamente. Os ajustes de itens
+            continuarão pendentes até você clicar em <strong>Confirmar edição</strong>.</p>
+        </div>
+        <button type="button" class="bf-button secondary correction-reopen-button"
+          [disabled]="busy() || reason().trim().length<4 || reason().trim().length>240"
+          (click)="reopenRequested.emit()">
+          Reabrir encomenda para editar
+        </button>
+        @if(reason().trim().length<4){
+          <small>Preencha o motivo da correção (mínimo de 4 caracteres) para habilitar a reabertura.</small>
+        }
+      </div>
+    }
     @if(preview();as preview){
       @if(preview.value){
         <div class="correction-totals" role="status">
@@ -105,7 +126,7 @@
             }
           </div>
         }
-      } @else {
+      } @else if(!reopenRequired()){
         <p class="sale-correction-error" role="alert"><bf-icon name="alert"/> {{preview.error}}</p>
       }
     }

@@ -308,6 +308,8 @@
             [sale]="sale" [lines]="advancedChanges()" [discount]="correctionDiscountCents()"
             [reason]="correctionReason()" [preview]="correctionPreview()"
             [stockConfirmed]="advancedStockConfirmed()" [busy]="!!pendingAction()"
+            [reopenRequired]="readyOrderReopeningRequired()"
+            (reopenRequested)="reopenReadyOrderForItemCorrection()"
             (lineChanged)="patchAdvancedLine($event.id,$event.field,$event.value);advancedStockConfirmed.set(false)"
             (lineRemoved)="removeAdvancedLine($event);advancedStockConfirmed.set(false)"
             (linePicked)="addAdvancedLine($event)"

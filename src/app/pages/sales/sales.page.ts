@@ -5,7 +5,7 @@ import { Sale } from '../../domain/models/sales.model';
 import { orderProgress } from '../../domain/logic/order-progress';
 import { saleCorrectionSignature } from '../../domain/logic/sale-correction';
 import { planShippingCorrection, shippingCorrectionSignature } from '../../domain/logic/shipping-correction';
-import { AdvancedSaleLineDraft, planAdvancedSaleEdit } from '../../domain/logic/advanced-sale-edit';
+import { AdvancedSaleLineDraft, planAdvancedSaleEdit, readyOrderNeedsReopening } from '../../domain/logic/advanced-sale-edit';
 import { FulfillmentStage,currentFulfillmentStage,validateFulfillmentCorrection } from '../../domain/logic/fulfillment-correction';
 import { canIncreaseSaleProduct,maxSaleLineQuantity } from '../../domain/logic/sale-edit-stock';
 import { CatalogStore } from '../../features/catalog/catalog.store';
@@ -87,6 +87,10 @@ export class SalesPage {
   readonly correctionReason=signal('');
   readonly advancedStockConfirmed=signal(false);
   readonly correctionSignature=signal('');
+  readonly readyOrderReopeningRequired=computed(()=>{
+    const sale=this.editBaseline();
+    return !!sale&&this.editingItems()&&readyOrderNeedsReopening(sale,this.advancedChanges());
+  });
   readonly correctionPreview=computed(()=>{
     const sale=this.editBaseline();
     if(!sale||!this.editingItems())return null;
@@ -360,6 +364,34 @@ export class SalesPage {
 
   discardItemCorrection():void {
     if(this.confirmDiscardCorrection())this.cancelItemCorrection();
+  }
+
+  async reopenReadyOrderForItemCorrection():Promise<void>{
+    const sale=this.editBaseline();
+    if(!sale || !this.editingItems() || !this.readyOrderReopeningRequired() || this.pendingAction())return;
+    const reason=this.correctionReason().trim();
+    if(reason.length<4 || reason.length>240){
+      this.toast.error('Informe o motivo da correção (4 a 240 caracteres).');
+      return;
+    }
+    if(!window.confirm('Reabrir esta encomenda como Em produção? As reservas serão liberadas e o andamento será registrado imediatamente. As alterações de itens continuarão pendentes até você confirmar a edição.'))return;
+    this.pendingAction.set('fulfillment');
+    try{
+      const result=await this.store.correctFulfillment(sale.id,{
+        expectedSignature:saleCorrectionSignature(sale),
+        target:'in-production',reason,physicalStockConfirmed:false,
+      });
+      if(!result)return;
+      this.catalog.applyStockChanges(result.stockChanges);
+      // Keep the unsaved draft intact, but refresh its concurrency signature
+      // against the audited re-opening now persisted by the transaction.
+      this.editBaseline.set(result.sale);
+      this.selectedSnapshot.set(result.sale);
+      this.correctionSignature.set(saleCorrectionSignature(result.sale));
+      this.advancedStockConfirmed.set(false);
+    }finally{
+      this.pendingAction.set(null);
+    }
   }
 
   async correctSelectedItems():Promise<void>{

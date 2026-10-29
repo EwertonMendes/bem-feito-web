@@ -145,7 +145,7 @@ export class FulfillmentCorrectionRepository {
       for(let i=0;i<writes.length;i++){
         const write=writes[i]!;
         const product=targets[i]!.data as Product;
-        tx.update(write.ref,{...write.values,stockStatus:productStockStatus(write.values.stock!,product.minimumStock),
+        tx.update(write.ref,{...write.values,stockStatus:productStockStatus(write.values['stock']!,product.minimumStock),
           updatedAt:serverTimestamp(),updatedBy:userId});
         if(write.stockDelta!==0){
           const movement:Omit<StockMovement,'id'>={

@@ -12,6 +12,7 @@ import {
 import { FormField, form, min, required } from '@angular/forms/signals';
 import { Addition, Product } from '../../../../domain/models/catalog.model';
 import { PRODUCT_CATEGORIES, productCategoryId } from '../../../../domain/logic/product-category';
+import { matchesCatalogSearch } from '../../../../domain/logic/catalog-search';
 import { CatalogImageRef } from '../../../../domain/models/image.model';
 import { calculateSaleTotalCents } from '../../../../domain/logic/sale-pricing';
 import { PaymentDraft, SaleDraft, SaleDraftLine } from '../../../../domain/models/sales.model';
@@ -106,7 +107,7 @@ export class SaleEditor {
     const term = this.normalizedSearch();
     const category = this.catalogCategory();
     return this.catalog.activeProducts().filter((product) =>
-      (!term || (product.displayName + ' ' + product.code).toLocaleLowerCase('pt-BR').includes(term)) &&
+      matchesCatalogSearch(term,product.displayName,product.code,product.modelName,product.variantName,this.collectionName(product.collectionId)) &&
       (!category || productCategoryId(product) === category)
     );
   });
@@ -116,7 +117,7 @@ export class SaleEditor {
     const term = this.normalizedSearch();
     const category = this.catalogCategory();
     return this.catalog.activeAdditions().filter((addition) =>
-      (!term || (addition.name + ' ' + addition.category).toLocaleLowerCase('pt-BR').includes(term)) &&
+      matchesCatalogSearch(term,addition.name,addition.category,addition.notes) &&
       (!category || addition.category === category)
     );
   });

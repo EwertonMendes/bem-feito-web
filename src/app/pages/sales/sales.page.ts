@@ -17,6 +17,9 @@ import { formatCurrency } from '../../core/utils/money';
 import { downloadCsv, exportCents } from '../../core/utils/csv-export';
 import { BfDialog } from '../../shared/ui/dialog/dialog';
 import { BfSelect } from '../../shared/ui/select/select';
+import { CatalogImage } from '../../shared/media/catalog-image/catalog-image';
+import { CatalogImageRef } from '../../domain/models/image.model';
+import { CatalogItemPicker, CatalogPickerSelection } from '../../features/sales/components/catalog-item-picker/catalog-item-picker';
 import { BfCheckbox } from '../../shared/ui/checkbox/checkbox';
 import { BusinessDateCursor } from '../../core/repositories/pagination';
 import { BfIcon } from '../../shared/ui/icon/icon';
@@ -27,7 +30,7 @@ import { BfSaleStatusChip } from '../../features/sales/components/sale-status-ch
 
 @Component({
   selector: 'bf-sales-page',
-  imports: [BfLoadingButton, BfIcon, BfDialog, BfSelect, BfCheckbox, BfEmptyState, BfPageRefresh, BfTableSkeleton, BfSaleStatusChip],
+  imports: [BfLoadingButton, BfIcon, BfDialog, BfSelect, BfCheckbox, CatalogImage, CatalogItemPicker, BfEmptyState, BfPageRefresh, BfTableSkeleton, BfSaleStatusChip],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sales.page.html',
   styleUrl: './sales.page.scss',
@@ -74,14 +77,7 @@ export class SalesPage {
   readonly openingItemEditor = signal(false);
   private readonly editBaseline = signal<Sale | null>(null);
   readonly advancedChanges=signal<AdvancedSaleLineDraft[]>([]);
-  readonly newLineKind=signal<'product'|'addition'>('product');
-  readonly newLineSource=signal('');
-  readonly newLineOptions=computed(()=>[
-    {value:'',label:'Selecione um item'},
-    ...(this.newLineKind()==='product'
-      ? this.catalog.activeProducts().map(p=>({value:p.id,label:p.displayName}))
-      : this.catalog.activeAdditions().map(a=>({value:a.id,label:a.name}))),
-  ]);
+  readonly correctionMobileTab=signal<'lines'|'catalog'>('lines');
   readonly correctionDiscountCents=signal(0);
   readonly correctionReason=signal('');
   readonly advancedStockConfirmed=signal(false);
@@ -255,8 +251,7 @@ export class SalesPage {
       this.correctionReason.set('');
       this.advancedStockConfirmed.set(false);
       this.correctionSignature.set(saleCorrectionSignature(current));
-      this.newLineSource.set('');
-      this.newLineKind.set('product');
+      this.correctionMobileTab.set('lines');
       this.editingItems.set(true);
     }catch(error){
       this.toast.error(this.errors.message(error));
@@ -283,18 +278,83 @@ export class SalesPage {
   removeAdvancedLine(id:string):void{
     this.advancedChanges.update(lines=>lines.filter(line=>line.id!==id));
   }
-  addAdvancedLine():void{
-    const sourceId=this.newLineSource(),kind=this.newLineKind();
-    if(!sourceId)return;
-    const product=kind==='product'?this.catalog.activeProducts().find(p=>p.id===sourceId):null;
-    const addition=kind==='addition'?this.catalog.activeAdditions().find(a=>a.id===sourceId):null;
-    if(!product&&!addition)return;
-    this.advancedChanges.update(lines=>[...lines,{
-      id:crypto.randomUUID(),kind,sourceId,quantity:1,
-      unitPriceCents:product?.salePriceCents??addition?.priceCents??0,
-    }]);
-    this.newLineSource.set('');
+  advancedLineImage(line:AdvancedSaleLineDraft):CatalogImageRef|undefined {
+    const original=this.editBaseline()?.items.find(item=>item.id===line.id);
+    if(original)return original.image ?? (line.kind==='product'
+      ?this.catalog.products().find(p=>p.id===line.sourceId)?.image
+      :this.catalog.additions().find(a=>a.id===line.sourceId)?.image);
+    return line.kind==='product'
+      ?this.catalog.products().find(p=>p.id===line.sourceId)?.image
+      :this.catalog.additions().find(a=>a.id===line.sourceId)?.image;
   }
+
+  advancedLineDetail(line:AdvancedSaleLineDraft):string {
+    return line.kind==='product'
+      ?this.catalog.products().find(p=>p.id===line.sourceId)?.code??'Produto'
+      :this.catalog.additions().find(a=>a.id===line.sourceId)?.category??'Adicional';
+  }
+
+  changeAdvancedQuantity(id:string,delta:number):void {
+    const line=this.advancedChanges().find(x=>x.id===id);
+    if(line)this.patchAdvancedLine(id,'quantity',Math.max(1,line.quantity+delta));
+  }
+
+  inventoryDeltaName(type:'product'|'input',id:string):string {
+    return type==='product'
+      ?this.catalog.products().find(p=>p.id===id)?.displayName??id
+      :this.catalog.inputs().find(i=>i.id===id)?.name??id;
+  }
+
+  addAdvancedLine(selection:CatalogPickerSelection):void {
+    const {sourceId,kind}=selection;
+    const product=kind==='product'?this.catalog.activeProducts().find(p=>p.id===sourceId):undefined;
+    const addition=kind==='addition'?this.catalog.activeAdditions().find(a=>a.id===sourceId):undefined;
+    if(!product&&!addition)return;
+    this.advancedChanges.update(lines=>{
+      const existing=lines.find(x=>x.kind===kind&&x.sourceId===sourceId);
+      if(existing)return lines.map(x=>x.id===existing.id?{...x,quantity:x.quantity+1}:x);
+      return [...lines,{
+        id:crypto.randomUUID(),kind,sourceId,quantity:1,
+        unitPriceCents:product?.salePriceCents??addition?.priceCents??0,
+      }];
+    });
+    this.advancedStockConfirmed.set(false);
+  }
+
+  hasUnsavedItemCorrection():boolean {
+    const sale=this.editBaseline();
+    if(!sale)return false;
+    if(this.correctionReason().trim() || this.correctionDiscountCents()!==sale.discountCents)return true;
+    const draft=this.advancedChanges();
+    return draft.length!==sale.items.length || draft.some((line,index)=>{
+      const original=sale.items[index];
+      return !original || line.id!==original.id || line.kind!==original.kind ||
+        line.sourceId!==original.sourceId || line.quantity!==original.quantity ||
+        line.unitPriceCents!==original.unitPriceCents;
+    });
+  }
+
+  confirmDiscardCorrection():boolean {
+    return !this.editingItems() || !this.hasUnsavedItemCorrection() ||
+      window.confirm('Descartar as alterações não salvas desta venda?');
+  }
+
+  closeSaleDetails():void {
+    if(!this.confirmDiscardCorrection())return;
+    if(this.editingItems())this.cancelItemCorrection();
+    this.detailDialog().close();
+  }
+
+  onDetailCancel(event:Event):void {
+    if(!this.editingItems())return;
+    event.preventDefault();
+    this.closeSaleDetails();
+  }
+
+  discardItemCorrection():void {
+    if(this.confirmDiscardCorrection())this.cancelItemCorrection();
+  }
+
   async correctSelectedItems():Promise<void>{
     if(this.pendingAction())return;
     const sale=this.editBaseline(),preview=this.correctionPreview();

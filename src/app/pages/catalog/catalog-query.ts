@@ -1,21 +1,4 @@
-/** Token-based search for catalog entities. Accent-insensitive, order-independent.
- * Single-character tokens are matched exactly to distinguish Patinha G from Patinha M.
- */
-export function normalizeCatalogText(value: string): string {
-  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .toLocaleLowerCase('pt-BR').replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ');
-}
-
-export function matchesCatalogSearch(query: string, ...fields: Array<string | undefined | null>): boolean {
-  const terms = normalizeCatalogText(query).split(' ').filter(Boolean);
-  if (!terms.length) return true;
-  const searchable = normalizeCatalogText(fields.filter(Boolean).join(' ')).split(' ').filter(Boolean);
-  // A lone character is exploratory ('a' finds Lavanda), while a short token
-  // combined with other terms identifies a variant ('Patinha G' must exclude M).
-  return terms.every(term => searchable.some(word => term.length === 1
-    ? (terms.length === 1 ? word.includes(term) : word === term)
-    : word.startsWith(term)));
-}
+export { normalizeCatalogText, matchesCatalogSearch } from '../../domain/logic/catalog-search';
 
 export type CatalogAvailability = 'all' | 'available' | 'unavailable' | 'low' | 'inactive';
 

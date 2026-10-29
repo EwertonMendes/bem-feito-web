@@ -1,0 +1,70 @@
+<section class="catalog-picker" aria-label="Adicionar produtos à venda">
+  <header class="picker-heading">
+    <div>
+      <h4>Adicionar itens</h4>
+      <p>Encontre produtos por fragrância, formato ou nome.</p>
+    </div>
+  </header>
+  <div class="picker-filters">
+    <div class="bf-segments picker-tabs" role="group" aria-label="Tipo de item">
+      <button type="button" [class.active]="kind()==='product'" [attr.aria-pressed]="kind()==='product'"
+        (click)="switchKind('product')">Produtos</button>
+      <button type="button" [class.active]="kind()==='addition'" [attr.aria-pressed]="kind()==='addition'"
+        (click)="switchKind('addition')">Adicionais</button>
+    </div>
+    <bf-search-field [value]="query()" (valueChange)="updateQuery($event)"
+      ariaLabel="Buscar itens do catálogo" placeholder="Ex.: Lavanda mini, Patinha G" />
+    <bf-select ariaLabel="Filtrar categoria" [options]="categoryOptions()"
+      [value]="category()" (valueChange)="updateCategory($event)" />
+  </div>
+  <div class="picker-results-heading" role="status" aria-live="polite">
+    {{resultCount()}} {{resultCount()===1?'resultado':'resultados'}}
+  </div>
+  <div class="picker-results">
+    @if(kind()==='product'){
+      @for(product of visibleProducts(); track product.id){
+        <article class="picker-result">
+          <div class="picker-thumb"><bf-catalog-image [image]="product.image" [alt]="product.displayName"
+            [thumbnail]="true" fit="contain" /></div>
+          <div class="picker-meta">
+            <strong>{{product.displayName}}</strong>
+            <span>{{productCategoryName(product)}}</span>
+            <div class="picker-item-bottom">
+              <b>{{currency(product.salePriceCents)}}</b>
+              <span [class.stock-empty]="freeStock(product)<=0">
+                {{freeStock(product)>0 ? ('Livre: '+freeStock(product)) : 'Sem estoque livre'}}
+              </span>
+            </div>
+          </div>
+          <button class="picker-add" type="button" [disabled]="!canPick(product)"
+            [attr.aria-label]="'Adicionar '+product.displayName" (click)="pick('product',product.id)">
+            <bf-icon name="plus" />
+            @if(count('product',product.id)>0){<span class="picked-count">{{count('product',product.id)}}</span>}
+          </button>
+        </article>
+      } @empty {<div class="picker-empty">Nenhum produto corresponde à busca.</div>}
+    } @else {
+      @for(addition of visibleAdditions(); track addition.id){
+        <article class="picker-result">
+          <div class="picker-thumb"><bf-catalog-image [image]="addition.image" [alt]="addition.name"
+            [thumbnail]="true" fit="contain" /></div>
+          <div class="picker-meta">
+            <strong>{{addition.name}}</strong>
+            <span>{{addition.category}}</span>
+            <div class="picker-item-bottom"><b>{{currency(addition.priceCents)}}</b></div>
+          </div>
+          <button class="picker-add" type="button" [disabled]="disabled()"
+            [attr.aria-label]="'Adicionar '+addition.name" (click)="pick('addition',addition.id)">
+            <bf-icon name="plus" />
+            @if(count('addition',addition.id)>0){<span class="picked-count">{{count('addition',addition.id)}}</span>}
+          </button>
+        </article>
+      } @empty {<div class="picker-empty">Nenhum adicional corresponde à busca.</div>}
+    }
+    @if(resultCount()>visibleLimit()){
+      <button class="picker-more" type="button" (click)="visibleLimit.update(n=>n+16)">
+        Mostrar mais · {{resultCount()-visibleLimit()}} restantes
+      </button>
+    }
+  </div>
+</section>

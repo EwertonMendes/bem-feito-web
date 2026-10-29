@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planAdvancedSaleEdit, type AdvancedSaleCatalog } from './advanced-sale-edit';
+import { planAdvancedSaleEdit, readyOrderNeedsReopening, type AdvancedSaleCatalog } from './advanced-sale-edit';
 import { saleCorrectionSignature } from './sale-correction';
 import { Sale } from '../models/sales.model';
 import { Product, Addition, InputItem } from '../models/catalog.model';
@@ -71,5 +71,30 @@ describe('Advanced sale correction domain integrity',()=>{
       orderAllocations:[{lineId:'old',productId:'p',quantity:2}]});
     expect(()=>planAdvancedSaleEdit(ordered,change(ordered,[{id:'old',kind:'product',
       sourceId:'p',quantity:1,unitPriceCents:1000}]),catalog)).toThrow('reservada');
+  });
+});
+
+describe('ready-order unlock guidance',()=>{
+  const ready=sale({stockApplied:false,fulfillmentStatus:'ready',
+    orderAllocations:[{lineId:'old',productId:'p',quantity:2}]});
+  const original={id:'old',kind:'product' as const,sourceId:'p',
+    quantity:2,unitPriceCents:1000};
+  it('requires reopening for added, removed and resized lines, not price-only edits',()=>{
+    expect(readyOrderNeedsReopening(ready,[original])).toBe(false);
+    expect(readyOrderNeedsReopening(ready,[{...original,unitPriceCents:900}])).toBe(false);
+    expect(readyOrderNeedsReopening(ready,[{...original,quantity:3}])).toBe(true);
+    expect(readyOrderNeedsReopening(ready,[])).toBe(true);
+    expect(readyOrderNeedsReopening(ready,[original,{id:'new',kind:'product',sourceId:'p2',
+      quantity:1,unitPriceCents:1000}])).toBe(true);
+  });
+  it('allows correction after an audited reopening releases reservations',()=>{
+    const changed=[original,{id:'new',kind:'product' as const,sourceId:'p2',quantity:1,unitPriceCents:1000}];
+    expect(()=>planAdvancedSaleEdit(ready,change(ready,changed),catalog)).toThrow('Reabra');
+    const reopened={...ready,fulfillmentStatus:'in-production' as const,
+      orderAllocations:[{lineId:'old',productId:'p',quantity:0}]};
+    expect(readyOrderNeedsReopening(reopened,changed)).toBe(false);
+    const planned=planAdvancedSaleEdit(reopened,change(reopened,changed),catalog);
+    expect(planned.inventoryDeltas).toMatchObject([{itemType:'product',itemId:'p2',quantityDelta:-1}]);
+    expect(planned.allocations).toContainEqual({lineId:'new',productId:'p2',quantity:0});
   });
 });

@@ -82,6 +82,11 @@ export class AdvancedSaleCorrectionRepository {
         const reserved=entity.reservedPhysicalStock??Math.min(entity.stock,entity.committedStock??0);
         const committed=entity.committedStock??0;
         if(current.stockApplied===false){
+          // Even when the sale is an order, corrections must not promise new
+          // physical units that are already reserved to somebody else.
+          if(delta.itemType==='product'&&delta.quantityDelta<0 &&
+             entity.stock-reserved < -delta.quantityDelta)
+            throw new Error('Estoque livre insuficiente para acrescentar estas unidades à encomenda.');
           const nextCommitted=committed-delta.quantityDelta;
           if(nextCommitted<reserved||nextCommitted<0)
             throw new Error('Esta edição conflita com unidades de outra encomenda.');

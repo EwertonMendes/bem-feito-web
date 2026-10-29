@@ -5,7 +5,9 @@ import { Sale } from '../../domain/models/sales.model';
 import { orderProgress } from '../../domain/logic/order-progress';
 import { saleCorrectionSignature } from '../../domain/logic/sale-correction';
 import { planShippingCorrection, shippingCorrectionSignature } from '../../domain/logic/shipping-correction';
-import { AdvancedSaleLineDraft, planAdvancedSaleEdit } from '../../domain/logic/advanced-sale-edit';
+import { AdvancedSaleLineDraft, planAdvancedSaleEdit, readyOrderNeedsReopening } from '../../domain/logic/advanced-sale-edit';
+import { FulfillmentStage,currentFulfillmentStage,validateFulfillmentCorrection } from '../../domain/logic/fulfillment-correction';
+import { canIncreaseSaleProduct,maxSaleLineQuantity } from '../../domain/logic/sale-edit-stock';
 import { CatalogStore } from '../../features/catalog/catalog.store';
 import { ModalActions } from '../../core/services/modal-actions.service';
 import { SalesStore } from '../../features/sales/sales.store';
@@ -17,6 +19,9 @@ import { formatCurrency } from '../../core/utils/money';
 import { downloadCsv, exportCents } from '../../core/utils/csv-export';
 import { BfDialog } from '../../shared/ui/dialog/dialog';
 import { BfSelect } from '../../shared/ui/select/select';
+import { CatalogPickerSelection } from '../../features/sales/components/catalog-item-picker/catalog-item-picker';
+import { SaleCorrectionEditor } from '../../features/sales/components/sale-correction-editor/sale-correction-editor';
+import {SaleFulfillmentEditor} from '../../features/sales/components/sale-fulfillment-editor/sale-fulfillment-editor';
 import { BfCheckbox } from '../../shared/ui/checkbox/checkbox';
 import { BusinessDateCursor } from '../../core/repositories/pagination';
 import { BfIcon } from '../../shared/ui/icon/icon';
@@ -27,7 +32,7 @@ import { BfSaleStatusChip } from '../../features/sales/components/sale-status-ch
 
 @Component({
   selector: 'bf-sales-page',
-  imports: [BfLoadingButton, BfIcon, BfDialog, BfSelect, BfCheckbox, BfEmptyState, BfPageRefresh, BfTableSkeleton, BfSaleStatusChip],
+  imports: [BfLoadingButton, BfIcon, BfDialog, BfSelect, BfCheckbox, SaleCorrectionEditor, SaleFulfillmentEditor, BfEmptyState, BfPageRefresh, BfTableSkeleton, BfSaleStatusChip],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sales.page.html',
   styleUrl: './sales.page.scss',
@@ -64,28 +69,28 @@ export class SalesPage {
     Number(Boolean(this.historyFrom())) + Number(Boolean(this.historyTo())) + Number(Boolean(this.historyProduct())));
   readonly historyActive = computed(()=>this.historySubmitted() && this.search().trim()===this.historicalQuery());
   readonly statusFilter = signal<'all' | 'paid' | 'open' | 'cancelled'>('all');
-  readonly pendingAction = signal<'ready' | 'delivered' | 'cancel' | 'allocate' | 'correct' | 'correct-items' | 'shipping' | null>(null);
+  readonly pendingAction = signal<'ready' | 'delivered' | 'cancel' | 'allocate' | 'correct' | 'correct-items' | 'shipping' | 'fulfillment' | null>(null);
   readonly editingDetails = signal(false);
   readonly editingItems = signal(false);
   readonly editingShipping = signal(false);
+  readonly editingFulfillment=signal(false);
+  readonly fulfillmentTarget=signal<FulfillmentStage>('delivered');
+  readonly fulfillmentReason=signal('');
+  readonly fulfillmentPhysicalConfirmed=signal(false);
   readonly shippingAmount = signal(0);
   readonly shippingReclassify = signal(false);
   readonly shippingReason = signal('');
   readonly openingItemEditor = signal(false);
   private readonly editBaseline = signal<Sale | null>(null);
   readonly advancedChanges=signal<AdvancedSaleLineDraft[]>([]);
-  readonly newLineKind=signal<'product'|'addition'>('product');
-  readonly newLineSource=signal('');
-  readonly newLineOptions=computed(()=>[
-    {value:'',label:'Selecione um item'},
-    ...(this.newLineKind()==='product'
-      ? this.catalog.activeProducts().map(p=>({value:p.id,label:p.displayName}))
-      : this.catalog.activeAdditions().map(a=>({value:a.id,label:a.name}))),
-  ]);
   readonly correctionDiscountCents=signal(0);
   readonly correctionReason=signal('');
   readonly advancedStockConfirmed=signal(false);
   readonly correctionSignature=signal('');
+  readonly readyOrderReopeningRequired=computed(()=>{
+    const sale=this.editBaseline();
+    return !!sale&&this.editingItems()&&readyOrderNeedsReopening(sale,this.advancedChanges());
+  });
   readonly correctionPreview=computed(()=>{
     const sale=this.editBaseline();
     if(!sale||!this.editingItems())return null;
@@ -102,6 +107,25 @@ export class SalesPage {
       },catalog),error:''};
     }catch(error){return {value:null,error:error instanceof Error?error.message:'Alterações inválidas.'};}
   });
+  readonly fulfillmentOptions=[
+    {value:'in-production',label:'Em produção (encomenda)'},
+    {value:'ready',label:'Pronta para entrega'},
+    {value:'delivered',label:'Entregue'},
+  ];
+  readonly fulfillmentError=computed(()=>{
+    const sale=this.editBaseline();
+    if(!sale || !this.editingFulfillment())return '';
+    try{
+      validateFulfillmentCorrection(sale,{
+        target:this.fulfillmentTarget(),reason:this.fulfillmentReason().trim().length>=4
+          ?this.fulfillmentReason():'Prévia da correção',
+        expectedSignature:saleCorrectionSignature(sale),
+        physicalStockConfirmed:this.fulfillmentPhysicalConfirmed(),
+      });
+      return '';
+    }catch(error){return error instanceof Error?error.message:'Andamento inválido.';}
+  });
+
   readonly shippingPreview = computed(() => {
     const sale = this.editBaseline();
     if (!sale || !this.editingShipping()) return null;
@@ -117,7 +141,7 @@ export class SalesPage {
   readonly orderProgress = orderProgress;
   private readonly selectedSnapshot = signal<Sale | null>(null);
   readonly selectedSale = computed(() => {
-    if((this.editingItems() || this.editingShipping()) && this.editBaseline())return this.editBaseline();
+    if((this.editingItems() || this.editingShipping() || this.editingFulfillment()) && this.editBaseline())return this.editBaseline();
     const snapshot = this.selectedSnapshot();
     return snapshot ? this.store.sales().find(sale => sale.id === snapshot.id) ?? snapshot : null;
   });
@@ -226,6 +250,7 @@ export class SalesPage {
     this.editingDetails.set(false);
     this.editingItems.set(false);
     this.editingShipping.set(false);
+    this.editingFulfillment.set(false);
     this.editBaseline.set(null);
     this.metadataDraft.set({customerName:sale.customerName??'',dueDate:sale.dueDate??'',notes:sale.notes??'',reason:''});
     this.detailDialog().open();
@@ -255,8 +280,6 @@ export class SalesPage {
       this.correctionReason.set('');
       this.advancedStockConfirmed.set(false);
       this.correctionSignature.set(saleCorrectionSignature(current));
-      this.newLineSource.set('');
-      this.newLineKind.set('product');
       this.editingItems.set(true);
     }catch(error){
       this.toast.error(this.errors.message(error));
@@ -270,31 +293,107 @@ export class SalesPage {
   }
   readonly Math=Math;
   hasProductLines(sale:Sale):boolean {return sale.items.length>0;}
-  advancedLineName(line:AdvancedSaleLineDraft):string{
-    const original=this.selectedSale()?.items.find(item=>item.id===line.id);
-    if(original)return original.name;
-    return line.kind==='product'
-      ?this.catalog.products().find(p=>p.id===line.sourceId)?.displayName??'Sabonete'
-      :this.catalog.additions().find(a=>a.id===line.sourceId)?.name??'Adicional';
-  }
   patchAdvancedLine(id:string,field:'quantity'|'unitPriceCents',value:number):void{
+    if(field==='quantity'){
+      const original=this.editBaseline();
+      const line=this.advancedChanges().find(x=>x.id===id);
+      if(!original||!line||!Number.isSafeInteger(value)||value<1)return;
+      if(line.kind==='product'){
+        const product=this.catalog.products().find(x=>x.id===line.sourceId);
+        if(!product)return;
+        const maximum=maxSaleLineQuantity(product,original.items,this.advancedChanges(),line);
+        // Historical orders can exceed stock; they may be reduced, but not enlarged.
+        if(value>Math.max(maximum,line.quantity))return;
+      }
+    }
     this.advancedChanges.update(lines=>lines.map(line=>line.id===id?{...line,[field]:value}:line));
   }
   removeAdvancedLine(id:string):void{
     this.advancedChanges.update(lines=>lines.filter(line=>line.id!==id));
   }
-  addAdvancedLine():void{
-    const sourceId=this.newLineSource(),kind=this.newLineKind();
-    if(!sourceId)return;
-    const product=kind==='product'?this.catalog.activeProducts().find(p=>p.id===sourceId):null;
-    const addition=kind==='addition'?this.catalog.activeAdditions().find(a=>a.id===sourceId):null;
+  addAdvancedLine(selection:CatalogPickerSelection):void {
+    const {sourceId,kind}=selection;
+    const product=kind==='product'?this.catalog.activeProducts().find(p=>p.id===sourceId):undefined;
+    const addition=kind==='addition'?this.catalog.activeAdditions().find(a=>a.id===sourceId):undefined;
     if(!product&&!addition)return;
-    this.advancedChanges.update(lines=>[...lines,{
-      id:crypto.randomUUID(),kind,sourceId,quantity:1,
-      unitPriceCents:product?.salePriceCents??addition?.priceCents??0,
-    }]);
-    this.newLineSource.set('');
+    const original=this.editBaseline();
+    if(product && (!original || !canIncreaseSaleProduct(product,original.items,this.advancedChanges())))return;
+    this.advancedChanges.update(lines=>{
+      const existing=lines.find(x=>x.kind===kind&&x.sourceId===sourceId);
+      if(existing)return lines.map(x=>x.id===existing.id?{...x,quantity:x.quantity+1}:x);
+      return [...lines,{
+        id:crypto.randomUUID(),kind,sourceId,quantity:1,
+        unitPriceCents:product?.salePriceCents??addition?.priceCents??0,
+      }];
+    });
+    this.advancedStockConfirmed.set(false);
   }
+
+  hasUnsavedItemCorrection():boolean {
+    const sale=this.editBaseline();
+    if(!sale)return false;
+    if(this.correctionReason().trim() || this.correctionDiscountCents()!==sale.discountCents)return true;
+    const draft=this.advancedChanges();
+    return draft.length!==sale.items.length || draft.some((line,index)=>{
+      const original=sale.items[index];
+      return !original || line.id!==original.id || line.kind!==original.kind ||
+        line.sourceId!==original.sourceId || line.quantity!==original.quantity ||
+        line.unitPriceCents!==original.unitPriceCents;
+    });
+  }
+
+  confirmDiscardCorrection():boolean {
+    return !this.editingItems() || !this.hasUnsavedItemCorrection() ||
+      window.confirm('Descartar as alterações não salvas desta venda?');
+  }
+
+  closeSaleDetails():void {
+    if(!this.confirmDiscardCorrection())return;
+    if(this.editingFulfillment() && (this.fulfillmentReason().trim() || this.fulfillmentTarget()!==currentFulfillmentStage(this.editBaseline()!)) &&
+      !window.confirm('Descartar a correção de andamento não salva?'))return;
+    if(this.editingItems())this.cancelItemCorrection();
+    if(this.editingFulfillment())this.cancelFulfillmentCorrection();
+    this.detailDialog().close();
+  }
+
+  onDetailCancel(event:Event):void {
+    if(!this.editingItems()&&!this.editingFulfillment())return;
+    event.preventDefault();
+    this.closeSaleDetails();
+  }
+
+  discardItemCorrection():void {
+    if(this.confirmDiscardCorrection())this.cancelItemCorrection();
+  }
+
+  async reopenReadyOrderForItemCorrection():Promise<void>{
+    const sale=this.editBaseline();
+    if(!sale || !this.editingItems() || !this.readyOrderReopeningRequired() || this.pendingAction())return;
+    const reason=this.correctionReason().trim();
+    if(reason.length<4 || reason.length>240){
+      this.toast.error('Informe o motivo da correção (4 a 240 caracteres).');
+      return;
+    }
+    if(!window.confirm('Reabrir esta encomenda como Em produção? As reservas serão liberadas e o andamento será registrado imediatamente. As alterações de itens continuarão pendentes até você confirmar a edição.'))return;
+    this.pendingAction.set('fulfillment');
+    try{
+      const result=await this.store.correctFulfillment(sale.id,{
+        expectedSignature:saleCorrectionSignature(sale),
+        target:'in-production',reason,physicalStockConfirmed:false,
+      });
+      if(!result)return;
+      this.catalog.applyStockChanges(result.stockChanges);
+      // Keep the unsaved draft intact, but refresh its concurrency signature
+      // against the audited re-opening now persisted by the transaction.
+      this.editBaseline.set(result.sale);
+      this.selectedSnapshot.set(result.sale);
+      this.correctionSignature.set(saleCorrectionSignature(result.sale));
+      this.advancedStockConfirmed.set(false);
+    }finally{
+      this.pendingAction.set(null);
+    }
+  }
+
   async correctSelectedItems():Promise<void>{
     if(this.pendingAction())return;
     const sale=this.editBaseline(),preview=this.correctionPreview();
@@ -310,6 +409,47 @@ export class SalesPage {
         this.catalog.applyStockChanges(result.stockChanges);
         this.selectedSnapshot.set(result.sale);
         this.editingItems.set(false);
+        this.editBaseline.set(null);
+      }
+    }finally{this.pendingAction.set(null);}
+  }
+
+  async openFulfillmentCorrection(sale:Sale):Promise<void>{
+    if(this.pendingAction()||this.openingItemEditor())return;
+    this.openingItemEditor.set(true);
+    try{
+      const current=await this.repository.findByIdFromServer(sale.id);
+      if(!current||current.status!=='active')throw new Error('Venda indisponível.');
+      if(this.selectedSnapshot()?.id!==sale.id)return;
+      this.selectedSnapshot.set(current);
+      this.editBaseline.set(current);
+      this.editingItems.set(false);this.editingDetails.set(false);this.editingShipping.set(false);
+      this.fulfillmentTarget.set(currentFulfillmentStage(current));
+      this.fulfillmentReason.set('');
+      this.fulfillmentPhysicalConfirmed.set(false);
+      this.editingFulfillment.set(true);
+    }catch(error){this.toast.error(this.errors.message(error));}
+    finally{this.openingItemEditor.set(false);}
+  }
+  cancelFulfillmentCorrection():void{
+    this.editingFulfillment.set(false);
+    this.editBaseline.set(null);
+    this.fulfillmentReason.set('');
+  }
+  async saveFulfillmentCorrection():Promise<void>{
+    const original=this.editBaseline();
+    if(!original||this.pendingAction()||this.fulfillmentError())return;
+    this.pendingAction.set('fulfillment');
+    try{
+      const result=await this.store.correctFulfillment(original.id,{
+        expectedSignature:saleCorrectionSignature(original),
+        target:this.fulfillmentTarget(),reason:this.fulfillmentReason(),
+        physicalStockConfirmed:this.fulfillmentPhysicalConfirmed(),
+      });
+      if(result){
+        this.catalog.applyStockChanges(result.stockChanges);
+        this.selectedSnapshot.set(result.sale);
+        this.editingFulfillment.set(false);
         this.editBaseline.set(null);
       }
     }finally{this.pendingAction.set(null);}

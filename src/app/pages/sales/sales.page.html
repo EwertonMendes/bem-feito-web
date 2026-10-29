@@ -190,14 +190,14 @@
 
 
 
-  <dialog bfDialog #detailDialog="bfDialog" class="bf-dialog sale-detail-dialog" [busy]="!!pendingAction()">
+  <dialog bfDialog #detailDialog="bfDialog" class="bf-dialog sale-detail-dialog" [class.editing-sale-items]="editingItems()" [busy]="!!pendingAction()" (cancel)="onDetailCancel($event)">
     @if (selectedSale(); as sale) {
       <div class="bf-dialog-header">
         <div>
           <h2>{{ sale.code }}</h2>
           <small>{{ date(sale.businessDate) }} · {{ sale.customerName || 'Sem cliente' }}</small>
         </div>
-        <button class="bf-floating-close" type="button" aria-label="Fechar detalhes" (click)="detailDialog.close()"><bf-icon name="close" /></button>
+        <button class="bf-floating-close" type="button" aria-label="Fechar detalhes" (click)="closeSaleDetails()"><bf-icon name="close" /></button>
       </div>
       <div class="bf-dialog-body">
         @if(!editingItems()) {
@@ -304,87 +304,25 @@
         @if (sale.notes && !editingDetails()) { <p class="notes">{{ sale.notes }}</p> }
         }
         @if(editingItems()){
-          <section class="sale-item-correction" aria-label="Editar itens da venda">
-            <h3><bf-icon name="details"/> Editar venda</h3>
-            <p>Inclua, remova ou substitua itens. Os custos históricos dos itens preservados continuam intactos. Confira o impacto antes de confirmar.</p>
-            @for(line of advancedChanges();track line.id){
-              <div class="sale-item-correction-row advanced-item-row">
-                <strong>{{advancedLineName(line)}}</strong>
-                <label>Quantidade
-                  <input class="bf-input" type="number" min="1" step="1" [value]="line.quantity"
-                    (input)="patchAdvancedLine(line.id,'quantity',+$any($event.target).value)"/>
-                </label>
-                <label>Preço unitário (R$)
-                  <input class="bf-input" type="number" min="0" step="0.01" [value]="line.unitPriceCents/100"
-                    (input)="patchAdvancedLine(line.id,'unitPriceCents',Math.round(+$any($event.target).value*100))"/>
-                </label>
-                <button class="bf-button secondary advanced-remove" type="button"
-                  [disabled]="!!pendingAction()" [attr.aria-label]="'Remover '+advancedLineName(line)"
-                  (click)="removeAdvancedLine(line.id)"><bf-icon name="close"/> Remover</button>
-              </div>
-            }
-            <div class="advanced-add-item">
-              <h4>Adicionar item</h4>
-              <div class="bf-segments" aria-label="Tipo de item">
-                <button type="button" [class.active]="newLineKind()==='product'"
-                  (click)="newLineKind.set('product');newLineSource.set('')">Produto</button>
-                <button type="button" [class.active]="newLineKind()==='addition'"
-                  (click)="newLineKind.set('addition');newLineSource.set('')">Adicional</button>
-              </div>
-              <div class="advanced-add-controls">
-                <bf-select ariaLabel="Selecionar item para adicionar" [options]="newLineOptions()"
-                  [value]="newLineSource()" (valueChange)="newLineSource.set($event)"/>
-                <button class="bf-button secondary" type="button" [disabled]="!newLineSource()"
-                  (click)="addAdvancedLine()"><bf-icon name="plus"/> Adicionar</button>
-              </div>
-            </div>
-            <div class="sale-item-correction-row">
-              <label>Desconto total (R$)
-                <input class="bf-input" type="number" min="0" step="0.01" [value]="correctionDiscountCents()/100"
-                  (input)="correctionDiscountCents.set(Math.round(+$any($event.target).value*100))"/>
-              </label>
-              <label>Motivo da correção <em>*</em>
-                <textarea class="bf-textarea" maxlength="240" placeholder="O que mudou nesta venda?"
-                  [value]="correctionReason()" (input)="correctionReason.set($any($event.target).value)"></textarea>
-              </label>
-            </div>
-            @if(correctionPreview();as preview){
-              @if(preview.value){
-                <div class="sale-correction-preview" role="status">
-                  <span>Total anterior <strong>{{currency(sale.totalCents)}}</strong></span>
-                  <span>Novo total <strong>{{currency(preview.value.totalCents)}}</strong></span>
-                  <span>Já recebido <strong>{{currency(sale.receivedCents)}}</strong></span>
-                  <span>Novo saldo <strong>{{currency(preview.value.balanceCents)}}</strong></span>
-                  <span>Itens alterando estoque <strong>{{preview.value.inventoryDeltas.length}}</strong></span>
-                </div>
-                @if(preview.value.inventoryDeltas.length){
-                  <div class="advanced-impact">
-                    <strong>Impacto de estoque</strong>
-                    @for(change of preview.value.inventoryDeltas;track change.itemType+change.itemId){
-                      <span>{{change.itemType==='product'?'Produto':'Insumo'}} · {{change.itemId}}:
-                        {{change.quantityDelta>0?'+':''}}{{change.quantityDelta}} {{sale.stockApplied===false?'(compromisso inverso)':'no estoque'}}</span>
-                    }
-                  </div>
-                }
-              }@else{
-                <p class="sale-correction-error" role="alert"><bf-icon name="alert"/> {{preview.error}}</p>
-              }
-            }
-            @if(sale.stockApplied!==false && correctionPreview()?.value?.inventoryDeltas?.length){
-              <div class="advanced-stock-confirm">
-                <bf-checkbox [checked]="advancedStockConfirmed()" (checkedChange)="advancedStockConfirmed.set($event)"
-                  label="Conferi o estoque físico"
-                  description="Confirmo que a alteração de sabonetes e insumos reflete a movimentação real."/>
-              </div>
-            }
-            <div class="sale-metadata-actions">
-              <button class="bf-button secondary" type="button" [disabled]="!!pendingAction()"
-                (click)="cancelItemCorrection()">Cancelar</button>
-              <button class="bf-button" type="button"
-                [disabled]="!!pendingAction() || !correctionPreview()?.value || correctionReason().trim().length<4 || (sale.stockApplied!==false && !!correctionPreview()?.value?.inventoryDeltas?.length && !advancedStockConfirmed())"
-                (click)="correctSelectedItems()">Confirmar edição</button>
-            </div>
-          </section>
+          <bf-sale-correction-editor
+            [sale]="sale" [lines]="advancedChanges()" [discount]="correctionDiscountCents()"
+            [reason]="correctionReason()" [preview]="correctionPreview()"
+            [stockConfirmed]="advancedStockConfirmed()" [busy]="!!pendingAction()"
+            [reopenRequired]="readyOrderReopeningRequired()"
+            (reopenRequested)="reopenReadyOrderForItemCorrection()"
+            (lineChanged)="patchAdvancedLine($event.id,$event.field,$event.value);advancedStockConfirmed.set(false)"
+            (lineRemoved)="removeAdvancedLine($event);advancedStockConfirmed.set(false)"
+            (linePicked)="addAdvancedLine($event)"
+            (discountChange)="correctionDiscountCents.set($event)"
+            (reasonChange)="correctionReason.set($event)"
+            (stockConfirmedChange)="advancedStockConfirmed.set($event)" />
+        }
+        @if(editingFulfillment()){
+          <bf-sale-fulfillment-editor [sale]="sale" [target]="fulfillmentTarget()"
+            [reason]="fulfillmentReason()" [physicalConfirmed]="fulfillmentPhysicalConfirmed()"
+            [error]="fulfillmentError()" (targetChange)="fulfillmentTarget.set($event)"
+            (reasonChange)="fulfillmentReason.set($event)"
+            (physicalConfirmedChange)="fulfillmentPhysicalConfirmed.set($event)"/>
         }
         @if(editingDetails()){
           <section class="sale-metadata-editor">
@@ -403,8 +341,25 @@
           </section>
         }
       </div>
-      <div class="bf-dialog-footer sale-detail-footer">
-        @if(sale.status==='active' && !editingDetails() && !editingItems() && !editingShipping()){
+      <div class="bf-dialog-footer sale-detail-footer" [class.correction-footer]="editingItems()||editingFulfillment()">
+        @if(editingItems()){
+          <div class="correction-footer-actions">
+            <button class="bf-button secondary" type="button" [disabled]="!!pendingAction()"
+              (click)="discardItemCorrection()">Cancelar edição</button>
+            <button class="bf-button" type="button"
+              [disabled]="!!pendingAction() || !correctionPreview()?.value || correctionReason().trim().length<4 || (sale.stockApplied!==false && !!correctionPreview()?.value?.inventoryDeltas?.length && !advancedStockConfirmed())"
+              (click)="correctSelectedItems()">Confirmar edição</button>
+          </div>
+        } @else if(editingFulfillment()){
+          <div class="correction-footer-actions">
+            <button class="bf-button secondary" type="button" [disabled]="!!pendingAction()"
+              (click)="cancelFulfillmentCorrection()">Cancelar correção</button>
+            <button class="bf-button" type="button" [disabled]="!!pendingAction() || !!fulfillmentError()"
+              (click)="saveFulfillmentCorrection()">Salvar andamento</button>
+          </div>
+        } @else {
+
+        @if(sale.status==='active' && !editingDetails() && !editingItems() && !editingShipping() && !editingFulfillment()){
           <div class="sale-footer-group sale-footer-edits" role="group" aria-label="Ajustes da venda">
             @if(hasProductLines(sale)){
               <button class="bf-button secondary" type="button"
@@ -418,10 +373,13 @@
             <button class="bf-button secondary" type="button"
               [disabled]="!!pendingAction() || openingItemEditor()"
               (click)="openShippingCorrection(sale)">Editar frete</button>
+            <button class="bf-button secondary" type="button"
+              [disabled]="!!pendingAction() || openingItemEditor()"
+              (click)="openFulfillmentCorrection(sale)"><bf-icon name="production"/> Corrigir andamento</button>
           </div>
         }
         <div class="sale-footer-group sale-footer-main" role="group" aria-label="Ações da venda">
-          @if(sale.status==='active' && !editingDetails() && !editingItems() && !editingShipping()){
+          @if(sale.status==='active' && !editingDetails() && !editingItems() && !editingShipping() && !editingFulfillment()){
             @if(sale.balanceCents>0){
               <button class="bf-button" type="button" [disabled]="!!pendingAction()"
                 (click)="modals.openReceipt(sale.id)"><bf-icon name="payment"/> Receber</button>
@@ -444,8 +402,9 @@
             </button>
           }
           <button class="bf-button secondary sale-footer-close" type="button"
-            [disabled]="!!pendingAction()" (click)="detailDialog.close()">Fechar</button>
+            [disabled]="!!pendingAction()" (click)="closeSaleDetails()">Fechar</button>
         </div>
+        }
       </div>
     }
   </dialog>

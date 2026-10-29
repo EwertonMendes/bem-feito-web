@@ -1,0 +1,30 @@
+<section class="fulfillment-editor" aria-label="Corrigir andamento da venda">
+  <div class="fulfillment-heading">
+    <h3><bf-icon name="production"/> Corrigir andamento</h3>
+    <p>Corrija uma venda lançada como encomenda ou como entregue por engano. A mudança é auditada e respeita os compromissos de estoque.</p>
+  </div>
+  <div class="fulfillment-current">
+    <span>Andamento registrado</span>
+    <strong>{{label(currentFulfillmentStage(sale()))}}</strong>
+  </div>
+  <label class="fulfillment-field">Andamento correto
+    <bf-select ariaLabel="Selecionar andamento correto" [options]="options" [value]="target()"
+      (valueChange)="changeTarget($event)" />
+  </label>
+  <label class="fulfillment-field">Motivo da correção <em>*</em>
+    <textarea class="bf-textarea" rows="3" maxlength="240"
+      placeholder="Ex.: a venda já foi entregue, mas foi cadastrada como encomenda"
+      [value]="reason()" (input)="reasonChange.emit($any($event.target).value)"></textarea>
+  </label>
+  @if(sale().stockApplied!==false && target()!=='delivered'){
+    <div class="fulfillment-reconcile">
+      <bf-checkbox [checked]="physicalConfirmed()" (checkedChange)="physicalConfirmedChange.emit($event)"
+        label="Confirmei a devolução física dos produtos"
+        description="Esta correção devolve os itens ao estoque e cria compromissos de encomenda. Os produtos precisam estar fisicamente disponíveis." />
+    </div>
+  }
+  <p class="fulfillment-hint">Pagamentos e valores não são alterados. Para mudar os itens, utilize a edição de venda separadamente.</p>
+  @if(error()){
+    <p class="fulfillment-error" role="alert"><bf-icon name="alert"/> {{error()}}</p>
+  }
+</section>

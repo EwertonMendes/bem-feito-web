@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input
 import { Product, Addition } from '../../../../domain/models/catalog.model';
 import { AdvancedSaleLineDraft } from '../../../../domain/logic/advanced-sale-edit';
 import { SaleLineSnapshot } from '../../../../domain/models/sales.model';
+import {physicalFreeStock,canIncreaseSaleProduct} from '../../../../domain/logic/sale-edit-stock';
 import { matchesCatalogSearch } from '../../../../domain/logic/catalog-search';
 import { PRODUCT_CATEGORIES, productCategoryId, productCategoryName } from '../../../../domain/logic/product-category';
 import { formatCurrency } from '../../../../core/utils/money';
@@ -28,7 +29,6 @@ export class CatalogItemPicker {
   readonly additions = input<readonly Addition[]>([]);
   readonly selected = input<readonly AdvancedSaleLineDraft[]>([]);
   readonly baseline = input<readonly SaleLineSnapshot[]>([]);
-  readonly allowBackorder = input(false);
   readonly disabled = input(false);
   readonly picked = output<CatalogPickerSelection>();
   readonly kind = signal<'product'|'addition'>('product');
@@ -84,16 +84,11 @@ export class CatalogItemPicker {
   }
 
   freeStock(product: Product): number {
-    return product.stock - (product.reservedPhysicalStock ?? Math.min(product.stock,product.committedStock??0));
+    return physicalFreeStock(product);
   }
 
   canPick(product: Product): boolean {
-    if(this.disabled())return false;
-    if(this.allowBackorder())return true;
-    const originallySold=this.baseline().filter(line=>line.kind==='product'&&line.sourceId===product.id)
-      .reduce((sum,line)=>sum+line.quantity,0);
-    const additional=this.count('product',product.id)-originallySold;
-    return this.freeStock(product) >= additional+1;
+    return !this.disabled() && canIncreaseSaleProduct(product,this.baseline(),this.selected());
   }
 
   pick(kind: 'product'|'addition', sourceId: string): void {

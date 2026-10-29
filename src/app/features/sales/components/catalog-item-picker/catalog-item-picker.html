@@ -32,7 +32,7 @@
             <div class="picker-item-bottom">
               <b>{{currency(product.salePriceCents)}}</b>
               <span [class.stock-empty]="freeStock(product)<=0">
-                {{freeStock(product)>0 ? ('Disponível: '+freeStock(product)) : 'Sem estoque'}}
+                {{freeStock(product)>0 ? ('Livre: '+freeStock(product)) : 'Sem estoque livre'}}
               </span>
             </div>
           </div>

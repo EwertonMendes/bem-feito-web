@@ -315,6 +315,13 @@
             (reasonChange)="correctionReason.set($event)"
             (stockConfirmedChange)="advancedStockConfirmed.set($event)" />
         }
+        @if(editingFulfillment()){
+          <bf-sale-fulfillment-editor [sale]="sale" [target]="fulfillmentTarget()"
+            [reason]="fulfillmentReason()" [physicalConfirmed]="fulfillmentPhysicalConfirmed()"
+            [error]="fulfillmentError()" (targetChange)="fulfillmentTarget.set($event)"
+            (reasonChange)="fulfillmentReason.set($event)"
+            (physicalConfirmedChange)="fulfillmentPhysicalConfirmed.set($event)"/>
+        }
         @if(editingDetails()){
           <section class="sale-metadata-editor">
             <h3><bf-icon name="details"/> Corrigir dados da venda</h3>
@@ -332,7 +339,7 @@
           </section>
         }
       </div>
-      <div class="bf-dialog-footer sale-detail-footer" [class.correction-footer]="editingItems()">
+      <div class="bf-dialog-footer sale-detail-footer" [class.correction-footer]="editingItems()||editingFulfillment()">
         @if(editingItems()){
           <div class="correction-footer-actions">
             <button class="bf-button secondary" type="button" [disabled]="!!pendingAction()"
@@ -341,9 +348,16 @@
               [disabled]="!!pendingAction() || !correctionPreview()?.value || correctionReason().trim().length<4 || (sale.stockApplied!==false && !!correctionPreview()?.value?.inventoryDeltas?.length && !advancedStockConfirmed())"
               (click)="correctSelectedItems()">Confirmar edição</button>
           </div>
+        } @else if(editingFulfillment()){
+          <div class="correction-footer-actions">
+            <button class="bf-button secondary" type="button" [disabled]="!!pendingAction()"
+              (click)="cancelFulfillmentCorrection()">Cancelar correção</button>
+            <button class="bf-button" type="button" [disabled]="!!pendingAction() || !!fulfillmentError()"
+              (click)="saveFulfillmentCorrection()">Salvar andamento</button>
+          </div>
         } @else {
 
-        @if(sale.status==='active' && !editingDetails() && !editingItems() && !editingShipping()){
+        @if(sale.status==='active' && !editingDetails() && !editingItems() && !editingShipping() && !editingFulfillment()){
           <div class="sale-footer-group sale-footer-edits" role="group" aria-label="Ajustes da venda">
             @if(hasProductLines(sale)){
               <button class="bf-button secondary" type="button"
@@ -357,10 +371,13 @@
             <button class="bf-button secondary" type="button"
               [disabled]="!!pendingAction() || openingItemEditor()"
               (click)="openShippingCorrection(sale)">Editar frete</button>
+            <button class="bf-button secondary" type="button"
+              [disabled]="!!pendingAction() || openingItemEditor()"
+              (click)="openFulfillmentCorrection(sale)"><bf-icon name="production"/> Corrigir andamento</button>
           </div>
         }
         <div class="sale-footer-group sale-footer-main" role="group" aria-label="Ações da venda">
-          @if(sale.status==='active' && !editingDetails() && !editingItems() && !editingShipping()){
+          @if(sale.status==='active' && !editingDetails() && !editingItems() && !editingShipping() && !editingFulfillment()){
             @if(sale.balanceCents>0){
               <button class="bf-button" type="button" [disabled]="!!pendingAction()"
                 (click)="modals.openReceipt(sale.id)"><bf-icon name="payment"/> Receber</button>

@@ -17,6 +17,8 @@ import { AdvancedSaleCorrectionRepository } from '../../core/repositories/advanc
 import { ShippingCorrectionRepository } from '../../core/repositories/shipping-correction.repository';
 import { ShippingCorrectionDraft } from '../../domain/logic/shipping-correction';
 import { AdvancedSaleDraft } from '../../domain/logic/advanced-sale-edit';
+import { FulfillmentCorrectionDraft } from '../../domain/logic/fulfillment-correction';
+import { FulfillmentCorrectionRepository } from '../../core/repositories/fulfillment-correction.repository';
 import { ErrorService } from '../../core/services/error.service';
 import { ToastService } from '../../core/services/toast.service';
 import { AsyncLoadGate } from '../../core/state/async-load-gate';
@@ -227,6 +229,21 @@ export class SalesStore {
   }
 
   private readonly advancedCorrections = inject(AdvancedSaleCorrectionRepository);
+  private readonly fulfillmentCorrections = inject(FulfillmentCorrectionRepository);
+
+  async correctFulfillment(saleId:string,draft:FulfillmentCorrectionDraft):
+    Promise<{sale:Sale;stockChanges:StockChange[]}|null>{
+    try{
+      const result=await this.fulfillmentCorrections.correct(saleId,draft);
+      this.patchSale(result.sale);
+      this.toast.success('Andamento da venda corrigido e auditado.');
+      return result;
+    }catch(error){
+      this.toast.error(this.errors.message(error));
+      return null;
+    }
+  }
+
 
   async correctAdvancedSale(saleId:string,draft:AdvancedSaleDraft):
     Promise<{sale:Sale;stockChanges:StockChange[]}|null>{

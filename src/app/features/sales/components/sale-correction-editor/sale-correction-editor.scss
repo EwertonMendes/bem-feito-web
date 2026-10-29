@@ -34,11 +34,11 @@
 .correction-item-total strong{font-size:.84rem;color:var(--text);font-variant-numeric:tabular-nums}
 .correction-empty{padding:30px 12px;text-align:center;border:1px dashed var(--line);border-radius:13px;color:var(--muted);font-size:.8rem;margin:0}
 .correction-review{display:grid;gap:16px;border:1px solid var(--line);background:var(--surface);padding:18px;border-radius:17px;min-width:0}
-.correction-review-fields{display:grid;grid-template-columns:minmax(160px,1fr) minmax(0,2fr);gap:14px}
-.correction-review-fields label{display:grid;align-content:start;gap:8px;min-width:0;font-size:.77rem;color:var(--muted);font-weight:650}
+.correction-review-fields{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:stretch}
+.correction-review-fields label{display:flex;flex-direction:column;gap:9px;min-width:0;font-size:.78rem;line-height:1.5;color:var(--muted);font-weight:650}
 .correction-review-fields em{color:var(--danger);font-style:normal}
 .correction-review-fields input,.correction-review-fields textarea{min-width:0;width:100%}
-.correction-review-fields textarea{min-height:88px;resize:vertical;line-height:1.5;display:block}
+.correction-review-fields textarea{min-height:106px;resize:vertical;line-height:1.5;display:block;box-sizing:border-box;padding:12px 14px}
 .correction-totals{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
 .correction-totals>span{display:grid;gap:8px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2);font-size:.75rem;color:var(--muted);min-width:0}
 .correction-totals strong{font-size:1.06rem;color:var(--text);font-variant-numeric:tabular-nums}
@@ -48,7 +48,7 @@
 @media(max-width:900px){
  .correction-workspace{grid-template-columns:minmax(0,1fr)}
  .correction-items-panel{padding:14px}
- .correction-review-fields{grid-template-columns:1fr 1.5fr}
+ .correction-review-fields{grid-template-columns:minmax(0,1fr)}
 }
 @media(max-width:640px){
  .correction-mobile-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
@@ -77,3 +77,9 @@
 .advanced-stock-confirm{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:.78rem;color:var(--text);line-height:1.5;background:var(--surface-2)}
 .sale-correction-error{display:flex;gap:8px;align-items:start;padding:12px;border-radius:10px;background:var(--warning-soft);color:var(--warning);font-size:.76rem}
 .sale-correction-error bf-icon{display:inline-flex;flex:none}
+
+.correction-stock-hint{font-size:.68rem;line-height:1.4;color:var(--muted);font-weight:500}
+.correction-review-fields .correction-discount-field{max-width:280px}
+.correction-review-fields .correction-reason-field{width:100%}
+.sale-item-correction button,:host button{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
+@media(max-width:640px){.correction-review-fields .correction-discount-field{max-width:none}}

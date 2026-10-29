@@ -6,6 +6,8 @@ import { orderProgress } from '../../domain/logic/order-progress';
 import { saleCorrectionSignature } from '../../domain/logic/sale-correction';
 import { planShippingCorrection, shippingCorrectionSignature } from '../../domain/logic/shipping-correction';
 import { AdvancedSaleLineDraft, planAdvancedSaleEdit } from '../../domain/logic/advanced-sale-edit';
+import { FulfillmentStage,currentFulfillmentStage,validateFulfillmentCorrection } from '../../domain/logic/fulfillment-correction';
+import { canIncreaseSaleProduct,maxSaleLineQuantity } from '../../domain/logic/sale-edit-stock';
 import { CatalogStore } from '../../features/catalog/catalog.store';
 import { ModalActions } from '../../core/services/modal-actions.service';
 import { SalesStore } from '../../features/sales/sales.store';
@@ -19,6 +21,7 @@ import { BfDialog } from '../../shared/ui/dialog/dialog';
 import { BfSelect } from '../../shared/ui/select/select';
 import { CatalogPickerSelection } from '../../features/sales/components/catalog-item-picker/catalog-item-picker';
 import { SaleCorrectionEditor } from '../../features/sales/components/sale-correction-editor/sale-correction-editor';
+import {SaleFulfillmentEditor} from '../../features/sales/components/sale-fulfillment-editor/sale-fulfillment-editor';
 import { BfCheckbox } from '../../shared/ui/checkbox/checkbox';
 import { BusinessDateCursor } from '../../core/repositories/pagination';
 import { BfIcon } from '../../shared/ui/icon/icon';
@@ -29,7 +32,7 @@ import { BfSaleStatusChip } from '../../features/sales/components/sale-status-ch
 
 @Component({
   selector: 'bf-sales-page',
-  imports: [BfLoadingButton, BfIcon, BfDialog, BfSelect, BfCheckbox, SaleCorrectionEditor, BfEmptyState, BfPageRefresh, BfTableSkeleton, BfSaleStatusChip],
+  imports: [BfLoadingButton, BfIcon, BfDialog, BfSelect, BfCheckbox, SaleCorrectionEditor, SaleFulfillmentEditor, BfEmptyState, BfPageRefresh, BfTableSkeleton, BfSaleStatusChip],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sales.page.html',
   styleUrl: './sales.page.scss',
@@ -66,10 +69,14 @@ export class SalesPage {
     Number(Boolean(this.historyFrom())) + Number(Boolean(this.historyTo())) + Number(Boolean(this.historyProduct())));
   readonly historyActive = computed(()=>this.historySubmitted() && this.search().trim()===this.historicalQuery());
   readonly statusFilter = signal<'all' | 'paid' | 'open' | 'cancelled'>('all');
-  readonly pendingAction = signal<'ready' | 'delivered' | 'cancel' | 'allocate' | 'correct' | 'correct-items' | 'shipping' | null>(null);
+  readonly pendingAction = signal<'ready' | 'delivered' | 'cancel' | 'allocate' | 'correct' | 'correct-items' | 'shipping' | 'fulfillment' | null>(null);
   readonly editingDetails = signal(false);
   readonly editingItems = signal(false);
   readonly editingShipping = signal(false);
+  readonly editingFulfillment=signal(false);
+  readonly fulfillmentTarget=signal<FulfillmentStage>('delivered');
+  readonly fulfillmentReason=signal('');
+  readonly fulfillmentPhysicalConfirmed=signal(false);
   readonly shippingAmount = signal(0);
   readonly shippingReclassify = signal(false);
   readonly shippingReason = signal('');
@@ -96,6 +103,25 @@ export class SalesPage {
       },catalog),error:''};
     }catch(error){return {value:null,error:error instanceof Error?error.message:'Alterações inválidas.'};}
   });
+  readonly fulfillmentOptions=[
+    {value:'in-production',label:'Em produção (encomenda)'},
+    {value:'ready',label:'Pronta para entrega'},
+    {value:'delivered',label:'Entregue'},
+  ];
+  readonly fulfillmentError=computed(()=>{
+    const sale=this.editBaseline();
+    if(!sale || !this.editingFulfillment())return '';
+    try{
+      validateFulfillmentCorrection(sale,{
+        target:this.fulfillmentTarget(),reason:this.fulfillmentReason().trim().length>=4
+          ?this.fulfillmentReason():'Prévia da correção',
+        expectedSignature:saleCorrectionSignature(sale),
+        physicalStockConfirmed:this.fulfillmentPhysicalConfirmed(),
+      });
+      return '';
+    }catch(error){return error instanceof Error?error.message:'Andamento inválido.';}
+  });
+
   readonly shippingPreview = computed(() => {
     const sale = this.editBaseline();
     if (!sale || !this.editingShipping()) return null;
@@ -111,7 +137,7 @@ export class SalesPage {
   readonly orderProgress = orderProgress;
   private readonly selectedSnapshot = signal<Sale | null>(null);
   readonly selectedSale = computed(() => {
-    if((this.editingItems() || this.editingShipping()) && this.editBaseline())return this.editBaseline();
+    if((this.editingItems() || this.editingShipping() || this.editingFulfillment()) && this.editBaseline())return this.editBaseline();
     const snapshot = this.selectedSnapshot();
     return snapshot ? this.store.sales().find(sale => sale.id === snapshot.id) ?? snapshot : null;
   });
@@ -220,6 +246,7 @@ export class SalesPage {
     this.editingDetails.set(false);
     this.editingItems.set(false);
     this.editingShipping.set(false);
+    this.editingFulfillment.set(false);
     this.editBaseline.set(null);
     this.metadataDraft.set({customerName:sale.customerName??'',dueDate:sale.dueDate??'',notes:sale.notes??'',reason:''});
     this.detailDialog().open();
@@ -263,6 +290,18 @@ export class SalesPage {
   readonly Math=Math;
   hasProductLines(sale:Sale):boolean {return sale.items.length>0;}
   patchAdvancedLine(id:string,field:'quantity'|'unitPriceCents',value:number):void{
+    if(field==='quantity'){
+      const original=this.editBaseline();
+      const line=this.advancedChanges().find(x=>x.id===id);
+      if(!original||!line||!Number.isSafeInteger(value)||value<1)return;
+      if(line.kind==='product'){
+        const product=this.catalog.products().find(x=>x.id===line.sourceId);
+        if(!product)return;
+        const maximum=maxSaleLineQuantity(product,original.items,this.advancedChanges(),line);
+        // Historical orders can exceed stock; they may be reduced, but not enlarged.
+        if(value>Math.max(maximum,line.quantity))return;
+      }
+    }
     this.advancedChanges.update(lines=>lines.map(line=>line.id===id?{...line,[field]:value}:line));
   }
   removeAdvancedLine(id:string):void{
@@ -273,6 +312,8 @@ export class SalesPage {
     const product=kind==='product'?this.catalog.activeProducts().find(p=>p.id===sourceId):undefined;
     const addition=kind==='addition'?this.catalog.activeAdditions().find(a=>a.id===sourceId):undefined;
     if(!product&&!addition)return;
+    const original=this.editBaseline();
+    if(product && (!original || !canIncreaseSaleProduct(product,original.items,this.advancedChanges())))return;
     this.advancedChanges.update(lines=>{
       const existing=lines.find(x=>x.kind===kind&&x.sourceId===sourceId);
       if(existing)return lines.map(x=>x.id===existing.id?{...x,quantity:x.quantity+1}:x);
@@ -304,12 +345,15 @@ export class SalesPage {
 
   closeSaleDetails():void {
     if(!this.confirmDiscardCorrection())return;
+    if(this.editingFulfillment() && (this.fulfillmentReason().trim() || this.fulfillmentTarget()!==currentFulfillmentStage(this.editBaseline()!)) &&
+      !window.confirm('Descartar a correção de andamento não salva?'))return;
     if(this.editingItems())this.cancelItemCorrection();
+    if(this.editingFulfillment())this.cancelFulfillmentCorrection();
     this.detailDialog().close();
   }
 
   onDetailCancel(event:Event):void {
-    if(!this.editingItems())return;
+    if(!this.editingItems()&&!this.editingFulfillment())return;
     event.preventDefault();
     this.closeSaleDetails();
   }
@@ -333,6 +377,47 @@ export class SalesPage {
         this.catalog.applyStockChanges(result.stockChanges);
         this.selectedSnapshot.set(result.sale);
         this.editingItems.set(false);
+        this.editBaseline.set(null);
+      }
+    }finally{this.pendingAction.set(null);}
+  }
+
+  async openFulfillmentCorrection(sale:Sale):Promise<void>{
+    if(this.pendingAction()||this.openingItemEditor())return;
+    this.openingItemEditor.set(true);
+    try{
+      const current=await this.repository.findByIdFromServer(sale.id);
+      if(!current||current.status!=='active')throw new Error('Venda indisponível.');
+      if(this.selectedSnapshot()?.id!==sale.id)return;
+      this.selectedSnapshot.set(current);
+      this.editBaseline.set(current);
+      this.editingItems.set(false);this.editingDetails.set(false);this.editingShipping.set(false);
+      this.fulfillmentTarget.set(currentFulfillmentStage(current));
+      this.fulfillmentReason.set('');
+      this.fulfillmentPhysicalConfirmed.set(false);
+      this.editingFulfillment.set(true);
+    }catch(error){this.toast.error(this.errors.message(error));}
+    finally{this.openingItemEditor.set(false);}
+  }
+  cancelFulfillmentCorrection():void{
+    this.editingFulfillment.set(false);
+    this.editBaseline.set(null);
+    this.fulfillmentReason.set('');
+  }
+  async saveFulfillmentCorrection():Promise<void>{
+    const original=this.editBaseline();
+    if(!original||this.pendingAction()||this.fulfillmentError())return;
+    this.pendingAction.set('fulfillment');
+    try{
+      const result=await this.store.correctFulfillment(original.id,{
+        expectedSignature:saleCorrectionSignature(original),
+        target:this.fulfillmentTarget(),reason:this.fulfillmentReason(),
+        physicalStockConfirmed:this.fulfillmentPhysicalConfirmed(),
+      });
+      if(result){
+        this.catalog.applyStockChanges(result.stockChanges);
+        this.selectedSnapshot.set(result.sale);
+        this.editingFulfillment.set(false);
         this.editBaseline.set(null);
       }
     }finally{this.pendingAction.set(null);}

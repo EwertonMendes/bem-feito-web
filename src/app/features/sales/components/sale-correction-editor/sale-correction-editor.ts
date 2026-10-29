@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
 import { CatalogImageRef } from '../../../../domain/models/image.model';
+import {maxSaleLineQuantity,canIncreaseSaleProduct,physicalFreeStock} from '../../../../domain/logic/sale-edit-stock';
 import { Sale } from '../../../../domain/models/sales.model';
 import { AdvancedSaleLineDraft, AdvancedSalePlan } from '../../../../domain/logic/advanced-sale-edit';
 import { formatCurrency } from '../../../../core/utils/money';
@@ -72,11 +73,33 @@ export class SaleCorrectionEditor {
       :this.catalog.inputs().find(i=>i.id===id)?.name??id;
   }
 
+  maxLineQuantity(line:AdvancedSaleLineDraft):number {
+    if(line.kind!=='product')return 100000;
+    const product=this.catalog.products().find(p=>p.id===line.sourceId);
+    return product?maxSaleLineQuantity(product,this.sale().items,this.lines(),line):line.quantity;
+  }
+  canIncrease(line:AdvancedSaleLineDraft):boolean {
+    if(this.busy()||line.quantity>=100000)return false;
+    if(line.kind!=='product')return true;
+    const product=this.catalog.products().find(p=>p.id===line.sourceId);
+    return !!product && canIncreaseSaleProduct(product,this.sale().items,this.lines());
+  }
+  stockHint(line:AdvancedSaleLineDraft):string {
+    if(line.kind!=='product')return '';
+    const product=this.catalog.products().find(p=>p.id===line.sourceId);
+    return product?'Livre para acréscimo: '+physicalFreeStock(product):'Produto indisponível';
+  }
   updateLine(id:string,field:SaleCorrectionLineChange['field'],value:number):void {
+    const line=this.lines().find(x=>x.id===id);
+    if(!line)return;
+    if(field==='quantity'){
+      if(!Number.isFinite(value))return;
+      value=Math.max(1,Math.min(Math.trunc(value),Math.max(line.quantity,this.maxLineQuantity(line))));
+    }
     this.lineChanged.emit({id,field,value});
   }
   changeLineQuantity(id:string,delta:number):void {
     const line=this.lines().find(x=>x.id===id);
-    if(line)this.updateLine(id,'quantity',Math.max(1,line.quantity+delta));
+    if(line && (delta<0 || this.canIncrease(line)))this.updateLine(id,'quantity',Math.max(1,line.quantity+delta));
   }
 }

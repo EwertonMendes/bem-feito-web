@@ -23,6 +23,7 @@ import { CatalogPickerSelection } from '../../features/sales/components/catalog-
 import { SaleCorrectionEditor } from '../../features/sales/components/sale-correction-editor/sale-correction-editor';
 import {SaleFulfillmentEditor} from '../../features/sales/components/sale-fulfillment-editor/sale-fulfillment-editor';
 import { BfCheckbox } from '../../shared/ui/checkbox/checkbox';
+import { BfNumberInput } from '../../shared/ui/number-input/number-input';
 import { BusinessDateCursor } from '../../core/repositories/pagination';
 import { BfIcon } from '../../shared/ui/icon/icon';
 import { BfEmptyState } from '../../shared/ui/empty-state/empty-state';
@@ -32,7 +33,7 @@ import { BfSaleStatusChip } from '../../features/sales/components/sale-status-ch
 
 @Component({
   selector: 'bf-sales-page',
-  imports: [BfLoadingButton, BfIcon, BfDialog, BfSelect, BfCheckbox, SaleCorrectionEditor, SaleFulfillmentEditor, BfEmptyState, BfPageRefresh, BfTableSkeleton, BfSaleStatusChip],
+  imports: [BfLoadingButton, BfIcon, BfDialog, BfSelect, BfCheckbox, BfNumberInput, SaleCorrectionEditor, SaleFulfillmentEditor, BfEmptyState, BfPageRefresh, BfTableSkeleton, BfSaleStatusChip],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sales.page.html',
   styleUrl: './sales.page.scss',

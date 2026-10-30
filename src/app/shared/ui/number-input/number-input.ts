@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, ElementRef, computed, input, model, output, signal, viewChild } from '@angular/core';
 import { FormValueControl } from '@angular/forms/signals';
+import {bankCurrencyCents,bankCurrencyFromAmount,formatBankCurrency,pastedCurrencyCents} from './bank-currency';
 
 export type BfNumberInputKind = 'currency' | 'decimal' | 'integer';
 
@@ -27,33 +28,68 @@ export class BfNumberInput implements FormValueControl<number> {
 
   readonly editing = signal(false);
   readonly draft = signal('');
+  private originalOnFocus=0;
 
   readonly displayValue = computed(() =>
     this.editing() ? this.draft() : this.format(this.value())
   );
 
-  readonly inputMode = computed(() => this.kind() === 'integer' ? 'numeric' : 'decimal');
+  readonly inputMode = computed(() => this.kind() === 'integer' || this.kind() === 'currency' ? 'numeric' : 'decimal');
 
   focus(options?: FocusOptions): void {
     this.native().nativeElement.focus(options);
   }
 
   onFocus(): void {
+    this.originalOnFocus=this.value();
     this.editing.set(true);
-    this.draft.set(this.formatEditable(this.value()));
-    queueMicrotask(() => this.native().nativeElement.select());
+    this.draft.set(this.kind()==='currency'
+      ?formatBankCurrency(bankCurrencyFromAmount(this.value()))
+      :this.formatEditable(this.value()));
+    // Selecting the existing amount makes entering a replacement predictable.
+    queueMicrotask(()=>{
+      if(this.editing())this.native().nativeElement.select();
+    });
   }
 
   onInput(event: Event): void {
-    const raw = (event.target as HTMLInputElement).value;
+    const element=event.target as HTMLInputElement;
+    const raw=element.value;
+    if(this.kind()==='currency'){
+      this.acceptCurrencyCents(bankCurrencyCents(raw),element);
+      return;
+    }
     this.draft.set(raw);
     const parsed = this.parse(raw);
     if (parsed !== null) this.value.set(this.normalize(parsed, false));
   }
 
+  onPaste(event: ClipboardEvent):void{
+    if(this.kind()!=='currency'||this.disabled())return;
+    const raw=event.clipboardData?.getData('text/plain');
+    if(raw===undefined)return;
+    // Replace the entire monetary value, not the caret's current fragment.
+    event.preventDefault();
+    const cents=pastedCurrencyCents(raw);
+    if(cents!==null)this.acceptCurrencyCents(cents,this.native().nativeElement);
+  }
+
+  private acceptCurrencyCents(cents:number,element:HTMLInputElement):void{
+    const formatted=formatBankCurrency(cents);
+    this.draft.set(formatted);
+    this.value.set(cents/100);
+    // Angular's binding can be updated asynchronously; keep the native control
+    // and caret in sync immediately for physical and mobile keyboards.
+    element.value=formatted;
+    element.setSelectionRange(formatted.length,formatted.length);
+  }
+
   onBlur(): void {
-    const parsed = this.parse(this.draft());
-    if (parsed !== null) this.value.set(this.normalize(parsed, true));
+    if(this.kind()==='currency')this.value.set(this.normalize(this.value(),true));
+    else {
+      const parsed=this.parse(this.draft());
+      if(parsed!==null)this.value.set(this.normalize(parsed,true));
+    }
     this.editing.set(false);
     this.draft.set('');
     this.touch.emit();
@@ -66,6 +102,7 @@ export class BfNumberInput implements FormValueControl<number> {
     }
     if (event.key === 'Escape') {
       event.preventDefault();
+      this.value.set(this.originalOnFocus);
       this.editing.set(false);
       this.draft.set('');
       this.native().nativeElement.blur();
@@ -91,7 +128,7 @@ export class BfNumberInput implements FormValueControl<number> {
     const safe = Number.isFinite(value) ? value : 0;
     const digits = this.fractionDigits();
     const rounded = this.round(safe, digits);
-    if (this.kind() === 'currency') return rounded.toFixed(2).replace('.', ',');
+    if (this.kind() === 'currency') return formatBankCurrency(bankCurrencyFromAmount(rounded));
     return String(rounded).replace('.', ',');
   }
 

@@ -15,3 +15,5 @@ input{width:100%;min-width:0;min-height:42px;border:0;outline:0;background:trans
 .prefix{padding-left:13px}
 .suffix{padding-right:13px;padding-left:6px}
 input::placeholder{color:color-mix(in srgb,var(--muted) 78%,transparent)}
+
+.currency input{font-variant-numeric:tabular-nums}

@@ -4,7 +4,8 @@ import { orderSaleCorrectionLines } from './sale-correction-lines';
 import {maxSaleLineQuantity,canIncreaseSaleProduct,physicalFreeStock} from '../../../../domain/logic/sale-edit-stock';
 import { Sale } from '../../../../domain/models/sales.model';
 import { AdvancedSaleLineDraft, AdvancedSalePlan } from '../../../../domain/logic/advanced-sale-edit';
-import { formatCurrency } from '../../../../core/utils/money';
+import { formatCurrency,toCents } from '../../../../core/utils/money';
+import { BfNumberInput } from '../../../../shared/ui/number-input/number-input';
 import { CatalogStore } from '../../../catalog/catalog.store';
 import { CatalogImage } from '../../../../shared/media/catalog-image/catalog-image';
 import { BfCheckbox } from '../../../../shared/ui/checkbox/checkbox';
@@ -20,7 +21,7 @@ export interface SaleCorrectionLineChange {
 /** Presentational sale correction workspace; all financial writes remain in SalesPage/transaction planner. */
 @Component({
   selector:'bf-sale-correction-editor',
-  imports:[CatalogImage,BfCheckbox,BfIcon,CatalogItemPicker],
+  imports:[CatalogImage,BfCheckbox,BfIcon,CatalogItemPicker,BfNumberInput],
   changeDetection:ChangeDetectionStrategy.OnPush,
   templateUrl:'./sale-correction-editor.html',
   styleUrl:'./sale-correction-editor.scss',
@@ -47,6 +48,7 @@ export class SaleCorrectionEditor {
   readonly stockConfirmedChange=output<boolean>();
 
   readonly currency=formatCurrency;
+  readonly toCents=toCents;
   readonly Math=Math;
   readonly mobileTab=signal<'lines'|'catalog'>('lines');
 

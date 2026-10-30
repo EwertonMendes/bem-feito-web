@@ -224,9 +224,10 @@
             <h3>Corrigir frete da venda</h3>
             <p>Altera o frete sem movimentar estoque ou registrar um novo pagamento.</p>
             <div class="sale-metadata-grid sale-shipping-grid">
-              <label>Frete cobrado (R$)
-                <input class="bf-input" type="number" min="0" step="0.01" [value]="shippingAmount()"
-                  (input)="shippingAmount.set(+$any($event.target).value); shippingReclassify.set(false)" />
+              <label>Frete cobrado
+                <bf-number-input kind="currency" [min]="0" [disabled]="!!pendingAction()"
+                  ariaLabel="Frete cobrado na venda" [value]="shippingAmount()"
+                  (valueChange)="shippingAmount.set($event);shippingReclassify.set(false)" />
               </label>
               @if((shippingAmount()*100-(sale.shippingFeeCents??0))>0 && (shippingAmount()*100-(sale.shippingFeeCents??0))<=sale.tipCents){
                 <bf-checkbox class="sale-shipping-reclassify" [checked]="shippingReclassify()"

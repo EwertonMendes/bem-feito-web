@@ -56,10 +56,11 @@
                 </div>
                 @if(line.kind==='product'){<small class="correction-stock-hint">{{stockHint(line)}}</small>}
               </div>
-              <label class="correction-price-field">Preço unitário (R$)
-                <input class="bf-input" type="number" min="0" step="0.01"
+              <label class="correction-price-field">Preço unitário
+                <bf-number-input kind="currency" [min]="0" [disabled]="busy()"
                   [value]="line.unitPriceCents/100"
-                  (input)="updateLine(line.id,'unitPriceCents',Math.round(+$any($event.target).value*100))"/>
+                  [ariaLabel]="'Preço unitário de '+advancedLineName(line)"
+                  (valueChange)="updateLine(line.id,'unitPriceCents',toCents($event))"/>
               </label>
               <span class="correction-item-total">Subtotal <strong>{{currency(line.quantity*line.unitPriceCents)}}</strong></span>
             </div>
@@ -76,10 +77,10 @@
   </div>
   <section class="correction-review" aria-label="Revisar valores da venda">
     <div class="correction-review-fields">
-      <label class="correction-discount-field">Desconto total (R$)
-        <input class="bf-input" type="number" min="0" step="0.01"
-          [value]="discount()/100"
-          (input)="discountChange.emit(Math.round(+$any($event.target).value*100))"/>
+      <label class="correction-discount-field">Desconto total
+        <bf-number-input kind="currency" [min]="0" [disabled]="busy()"
+          ariaLabel="Desconto total da venda" [value]="discount()/100"
+          (valueChange)="discountChange.emit(toCents($event))"/>
       </label>
       <label class="correction-reason-field">
         <span class="correction-field-label">Motivo da correção <em aria-hidden="true">*</em></span>

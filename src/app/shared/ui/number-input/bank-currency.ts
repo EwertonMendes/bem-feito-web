@@ -20,6 +20,6 @@ export function formatBankCurrency(cents:number):string{
 /** A formatted clipboard value and an unformatted bank-entry digit sequence
  * both represent the same number of centavos; reject a negative price. */
 export function pastedCurrencyCents(text:string):number|null{
-  if(text.trim().startsWith('-')||!/[0-9]/.test(text))return null;
+  if(text.includes('-')||!/[0-9]/.test(text))return null;
   return bankCurrencyCents(text);
 }
